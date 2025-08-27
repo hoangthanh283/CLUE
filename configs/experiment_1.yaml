@@ -1,0 +1,31 @@
+experiment_name: "bert_base_ewc_conll"
+
+# Dataset configuration
+dataset:
+  name: "conll2003"
+  batch_size: 32
+  max_seq_length: 128
+
+# Model configuration  
+model:
+  name: "bert_base"
+  pretrained: "bert-base-uncased"
+  num_labels: 9
+
+# Training configuration
+training:
+  epochs: 10
+  learning_rate: 2e-5
+  optimizer: "adamw"
+  scheduler: "linear"
+
+# Continual Learning Strategy
+cl_strategy:
+  name: "ewc"
+  lambda_reg: 0.4
+  importance_method: "fisher"
+
+# Evaluation settings
+evaluation:
+  metrics: ["f1", "precision", "recall"]
+  save_predictions: true

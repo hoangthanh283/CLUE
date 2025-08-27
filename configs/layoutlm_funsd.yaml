@@ -1,0 +1,76 @@
+experiment_name: "layoutlm_funsd"
+
+# Dataset configuration
+dataset:
+  name: "funsd"
+  hf_dataset_name: "nielsr/funsd"
+  task_type: "token_classification"
+  preprocessing:
+    max_seq_length: 512
+    max_position_embeddings: 1024
+    image_size: [224, 224]
+    apply_ocr: false  # FUNSD already has OCR annotations
+    normalize_bbox: true
+    include_image: true
+
+# Model configuration  
+model:
+  name: "layoutlm"
+  model_type: "layoutlm-base-uncased"
+  pretrained_model_name: "microsoft/layoutlm-base-uncased"
+  config:
+    num_labels: 5  # B-HEADER, I-HEADER, B-QUESTION, I-QUESTION, B-ANSWER, I-ANSWER, O
+    hidden_dropout_prob: 0.1
+    attention_probs_dropout_prob: 0.1
+    classifier_dropout: 0.1
+
+# Training configuration
+training:
+  batch_size: 16
+  gradient_accumulation_steps: 1
+  num_epochs: 100
+  learning_rate: 5e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  optimizer: "adamw"
+  scheduler: "linear"
+  save_strategy: "epoch"
+  evaluation_strategy: "epoch"
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_f1"
+  greater_is_better: true
+  early_stopping_patience: 10
+
+# Data processing
+data_processing:
+  train_split: "train"
+  test_split: "test" 
+  validation_split: 0.1  # Split from train if no validation set
+  shuffle_train: true
+  seed: 42
+
+# Continual Learning Strategy
+cl_strategy:
+  name: "none"  # baseline without CL
+
+# Evaluation settings
+evaluation:
+  metrics: ["accuracy", "f1", "precision", "recall"]
+  save_predictions: true
+  compute_entity_level_f1: true
+
+# Logging and output
+output:
+  log_level: "INFO"
+  save_model: true
+  save_tokenizer: true
+  push_to_hub: false
+
+# Neptune experiment tracking (optional)
+# To enable Neptune tracking, set use_neptune to true and provide your credentials
+neptune:
+  use_neptune: false  # Set to true to enable Neptune tracking
+  neptune_project: "your-workspace/cl4ie"  # Replace with your Neptune project
+  neptune_api_token: null  # Set your Neptune API token or use NEPTUNE_API_TOKEN env var
+  tags: ["layoutlm", "funsd", "information_extraction"]

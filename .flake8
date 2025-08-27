@@ -1,0 +1,11 @@
+[flake8]
+max-line-length = 120
+max-complexity = 18
+select = ANN,B,C,E,F,Q0,W,T4,B9
+inline-quotes = double
+avoid-escape = False
+suppress-none-returning = True
+ignore = ANN101,ANN102,W503,ANN401
+per-file-ignores =
+exclude =
+    submodule_*

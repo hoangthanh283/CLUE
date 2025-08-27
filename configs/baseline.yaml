@@ -1,0 +1,29 @@
+experiment_name: "baseline_no_cl"
+
+# Dataset configuration
+dataset:
+  name: "conll2003"
+  batch_size: 32
+  max_seq_length: 128
+
+# Model configuration  
+model:
+  name: "bert_base"
+  pretrained: "bert-base-uncased"
+  num_labels: 9
+
+# Training configuration
+training:
+  epochs: 10
+  learning_rate: 2e-5
+  optimizer: "adamw"
+  scheduler: "linear"
+
+# No Continual Learning Strategy (baseline)
+cl_strategy:
+  name: "none"
+
+# Evaluation settings
+evaluation:
+  metrics: ["f1", "precision", "recall"]
+  save_predictions: true
