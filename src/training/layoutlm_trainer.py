@@ -44,6 +44,9 @@ class LayoutLMTrainer:
         # Setup metrics
         self.metrics = LayoutLMMetrics(label_list, id2label)
 
+        # Gradient accumulation.
+        self.gradient_accumulation_steps = self.training_config.get("gradient_accumulation_steps", 1)
+
         # Setup optimizer and scheduler
         self.optimizer = self._setup_optimizer()
         self.scheduler = self._setup_scheduler()
@@ -62,12 +65,11 @@ class LayoutLMTrainer:
         self.early_stopping_patience = self.training_config.get("early_stopping_patience", 10)
         self.early_stopping_counter = 0
 
-        # Gradient accumulation
-        self.gradient_accumulation_steps = self.training_config.get("gradient_accumulation_steps", 1)
-
         # Logging
         self.log_steps = self.training_config.get("log_steps", 100)
         self.eval_steps = self.training_config.get("eval_steps", None)
+        if self.eval_steps is not None:
+            self.eval_steps = int(self.eval_steps)
 
         # Setup Neptune if configured
         self.neptune_run = None
