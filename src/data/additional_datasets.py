@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datasets import Dataset as HFDataset
 from datasets import load_dataset
 
-from .layoutlm_datasets import BaseDatasetLoader, DocumentExample
+from src.data.layoutlm_datasets import BaseDatasetLoader, DocumentExample
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +57,28 @@ class SROIEDatasetLoader(BaseDatasetLoader):
 
         for item in dataset:
             words = item["words"]
-            bboxes = item["bboxes"]
-            ner_tags = item["ner_tags"]
-            image = item["image"]
+
+            # Handle different SROIE dataset formats
+            if "bboxes" in item:
+                # darentang/sroie format
+                bboxes = item["bboxes"]
+                ner_tags = item["ner_tags"]
+                # For darentang/sroie, we need to load image from path
+                if "image_path" in item:
+                    # For now, we'll skip image loading and set to None
+                    # since LayoutLMv3 text-only mode doesn't need images
+                    image = None
+                else:
+                    image = item.get("image", None)
+            elif "actual_boxes" in item:
+                # buthaya/sroie format
+                bboxes = item["actual_boxes"]
+                labels_str = item["labels"]
+                # Convert string labels to numeric then back to our format
+                ner_tags = [self.label2id.get(label, 0) for label in labels_str]
+                image = item.get("image", None)
+            else:
+                raise ValueError(f"Unknown SROIE dataset format. Available keys: {list(item.keys())}")
 
             # Convert numeric labels to string labels
             labels = [self.id2label[tag] for tag in ner_tags]
@@ -72,14 +91,15 @@ class SROIEDatasetLoader(BaseDatasetLoader):
                     bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
                               for bbox in bboxes]
                 else:
-                    # For cases without image (e.g., LayoutLMv3 text-only), 
-                    # we need to normalize based on original image dimensions
-                    # Get the original image temporarily to get dimensions
-                    orig_image = item["image"]
-                    if orig_image is not None:
-                        width, height = orig_image.size
-                        bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                                  for bbox in bboxes]
+                    # For cases without image, use default normalization
+                    # Check if we have page dimensions from the dataset
+                    if "page_width" in item and "page_height" in item:
+                        width, height = item["page_width"], item["page_height"]
+                    else:
+                        # Use reasonable defaults for SROIE documents
+                        width, height = 1000, 1000
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
 
             # Prepare image (only if we actually need it)
             if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
@@ -159,14 +179,10 @@ class XFUNDDatasetLoader(BaseDatasetLoader):
                     bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
                               for bbox in bboxes]
                 else:
-                    # For cases without image (e.g., LayoutLMv3 text-only), 
-                    # we need to normalize based on original image dimensions
-                    # Get the original image temporarily to get dimensions
-                    orig_image = item["image"]
-                    if orig_image is not None:
-                        width, height = orig_image.size
-                        bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                                  for bbox in bboxes]
+                    # For cases without image, use default normalization
+                    width, height = 1000, 1000  # Default page size for XFUND
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
 
             # Prepare image (only if we actually need it)
             if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
@@ -261,14 +277,10 @@ class WildReceiptDatasetLoader(BaseDatasetLoader):
                     bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
                               for bbox in bboxes]
                 else:
-                    # For cases without image (e.g., LayoutLMv3 text-only), 
-                    # we need to normalize based on original image dimensions
-                    # Get the original image temporarily to get dimensions
-                    orig_image = item["image"]
-                    if orig_image is not None:
-                        width, height = orig_image.size
-                        bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                                  for bbox in bboxes]
+                    # For cases without image, use default normalization
+                    width, height = 1000, 1000  # Default page size for WildReceipt
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
 
             # Prepare image (only if we actually need it)
             if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:

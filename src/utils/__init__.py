@@ -19,7 +19,7 @@ def setup_logging(log_dir, experiment_name):
     """Setup logging for experiments"""
     # Create log directory if it doesn't exist
     os.makedirs(log_dir, exist_ok=True)
-    
+
     log_file = os.path.join(log_dir, f"{experiment_name}.log")
     logging.basicConfig(
         level=logging.INFO,

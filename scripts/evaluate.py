@@ -2,20 +2,14 @@
 """
 Evaluation script for LayoutLM-based information extraction experiments
 """
-
 import argparse
 import json
-import sys
 from pathlib import Path
 
 from src.data.layoutlm_datasets import create_data_loader, get_dataset_loader
 from src.models.layoutlm_models import get_model
 from src.training.layoutlm_trainer import create_trainer
 from src.utils import load_config, setup_logging
-
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
 
 def main():

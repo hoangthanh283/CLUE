@@ -13,7 +13,8 @@ from datasets import Dataset as HFDataset
 from datasets import load_dataset
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
-from transformers import LayoutLMTokenizer, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer
+from transformers import (LayoutLMTokenizerFast, LayoutLMv2Tokenizer,
+                          LayoutLMv3Tokenizer)
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,8 @@ class BaseDatasetLoader(ABC):
         elif "layoutlmv2" in model_name.lower():
             self.tokenizer = LayoutLMv2Tokenizer.from_pretrained(model_name)
         else:
-            self.tokenizer = LayoutLMTokenizer.from_pretrained(model_name)
+            # Use Fast tokenizer for LayoutLM v1 to support boxes/labels alignment
+            self.tokenizer = LayoutLMTokenizerFast.from_pretrained(model_name)
 
         self.max_seq_length = config["dataset"]["preprocessing"]["max_seq_length"]
         self.image_size = config["dataset"]["preprocessing"]["image_size"]
@@ -73,13 +75,13 @@ class BaseDatasetLoader(ABC):
         y0 = int(1000 * y0 / height)
         x1 = int(1000 * x1 / width)
         y1 = int(1000 * y1 / height)
-        
+
         # Clamp values to [0, 1000] range as required by LayoutLMv3
         x0 = max(0, min(1000, x0))
         y0 = max(0, min(1000, y0))
         x1 = max(0, min(1000, x1))
         y1 = max(0, min(1000, y1))
-        
+
         return [x0, y0, x1, y1]
 
     def prepare_image(self, image: Image.Image) -> Image.Image:
@@ -216,33 +218,53 @@ class CORDDatasetLoader(BaseDatasetLoader):
 
     def create_examples(self, dataset: HFDataset) -> List[DocumentExample]:
         """Convert CORD dataset to DocumentExample format"""
+        import json
         examples = []
 
         for item in dataset:
-            words = item["words"]
-            bboxes = item["bboxes"]
-            ner_tags = item["ner_tags"]
+            # Parse the ground truth JSON
+            ground_truth = json.loads(item["ground_truth"])
             image = item["image"]
 
-            # Convert numeric labels to string labels
-            labels = [self.id2label[tag] for tag in ner_tags]
+            # Extract words, bboxes, and labels from valid_line
+            words = []
+            bboxes = []
+            labels = []
+
+            for line in ground_truth.get("valid_line", []):
+                category = line.get("category", "other")
+
+                # Map CORD categories to our label format
+                if category.upper() not in [label.replace("B-", "").replace("I-", "") for label in self.label_list]:
+                    category = "other"
+
+                line_words = line.get("words", [])
+                for i, word_info in enumerate(line_words):
+                    words.append(word_info["text"])
+
+                    # Convert quad to bbox [x0, y0, x1, y1]
+                    quad = word_info["quad"]
+                    x0 = min(quad["x1"], quad["x2"], quad["x3"], quad["x4"])
+                    y0 = min(quad["y1"], quad["y2"], quad["y3"], quad["y4"])
+                    x1 = max(quad["x1"], quad["x2"], quad["x3"], quad["x4"])
+                    y1 = max(quad["y1"], quad["y2"], quad["y3"], quad["y4"])
+                    bboxes.append([x0, y0, x1, y1])
+
+                    # Assign B-/I- labels
+                    if i == 0:
+                        labels.append(f"B-{category.upper()}")
+                    else:
+                        labels.append(f"I-{category.upper()}")
+
+            # If no valid words found, skip this example
+            if not words:
+                continue
 
             # Normalize bboxes if required
-            if self.normalize_bbox:
-                if image is not None:
-                    # Use actual image dimensions
-                    width, height = image.size
-                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                              for bbox in bboxes]
-                else:
-                    # For cases without image (e.g., LayoutLMv3 text-only), 
-                    # we need to normalize based on original image dimensions
-                    # Get the original image temporarily to get dimensions
-                    orig_image = item["image"]
-                    if orig_image is not None:
-                        width, height = orig_image.size
-                        bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                                  for bbox in bboxes]
+            if self.normalize_bbox and image is not None:
+                width, height = image.size
+                bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                          for bbox in bboxes]
 
             # Prepare image (only if we actually need it)
             if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
@@ -268,7 +290,7 @@ class LayoutLMDataset(Dataset):
     def __init__(
         self,
         examples: List[DocumentExample],
-        tokenizer: Union[LayoutLMTokenizer, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer],
+        tokenizer: Union[LayoutLMTokenizerFast, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer],
         label2id: Dict[str, int],
         max_seq_length: int = 512,
         include_image: bool = True
@@ -286,36 +308,36 @@ class LayoutLMDataset(Dataset):
         example = self.examples[idx]
 
         # For LayoutLM v1, we need to handle tokenization differently
-        if isinstance(self.tokenizer, LayoutLMTokenizer):
+        if isinstance(self.tokenizer, LayoutLMTokenizerFast):
             # LayoutLM v1 tokenizer - tokenize words individually then concatenate
             all_tokens = []
             all_token_boxes = []
             all_token_labels = []
-            
+
             # Add [CLS] token
             all_tokens.append(self.tokenizer.cls_token_id)
             all_token_boxes.append([0, 0, 0, 0])
             all_token_labels.append(0)  # O label for [CLS]
-            
+
             # Process each word
             for word, bbox, label in zip(example.words, example.bboxes, example.labels):
                 # Tokenize the word
                 word_tokens = self.tokenizer.tokenize(word)
                 word_token_ids = self.tokenizer.convert_tokens_to_ids(word_tokens)
-                
+
                 # Add tokens for this word
                 for i, token_id in enumerate(word_token_ids):
                     all_tokens.append(token_id)
-                    
+
                     # Clamp bbox coordinates to valid range [0, 1000]
                     clamped_bbox = [
                         max(0, min(1000, bbox[0])),
-                        max(0, min(1000, bbox[1])), 
+                        max(0, min(1000, bbox[1])),
                         max(0, min(1000, bbox[2])),
                         max(0, min(1000, bbox[3]))
                     ]
                     all_token_boxes.append(clamped_bbox)
-                    
+
                     # Use B- label for first token, I- label for subsequent tokens
                     if i == 0:
                         # First token of word gets the original label
@@ -328,27 +350,27 @@ class LayoutLMDataset(Dataset):
                         else:
                             token_label = self.label2id.get(label, 0)
                     all_token_labels.append(token_label)
-            
+
             # Add [SEP] token
             all_tokens.append(self.tokenizer.sep_token_id)
             all_token_boxes.append([1000, 1000, 1000, 1000])
             all_token_labels.append(0)  # O label for [SEP]
-            
+
             # Truncate if too long
             if len(all_tokens) > self.max_seq_length:
-                all_tokens = all_tokens[:self.max_seq_length-1] + [self.tokenizer.sep_token_id]
-                all_token_boxes = all_token_boxes[:self.max_seq_length-1] + [[1000, 1000, 1000, 1000]]
-                all_token_labels = all_token_labels[:self.max_seq_length-1] + [0]
-            
+                all_tokens = all_tokens[:self.max_seq_length - 1] + [self.tokenizer.sep_token_id]
+                all_token_boxes = all_token_boxes[:self.max_seq_length - 1] + [[1000, 1000, 1000, 1000]]
+                all_token_labels = all_token_labels[:self.max_seq_length - 1] + [0]
+
             # Pad to max_seq_length
             while len(all_tokens) < self.max_seq_length:
                 all_tokens.append(self.tokenizer.pad_token_id)
                 all_token_boxes.append([0, 0, 0, 0])
                 all_token_labels.append(-100)  # Ignore label for [PAD]
-            
+
             # Create attention mask
             attention_mask = [1 if token_id != self.tokenizer.pad_token_id else 0 for token_id in all_tokens]
-            
+
             # Prepare output
             item = {
                 "input_ids": torch.tensor(all_tokens, dtype=torch.long),
@@ -362,7 +384,7 @@ class LayoutLMDataset(Dataset):
                 # LayoutLMv3 with image support
                 # Convert string labels to integers
                 integer_labels = [self.label2id.get(label, 0) for label in example.labels]
-                
+
                 encoding = self.tokenizer(
                     example.words,
                     boxes=example.bboxes,
@@ -373,7 +395,7 @@ class LayoutLMDataset(Dataset):
                     max_length=self.max_seq_length,
                     return_tensors="pt"
                 )
-                
+
                 # Prepare output with visual features
                 item = {
                     "input_ids": encoding["input_ids"].squeeze(),
@@ -386,7 +408,7 @@ class LayoutLMDataset(Dataset):
                 # LayoutLM v2/v3 without images OR LayoutLMv2
                 # Convert string labels to integers
                 integer_labels = [self.label2id.get(label, 0) for label in example.labels]
-                
+
                 encoding = self.tokenizer(
                     example.words,
                     boxes=example.bboxes,
@@ -396,7 +418,7 @@ class LayoutLMDataset(Dataset):
                     max_length=self.max_seq_length,
                     return_tensors="pt"
                 )
-                
+
                 # Prepare output (text + layout only)
                 item = {
                     "input_ids": encoding["input_ids"].squeeze(),
@@ -406,18 +428,18 @@ class LayoutLMDataset(Dataset):
                 }
 
         # Add image if available and required (for v1/v2 or v3 without integrated image processing)
-        if (self.include_image and example.image is not None and 
-            not isinstance(self.tokenizer, LayoutLMv3Tokenizer)):
+        if (self.include_image and example.image is not None
+                and not isinstance(self.tokenizer, LayoutLMv3Tokenizer)):
             # Convert PIL image to tensor for v1/v2
             image_tensor = torch.tensor(np.array(example.image)).permute(2, 0, 1).float() / 255.0
             item["image"] = image_tensor
-        
+
         return item
 
 
 def create_data_loader(
     examples: List[DocumentExample],
-    tokenizer: Union[LayoutLMTokenizer, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer],
+    tokenizer: Union[LayoutLMTokenizerFast, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer],
     label2id: Dict[str, int],
     config: Dict[str, Any],
     is_training: bool = True

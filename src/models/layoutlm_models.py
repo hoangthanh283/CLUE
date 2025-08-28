@@ -76,7 +76,7 @@ class BaseLayoutLMModel(nn.Module, ABC):
             backbone_inputs["position_ids"] = position_ids
         if head_mask is not None:
             backbone_inputs["head_mask"] = head_mask
-        
+
         # Handle visual inputs for different LayoutLM versions
         if hasattr(self.backbone, 'config') and 'layoutlmv3' in self.backbone.config.model_type:
             # LayoutLMv3 - use pixel_values if provided, otherwise text+layout only

@@ -170,7 +170,7 @@ class LayoutLMTrainer:
 
                     # Save best model
                     if self.training_config.get("save_best_model", True):
-                        self.best_model_path = self.output_dir / f"best_model"
+                        self.best_model_path = self.output_dir / "best_model"
                         self.save_model(self.best_model_path)
                         logger.info(f"New best model saved: {current_metric:.4f}")
                 else:
@@ -181,14 +181,7 @@ class LayoutLMTrainer:
                     logger.info(f"Early stopping triggered after {epoch + 1} epochs")
                     break
 
-            # Save checkpoint
-            if self.training_config.get("save_strategy", "epoch") == "epoch":
-                checkpoint_path = self.output_dir / f"checkpoint_epoch_{epoch + 1}"
-                self.save_model(checkpoint_path)
-
         logger.info("Training completed!")
-
-        # Load best model if available
         if self.best_model_path and self.training_config.get("load_best_model_at_end", True):
             logger.info(f"Loading best model from {self.best_model_path}")
             self.load_model(self.best_model_path)
@@ -202,12 +195,9 @@ class LayoutLMTrainer:
     def _train_epoch(self) -> Dict[str, float]:
         """Train for one epoch"""
         self.model.train()
-
         total_loss = 0.0
         num_batches = 0
-
         progress_bar = tqdm(self.train_dataloader, desc=f"Epoch {self.epoch + 1}")
-
         for step, batch in enumerate(progress_bar):
             # Move batch to device
             batch = {k: v.to(self.device) for k, v in batch.items()}

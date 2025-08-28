@@ -34,7 +34,7 @@ training:
   warmup_ratio: 0.1
   optimizer: "adamw"
   scheduler: "linear"
-  save_strategy: "epoch"
+  save_strategy: null
   evaluation_strategy: "epoch"
   save_total_limit: 3
   load_best_model_at_end: true
