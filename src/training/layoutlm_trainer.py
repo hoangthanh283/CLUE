@@ -170,7 +170,7 @@ class LayoutLMTrainer:
 
                     # Save best model
                     if self.training_config.get("save_best_model", True):
-                        self.best_model_path = self.output_dir / f"best_model_epoch_{epoch + 1}"
+                        self.best_model_path = self.output_dir / f"best_model"
                         self.save_model(self.best_model_path)
                         logger.info(f"New best model saved: {current_metric:.4f}")
                 else:

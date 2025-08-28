@@ -57,6 +57,7 @@ class BaseLayoutLMModel(nn.Module, ABC):
         head_mask: Optional[torch.Tensor] = None,
         labels: Optional[torch.Tensor] = None,
         image: Optional[torch.Tensor] = None,
+        pixel_values: Optional[torch.Tensor] = None,  # For LayoutLMv3
         **kwargs
     ) -> Dict[str, torch.Tensor]:
         """Forward pass"""
@@ -75,8 +76,16 @@ class BaseLayoutLMModel(nn.Module, ABC):
             backbone_inputs["position_ids"] = position_ids
         if head_mask is not None:
             backbone_inputs["head_mask"] = head_mask
-        if image is not None:
-            backbone_inputs["image"] = image
+        
+        # Handle visual inputs for different LayoutLM versions
+        if hasattr(self.backbone, 'config') and 'layoutlmv3' in self.backbone.config.model_type:
+            # LayoutLMv3 - use pixel_values if provided, otherwise text+layout only
+            if pixel_values is not None:
+                backbone_inputs["pixel_values"] = pixel_values
+        else:
+            # LayoutLMv1/v2 - use image if provided
+            if image is not None:
+                backbone_inputs["image"] = image
 
         # Forward through backbone
         outputs = self.backbone(**backbone_inputs)
@@ -269,12 +278,12 @@ class LayoutLMMetrics:
 
 # Model factory
 MODEL_CLASSES = {
-    "layoutlm": LayoutLMForTokenClassification,
-    "layoutlm-base-uncased": LayoutLMForTokenClassification,
-    "layoutlmv2": LayoutLMv2ForTokenClassification,
-    "layoutlmv2-base-uncased": LayoutLMv2ForTokenClassification,
-    "layoutlmv3": LayoutLMv3ForTokenClassification,
     "layoutlmv3-base": LayoutLMv3ForTokenClassification,
+    "layoutlmv3": LayoutLMv3ForTokenClassification,
+    "layoutlmv2-base-uncased": LayoutLMv2ForTokenClassification,
+    "layoutlmv2": LayoutLMv2ForTokenClassification,
+    "layoutlm-base-uncased": LayoutLMForTokenClassification,
+    "layoutlm": LayoutLMForTokenClassification,
 }
 
 

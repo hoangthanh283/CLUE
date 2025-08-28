@@ -65,14 +65,28 @@ class SROIEDatasetLoader(BaseDatasetLoader):
             labels = [self.id2label[tag] for tag in ner_tags]
 
             # Normalize bboxes if required
-            if self.normalize_bbox and image is not None:
-                width, height = image.size
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                          for bbox in bboxes]
+            if self.normalize_bbox:
+                if image is not None:
+                    # Use actual image dimensions
+                    width, height = image.size
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
+                else:
+                    # For cases without image (e.g., LayoutLMv3 text-only), 
+                    # we need to normalize based on original image dimensions
+                    # Get the original image temporarily to get dimensions
+                    orig_image = item["image"]
+                    if orig_image is not None:
+                        width, height = orig_image.size
+                        bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                                  for bbox in bboxes]
 
-            # Prepare image
-            if image is not None:
+            # Prepare image (only if we actually need it)
+            if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
                 image = self.prepare_image(image)
+            else:
+                # Don't include image if include_image is False
+                image = None
 
             example = DocumentExample(
                 words=words,
@@ -138,14 +152,28 @@ class XFUNDDatasetLoader(BaseDatasetLoader):
             labels = [self.id2label[tag] for tag in ner_tags]
 
             # Normalize bboxes if required
-            if self.normalize_bbox and image is not None:
-                width, height = image.size
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                          for bbox in bboxes]
+            if self.normalize_bbox:
+                if image is not None:
+                    # Use actual image dimensions
+                    width, height = image.size
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
+                else:
+                    # For cases without image (e.g., LayoutLMv3 text-only), 
+                    # we need to normalize based on original image dimensions
+                    # Get the original image temporarily to get dimensions
+                    orig_image = item["image"]
+                    if orig_image is not None:
+                        width, height = orig_image.size
+                        bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                                  for bbox in bboxes]
 
-            # Prepare image
-            if image is not None:
+            # Prepare image (only if we actually need it)
+            if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
                 image = self.prepare_image(image)
+            else:
+                # Don't include image if include_image is False
+                image = None
 
             example = DocumentExample(
                 words=words,
@@ -226,14 +254,28 @@ class WildReceiptDatasetLoader(BaseDatasetLoader):
             labels = [self.id2label[tag] for tag in ner_tags]
 
             # Normalize bboxes if required
-            if self.normalize_bbox and image is not None:
-                width, height = image.size
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                          for bbox in bboxes]
+            if self.normalize_bbox:
+                if image is not None:
+                    # Use actual image dimensions
+                    width, height = image.size
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
+                else:
+                    # For cases without image (e.g., LayoutLMv3 text-only), 
+                    # we need to normalize based on original image dimensions
+                    # Get the original image temporarily to get dimensions
+                    orig_image = item["image"]
+                    if orig_image is not None:
+                        width, height = orig_image.size
+                        bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                                  for bbox in bboxes]
 
-            # Prepare image
-            if image is not None:
+            # Prepare image (only if we actually need it)
+            if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
                 image = self.prepare_image(image)
+            else:
+                # Don't include image if include_image is False
+                image = None
 
             example = DocumentExample(
                 words=words,

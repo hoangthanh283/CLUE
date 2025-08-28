@@ -1,17 +1,17 @@
-experiment_name: "layoutlmv3_funsd"
+experiment_name: "layoutlmv3_cord"
 
 # Dataset configuration
 dataset:
-  name: "funsd"
-  hf_dataset_name: "nielsr/funsd"
+  name: "cord"
+  hf_dataset_name: "naver-clova-ix/cord-v2"
   task_type: "token_classification"
   preprocessing:
     max_seq_length: 512
     max_position_embeddings: 1024
     image_size: [224, 224]
-    apply_ocr: false  # FUNSD already has OCR annotations
+    apply_ocr: false  # CORD has OCR annotations
     normalize_bbox: true
-    include_image: false  # Disable visual features for LayoutLMv3
+    include_image: false  # LayoutLMv3 text-only mode
 
 # Model configuration  
 model:
@@ -19,7 +19,7 @@ model:
   model_type: "layoutlmv3-base"
   pretrained_model_name: "microsoft/layoutlmv3-base"
   config:
-    num_labels: 7  # O, B-HEADER, I-HEADER, B-QUESTION, I-QUESTION, B-ANSWER, I-ANSWER
+    num_labels: 31  # CORD has 30 entity types + O
     hidden_dropout_prob: 0.1
     attention_probs_dropout_prob: 0.1
     classifier_dropout: 0.1
@@ -45,14 +45,14 @@ training:
 # Data processing
 data_processing:
   train_split: "train"
-  test_split: "test" 
-  validation_split: 0.1  # Split from train if no validation set
+  test_split: "test"
+  validation_split: "validation"
   shuffle_train: true
   seed: 42
 
 # Continual Learning Strategy
 cl_strategy:
-  name: "none"  # baseline without CL
+  name: "none"
 
 # Evaluation settings
 evaluation:
@@ -73,4 +73,4 @@ neptune:
   use_neptune: false  # Set to true to enable Neptune tracking
   neptune_project: "your-workspace/cl4ie"  # Replace with your Neptune project
   neptune_api_token: null  # Set your Neptune API token or use NEPTUNE_API_TOKEN env var
-  tags: ["layoutlm", "funsd", "information_extraction"]
+  tags: ["layoutlmv3", "cord", "information_extraction"]

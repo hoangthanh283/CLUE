@@ -13,8 +13,7 @@ from datasets import Dataset as HFDataset
 from datasets import load_dataset
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
-from transformers import (LayoutLMTokenizer, LayoutLMv2Tokenizer,
-                          LayoutLMv3Tokenizer)
+from transformers import LayoutLMTokenizer, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -68,12 +67,19 @@ class BaseDatasetLoader(ABC):
         pass
 
     def normalize_bbox_coordinates(self, bbox: List[int], width: int, height: int) -> List[int]:
-        """Normalize bbox coordinates to [0, 1000] range"""
+        """Normalize bbox coordinates to [0, 1000] range and clamp to valid bounds"""
         x0, y0, x1, y1 = bbox
         x0 = int(1000 * x0 / width)
         y0 = int(1000 * y0 / height)
         x1 = int(1000 * x1 / width)
         y1 = int(1000 * y1 / height)
+        
+        # Clamp values to [0, 1000] range as required by LayoutLMv3
+        x0 = max(0, min(1000, x0))
+        y0 = max(0, min(1000, y0))
+        x1 = max(0, min(1000, x1))
+        y1 = max(0, min(1000, y1))
+        
         return [x0, y0, x1, y1]
 
     def prepare_image(self, image: Image.Image) -> Image.Image:
@@ -85,14 +91,17 @@ class BaseDatasetLoader(ABC):
 
 
 class FUNSDDatasetLoader(BaseDatasetLoader):
-    """Loader for FUNSD dataset"""
+    """DatasetLoader for FUNSD dataset"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict):
         super().__init__(config)
-        self.label_list = ["O", "B-HEADER", "I-HEADER", "B-QUESTION",
-                           "I-QUESTION", "B-ANSWER", "I-ANSWER"]
-        self.label2id = {label: i for i, label in enumerate(self.label_list)}
-        self.id2label = {i: label for i, label in enumerate(self.label_list)}
+        self.hf_dataset_name = config["dataset"]["hf_dataset_name"]
+        self.label_list = [
+            'O', 'B-HEADER', 'I-HEADER', 'B-QUESTION', 'I-QUESTION', 'B-ANSWER', 'I-ANSWER'
+        ]
+        # Create mappings
+        self.label2id = {label: idx for idx, label in enumerate(self.label_list)}
+        self.id2label = {idx: label for idx, label in enumerate(self.label_list)}
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
         """Load FUNSD dataset from HuggingFace"""
@@ -101,15 +110,7 @@ class FUNSDDatasetLoader(BaseDatasetLoader):
         dataset = load_dataset(self.hf_dataset_name)
         train_dataset = dataset["train"]
         test_dataset = dataset["test"]
-
-        # FUNSD doesn't have a validation split, so we'll create one
-        validation_split = self.config["data_processing"].get("validation_split", 0.1)
-        if isinstance(validation_split, float) and 0 < validation_split < 1:
-            train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-            train_dataset = train_val["train"]
-            val_dataset = train_val["test"]
-        else:
-            val_dataset = None
+        val_dataset = dataset.get("validation", None)
 
         return train_dataset, test_dataset, val_dataset
 
@@ -131,14 +132,21 @@ class FUNSDDatasetLoader(BaseDatasetLoader):
             labels = [self.id2label[tag] for tag in ner_tags]
 
             # Normalize bboxes if required
-            if self.normalize_bbox and image is not None:
-                width, height = image.size
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                          for bbox in bboxes]
+            if self.normalize_bbox:
+                # Always normalize if requested, regardless of whether we'll use the image
+                # Use the original image to get dimensions
+                orig_image = item["image"]
+                if orig_image is not None:
+                    width, height = orig_image.size
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
 
-            # Prepare image
-            if image is not None:
+            # Prepare image (only if we actually need it)
+            if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
                 image = self.prepare_image(image)
+            else:
+                # Don't include image if include_image is False
+                image = None
 
             example = DocumentExample(
                 words=words,
@@ -220,14 +228,28 @@ class CORDDatasetLoader(BaseDatasetLoader):
             labels = [self.id2label[tag] for tag in ner_tags]
 
             # Normalize bboxes if required
-            if self.normalize_bbox and image is not None:
-                width, height = image.size
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                          for bbox in bboxes]
+            if self.normalize_bbox:
+                if image is not None:
+                    # Use actual image dimensions
+                    width, height = image.size
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
+                else:
+                    # For cases without image (e.g., LayoutLMv3 text-only), 
+                    # we need to normalize based on original image dimensions
+                    # Get the original image temporarily to get dimensions
+                    orig_image = item["image"]
+                    if orig_image is not None:
+                        width, height = orig_image.size
+                        bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                                  for bbox in bboxes]
 
-            # Prepare image
-            if image is not None:
+            # Prepare image (only if we actually need it)
+            if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
                 image = self.prepare_image(image)
+            else:
+                # Don't include image if include_image is False
+                image = None
 
             example = DocumentExample(
                 words=words,
@@ -263,32 +285,133 @@ class LayoutLMDataset(Dataset):
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         example = self.examples[idx]
 
-        # Tokenize
-        encoding = self.tokenizer(
-            example.words,
-            boxes=example.bboxes,
-            word_labels=example.labels,
-            truncation=True,
-            padding="max_length",
-            max_length=self.max_seq_length,
-            return_tensors="pt",
-            return_offsets_mapping=True
-        )
+        # For LayoutLM v1, we need to handle tokenization differently
+        if isinstance(self.tokenizer, LayoutLMTokenizer):
+            # LayoutLM v1 tokenizer - tokenize words individually then concatenate
+            all_tokens = []
+            all_token_boxes = []
+            all_token_labels = []
+            
+            # Add [CLS] token
+            all_tokens.append(self.tokenizer.cls_token_id)
+            all_token_boxes.append([0, 0, 0, 0])
+            all_token_labels.append(0)  # O label for [CLS]
+            
+            # Process each word
+            for word, bbox, label in zip(example.words, example.bboxes, example.labels):
+                # Tokenize the word
+                word_tokens = self.tokenizer.tokenize(word)
+                word_token_ids = self.tokenizer.convert_tokens_to_ids(word_tokens)
+                
+                # Add tokens for this word
+                for i, token_id in enumerate(word_token_ids):
+                    all_tokens.append(token_id)
+                    
+                    # Clamp bbox coordinates to valid range [0, 1000]
+                    clamped_bbox = [
+                        max(0, min(1000, bbox[0])),
+                        max(0, min(1000, bbox[1])), 
+                        max(0, min(1000, bbox[2])),
+                        max(0, min(1000, bbox[3]))
+                    ]
+                    all_token_boxes.append(clamped_bbox)
+                    
+                    # Use B- label for first token, I- label for subsequent tokens
+                    if i == 0:
+                        # First token of word gets the original label
+                        token_label = self.label2id.get(label, 0)
+                    else:
+                        # Subsequent tokens get I- version if it's a B- label
+                        if label.startswith('B-'):
+                            i_label = 'I-' + label[2:]
+                            token_label = self.label2id.get(i_label, 0)
+                        else:
+                            token_label = self.label2id.get(label, 0)
+                    all_token_labels.append(token_label)
+            
+            # Add [SEP] token
+            all_tokens.append(self.tokenizer.sep_token_id)
+            all_token_boxes.append([1000, 1000, 1000, 1000])
+            all_token_labels.append(0)  # O label for [SEP]
+            
+            # Truncate if too long
+            if len(all_tokens) > self.max_seq_length:
+                all_tokens = all_tokens[:self.max_seq_length-1] + [self.tokenizer.sep_token_id]
+                all_token_boxes = all_token_boxes[:self.max_seq_length-1] + [[1000, 1000, 1000, 1000]]
+                all_token_labels = all_token_labels[:self.max_seq_length-1] + [0]
+            
+            # Pad to max_seq_length
+            while len(all_tokens) < self.max_seq_length:
+                all_tokens.append(self.tokenizer.pad_token_id)
+                all_token_boxes.append([0, 0, 0, 0])
+                all_token_labels.append(-100)  # Ignore label for [PAD]
+            
+            # Create attention mask
+            attention_mask = [1 if token_id != self.tokenizer.pad_token_id else 0 for token_id in all_tokens]
+            
+            # Prepare output
+            item = {
+                "input_ids": torch.tensor(all_tokens, dtype=torch.long),
+                "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
+                "bbox": torch.tensor(all_token_boxes, dtype=torch.long),
+                "labels": torch.tensor(all_token_labels, dtype=torch.long)
+            }
+        else:
+            # LayoutLM v2/v3 tokenizer
+            if isinstance(self.tokenizer, LayoutLMv3Tokenizer) and self.include_image and example.image is not None:
+                # LayoutLMv3 with image support
+                # Convert string labels to integers
+                integer_labels = [self.label2id.get(label, 0) for label in example.labels]
+                
+                encoding = self.tokenizer(
+                    example.words,
+                    boxes=example.bboxes,
+                    word_labels=integer_labels,
+                    images=example.image,  # Pass image directly to v3 tokenizer
+                    truncation=True,
+                    padding="max_length",
+                    max_length=self.max_seq_length,
+                    return_tensors="pt"
+                )
+                
+                # Prepare output with visual features
+                item = {
+                    "input_ids": encoding["input_ids"].squeeze(),
+                    "attention_mask": encoding["attention_mask"].squeeze(),
+                    "bbox": encoding["bbox"].squeeze(),
+                    "pixel_values": encoding["pixel_values"].squeeze(),  # Visual features
+                    "labels": encoding["labels"].squeeze()
+                }
+            else:
+                # LayoutLM v2/v3 without images OR LayoutLMv2
+                # Convert string labels to integers
+                integer_labels = [self.label2id.get(label, 0) for label in example.labels]
+                
+                encoding = self.tokenizer(
+                    example.words,
+                    boxes=example.bboxes,
+                    word_labels=integer_labels,
+                    truncation=True,
+                    padding="max_length",
+                    max_length=self.max_seq_length,
+                    return_tensors="pt"
+                )
+                
+                # Prepare output (text + layout only)
+                item = {
+                    "input_ids": encoding["input_ids"].squeeze(),
+                    "attention_mask": encoding["attention_mask"].squeeze(),
+                    "bbox": encoding["bbox"].squeeze(),
+                    "labels": encoding["labels"].squeeze()
+                }
 
-        # Prepare output
-        item = {
-            "input_ids": encoding["input_ids"].squeeze(),
-            "attention_mask": encoding["attention_mask"].squeeze(),
-            "bbox": encoding["bbox"].squeeze(),
-            "labels": encoding["labels"].squeeze()
-        }
-
-        # Add image if available and required
-        if self.include_image and example.image is not None:
-            # Convert PIL image to tensor
+        # Add image if available and required (for v1/v2 or v3 without integrated image processing)
+        if (self.include_image and example.image is not None and 
+            not isinstance(self.tokenizer, LayoutLMv3Tokenizer)):
+            # Convert PIL image to tensor for v1/v2
             image_tensor = torch.tensor(np.array(example.image)).permute(2, 0, 1).float() / 255.0
             item["image"] = image_tensor
-
+        
         return item
 
 
@@ -337,9 +460,7 @@ except ImportError:
 def get_dataset_loader(config: Dict[str, Any]) -> BaseDatasetLoader:
     """Factory function to get appropriate dataset loader"""
     dataset_name = config["dataset"]["name"].lower()
-
     if dataset_name not in DATASET_LOADERS:
         raise ValueError(f"Unsupported dataset: {dataset_name}. "
                          f"Supported datasets: {list(DATASET_LOADERS.keys())}")
-
     return DATASET_LOADERS[dataset_name](config)
