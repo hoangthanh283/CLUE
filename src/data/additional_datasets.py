@@ -134,14 +134,13 @@ class XFUNDDatasetLoader(BaseDatasetLoader):
         self.language = config["dataset"].get("language", "zh")
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
-        """Load XFUND dataset from HuggingFace"""
-        # XFUND dataset name includes language code
-        dataset_name = f"{self.hf_dataset_name}.{self.language}"
-        logger.info(f"Loading XFUND dataset from {dataset_name}")
+        """Load XFUND dataset from HuggingFace and filter by language"""
+        logger.info(f"Loading XFUND dataset from {self.hf_dataset_name} and filtering by language: {self.language}")
 
-        dataset = load_dataset(dataset_name)
-        train_dataset = dataset["train"]
-        test_dataset = dataset["validation"]  # XFUND uses 'validation' as test set
+        dataset = load_dataset(self.hf_dataset_name)
+        # Filter by language for each split
+        train_dataset = dataset["train"].filter(lambda x: x["lang"] == self.language)
+        test_dataset = dataset["validation"].filter(lambda x: x["lang"] == self.language)  # XFUND uses 'validation' as test set
 
         # Create validation split from training data
         validation_split = self.config["data_processing"].get("validation_split", 0.1)
