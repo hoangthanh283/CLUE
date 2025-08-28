@@ -24,7 +24,7 @@ class DocumentExample:
     """Single document example for LayoutLM models"""
 
     words: List[str]
-    bboxes: List[List[int]]  # [x0, y0, x1, y1] format
+    bboxes: List[List[int]]  # [x0, y0, x1, y1] format.
     labels: List[str]
     image: Optional[Image.Image] = None
     image_path: Optional[str] = None
@@ -437,6 +437,289 @@ class LayoutLMDataset(Dataset):
         return item
 
 
+class SROIEDatasetLoader(BaseDatasetLoader):
+    """Loader for SROIE dataset"""
+
+    def __init__(self, config: Dict[str, Any]):
+        super().__init__(config)
+        self.label_list = [
+            "O",
+            "B-COMPANY", "I-COMPANY",
+            "B-DATE", "I-DATE",
+            "B-ADDRESS", "I-ADDRESS",
+            "B-TOTAL", "I-TOTAL"
+        ]
+        self.label2id = {label: i for i, label in enumerate(self.label_list)}
+        self.id2label = {i: label for i, label in enumerate(self.label_list)}
+
+    def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
+        """Load SROIE dataset from HuggingFace"""
+        logger.info(f"Loading SROIE dataset from {self.hf_dataset_name}")
+
+        dataset = load_dataset(self.hf_dataset_name)
+        train_dataset = dataset["train"]
+        test_dataset = dataset["test"]
+
+        # Create validation split if needed
+        validation_split = self.config["data_processing"].get("validation_split", 0.1)
+        if isinstance(validation_split, float) and 0 < validation_split < 1:
+            train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
+            train_dataset = train_val["train"]
+            val_dataset = train_val["test"]
+        else:
+            val_dataset = None
+
+        return train_dataset, test_dataset, val_dataset
+
+    def get_label_list(self) -> List[str]:
+        """Get SROIE label list"""
+        return self.label_list
+
+    def create_examples(self, dataset: HFDataset) -> List[DocumentExample]:
+        """Convert SROIE dataset to DocumentExample format"""
+        examples = []
+
+        for item in dataset:
+            words = item["words"]
+
+            # Handle different SROIE dataset formats
+            if "bboxes" in item:
+                # darentang/sroie format
+                bboxes = item["bboxes"]
+                ner_tags = item["ner_tags"]
+                # For darentang/sroie, we need to load image from path
+                if "image_path" in item:
+                    # For now, we'll skip image loading and set to None
+                    # since LayoutLMv3 text-only mode doesn't need images
+                    image = None
+                else:
+                    image = item.get("image", None)
+            elif "actual_boxes" in item:
+                # buthaya/sroie format
+                bboxes = item["actual_boxes"]
+                labels_str = item["labels"]
+                # Convert string labels to numeric then back to our format
+                ner_tags = [self.label2id.get(label, 0) for label in labels_str]
+                image = item.get("image", None)
+            else:
+                raise ValueError(f"Unknown SROIE dataset format. Available keys: {list(item.keys())}")
+
+            # Convert numeric labels to string labels
+            labels = [self.id2label[tag] for tag in ner_tags]
+
+            # Normalize bboxes if required
+            if self.normalize_bbox:
+                if image is not None:
+                    # Use actual image dimensions
+                    width, height = image.size
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
+                else:
+                    # For cases without image, use default normalization
+                    # Check if we have page dimensions from the dataset
+                    if "page_width" in item and "page_height" in item:
+                        width, height = item["page_width"], item["page_height"]
+                    else:
+                        # Use reasonable defaults for SROIE documents
+                        width, height = 1000, 1000
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
+
+            # Prepare image (only if we actually need it)
+            if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
+                image = self.prepare_image(image)
+            else:
+                # Don't include image if include_image is False
+                image = None
+
+            example = DocumentExample(
+                words=words,
+                bboxes=bboxes,
+                labels=labels,
+                image=image
+            )
+            examples.append(example)
+
+        return examples
+
+
+class XFUNDDatasetLoader(BaseDatasetLoader):
+    """Loader for XFUND dataset (multilingual FUNSD)"""
+
+    def __init__(self, config: Dict[str, Any]):
+        super().__init__(config)
+        # XFUND uses same labels as FUNSD but supports multiple languages
+        self.label_list = ["O", "B-HEADER", "I-HEADER", "B-QUESTION", "I-QUESTION", "B-ANSWER", "I-ANSWER"]
+        self.label2id = {label: i for i, label in enumerate(self.label_list)}
+        self.id2label = {i: label for i, label in enumerate(self.label_list)}
+
+        # Language code for XFUND (e.g., "xfund.zh", "xfund.ja", etc.)
+        self.language = config["dataset"].get("language", "zh")
+
+    def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
+        """Load XFUND dataset from HuggingFace and filter by language"""
+        logger.info(f"Loading XFUND dataset from {self.hf_dataset_name} and filtering by language: {self.language}")
+        dataset = load_dataset(self.hf_dataset_name)
+
+        # Create validation split from training data.
+        validation_split = self.config["data_processing"].get("validation_split", 0.1)
+        if isinstance(validation_split, float) and 0 < validation_split < 1:
+            train_val = dataset["train"].train_test_split(test_size=validation_split, seed=42)
+            train_dataset = train_val["train"]
+            val_dataset = train_val["test"]
+        else:
+            val_dataset = None
+
+        # Filter by language for each split.
+        train_cursor = train_dataset.filter(lambda example: example["id"].startswith(f"{self.language}_"))
+        val_cursor = val_dataset.filter(lambda example: example["id"].startswith(f"{self.language}_")) if val_dataset else None
+        test_cursor = dataset["val"].filter(lambda example: example["id"].startswith(f"{self.language}_"))
+        return train_cursor, test_cursor, val_cursor
+
+    def get_label_list(self) -> List[str]:
+        """Get XFUND label list"""
+        return self.label_list
+
+    def create_examples(self, dataset: HFDataset) -> List[DocumentExample]:
+        """Convert XFUND dataset to DocumentExample format"""
+        examples = []
+        for item in dataset:
+            words = item["words"]
+            bboxes = item["bboxes"]
+            ner_tags = item["ner_tags"]
+            image = item["image"]
+
+            # Convert numeric labels to string labels
+            labels = [self.id2label[tag] for tag in ner_tags]
+
+            # Normalize bboxes if required
+            if self.normalize_bbox:
+                if image is not None:
+                    # Use actual image dimensions
+                    width, height = image.size
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
+                else:
+                    # For cases without image, use default normalization
+                    width, height = 1000, 1000  # Default page size for XFUND
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height) for bbox in bboxes]
+
+            # Prepare image (only if we actually need it)
+            if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
+                image = self.prepare_image(image)
+            else:
+                # Don't include image if include_image is False
+                image = None
+
+            example = DocumentExample(
+                words=words,
+                bboxes=bboxes,
+                labels=labels,
+                image=image
+            )
+            examples.append(example)
+
+        return examples
+
+
+class WildReceiptDatasetLoader(BaseDatasetLoader):
+    """Loader for WildReceipt dataset"""
+
+    def __init__(self, config: Dict[str, Any]):
+        super().__init__(config)
+        # WildReceipt has 26 entity types
+        self.label_list = [
+            "O",
+            "B-Store_name_key", "I-Store_name_key",
+            "B-Store_name_value", "I-Store_name_value",
+            "B-Store_addr_key", "I-Store_addr_key",
+            "B-Store_addr_value", "I-Store_addr_value",
+            "B-Tel_key", "I-Tel_key",
+            "B-Tel_value", "I-Tel_value",
+            "B-Date_key", "I-Date_key",
+            "B-Date_value", "I-Date_value",
+            "B-Time_key", "I-Time_key",
+            "B-Time_value", "I-Time_value",
+            "B-Prod_item_key", "I-Prod_item_key",
+            "B-Prod_item_value", "I-Prod_item_value",
+            "B-Prod_quantity_key", "I-Prod_quantity_key",
+            "B-Prod_quantity_value", "I-Prod_quantity_value",
+            "B-Prod_price_key", "I-Prod_price_key",
+            "B-Prod_price_value", "I-Prod_price_value",
+            "B-Total_key", "I-Total_key",
+            "B-Total_value", "I-Total_value",
+            "B-Others", "I-Others"
+        ]
+        self.label2id = {label: i for i, label in enumerate(self.label_list)}
+        self.id2label = {i: label for i, label in enumerate(self.label_list)}
+
+    def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
+        """Load WildReceipt dataset from HuggingFace"""
+        logger.info(f"Loading WildReceipt dataset from {self.hf_dataset_name}")
+
+        dataset = load_dataset(self.hf_dataset_name)
+        train_dataset = dataset["train"]
+        test_dataset = dataset["test"]
+
+        # Create validation split if needed
+        validation_split = self.config["data_processing"].get("validation_split", 0.1)
+        if isinstance(validation_split, float) and 0 < validation_split < 1:
+            train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
+            train_dataset = train_val["train"]
+            val_dataset = train_val["test"]
+        else:
+            val_dataset = None
+
+        return train_dataset, test_dataset, val_dataset
+
+    def get_label_list(self) -> List[str]:
+        """Get WildReceipt label list"""
+        return self.label_list
+
+    def create_examples(self, dataset: HFDataset) -> List[DocumentExample]:
+        """Convert WildReceipt dataset to DocumentExample format"""
+        examples = []
+
+        for item in dataset:
+            words = item["words"]
+            bboxes = item["bboxes"]
+            ner_tags = item["ner_tags"]
+            image = item["image"]
+
+            # Convert numeric labels to string labels
+            labels = [self.id2label[tag] for tag in ner_tags]
+
+            # Normalize bboxes if required
+            if self.normalize_bbox:
+                if image is not None:
+                    # Use actual image dimensions
+                    width, height = image.size
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
+                else:
+                    # For cases without image, use default normalization
+                    width, height = 1000, 1000  # Default page size for WildReceipt
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                              for bbox in bboxes]
+
+            # Prepare image (only if we actually need it)
+            if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
+                image = self.prepare_image(image)
+            else:
+                # Don't include image if include_image is False
+                image = None
+
+            example = DocumentExample(
+                words=words,
+                bboxes=bboxes,
+                labels=labels,
+                image=image
+            )
+            examples.append(example)
+
+        return examples
+
+
 def create_data_loader(
     examples: List[DocumentExample],
     tokenizer: Union[LayoutLMTokenizerFast, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer],
@@ -469,14 +752,10 @@ def create_data_loader(
 DATASET_LOADERS = {
     "funsd": FUNSDDatasetLoader,
     "cord": CORDDatasetLoader,
+    "sroie": SROIEDatasetLoader,
+    "xfund": XFUNDDatasetLoader,
+    "wildreceipt": WildReceiptDatasetLoader,
 }
-
-# Import additional datasets
-try:
-    from .additional_datasets import ADDITIONAL_DATASET_LOADERS
-    DATASET_LOADERS.update(ADDITIONAL_DATASET_LOADERS)
-except ImportError:
-    logger.warning("Additional datasets not available")
 
 
 def get_dataset_loader(config: Dict[str, Any]) -> BaseDatasetLoader:
