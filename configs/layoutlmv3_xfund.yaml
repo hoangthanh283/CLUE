@@ -3,7 +3,7 @@ experiment_name: "layoutlmv3_xfund_zh"
 # Dataset configuration
 dataset:
   name: "xfund"
-  hf_dataset_name: "FrancophonIA/XFUND"
+  hf_dataset_name: "nnul/xfund-multilingual"
   language: "zh"  # Chinese, can be changed to "ja", "es", "fr", "it", "de", "pt"
   task_type: "token_classification"
   preprocessing:
