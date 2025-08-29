@@ -1,6 +1,7 @@
 """
 Data loaders and processors for LayoutLM-based Information Extraction
 """
+
 import io
 import json
 import logging
@@ -8,11 +9,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
-import numpy as np
+from PIL import Image
 import torch
 from datasets import Dataset as HFDataset
 from datasets import load_dataset
-from PIL import Image
+
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import (LayoutLMTokenizerFast, LayoutLMv2Tokenizer,
                           LayoutLMv3Tokenizer)
@@ -27,8 +28,6 @@ class DocumentExample:
     words: List[str]
     bboxes: List[List[int]]  # [x0, y0, x1, y1] format.
     labels: List[str]
-    image: Optional[Image.Image] = None
-    image_path: Optional[str] = None
 
 
 class BaseDatasetLoader(ABC):
@@ -57,7 +56,6 @@ class BaseDatasetLoader(ABC):
             self.tokenizer = LayoutLMTokenizerFast.from_pretrained(model_name)
 
         self.max_seq_length = config["dataset"]["preprocessing"]["max_seq_length"]
-        self.image_size = config["dataset"]["preprocessing"]["image_size"]
         self.normalize_bbox = config["dataset"]["preprocessing"]["normalize_bbox"]
 
     @abstractmethod
@@ -85,6 +83,52 @@ class BaseDatasetLoader(ABC):
         """Process a single dataset item into DocumentExample format"""
         pass
 
+    def get_image_dimensions(self, image) -> Tuple[int, int]:
+        """Get image dimensions without loading full image for processing
+        
+        Args:
+            image: Image in various formats (PIL Image, dict with bytes, etc.)
+            
+        Returns:
+            Tuple of (width, height)
+        """
+        try:
+            # If it's already a PIL Image, get dimensions directly
+            if isinstance(image, Image.Image):
+                return image.size
+            
+            # If it's a dictionary (common in streaming datasets), try to extract bytes
+            if isinstance(image, dict):
+                if "bytes" in image:
+                    with Image.open(io.BytesIO(image["bytes"])) as img:
+                        return img.size
+                elif "path" in image:
+                    with Image.open(image["path"]) as img:
+                        return img.size
+                else:
+                    logger.warning(f"Unknown image dict format: {list(image.keys())}")
+                    return 1000, 1000  # Fallback
+            
+            # If it's bytes directly
+            if isinstance(image, bytes):
+                with Image.open(io.BytesIO(image)) as img:
+                    return img.size
+            
+            # If it's a file path
+            if isinstance(image, str):
+                with Image.open(image) as img:
+                    return img.size
+                
+            # If it has a size attribute, try to use it
+            if hasattr(image, 'size'):
+                return image.size
+            
+            logger.warning(f"Unknown image type: {type(image)}. Using default dimensions.")
+            return 1000, 1000  # Fallback
+        except Exception as e:
+            logger.warning(f"Error getting image dimensions: {e}. Using default dimensions.")
+            return 1000, 1000  # Fallback
+
     def normalize_bbox_coordinates(self, bbox: List[int], width: int, height: int) -> List[int]:
         """Normalize bbox coordinates to [0, 1000] range and clamp to valid bounds"""
         x0, y0, x1, y1 = bbox
@@ -100,22 +144,7 @@ class BaseDatasetLoader(ABC):
         y1 = max(0, min(1000, y1))
         return [x0, y0, x1, y1]
 
-    def prepare_image(self, image) -> Optional[Image.Image]:
-        """Prepare image for LayoutLM processing"""
-        try:
-            # Handle PIL Image
-            if hasattr(image, 'mode'):
-                if image.mode != "RGB":
-                    image = image.convert("RGB")
-                image = image.resize(self.image_size)
-                return image
-            else:
-                # Image might be in a different format (dict, etc.) in streaming mode
-                logger.warning(f"Cannot process image of type {type(image)}. Skipping image processing.")
-                return None
-        except Exception as e:
-            logger.warning(f"Error processing image: {e}. Skipping image processing.")
-            return None
+
     
     def _compute_dataset_length(self, dataset_name: str, hf_dataset_name: str, split_name: str) -> int:
         """Compute actual dataset length by loading in non-streaming mode
@@ -186,8 +215,8 @@ class BaseDatasetLoader(ABC):
             else:
                 logger.warning(f"Split {actual_split_name} not found in dataset {hf_dataset_name}")
                 return 0
-        except Exception as e:
-            logger.warning(f"Could not compute length for {cache_key}: {e}")
+        except Exception as error:
+            logger.warning(f"Could not compute length for {cache_key}: {error}")
             return 0
     
     def get_dataset_length(self, split_name: str) -> int:
@@ -247,14 +276,12 @@ class LayoutLMDataset(Dataset):
         examples: List[DocumentExample],
         tokenizer: Union[LayoutLMTokenizerFast, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer],
         label2id: Dict[str, int],
-        max_seq_length: int = 512,
-        include_image: bool = True
+        max_seq_length: int = 512
     ):
         self.examples = examples
         self.tokenizer = tokenizer
         self.label2id = label2id
         self.max_seq_length = max_seq_length
-        self.include_image = include_image
 
     def __len__(self) -> int:
         return len(self.examples)
@@ -337,53 +364,27 @@ class LayoutLMDataset(Dataset):
                 "labels": torch.tensor(all_token_labels, dtype=torch.long)
             }
         else:
-            # LayoutLM v2/v3 tokenizer
-            if isinstance(self.tokenizer, LayoutLMv3Tokenizer) and self.include_image and example.image is not None:
-                # LayoutLMv3 with image support
-                # Convert string labels to integers
-                integer_labels = [self.label2id.get(label, 0) for label in example.labels]
+            # LayoutLM v2/v3 tokenizer - text + layout only (no images)
+            # Convert string labels to integers
+            integer_labels = [self.label2id.get(label, 0) for label in example.labels]
 
-                encoding = self.tokenizer(
-                    example.words,
-                    boxes=example.bboxes,
-                    word_labels=integer_labels,
-                    images=example.image,  # Pass image directly to v3 tokenizer
-                    truncation=True,
-                    padding="max_length",
-                    max_length=self.max_seq_length,
-                    return_tensors="pt"
-                )
+            encoding = self.tokenizer(
+                example.words,
+                boxes=example.bboxes,
+                word_labels=integer_labels,
+                truncation=True,
+                padding="max_length",
+                max_length=self.max_seq_length,
+                return_tensors="pt"
+            )
 
-                # Prepare output with visual features
-                item = {
-                    "input_ids": encoding["input_ids"].squeeze(),
-                    "attention_mask": encoding["attention_mask"].squeeze(),
-                    "bbox": encoding["bbox"].squeeze(),
-                    "pixel_values": encoding["pixel_values"].squeeze(),  # Visual features
-                    "labels": encoding["labels"].squeeze()
-                }
-            else:
-                # LayoutLM v2/v3 without images OR LayoutLMv2
-                # Convert string labels to integers
-                integer_labels = [self.label2id.get(label, 0) for label in example.labels]
-
-                encoding = self.tokenizer(
-                    example.words,
-                    boxes=example.bboxes,
-                    word_labels=integer_labels,
-                    truncation=True,
-                    padding="max_length",
-                    max_length=self.max_seq_length,
-                    return_tensors="pt"
-                )
-
-                # Prepare output (text + layout only)
-                item = {
-                    "input_ids": encoding["input_ids"].squeeze(),
-                    "attention_mask": encoding["attention_mask"].squeeze(),
-                    "bbox": encoding["bbox"].squeeze(),
-                    "labels": encoding["labels"].squeeze()
-                }
+            # Prepare output (text + layout only)
+            item = {
+                "input_ids": encoding["input_ids"].squeeze(),
+                "attention_mask": encoding["attention_mask"].squeeze(),
+                "bbox": encoding["bbox"].squeeze(),
+                "labels": encoding["labels"].squeeze()
+            }
 
         # Add image if available and required (for v1/v2 or v3 without integrated image processing)
         if (self.include_image and example.image is not None
@@ -404,7 +405,6 @@ class LayoutLMStreamingDataset(IterableDataset):
         tokenizer: Union[LayoutLMTokenizerFast, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer],
         label2id: Dict[str, int],
         max_seq_length: int = 512,
-        include_image: bool = True,
         shuffle: bool = False,
         seed: int = 42,
         split_name: str = "train"
@@ -413,7 +413,6 @@ class LayoutLMStreamingDataset(IterableDataset):
         self.tokenizer = tokenizer
         self.label2id = label2id
         self.max_seq_length = max_seq_length
-        self.include_image = include_image
         self.split_name = split_name
         
         # Get actual dataset length
@@ -516,53 +515,27 @@ class LayoutLMStreamingDataset(IterableDataset):
                 "labels": torch.tensor(all_token_labels, dtype=torch.long)
             }
         else:
-            # LayoutLM v2/v3 tokenizer
-            if isinstance(self.tokenizer, LayoutLMv3Tokenizer) and self.include_image and example.image is not None:
-                # LayoutLMv3 with image support
-                # Convert string labels to integers
-                integer_labels = [self.label2id.get(label, 0) for label in example.labels]
+            # LayoutLM v2/v3 tokenizer - text + layout only (no images)
+            # Convert string labels to integers
+            integer_labels = [self.label2id.get(label, 0) for label in example.labels]
 
-                encoding = self.tokenizer(
-                    example.words,
-                    boxes=example.bboxes,
-                    word_labels=integer_labels,
-                    images=example.image,  # Pass image directly to v3 tokenizer
-                    truncation=True,
-                    padding="max_length",
-                    max_length=self.max_seq_length,
-                    return_tensors="pt"
-                )
+            encoding = self.tokenizer(
+                example.words,
+                boxes=example.bboxes,
+                word_labels=integer_labels,
+                truncation=True,
+                padding="max_length",
+                max_length=self.max_seq_length,
+                return_tensors="pt"
+            )
 
-                # Prepare output with visual features
-                item = {
-                    "input_ids": encoding["input_ids"].squeeze(),
-                    "attention_mask": encoding["attention_mask"].squeeze(),
-                    "bbox": encoding["bbox"].squeeze(),
-                    "pixel_values": encoding["pixel_values"].squeeze(),  # Visual features
-                    "labels": encoding["labels"].squeeze()
-                }
-            else:
-                # LayoutLM v2/v3 without images OR LayoutLMv2
-                # Convert string labels to integers
-                integer_labels = [self.label2id.get(label, 0) for label in example.labels]
-
-                encoding = self.tokenizer(
-                    example.words,
-                    boxes=example.bboxes,
-                    word_labels=integer_labels,
-                    truncation=True,
-                    padding="max_length",
-                    max_length=self.max_seq_length,
-                    return_tensors="pt"
-                )
-
-                # Prepare output (text + layout only)
-                item = {
-                    "input_ids": encoding["input_ids"].squeeze(),
-                    "attention_mask": encoding["attention_mask"].squeeze(),
-                    "bbox": encoding["bbox"].squeeze(),
-                    "labels": encoding["labels"].squeeze()
-                }
+            # Prepare output (text + layout only)
+            item = {
+                "input_ids": encoding["input_ids"].squeeze(),
+                "attention_mask": encoding["attention_mask"].squeeze(),
+                "bbox": encoding["bbox"].squeeze(),
+                "labels": encoding["labels"].squeeze()
+            }
 
         # Add image if available and required (for v1/v2 or v3 without integrated image processing)
         if (self.include_image and example.image is not None
@@ -634,35 +607,22 @@ class FUNSDDatasetLoader(BaseDatasetLoader):
         words = item["words"]
         bboxes = item["bboxes"]
         ner_tags = item["ner_tags"]
-        image = item["image"]
 
         # Convert numeric labels to string labels
         labels = [self.id2label[tag] for tag in ner_tags]
 
         # Normalize bboxes if required
         if self.normalize_bbox:
-            # Always normalize if requested, regardless of whether we'll use the image
-            # Use the original image to get dimensions
-            orig_image = item["image"]
-            if orig_image is not None:
-                try:
-                    width, height = orig_image.size
-                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                              for bbox in bboxes]
-                except AttributeError:
-                    # Image might be a dict or other format in streaming mode
-                    logger.warning(f"Image has no size attribute (type: {type(orig_image)}). Using default dimensions.")
-                    width, height = 1000, 1000
-                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                              for bbox in bboxes]
+            # Get actual image dimensions for proper normalization
+            if "image" in item:
+                width, height = self.get_image_dimensions(item["image"])
+            else:
+                logger.warning("No image found in FUNSD item, using default dimensions")
+                width, height = 1000, 1000
+            bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                      for bbox in bboxes]
 
-        # Prepare image (only if we actually need it)
-        if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
-            image = self.prepare_image(image)
-        else:
-            # Don't include image if include_image is False
-            image = None
-        return DocumentExample(words=words, bboxes=bboxes, labels=labels, image=image)
+        return DocumentExample(words=words, bboxes=bboxes, labels=labels)
 
 
 class CORDDatasetLoader(BaseDatasetLoader):
@@ -753,8 +713,6 @@ class CORDDatasetLoader(BaseDatasetLoader):
         """Process a single CORD dataset item into DocumentExample format"""
         # Parse the ground truth JSON
         ground_truth = json.loads(item["ground_truth"])
-        image = item["image"]
-
         # Extract words, bboxes, and labels from valid_line
         words: List[str] = []
         bboxes: List[List[int]] = []
@@ -788,25 +746,17 @@ class CORDDatasetLoader(BaseDatasetLoader):
             # If no valid words found, skip this example.
             return None
 
-        if self.normalize_bbox and image is not None:
-            # Normalize bboxes if required.
-            try:
-                width, height = image.size
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height) for bbox in bboxes]
-            except AttributeError:
-                # Image might be a dict or other format in streaming mode
-                logger.warning(f"Image has no size attribute (type: {type(image)}). Using default dimensions.")
+        # Normalize bboxes if required using actual image dimensions
+        if self.normalize_bbox:
+            # Get actual image dimensions for proper normalization
+            if "image" in item:
+                width, height = self.get_image_dimensions(item["image"])
+            else:
+                logger.warning("No image found in CORD item, using default dimensions")
                 width, height = 1000, 1000
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                          for bbox in bboxes]
+            bboxes = [self.normalize_bbox_coordinates(bbox, width, height) for bbox in bboxes]
 
-        # Prepare image (only if we actually need it).
-        if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
-            image = self.prepare_image(image)
-        else:
-            # Don't include image if include_image is False.
-            image = None
-        return DocumentExample(words=words, bboxes=bboxes, labels=labels, image=image)
+        return DocumentExample(words=words, bboxes=bboxes, labels=labels)
 
 
 class SROIEDatasetLoader(BaseDatasetLoader):
@@ -874,20 +824,13 @@ class SROIEDatasetLoader(BaseDatasetLoader):
             # darentang/sroie format
             bboxes = item["bboxes"]
             ner_tags = item["ner_tags"]
-            # For darentang/sroie, we need to load image from path
-            if "image_path" in item:
-                # For now, we'll skip image loading and set to None
-                # since LayoutLMv3 text-only mode doesn't need images
-                image = None
-            else:
-                image = item.get("image", None)
+            # For darentang/sroie, we skip image handling
         elif "actual_boxes" in item:
             # buthaya/sroie format
             bboxes = item["actual_boxes"]
             labels_str = item["labels"]
             # Convert string labels to numeric then back to our format
             ner_tags = [self.label2id.get(label, 0) for label in labels_str]
-            image = item.get("image", None)
         else:
             raise ValueError(f"Unknown SROIE dataset format. Available keys: {list(item.keys())}")
 
@@ -896,29 +839,20 @@ class SROIEDatasetLoader(BaseDatasetLoader):
 
         # Normalize bboxes if required
         if self.normalize_bbox:
-            if image is not None:
-                # Use actual image dimensions
-                width, height = image.size
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                          for bbox in bboxes]
+            # Check if we have page dimensions from the dataset
+            if "page_width" in item and "page_height" in item:
+                width, height = item["page_width"], item["page_height"]
+            elif "image" in item:
+                # Get dimensions from image if page dimensions not available
+                width, height = self.get_image_dimensions(item["image"])
             else:
-                # For cases without image, use default normalization
-                # Check if we have page dimensions from the dataset
-                if "page_width" in item and "page_height" in item:
-                    width, height = item["page_width"], item["page_height"]
-                else:
-                    # Use reasonable defaults for SROIE documents
-                    width, height = 1000, 1000
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                          for bbox in bboxes]
+                # Use reasonable defaults for SROIE documents
+                logger.warning("No page dimensions or image found in SROIE item, using default dimensions")
+                width, height = 1000, 1000
+            bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                      for bbox in bboxes]
 
-        # Prepare image (only if we actually need it)
-        if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
-            image = self.prepare_image(image)
-        else:
-            # Don't include image if include_image is False
-            image = None
-        return DocumentExample(words=words, bboxes=bboxes, labels=labels, image=image)
+        return DocumentExample(words=words, bboxes=bboxes, labels=labels)
 
 
 class XFUNDDatasetLoader(BaseDatasetLoader):
@@ -984,30 +918,21 @@ class XFUNDDatasetLoader(BaseDatasetLoader):
         words = item["words"]
         bboxes = item["bboxes"]
         ner_tags = item["ner_tags"]
-        image = item["image"]
 
         # Convert numeric labels to string labels
         labels = [self.id2label[tag] for tag in ner_tags]
 
         # Normalize bboxes if required
         if self.normalize_bbox:
-            if image is not None:
-                if isinstance(image, dict):
-                    image = Image.open(io.BytesIO(image["bytes"]))
-                width, height = image.size
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height) for bbox in bboxes]
+            # Get actual image dimensions for proper normalization
+            if "image" in item:
+                width, height = self.get_image_dimensions(item["image"])
             else:
-                # For cases without image, use default normalization.
-                width, height = 1000, 1000  # Default page size for XFUND.
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height) for bbox in bboxes]
+                logger.warning("No image found in XFUND item, using default dimensions")
+                width, height = 1000, 1000
+            bboxes = [self.normalize_bbox_coordinates(bbox, width, height) for bbox in bboxes]
 
-        # Prepare image (only if we actually need it)
-        if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
-            image = self.prepare_image(image)
-        else:
-            # Don't include image if include_image is False
-            image = None
-        return DocumentExample(words=words, bboxes=bboxes, labels=labels, image=image)
+        return DocumentExample(words=words, bboxes=bboxes, labels=labels)
 
 
 class WildReceiptDatasetLoader(BaseDatasetLoader):
@@ -1087,31 +1012,22 @@ class WildReceiptDatasetLoader(BaseDatasetLoader):
         words = item["words"]
         bboxes = item["bboxes"]
         ner_tags = item["ner_tags"]
-        image = item["image"]
 
         # Convert numeric labels to string labels
         labels = [self.id2label[tag] for tag in ner_tags]
 
         # Normalize bboxes if required
         if self.normalize_bbox:
-            if image is not None:
-                # Use actual image dimensions
-                width, height = image.size
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                          for bbox in bboxes]
+            # Get actual image dimensions for proper normalization
+            if "image" in item:
+                width, height = self.get_image_dimensions(item["image"])
             else:
-                # For cases without image, use default normalization
-                width, height = 1000, 1000  # Default page size for WildReceipt
-                bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
-                          for bbox in bboxes]
+                logger.warning("No image found in WildReceipt item, using default dimensions")
+                width, height = 1000, 1000
+            bboxes = [self.normalize_bbox_coordinates(bbox, width, height)
+                      for bbox in bboxes]
 
-        # Prepare image (only if we actually need it)
-        if image is not None and self.config["dataset"]["preprocessing"]["include_image"]:
-            image = self.prepare_image(image)
-        else:
-            # Don't include image if include_image is False
-            image = None
-        return DocumentExample(words=words, bboxes=bboxes, labels=labels, image=image)
+        return DocumentExample(words=words, bboxes=bboxes, labels=labels)
 
 
 def create_data_loader(
@@ -1151,7 +1067,7 @@ def create_data_loader(
             tokenizer=tokenizer,
             label2id=label2id,
             max_seq_length=config["dataset"]["preprocessing"]["max_seq_length"],
-            include_image=config["dataset"]["preprocessing"]["include_image"],
+
             shuffle=shuffle_train,
             seed=seed,
             split_name=split_name
@@ -1175,7 +1091,7 @@ def create_data_loader(
             tokenizer=tokenizer,
             label2id=label2id,
             max_seq_length=config["dataset"]["preprocessing"]["max_seq_length"],
-            include_image=config["dataset"]["preprocessing"]["include_image"]
+
         )
 
         return DataLoader(

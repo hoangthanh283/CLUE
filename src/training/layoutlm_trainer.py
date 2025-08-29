@@ -168,10 +168,7 @@ class LayoutLMTrainer:
 
     def train(self) -> Dict[str, float]:
         """Main training loop"""
-        logger.info("Starting training...")
-
         num_epochs = self.training_config["num_epochs"]
-
         for epoch in range(num_epochs):
             self.epoch = epoch
 
