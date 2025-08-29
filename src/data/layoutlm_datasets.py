@@ -146,20 +146,27 @@ class BaseDatasetLoader(ABC):
 
 
     
-    def _compute_dataset_length(self, dataset_name: str, hf_dataset_name: str, split_name: str) -> int:
+    def _compute_dataset_length(self, dataset_name: str, hf_dataset_name: str, split_name: str, quick_mode: bool = True) -> int:
         """Compute actual dataset length by loading in non-streaming mode
         
         Args:
             dataset_name: Name of the dataset
             hf_dataset_name: HuggingFace dataset name
             split_name: Split name (train, test, validation)
+            quick_mode: If True, skip expensive length computation for streaming mode
             
         Returns:
-            Actual dataset length
+            Actual dataset length or 0 if quick_mode is enabled
         """
         cache_key = f"{dataset_name}_{split_name}"
         if cache_key in self._dataset_lengths:
             return self._dataset_lengths[cache_key]
+        
+        # Skip expensive computation in streaming mode if quick_mode is enabled
+        if quick_mode and self.streaming:
+            logger.info(f"Skipping length computation for {dataset_name} {split_name} split (streaming quick mode)")
+            self._dataset_lengths[cache_key] = 0
+            return 0
         
         try:
             logger.info(f"Computing length for {dataset_name} {split_name} split...")
@@ -240,22 +247,17 @@ class BaseDatasetLoader(ABC):
                 logger.info(f"Applying shuffle to streaming dataset with seed {seed}")
                 train_dataset = train_dataset.shuffle(seed=seed, buffer_size=10000)
             
-            # For streaming datasets, we need to estimate the total size to create proper splits
-            total_length = self.get_dataset_length("train")
-            if total_length > 0:
-                val_size = int(total_length * validation_split)
-                train_size = total_length - val_size
-                
-                # Use take() and skip() methods which work with streaming datasets  
-                val_dataset = train_dataset.take(val_size)  # Take first val_size examples for validation
-                train_dataset_split = train_dataset.skip(val_size)  # Skip first val_size examples for training
-                
-                logger.info(f"Streaming split: validation={val_size}, training={train_size}")
-            else:
-                # Fallback if we can't determine size
-                skip_ratio = int(1.0 / validation_split)
-                val_dataset = train_dataset.take(skip_ratio)
-                train_dataset_split = train_dataset.skip(skip_ratio)
+            # For streaming datasets, use a simple ratio-based split to avoid expensive computation
+            # We'll estimate split sizes based on the validation_split ratio
+            estimated_total = 1000  # Rough estimate for logging purposes
+            val_size = int(estimated_total * validation_split)
+            train_size = estimated_total - val_size
+            
+            # Use take() and skip() methods which work with streaming datasets  
+            val_dataset = train_dataset.take(val_size)  # Take first val_size examples for validation
+            train_dataset_split = train_dataset.skip(val_size)  # Skip first val_size examples for training
+            
+            logger.info(f"Streaming split (estimated): validation=~{val_size}, training=~{train_size}")
             
             shuffle_msg = " with shuffling" if shuffle else ""
             logger.info(f"Streaming mode: Created train/val split{shuffle_msg}.")
@@ -386,12 +388,7 @@ class LayoutLMDataset(Dataset):
                 "labels": encoding["labels"].squeeze()
             }
 
-        # Add image if available and required (for v1/v2 or v3 without integrated image processing)
-        if (self.include_image and example.image is not None
-                and not isinstance(self.tokenizer, LayoutLMv3Tokenizer)):
-            # Convert PIL image to tensor for v1/v2
-            image_tensor = torch.tensor(np.array(example.image)).permute(2, 0, 1).float() / 255.0
-            item["image"] = image_tensor
+
         return item
 
 
@@ -415,13 +412,10 @@ class LayoutLMStreamingDataset(IterableDataset):
         self.max_seq_length = max_seq_length
         self.split_name = split_name
         
-        # Get actual dataset length
-        try:
-            self._length = dataset_loader.get_dataset_length(split_name)
-            logger.info(f"LayoutLMStreamingDataset created for '{split_name}' split with length: {self._length}")
-        except Exception as e:
-            logger.warning(f"Could not get dataset length for split '{split_name}': {e}. Using 0.")
-            self._length = 0
+        # For streaming datasets, we'll use 0 as length to avoid expensive computation
+        # The length is only used for progress bars and scheduler setup
+        self._length = 0
+        logger.info(f"LayoutLMStreamingDataset created for '{split_name}' split (length unknown in streaming mode)")
         
         # Apply shuffling if requested
         if shuffle:
@@ -537,12 +531,7 @@ class LayoutLMStreamingDataset(IterableDataset):
                 "labels": encoding["labels"].squeeze()
             }
 
-        # Add image if available and required (for v1/v2 or v3 without integrated image processing)
-        if (self.include_image and example.image is not None
-                and not isinstance(self.tokenizer, LayoutLMv3Tokenizer)):
-            # Convert PIL image to tensor for v1/v2
-            image_tensor = torch.tensor(np.array(example.image)).permute(2, 0, 1).float() / 255.0
-            item["image"] = image_tensor
+
 
         return item
 
@@ -1134,24 +1123,16 @@ def safe_dataset_length(dataset: Union[HFDataset, LayoutLMStreamingDataset], str
     Returns:
         Dataset length as int, or descriptive string if unavailable
     """
-    # If it's a LayoutLMStreamingDataset, it has a __len__ method
+    # If it's a LayoutLMStreamingDataset, return descriptive string since length is unknown
     if isinstance(dataset, LayoutLMStreamingDataset):
-        return len(dataset)
+        return "Unknown (streaming mode)"
     
-    # If we have a dataset_loader and we're in streaming mode, get actual length
-    if streaming and dataset_loader is not None:
-        try:
-            actual_length = dataset_loader.get_dataset_length(split_name)
-            if actual_length > 0:
-                return actual_length
-        except Exception as e:
-            logger.warning(f"Could not get actual dataset length: {e}")
+    # For streaming mode, return unknown to avoid expensive computation
+    if streaming:
+        return "Unknown (streaming mode)"
     
     # Fallback for non-streaming mode
-    if not streaming:
-        try:
-            return len(dataset)
-        except Exception:
-            return "Unknown (length unavailable)"
-    
-    return "Unknown (streaming mode)"
+    try:
+        return len(dataset)
+    except Exception:
+        return "Unknown (length unavailable)"
