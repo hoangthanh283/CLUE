@@ -17,24 +17,9 @@ def main():
     print("Loading dataset...")
     train_dataset, test_dataset, val_dataset = dataset_loader.load_data()
 
-    # Check if we're in streaming mode
-    streaming_mode = config["dataset"].get("streaming", False)
-    print(f"Streaming mode: {streaming_mode}")
-
-    print("Creating examples...")
-    if streaming_mode:
-        # In streaming mode, we can't use .select(), so we'll iterate and take first 3
-        print("Using streaming mode - taking first 3 examples...")
-        train_examples = []
-        for i, item in enumerate(train_dataset):
-            if i >= 3:
-                break
-            example = dataset_loader._process_single_item(item)
-            train_examples.append(example)
-    else:
-        # In memory mode, we can use .select()
-        sample_dataset = train_dataset.select(range(3))  # Just first 3
-        train_examples = dataset_loader.create_examples(sample_dataset)
+    print("Sampling examples...")
+    sample_dataset = train_dataset.select(range(3))  # first 3 for quick sanity
+    train_examples = dataset_loader.create_examples(sample_dataset)
 
     print("Loading LayoutLMv3 tokenizer...")
     tokenizer = LayoutLMv3Tokenizer.from_pretrained("microsoft/layoutlmv3-base")

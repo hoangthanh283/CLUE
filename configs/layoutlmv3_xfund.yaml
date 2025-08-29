@@ -6,7 +6,7 @@ dataset:
   hf_dataset_name: "nnul/xfund-multilingual"
   language: "de"  # Chinese, can be changed to "ja", "es", "fr", "it", "de", "pt"
   task_type: "token_classification"
-  streaming: true 
+  
   preprocessing:
     max_seq_length: 512
     max_position_embeddings: 1024
@@ -36,7 +36,7 @@ training:
   warmup_ratio: 0.1
   optimizer: "adamw"
   scheduler: "linear"
-  estimated_steps_per_epoch: 100  # Estimated steps per epoch for streaming mode
+  
   save_strategy: null
   evaluation_strategy: "epoch"
   save_total_limit: 3
@@ -50,7 +50,7 @@ data_processing:
   train_split: "train"
   test_split: "validation"  # XFUND uses validation as test set
   validation_split: 0.1
-  shuffle_train: true  # Now supported in streaming mode with buffer-based shuffling
+  shuffle_train: true
   seed: 42
 
 # Continual Learning Strategy

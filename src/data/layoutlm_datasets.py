@@ -14,7 +14,7 @@ import torch
 from datasets import Dataset as HFDataset
 from datasets import load_dataset
 
-from torch.utils.data import DataLoader, Dataset, IterableDataset
+from torch.utils.data import DataLoader, Dataset
 from transformers import (LayoutLMTokenizerFast, LayoutLMv2Tokenizer,
                           LayoutLMv3Tokenizer)
 
@@ -38,12 +38,11 @@ class BaseDatasetLoader(ABC):
         self.dataset_name = config["dataset"]["name"]
         self.hf_dataset_name = config["dataset"]["hf_dataset_name"]
         self.task_type = config["dataset"]["task_type"]
-        
-        # Check if streaming mode is enabled
-        self.streaming = config["dataset"].get("streaming", False)
-        
+        # Streaming mode removed; always use on-demand map-style datasets
         # Cache for actual dataset lengths (will be populated during load_data)
         self._dataset_lengths = {}
+        # Cache image dimensions to avoid repeated disk I/O
+        self._image_size_cache: Dict[str, Tuple[int, int]] = {}
 
         # Initialize tokenizer based on model type
         model_name = config["model"]["pretrained_model_name"]
@@ -73,11 +72,6 @@ class BaseDatasetLoader(ABC):
         """Convert HuggingFace dataset to DocumentExample format"""
         pass
     
-    def create_examples_iterator(self, dataset: HFDataset) -> Iterator[DocumentExample]:
-        """Create an iterator over DocumentExample objects for streaming"""
-        for item in dataset:
-            yield self._process_single_item(item)
-    
     @abstractmethod
     def _process_single_item(self, item: Dict[str, Any]) -> DocumentExample:
         """Process a single dataset item into DocumentExample format"""
@@ -97,27 +91,51 @@ class BaseDatasetLoader(ABC):
             if isinstance(image, Image.Image):
                 return image.size
             
-            # If it's a dictionary (common in streaming datasets), try to extract bytes
+            # If it's a dictionary (e.g., with raw bytes), try to extract bytes
             if isinstance(image, dict):
-                if "bytes" in image:
-                    with Image.open(io.BytesIO(image["bytes"])) as img:
-                        return img.size
-                elif "path" in image:
+                # Prefer caching by path
+                if "path" in image and isinstance(image["path"], str):
+                    key = image["path"]
+                    if key in self._image_size_cache:
+                        return self._image_size_cache[key]
                     with Image.open(image["path"]) as img:
-                        return img.size
+                        size = img.size
+                    self._image_size_cache[key] = size
+                    return size
+                elif "bytes" in image and isinstance(image["bytes"], (bytes, bytearray)):
+                    raw = image["bytes"]
+                    # Lightweight cache key derived from length and prefix to avoid hashing entire file
+                    prefix = bytes(raw[:64])
+                    key = f"bytes:{len(raw)}:{prefix}"
+                    if key in self._image_size_cache:
+                        return self._image_size_cache[key]
+                    with Image.open(io.BytesIO(raw)) as img:
+                        size = img.size
+                    self._image_size_cache[key] = size
+                    return size
                 else:
                     logger.warning(f"Unknown image dict format: {list(image.keys())}")
                     return 1000, 1000  # Fallback
             
             # If it's bytes directly
             if isinstance(image, bytes):
+                prefix = image[:64]
+                key = f"bytes:{len(image)}:{prefix}"
+                if key in self._image_size_cache:
+                    return self._image_size_cache[key]
                 with Image.open(io.BytesIO(image)) as img:
-                    return img.size
+                    size = img.size
+                self._image_size_cache[key] = size
+                return size
             
             # If it's a file path
             if isinstance(image, str):
+                if image in self._image_size_cache:
+                    return self._image_size_cache[image]
                 with Image.open(image) as img:
-                    return img.size
+                    size = img.size
+                self._image_size_cache[image] = size
+                return size
                 
             # If it has a size attribute, try to use it
             if hasattr(image, 'size'):
@@ -146,14 +164,15 @@ class BaseDatasetLoader(ABC):
 
 
     
-    def _compute_dataset_length(self, dataset_name: str, hf_dataset_name: str, split_name: str, quick_mode: bool = True) -> int:
-        """Compute actual dataset length by loading in non-streaming mode
+    def _compute_dataset_length(self, dataset_name: str, hf_dataset_name: str, split_name: str, quick_mode: bool = True
+                                ) -> int:
+        """Compute actual dataset length by loading the dataset
         
         Args:
             dataset_name: Name of the dataset
             hf_dataset_name: HuggingFace dataset name
             split_name: Split name (train, test, validation)
-            quick_mode: If True, skip expensive length computation for streaming mode
+            quick_mode: Reserved for compatibility (no special behavior)
             
         Returns:
             Actual dataset length or 0 if quick_mode is enabled
@@ -162,15 +181,9 @@ class BaseDatasetLoader(ABC):
         if cache_key in self._dataset_lengths:
             return self._dataset_lengths[cache_key]
         
-        # Skip expensive computation in streaming mode if quick_mode is enabled
-        if quick_mode and self.streaming:
-            logger.info(f"Skipping length computation for {dataset_name} {split_name} split (streaming quick mode)")
-            self._dataset_lengths[cache_key] = 0
-            return 0
-        
         try:
             logger.info(f"Computing length for {dataset_name} {split_name} split...")
-            # Load in non-streaming mode to get length
+            # Load dataset to get length
             non_streaming_dataset = load_dataset(hf_dataset_name, streaming=False)
 
             # Handle different dataset split mappings
@@ -196,7 +209,8 @@ class BaseDatasetLoader(ABC):
                     if isinstance(validation_split, float) and 0 < validation_split < 1:
                         val_length = int(train_length * validation_split)
                         self._dataset_lengths[cache_key] = val_length
-                        logger.info(f"Cached validation length for {cache_key}: {val_length} (from train: {train_length})")
+                        logger.info(f"Cached validation length for {cache_key}: {val_length} (from train: "
+                                    f"{train_length})")
                         return val_length
                     else:
                         return 0
@@ -237,37 +251,7 @@ class BaseDatasetLoader(ABC):
         """
         return self._compute_dataset_length(self.dataset_name, self.hf_dataset_name, split_name)
 
-    def _create_streaming_validation_split(self, train_dataset: HFDataset, validation_split: float, shuffle: bool = False) -> Tuple[HFDataset, HFDataset]:
-        """Create train/validation split for streaming datasets"""
-        try:
-            # Add shuffling support for streaming datasets
-            if shuffle:
-                # Add a seed for reproducible shuffling
-                seed = self.config.get("data_processing", {}).get("seed", 42)
-                logger.info(f"Applying shuffle to streaming dataset with seed {seed}")
-                train_dataset = train_dataset.shuffle(seed=seed, buffer_size=10000)
-            
-            # For streaming datasets, use a simple ratio-based split to avoid expensive computation
-            # We'll estimate split sizes based on the validation_split ratio
-            estimated_total = 1000  # Rough estimate for logging purposes
-            val_size = int(estimated_total * validation_split)
-            train_size = estimated_total - val_size
-            
-            # Use take() and skip() methods which work with streaming datasets  
-            val_dataset = train_dataset.take(val_size)  # Take first val_size examples for validation
-            train_dataset_split = train_dataset.skip(val_size)  # Skip first val_size examples for training
-            
-            logger.info(f"Streaming split (estimated): validation=~{val_size}, training=~{train_size}")
-            
-            shuffle_msg = " with shuffling" if shuffle else ""
-            logger.info(f"Streaming mode: Created train/val split{shuffle_msg}.")
-            return train_dataset_split, val_dataset
-            
-        except Exception as e:
-            logger.warning(f"Could not create proper streaming split: {e}. "
-                         "Using full training set for both train and validation.")
-            # Fallback: use full dataset for both (not ideal but works)
-            return train_dataset, train_dataset
+    # Legacy streaming utilities have been fully removed
 
 
 class LayoutLMDataset(Dataset):
@@ -293,247 +277,64 @@ class LayoutLMDataset(Dataset):
         return self._process_example(example)
     
     def _process_example(self, example: DocumentExample) -> Dict[str, torch.Tensor]:
-        """Process a single DocumentExample into model inputs"""
-        # For LayoutLM v1, we need to handle tokenization differently
-        if isinstance(self.tokenizer, LayoutLMTokenizerFast):
-            # LayoutLM v1 tokenizer - tokenize words individually then concatenate
-            all_tokens = []
-            all_token_boxes = []
-            all_token_labels = []
-
-            # Add [CLS] token
-            all_tokens.append(self.tokenizer.cls_token_id)
-            all_token_boxes.append([0, 0, 0, 0])
-            all_token_labels.append(0)  # O label for [CLS]
-
-            # Process each word
-            for word, bbox, label in zip(example.words, example.bboxes, example.labels):
-                # Tokenize the word
-                word_tokens = self.tokenizer.tokenize(word)
-                word_token_ids = self.tokenizer.convert_tokens_to_ids(word_tokens)
-
-                # Add tokens for this word
-                for i, token_id in enumerate(word_token_ids):
-                    all_tokens.append(token_id)
-
-                    # Clamp bbox coordinates to valid range [0, 1000]
-                    clamped_bbox = [
-                        max(0, min(1000, bbox[0])),
-                        max(0, min(1000, bbox[1])),
-                        max(0, min(1000, bbox[2])),
-                        max(0, min(1000, bbox[3]))
-                    ]
-                    all_token_boxes.append(clamped_bbox)
-
-                    # Use B- label for first token, I- label for subsequent tokens
-                    if i == 0:
-                        # First token of word gets the original label
-                        token_label = self.label2id.get(label, 0)
-                    else:
-                        # Subsequent tokens get I- version if it's a B- label
-                        if label.startswith('B-'):
-                            i_label = 'I-' + label[2:]
-                            token_label = self.label2id.get(i_label, 0)
-                        else:
-                            token_label = self.label2id.get(label, 0)
-                    all_token_labels.append(token_label)
-
-            # Add [SEP] token
-            all_tokens.append(self.tokenizer.sep_token_id)
-            all_token_boxes.append([1000, 1000, 1000, 1000])
-            all_token_labels.append(0)  # O label for [SEP]
-
-            # Truncate if too long
-            if len(all_tokens) > self.max_seq_length:
-                all_tokens = all_tokens[:self.max_seq_length - 1] + [self.tokenizer.sep_token_id]
-                all_token_boxes = all_token_boxes[:self.max_seq_length - 1] + [[1000, 1000, 1000, 1000]]
-                all_token_labels = all_token_labels[:self.max_seq_length - 1] + [0]
-
-            # Pad to max_seq_length
-            while len(all_tokens) < self.max_seq_length:
-                all_tokens.append(self.tokenizer.pad_token_id)
-                all_token_boxes.append([0, 0, 0, 0])
-                all_token_labels.append(-100)  # Ignore label for [PAD]
-
-            # Create attention mask
-            attention_mask = [1 if token_id != self.tokenizer.pad_token_id else 0 for token_id in all_tokens]
-
-            # Prepare output
-            item = {
-                "input_ids": torch.tensor(all_tokens, dtype=torch.long),
-                "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
-                "bbox": torch.tensor(all_token_boxes, dtype=torch.long),
-                "labels": torch.tensor(all_token_labels, dtype=torch.long)
-            }
-        else:
-            # LayoutLM v2/v3 tokenizer - text + layout only (no images)
-            # Convert string labels to integers
-            integer_labels = [self.label2id.get(label, 0) for label in example.labels]
-
-            encoding = self.tokenizer(
-                example.words,
-                boxes=example.bboxes,
-                word_labels=integer_labels,
-                truncation=True,
-                padding="max_length",
-                max_length=self.max_seq_length,
-                return_tensors="pt"
-            )
-
-            # Prepare output (text + layout only)
-            item = {
-                "input_ids": encoding["input_ids"].squeeze(),
-                "attention_mask": encoding["attention_mask"].squeeze(),
-                "bbox": encoding["bbox"].squeeze(),
-                "labels": encoding["labels"].squeeze()
-            }
+        """Process a single DocumentExample into model inputs using fast tokenizer for all versions."""
+        integer_labels = [self.label2id.get(label, 0) for label in example.labels]
+        encoding = self.tokenizer(
+            example.words,
+            boxes=example.bboxes,
+            word_labels=integer_labels,
+            truncation=True,
+            padding="max_length",
+            max_length=self.max_seq_length,
+            return_tensors="pt",
+        )
+        return {
+            "input_ids": encoding["input_ids"].squeeze(),
+            "attention_mask": encoding["attention_mask"].squeeze(),
+            "bbox": encoding["bbox"].squeeze(),
+            "labels": encoding["labels"].squeeze(),
+        }
 
 
-        return item
-
-
-class LayoutLMStreamingDataset(IterableDataset):
-    """Streaming PyTorch Dataset for LayoutLM models"""
+class LayoutLMMapDataset(Dataset):
+    """Map-style dataset that reads HF rows on-demand and tokenizes lazily."""
 
     def __init__(
         self,
         dataset_loader: BaseDatasetLoader,
-        dataset: HFDataset,
+        hf_dataset: HFDataset,
         tokenizer: Union[LayoutLMTokenizerFast, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer],
         label2id: Dict[str, int],
         max_seq_length: int = 512,
-        shuffle: bool = False,
-        seed: int = 42,
-        split_name: str = "train"
     ):
         self.dataset_loader = dataset_loader
+        self.hf_dataset = hf_dataset
         self.tokenizer = tokenizer
         self.label2id = label2id
         self.max_seq_length = max_seq_length
-        self.split_name = split_name
-        
-        # For streaming datasets, we'll use 0 as length to avoid expensive computation
-        # The length is only used for progress bars and scheduler setup
-        self._length = 0
-        logger.info(f"LayoutLMStreamingDataset created for '{split_name}' split (length unknown in streaming mode)")
-        
-        # Apply shuffling if requested
-        if shuffle:
-            logger.info(f"Applying shuffle to streaming dataset with seed {seed}")
-            self.dataset = dataset.shuffle(seed=seed, buffer_size=10000)
-        else:
-            self.dataset = dataset
-    
+
     def __len__(self) -> int:
-        """Return the actual dataset length"""
-        return self._length
+        return len(self.hf_dataset)
 
-    def __iter__(self) -> Iterator[Dict[str, torch.Tensor]]:
-        """Iterate over the dataset and yield processed examples"""
-        for item in self.dataset:
-            example = self.dataset_loader._process_single_item(item)
-            if example is not None:  # Skip None examples (e.g., from CORD dataset)
-                yield self._process_example(example)
-    
-    def _process_example(self, example: DocumentExample) -> Dict[str, torch.Tensor]:
-        """Process a single DocumentExample into model inputs"""
-        # For LayoutLM v1, we need to handle tokenization differently
-        if isinstance(self.tokenizer, LayoutLMTokenizerFast):
-            # LayoutLM v1 tokenizer - tokenize words individually then concatenate
-            all_tokens = []
-            all_token_boxes = []
-            all_token_labels = []
-
-            # Add [CLS] token
-            all_tokens.append(self.tokenizer.cls_token_id)
-            all_token_boxes.append([0, 0, 0, 0])
-            all_token_labels.append(0)  # O label for [CLS]
-
-            # Process each word
-            for word, bbox, label in zip(example.words, example.bboxes, example.labels):
-                # Tokenize the word
-                word_tokens = self.tokenizer.tokenize(word)
-                word_token_ids = self.tokenizer.convert_tokens_to_ids(word_tokens)
-
-                # Add tokens for this word
-                for i, token_id in enumerate(word_token_ids):
-                    all_tokens.append(token_id)
-
-                    # Clamp bbox coordinates to valid range [0, 1000]
-                    clamped_bbox = [
-                        max(0, min(1000, bbox[0])),
-                        max(0, min(1000, bbox[1])),
-                        max(0, min(1000, bbox[2])),
-                        max(0, min(1000, bbox[3]))
-                    ]
-                    all_token_boxes.append(clamped_bbox)
-
-                    # Use B- label for first token, I- label for subsequent tokens
-                    if i == 0:
-                        # First token of word gets the original label
-                        token_label = self.label2id.get(label, 0)
-                    else:
-                        # Subsequent tokens get I- version if it's a B- label
-                        if label.startswith('B-'):
-                            i_label = 'I-' + label[2:]
-                            token_label = self.label2id.get(i_label, 0)
-                        else:
-                            token_label = self.label2id.get(label, 0)
-                    all_token_labels.append(token_label)
-
-            # Add [SEP] token
-            all_tokens.append(self.tokenizer.sep_token_id)
-            all_token_boxes.append([1000, 1000, 1000, 1000])
-            all_token_labels.append(0)  # O label for [SEP]
-
-            # Truncate if too long
-            if len(all_tokens) > self.max_seq_length:
-                all_tokens = all_tokens[:self.max_seq_length - 1] + [self.tokenizer.sep_token_id]
-                all_token_boxes = all_token_boxes[:self.max_seq_length - 1] + [[1000, 1000, 1000, 1000]]
-                all_token_labels = all_token_labels[:self.max_seq_length - 1] + [0]
-
-            # Pad to max_seq_length
-            while len(all_tokens) < self.max_seq_length:
-                all_tokens.append(self.tokenizer.pad_token_id)
-                all_token_boxes.append([0, 0, 0, 0])
-                all_token_labels.append(-100)  # Ignore label for [PAD]
-
-            # Create attention mask
-            attention_mask = [1 if token_id != self.tokenizer.pad_token_id else 0 for token_id in all_tokens]
-
-            # Prepare output
-            item = {
-                "input_ids": torch.tensor(all_tokens, dtype=torch.long),
-                "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
-                "bbox": torch.tensor(all_token_boxes, dtype=torch.long),
-                "labels": torch.tensor(all_token_labels, dtype=torch.long)
-            }
-        else:
-            # LayoutLM v2/v3 tokenizer - text + layout only (no images)
-            # Convert string labels to integers
-            integer_labels = [self.label2id.get(label, 0) for label in example.labels]
-
-            encoding = self.tokenizer(
-                example.words,
-                boxes=example.bboxes,
-                word_labels=integer_labels,
-                truncation=True,
-                padding="max_length",
-                max_length=self.max_seq_length,
-                return_tensors="pt"
-            )
-
-            # Prepare output (text + layout only)
-            item = {
-                "input_ids": encoding["input_ids"].squeeze(),
-                "attention_mask": encoding["attention_mask"].squeeze(),
-                "bbox": encoding["bbox"].squeeze(),
-                "labels": encoding["labels"].squeeze()
-            }
-
-
-
-        return item
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+        item = self.hf_dataset[int(idx)]
+        example = self.dataset_loader._process_single_item(item)
+        integer_labels = [self.label2id.get(label, 0) for label in example.labels]
+        encoding = self.tokenizer(
+            example.words,
+            boxes=example.bboxes,
+            word_labels=integer_labels,
+            truncation=True,
+            padding="max_length",
+            max_length=self.max_seq_length,
+            return_tensors="pt",
+        )
+        return {
+            "input_ids": encoding["input_ids"].squeeze(),
+            "attention_mask": encoding["attention_mask"].squeeze(),
+            "bbox": encoding["bbox"].squeeze(),
+            "labels": encoding["labels"].squeeze(),
+        }
 
 
 class FUNSDDatasetLoader(BaseDatasetLoader):
@@ -549,9 +350,9 @@ class FUNSDDatasetLoader(BaseDatasetLoader):
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
         """Load FUNSD dataset from HuggingFace"""
-        logger.info(f"Loading FUNSD dataset from {self.hf_dataset_name} (streaming={self.streaming})")
+        logger.info(f"Loading FUNSD dataset from {self.hf_dataset_name}")
 
-        dataset = load_dataset(self.hf_dataset_name, streaming=self.streaming)
+        dataset = load_dataset(self.hf_dataset_name, streaming=False)
         train_dataset = dataset["train"]
         test_dataset = dataset["test"]
         val_dataset = dataset.get("validation", None)
@@ -560,17 +361,10 @@ class FUNSDDatasetLoader(BaseDatasetLoader):
         if val_dataset is None:
             validation_split = self.config["data_processing"].get("validation_split", 0.1)
             if isinstance(validation_split, float) and 0 < validation_split < 1:
-                if not self.streaming:
-                    # For non-streaming datasets, we can use train_test_split
-                    train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-                    train_dataset = train_val["train"]
-                    val_dataset = train_val["test"]
-                else:
-                    # For streaming datasets, use the helper method
-                    shuffle_train = self.config.get("data_processing", {}).get("shuffle_train", False)
-                    train_dataset, val_dataset = self._create_streaming_validation_split(
-                        train_dataset, validation_split, shuffle=shuffle_train
-                    )
+                # Use built-in split for map-style dataset
+                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
+                train_dataset = train_val["train"]
+                val_dataset = train_val["test"]
 
         return train_dataset, test_dataset, val_dataset
 
@@ -580,12 +374,6 @@ class FUNSDDatasetLoader(BaseDatasetLoader):
 
     def create_examples(self, dataset: HFDataset) -> List[DocumentExample]:
         """Convert FUNSD dataset to DocumentExample format"""
-        if self.streaming:
-            # For streaming datasets, this method shouldn't be used
-            # Instead, use create_examples_iterator or the streaming dataset directly
-            raise ValueError("create_examples() should not be used with streaming datasets. "
-                           "Use create_examples_iterator() instead.")
-        
         examples = []
         for item in dataset:
             examples.append(self._process_single_item(item))
@@ -656,9 +444,9 @@ class CORDDatasetLoader(BaseDatasetLoader):
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
         """Load CORD dataset from HuggingFace"""
-        logger.info(f"Loading CORD dataset from {self.hf_dataset_name} (streaming={self.streaming})")
+        logger.info(f"Loading CORD dataset from {self.hf_dataset_name}")
 
-        dataset = load_dataset(self.hf_dataset_name, streaming=self.streaming)
+        dataset = load_dataset(self.hf_dataset_name, streaming=False)
         train_dataset = dataset["train"]
         test_dataset = dataset["test"]
         val_dataset = dataset.get("validation", None)
@@ -667,17 +455,9 @@ class CORDDatasetLoader(BaseDatasetLoader):
         if val_dataset is None:
             validation_split = self.config["data_processing"].get("validation_split", 0.1)
             if isinstance(validation_split, float) and 0 < validation_split < 1:
-                if not self.streaming:
-                    # For non-streaming datasets, we can use train_test_split
-                    train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-                    train_dataset = train_val["train"]
-                    val_dataset = train_val["test"]
-                else:
-                    # For streaming datasets, use the helper method
-                    shuffle_train = self.config.get("data_processing", {}).get("shuffle_train", False)
-                    train_dataset, val_dataset = self._create_streaming_validation_split(
-                        train_dataset, validation_split, shuffle=shuffle_train
-                    )
+                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
+                train_dataset = train_val["train"]
+                val_dataset = train_val["test"]
 
         return train_dataset, test_dataset, val_dataset
 
@@ -687,10 +467,6 @@ class CORDDatasetLoader(BaseDatasetLoader):
 
     def create_examples(self, dataset: HFDataset) -> List[DocumentExample]:
         """Convert CORD dataset to DocumentExample format"""
-        if self.streaming:
-            raise ValueError("create_examples() should not be used with streaming datasets. "
-                           "Use create_examples_iterator() instead.")
-        
         examples = []
         for item in dataset:
             example = self._process_single_item(item)
@@ -765,25 +541,18 @@ class SROIEDatasetLoader(BaseDatasetLoader):
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
         """Load SROIE dataset from HuggingFace"""
-        logger.info(f"Loading SROIE dataset from {self.hf_dataset_name} (streaming={self.streaming})")
+        logger.info(f"Loading SROIE dataset from {self.hf_dataset_name}")
 
-        dataset = load_dataset(self.hf_dataset_name, streaming=self.streaming)
+        dataset = load_dataset(self.hf_dataset_name, streaming=False)
         train_dataset = dataset["train"]
         test_dataset = dataset["test"]
 
         # Create validation split if needed
         validation_split = self.config["data_processing"].get("validation_split", 0.1)
         if isinstance(validation_split, float) and 0 < validation_split < 1:
-            if not self.streaming:
-                # For non-streaming datasets, we can use train_test_split
-                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-                train_dataset = train_val["train"]
-                val_dataset = train_val["test"]
-            else:
-                # For streaming datasets, use the helper method
-                train_dataset, val_dataset = self._create_streaming_validation_split(
-                    train_dataset, validation_split
-                )
+            train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
+            train_dataset = train_val["train"]
+            val_dataset = train_val["test"]
         else:
             val_dataset = None
 
@@ -795,10 +564,7 @@ class SROIEDatasetLoader(BaseDatasetLoader):
 
     def create_examples(self, dataset: HFDataset) -> List[DocumentExample]:
         """Convert SROIE dataset to DocumentExample format"""
-        if self.streaming:
-            raise ValueError("create_examples() should not be used with streaming datasets. "
-                           "Use create_examples_iterator() instead.")
-        
+        # Simple conversion in memory when needed (not used in main path)
         examples = []
         for item in dataset:
             examples.append(self._process_single_item(item))
@@ -853,38 +619,35 @@ class XFUNDDatasetLoader(BaseDatasetLoader):
         self.label_list = ["O", "B-HEADER", "I-HEADER", "B-QUESTION", "I-QUESTION", "B-ANSWER", "I-ANSWER"]
         self.label2id = {label: i for i, label in enumerate(self.label_list)}
         self.id2label = {i: label for i, label in enumerate(self.label_list)}
-
         # Language code for XFUND (e.g., "xfund.zh", "xfund.ja", etc.)
         self.language = config["dataset"].get("language", "zh")
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
         """Load XFUND dataset from HuggingFace and filter by language"""
-        logger.info(f"Loading XFUND dataset from {self.hf_dataset_name} and filtering by language: {self.language} "
-                    f"(streaming={self.streaming})")
-        dataset = load_dataset(self.hf_dataset_name, streaming=self.streaming)
+        logger.info(f"Loading XFUND dataset from {self.hf_dataset_name} and filtering by language: {self.language}")
+        dataset = load_dataset(self.hf_dataset_name, streaming=False)
+        filtered_train: List[Dict[str, Any]] = []
+        for item in dataset["train"]:
+            if item["id"].startswith(f"{self.language}_"):
+                filtered_train.append(item)
+        filtered_train = HFDataset.from_list(filtered_train)
 
-        # Create validation split from training data
+        # Create validation split from filtered training data.
         validation_split = self.config["data_processing"].get("validation_split", 0.1)
         if isinstance(validation_split, float) and 0 < validation_split < 1:
-            if not self.streaming:
-                # For non-streaming datasets, we can use train_test_split
-                train_val = dataset["train"].train_test_split(test_size=validation_split, seed=42)
-                train_dataset = train_val["train"]
-                val_dataset = train_val["test"]
-            else:
-                # For streaming datasets, use the helper method
-                shuffle_train = self.config.get("data_processing", {}).get("shuffle_train", False)
-                train_dataset, val_dataset = self._create_streaming_validation_split(
-                    dataset["train"], validation_split, shuffle=shuffle_train
-                )
+            train_val = filtered_train.train_test_split(test_size=validation_split, seed=42)
+            train_dataset = train_val["train"]
+            val_dataset = train_val["test"]
         else:
-            train_dataset = dataset["train"]
+            train_dataset = filtered_train
             val_dataset = None
 
-        # Filter by language for each split.
-        train_dataset = train_dataset.filter(lambda example: example["id"].startswith(f"{self.language}_"))
-        val_dataset = val_dataset.filter(lambda example: example["id"].startswith(f"{self.language}_")) if val_dataset else None
-        test_dataset = dataset["val"].filter(lambda example: example["id"].startswith(f"{self.language}_"))
+        # Prepare test split separately and filter by language.
+        filtered_test: List[Dict[str, Any]] = []
+        for item in dataset["val"]:
+            if item["id"].startswith(f"{self.language}_"):
+                filtered_test.append(item)
+        test_dataset = HFDataset.from_list(filtered_test)
         return train_dataset, test_dataset, val_dataset
 
     def get_label_list(self) -> List[str]:
@@ -893,10 +656,6 @@ class XFUNDDatasetLoader(BaseDatasetLoader):
 
     def create_examples(self, dataset: HFDataset) -> List[DocumentExample]:
         """Convert XFUND dataset to DocumentExample format"""
-        if self.streaming:
-            raise ValueError("create_examples() should not be used with streaming datasets. Use "
-                             "create_examples_iterator() instead.")
-        
         examples = []
         for item in dataset:
             examples.append(self._process_single_item(item))
@@ -907,19 +666,25 @@ class XFUNDDatasetLoader(BaseDatasetLoader):
         words = item["words"]
         bboxes = item["bboxes"]
         ner_tags = item["ner_tags"]
-
         # Convert numeric labels to string labels
         labels = [self.id2label[tag] for tag in ner_tags]
 
-        # Normalize bboxes if required
+        # Normalize bboxes if required, but skip if they already look normalized (0..1000)
         if self.normalize_bbox:
-            # Get actual image dimensions for proper normalization
-            if "image" in item:
-                width, height = self.get_image_dimensions(item["image"])
-            else:
-                logger.warning("No image found in XFUND item, using default dimensions")
-                width, height = 1000, 1000
-            bboxes = [self.normalize_bbox_coordinates(bbox, width, height) for bbox in bboxes]
+            try:
+                if not bboxes or all(0 <= c <= 1000 for bb in bboxes for c in bb):
+                    # Likely already normalized; skip costly image probing
+                    pass
+                else:
+                    if "image" in item:
+                        width, height = self.get_image_dimensions(item["image"])
+                    else:
+                        logger.warning("No image found in XFUND item, using default dimensions")
+                        width, height = 1000, 1000
+                    bboxes = [self.normalize_bbox_coordinates(bbox, width, height) for bbox in bboxes]
+            except Exception:
+                # Fallback to original bboxes on any unexpected structure
+                pass
 
         return DocumentExample(words=words, bboxes=bboxes, labels=labels)
 
@@ -957,25 +722,18 @@ class WildReceiptDatasetLoader(BaseDatasetLoader):
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
         """Load WildReceipt dataset from HuggingFace"""
-        logger.info(f"Loading WildReceipt dataset from {self.hf_dataset_name} (streaming={self.streaming})")
+        logger.info(f"Loading WildReceipt dataset from {self.hf_dataset_name}")
 
-        dataset = load_dataset(self.hf_dataset_name, streaming=self.streaming)
+        dataset = load_dataset(self.hf_dataset_name, streaming=False)
         train_dataset = dataset["train"]
         test_dataset = dataset["test"]
 
         # Create validation split if needed
         validation_split = self.config["data_processing"].get("validation_split", 0.1)
         if isinstance(validation_split, float) and 0 < validation_split < 1:
-            if not self.streaming:
-                # For non-streaming datasets, we can use train_test_split
-                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-                train_dataset = train_val["train"]
-                val_dataset = train_val["test"]
-            else:
-                # For streaming datasets, use the helper method
-                train_dataset, val_dataset = self._create_streaming_validation_split(
-                    train_dataset, validation_split
-                )
+            train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
+            train_dataset = train_val["train"]
+            val_dataset = train_val["test"]
         else:
             val_dataset = None
 
@@ -987,10 +745,6 @@ class WildReceiptDatasetLoader(BaseDatasetLoader):
 
     def create_examples(self, dataset: HFDataset) -> List[DocumentExample]:
         """Convert WildReceipt dataset to DocumentExample format"""
-        if self.streaming:
-            raise ValueError("create_examples() should not be used with streaming datasets. "
-                           "Use create_examples_iterator() instead.")
-        
         examples = []
         for item in dataset:
             examples.append(self._process_single_item(item))
@@ -1020,79 +774,37 @@ class WildReceiptDatasetLoader(BaseDatasetLoader):
 
 
 def create_data_loader(
-    examples: Optional[List[DocumentExample]] = None,
-    tokenizer: Optional[Union[LayoutLMTokenizerFast, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer]] = None,
-    label2id: Optional[Dict[str, int]] = None,
-    config: Optional[Dict[str, Any]] = None,
-    is_training: bool = True,
-    dataset_loader: Optional[BaseDatasetLoader] = None,
-    hf_dataset: Optional[HFDataset] = None,
-    split_name: str = "train"
+    *,
+    tokenizer: Union[LayoutLMTokenizerFast, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer],
+    label2id: Dict[str, int],
+    config: Dict[str, Any],
+    is_training: bool,
+    dataset_loader: BaseDatasetLoader,
+    hf_dataset: HFDataset,
 ) -> DataLoader:
-    """Create DataLoader for LayoutLM training/evaluation
-    
-    Args:
-        examples: List of DocumentExample objects (for non-streaming mode)
-        tokenizer: Tokenizer for processing text
-        label2id: Mapping from label strings to integers
-        config: Configuration dictionary
-        is_training: Whether this is for training
-        dataset_loader: Dataset loader instance (for streaming mode)
-        hf_dataset: HuggingFace dataset (for streaming mode)
-    """
-    
-    # Check if we're in streaming mode
-    if config and config["dataset"].get("streaming", False):
-        if dataset_loader is None or hf_dataset is None:
-            raise ValueError("dataset_loader and hf_dataset must be provided for streaming mode")
-        
-        # Use streaming dataset
-        shuffle_train = is_training and config.get("data_processing", {}).get("shuffle_train", False)
-        seed = config.get("data_processing", {}).get("seed", 42)
-        
-        dataset = LayoutLMStreamingDataset(
-            dataset_loader=dataset_loader,
-            dataset=hf_dataset,
-            tokenizer=tokenizer,
-            label2id=label2id,
-            max_seq_length=config["dataset"]["preprocessing"]["max_seq_length"],
-
-            shuffle=shuffle_train,
-            seed=seed,
-            split_name=split_name
-        )
-        
-        # For streaming datasets, length is unknown but shuffling is supported
-        # Use fewer workers for streaming to avoid worker issues
-        return DataLoader(
-            dataset,
-            batch_size=config["training"]["batch_size"],
-            num_workers=0,  # Use 0 workers for streaming datasets to avoid multiprocessing issues
-            pin_memory=True
-        )
-    else:
-        # Use regular dataset
-        if examples is None:
-            raise ValueError("examples must be provided for non-streaming mode")
-        
-        dataset = LayoutLMDataset(
-            examples=examples,
-            tokenizer=tokenizer,
-            label2id=label2id,
-            max_seq_length=config["dataset"]["preprocessing"]["max_seq_length"],
-
-        )
-
-        return DataLoader(
-            dataset,
-            batch_size=config["training"]["batch_size"],
-            shuffle=is_training and config["data_processing"]["shuffle_train"],
-            num_workers=4,
-            pin_memory=True
-        )
+    """Create DataLoader that reads HF rows on-demand (no full preloading)."""
+    dataset = LayoutLMMapDataset(
+        dataset_loader=dataset_loader,
+        hf_dataset=hf_dataset,
+        tokenizer=tokenizer,
+        label2id=label2id,
+        max_seq_length=config["dataset"]["preprocessing"]["max_seq_length"],
+    )
+    workers = int(config["training"].get("num_workers", 4))
+    dl_kwargs = {
+        "batch_size": config["training"]["batch_size"],
+        "shuffle": is_training and config.get("data_processing", {}).get("shuffle_train", False),
+        "num_workers": workers,
+        "pin_memory": True,
+    }
+    if workers > 0:
+        if "persistent_workers" in config["training"]:
+            dl_kwargs["persistent_workers"] = bool(config["training"]["persistent_workers"])
+        if "prefetch_factor" in config["training"]:
+            dl_kwargs["prefetch_factor"] = int(config["training"]["prefetch_factor"])
+    return DataLoader(dataset, **dl_kwargs)
 
 
-# Dataset factory
 DATASET_LOADERS = {
     "funsd": FUNSDDatasetLoader,
     "cord": CORDDatasetLoader,
@@ -1109,30 +821,3 @@ def get_dataset_loader(config: Dict[str, Any]) -> BaseDatasetLoader:
         raise ValueError(f"Unsupported dataset: {dataset_name}. "
                          f"Supported datasets: {list(DATASET_LOADERS.keys())}")
     return DATASET_LOADERS[dataset_name](config)
-
-
-def safe_dataset_length(dataset: Union[HFDataset, LayoutLMStreamingDataset], streaming: bool = False, dataset_loader: Optional[BaseDatasetLoader] = None, split_name: str = "train") -> Union[int, str]:
-    """Safely get dataset length, handling streaming mode
-    
-    Args:
-        dataset: HuggingFace dataset or LayoutLMStreamingDataset
-        streaming: Whether the dataset is in streaming mode
-        dataset_loader: Optional dataset loader to get actual length
-        split_name: Split name for computing length
-        
-    Returns:
-        Dataset length as int, or descriptive string if unavailable
-    """
-    # If it's a LayoutLMStreamingDataset, return descriptive string since length is unknown
-    if isinstance(dataset, LayoutLMStreamingDataset):
-        return "Unknown (streaming mode)"
-    
-    # For streaming mode, return unknown to avoid expensive computation
-    if streaming:
-        return "Unknown (streaming mode)"
-    
-    # Fallback for non-streaming mode
-    try:
-        return len(dataset)
-    except Exception:
-        return "Unknown (length unavailable)"

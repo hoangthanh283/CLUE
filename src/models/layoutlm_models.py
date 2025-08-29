@@ -127,7 +127,8 @@ class BaseLayoutLMModel(nn.Module, ABC):
         self.backbone = self.backbone.from_pretrained(load_directory)
         # Load the classification head
         classifier_path = f"{load_directory}/classifier.pt"
-        self.classifier.load_state_dict(torch.load(classifier_path))
+        # Load to CPU first; caller can move model to desired device afterward
+        self.classifier.load_state_dict(torch.load(classifier_path, map_location="cpu"))
 
 
 class LayoutLMForTokenClassification(BaseLayoutLMModel):

@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from src.data.layoutlm_datasets import create_data_loader, get_dataset_loader, safe_dataset_length
+from src.data.layoutlm_datasets import create_data_loader, get_dataset_loader
 from src.models.layoutlm_models import get_model
 from src.training.layoutlm_trainer import create_trainer
 from src.utils import load_config, setup_logging
@@ -80,44 +80,26 @@ def main():
 
         logger.info(f"Dataset: {config['dataset']['name']}")
         
-        # Check if we're in streaming mode
-        streaming_mode = config["dataset"].get("streaming", False)
-        logger.info(f"Streaming mode: {streaming_mode}")
-        
-        # Use safe dataset length function with dataset loader
+        # Report dataset length (map-style)
         eval_split_name = args.dataset_split if args.dataset_split != "validation" else "validation"
-        logger.info(f"Evaluation samples: {safe_dataset_length(eval_dataset, streaming_mode, dataset_loader, eval_split_name)}")
-        
+        try:
+            logger.info(f"Evaluation samples: {len(eval_dataset)}")
+        except Exception:
+            logger.info("Could not determine evaluation dataset length.")
         logger.info(f"Labels: {label_list}")
 
         # Create data loader
         logger.info("Creating data loader...")
         
-        if streaming_mode:
-            # Streaming mode: use LayoutLMStreamingDataset
-            logger.info("Using streaming data loader...")
-            eval_dataloader = create_data_loader(
-                config=config,
-                is_training=False,
-                dataset_loader=dataset_loader,
-                hf_dataset=eval_dataset,
-                tokenizer=dataset_loader.tokenizer,
-                label2id=label2id,
-                split_name=eval_split_name
-            )
-        else:
-            # Memory mode: create examples first, then use LayoutLMDataset
-            logger.info("Creating examples...")
-            eval_examples = dataset_loader.create_examples(eval_dataset)
-            
-            logger.info("Using memory-based data loader...")
-            eval_dataloader = create_data_loader(
-                examples=eval_examples,
-                tokenizer=dataset_loader.tokenizer,
-                label2id=label2id,
-                config=config,
-                is_training=False
-            )
+        # Map-style, on-demand data loader
+        eval_dataloader = create_data_loader(
+            config=config,
+            is_training=False,
+            dataset_loader=dataset_loader,
+            hf_dataset=eval_dataset,
+            tokenizer=dataset_loader.tokenizer,
+            label2id=label2id,
+        )
 
         # Initialize model
         logger.info("Initializing model...")
