@@ -5,6 +5,7 @@ dataset:
   name: "sroie"
   hf_dataset_name: "darentang/sroie"
   task_type: "token_classification"
+  streaming: false  # Set to true for memory-efficient streaming mode
   preprocessing:
     max_seq_length: 512
     max_position_embeddings: 1024

@@ -10,7 +10,7 @@ import neptune
 import torch
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, IterableDataset
 from tqdm.auto import tqdm
 from transformers import get_linear_schedule_with_warmup
 
@@ -46,6 +46,11 @@ class LayoutLMTrainer:
 
         # Gradient accumulation.
         self.gradient_accumulation_steps = self.training_config.get("gradient_accumulation_steps", 1)
+        
+        # Check if we're using streaming datasets (needed before scheduler setup)
+        self.is_streaming = isinstance(self.train_dataloader.dataset, IterableDataset)
+        if self.is_streaming:
+            logger.info("Streaming dataset detected. Some features may be limited (e.g., dataset length, shuffling).")
 
         # Setup optimizer and scheduler
         self.optimizer = self._setup_optimizer()
@@ -122,7 +127,25 @@ class LayoutLMTrainer:
             return None
 
         num_epochs = self.training_config["num_epochs"]
-        num_training_steps = len(self.train_dataloader) * num_epochs // self.gradient_accumulation_steps
+        
+        # Handle streaming datasets that don't have length
+        if self.is_streaming:
+            # Streaming dataset - use estimated steps or disable scheduler
+            logger.warning("Streaming mode detected. Using estimated training steps for scheduler.")
+            
+            # Get estimated steps from config or use reasonable default
+            estimated_steps_per_epoch = self.training_config.get("estimated_steps_per_epoch", None)
+            if estimated_steps_per_epoch:
+                num_training_steps = estimated_steps_per_epoch * num_epochs // self.gradient_accumulation_steps
+            else:
+                # Disable scheduler for streaming mode if no estimate provided
+                logger.info("No estimated_steps_per_epoch provided. Disabling scheduler for streaming mode.")
+                return None
+        else:
+            # Regular dataset - can get length normally
+            dataloader_length = len(self.train_dataloader)
+            num_training_steps = dataloader_length * num_epochs // self.gradient_accumulation_steps
+        
         warmup_ratio = self.training_config.get("warmup_ratio", 0.1)
         num_warmup_steps = int(warmup_ratio * num_training_steps)
 
@@ -140,7 +163,7 @@ class LayoutLMTrainer:
         else:
             raise ValueError(f"Unsupported scheduler: {scheduler_name}")
 
-        logger.info(f"Setup {scheduler_name} scheduler with {num_warmup_steps} warmup steps")
+        logger.info(f"Setup {scheduler_name} scheduler with {num_training_steps} training steps and {num_warmup_steps} warmup steps")
         return scheduler
 
     def train(self) -> Dict[str, float]:
@@ -277,10 +300,15 @@ class LayoutLMTrainer:
 
         # Compute metrics
         metrics = self.metrics.compute_metrics(all_predictions, all_labels, all_attention_masks)
-
-        # Add loss
         if total_loss > 0:
-            metrics["eval_loss"] = total_loss / len(self.eval_dataloader)
+            try:
+                # Try to get dataloader length (should work now with our LayoutLMStreamingDataset)
+                dataloader_length = len(self.eval_dataloader)
+                metrics["eval_loss"] = total_loss / dataloader_length
+            except (TypeError, AttributeError):
+                # Fallback: use number of batches processed
+                logger.warning("Could not get eval dataloader length, using batch count for loss calculation")
+                metrics["eval_loss"] = total_loss / num_batches
 
         # Add eval_ prefix
         eval_metrics = {f"eval_{k}": v for k, v in metrics.items()}
