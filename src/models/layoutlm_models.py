@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import torch
 import torch.nn as nn
+from seqeval.scheme import IOB2
 from transformers import (LayoutLMConfig, LayoutLMModel, LayoutLMv2Config,
                           LayoutLMv2Model, LayoutLMv3Config, LayoutLMv3Model)
 
@@ -129,6 +130,16 @@ class BaseLayoutLMModel(nn.Module, ABC):
         classifier_path = f"{load_directory}/classifier.pt"
         # Load to CPU first; caller can move model to desired device afterward
         self.classifier.load_state_dict(torch.load(classifier_path, map_location="cpu"))
+
+    def reset_classifier(self, num_labels: int):
+        """Reset the classification head to a new label count (for sequential FT).
+
+        Keeps the backbone intact; reinitializes a new Linear layer.
+        """
+        self.num_labels = int(num_labels)
+        device = next(self.parameters()).device
+        self.classifier = nn.Linear(self.backbone.config.hidden_size, self.num_labels).to(device)
+        self._init_weights()
 
 
 class LayoutLMForTokenClassification(BaseLayoutLMModel):
@@ -262,14 +273,10 @@ class LayoutLMMetrics:
     def _compute_entity_level_f1(self, predictions: List[int], labels: List[int]) -> float:
         """Compute entity-level F1 score for BIO tagging"""
         try:
+            # Convert to label strings.
             from seqeval.metrics import f1_score
-            from seqeval.scheme import IOB2
-
-            # Convert to label strings
             pred_labels = [self.id2label[pred] for pred in predictions]
             true_labels = [self.id2label[label] for label in labels]
-
-            # seqeval expects list of lists
             return f1_score([true_labels], [pred_labels], mode="strict", scheme=IOB2)
         except ImportError:
             logger.warning("seqeval not available, using token-level F1 as entity F1")

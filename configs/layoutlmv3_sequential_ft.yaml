@@ -1,0 +1,101 @@
+experiment_name: "layoutlmv3_seq_ft"
+
+# Base dataset config (will be overridden per task)
+dataset:
+  name: "funsd"
+  hf_dataset_name: "nielsr/funsd"
+  task_type: "token_classification"
+  preprocessing:
+    max_seq_length: 512
+    max_position_embeddings: 1024
+    image_size: [224, 224]
+    apply_ocr: false
+    normalize_bbox: true
+    include_image: false   # use text+layout only for speed (LayoutLMv3)
+
+# Model configuration
+model:
+  name: "layoutlmv3"
+  model_type: "layoutlmv3-base"
+  pretrained_model_name: "microsoft/layoutlmv3-base"
+  config:
+    num_labels: 7   # overwritten by script per task
+    hidden_dropout_prob: 0.1
+    attention_probs_dropout_prob: 0.1
+    classifier_dropout: 0.1
+
+# Training configuration
+training:
+  batch_size: 4
+  gradient_accumulation_steps: 1
+  num_epochs: 10
+  learning_rate: 5.0e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  optimizer: "adamw"
+  scheduler: "linear"
+  save_strategy: null
+  evaluation_strategy: "epoch"
+  save_total_limit: 1
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_f1"
+  greater_is_better: true
+  early_stopping_patience: 3
+
+# Data processing
+data_processing:
+  train_split: "train"
+  test_split: "test"
+  validation_split: 0.1
+  shuffle_train: true
+  seed: 42
+
+# Continual Learning Strategy (sequential fine-tuning)
+cl_strategy:
+  name: "sequential"
+
+label_space:
+  unified: true
+
+# Tasks sequence: FUNSD -> CORD -> SROIE -> WildReceipt -> XFUND (zh)
+tasks:
+  - name: "funsd"
+    dataset:
+      name: "funsd"
+      hf_dataset_name: "nielsr/funsd"
+  - name: "cord"
+    dataset:
+      name: "cord"
+      hf_dataset_name: "naver-clova-ix/cord-v2"
+  - name: "sroie"
+    dataset:
+      name: "sroie"
+      hf_dataset_name: "darentang/sroie"
+  - name: "wildreceipt"
+    dataset:
+      name: "wildreceipt"
+      hf_dataset_name: "kaydee/wildreceipt"
+  - name: "xfund_zh"
+    dataset:
+      name: "xfund"
+      hf_dataset_name: "nnul/xfund-multilingual"
+      language: "zh"
+
+# Evaluation settings
+evaluation:
+  metrics: ["accuracy", "f1", "precision", "recall"]
+  save_predictions: false
+
+# Logging and output
+output:
+  log_level: "INFO"
+  save_model: true
+  save_tokenizer: true
+  push_to_hub: false
+
+# Neptune (optional)
+neptune:
+  use_neptune: false
+  neptune_project: "your-workspace/cl4ie"
+  neptune_api_token: null
+  tags: ["layoutlmv3", "sequential", "funsd", "cord", "sroie", "wildreceipt", "xfund"]

@@ -46,7 +46,7 @@ class LayoutLMTrainer:
 
         # Gradient accumulation.
         self.gradient_accumulation_steps = self.training_config.get("gradient_accumulation_steps", 1)
-        
+
         # Setup optimizer and scheduler
         self.optimizer = self._setup_optimizer()
         self.scheduler = self._setup_scheduler()
@@ -117,16 +117,12 @@ class LayoutLMTrainer:
     def _setup_scheduler(self) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
         """Setup learning rate scheduler"""
         scheduler_name = self.training_config.get("scheduler", "linear").lower()
-
         if scheduler_name == "none":
             return None
 
         num_epochs = self.training_config["num_epochs"]
-        
-        # Regular dataset - can get length normally
         dataloader_length = len(self.train_dataloader)
         num_training_steps = dataloader_length * num_epochs // self.gradient_accumulation_steps
-        
         warmup_ratio = self.training_config.get("warmup_ratio", 0.1)
         num_warmup_steps = int(warmup_ratio * num_training_steps)
 
@@ -144,7 +140,8 @@ class LayoutLMTrainer:
         else:
             raise ValueError(f"Unsupported scheduler: {scheduler_name}")
 
-        logger.info(f"Setup {scheduler_name} scheduler with {num_training_steps} training steps and {num_warmup_steps} warmup steps")
+        logger.info(f"Setup {scheduler_name} scheduler with {num_training_steps} training steps and {num_warmup_steps} "
+                    "warmup steps")
         return scheduler
 
     def train(self) -> Dict[str, float]:

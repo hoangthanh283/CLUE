@@ -3,7 +3,7 @@ experiment_name: "layoutlmv3_sroie"
 # Dataset configuration
 dataset:
   name: "sroie"
-  hf_dataset_name: "darentang/sroie"
+  hf_dataset_name: "buthaya/sroie"
   task_type: "token_classification"
   preprocessing:
     max_seq_length: 512
@@ -28,7 +28,7 @@ model:
 training:
   batch_size: 2
   gradient_accumulation_steps: 4
-  num_epochs: 100
+  num_epochs: 10
   learning_rate: 5.e-5
   weight_decay: 0.01
   warmup_ratio: 0.1

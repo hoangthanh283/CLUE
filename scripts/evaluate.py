@@ -77,20 +77,15 @@ def main():
         label_list = dataset_loader.get_label_list()
         label2id = {label: i for i, label in enumerate(label_list)}
         id2label = {i: label for i, label in enumerate(label_list)}
-
         logger.info(f"Dataset: {config['dataset']['name']}")
-        
-        # Report dataset length (map-style)
-        eval_split_name = args.dataset_split if args.dataset_split != "validation" else "validation"
+
+        # Report dataset length (map-style).
         try:
             logger.info(f"Evaluation samples: {len(eval_dataset)}")
         except Exception:
             logger.info("Could not determine evaluation dataset length.")
         logger.info(f"Labels: {label_list}")
-
-        # Create data loader
         logger.info("Creating data loader...")
-        
         # Map-style, on-demand data loader
         eval_dataloader = create_data_loader(
             config=config,
