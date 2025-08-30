@@ -70,7 +70,7 @@ tasks:
   - name: "sroie"
     dataset:
       name: "sroie"
-      hf_dataset_name: "darentang/sroie"
+      hf_dataset_name: "buthaya/sroie"
   - name: "wildreceipt"
     dataset:
       name: "wildreceipt"
