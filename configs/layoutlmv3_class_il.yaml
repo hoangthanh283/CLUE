@@ -1,4 +1,4 @@
-experiment_name: "layoutlmv3_seq_ft"
+experiment_name: "layoutlmv3_class_il"
 
 # Base dataset config (will be overridden per task)
 dataset:
@@ -11,7 +11,7 @@ dataset:
     image_size: [224, 224]
     apply_ocr: false
     normalize_bbox: true
-    include_image: false   # use text+layout only for speed (LayoutLMv3)
+    include_image: false
 
 # Model configuration
 model:
@@ -19,15 +19,19 @@ model:
   model_type: "layoutlmv3-base"
   pretrained_model_name: "microsoft/layoutlmv3-base"
   config:
-    num_labels: 51   # unified BIO label space across 5 datasets.
+    num_labels: 7    # number of labels for the first task (FUNSD); will grow as new tasks are added.
     hidden_dropout_prob: 0.1
     attention_probs_dropout_prob: 0.1
     classifier_dropout: 0.1
 
+# Continual Learning head setting
+# - class_il: single head over the union of labels
+cl_setting: "class_il"
+
 # Training configuration
 training:
-  batch_size: 4
-  gradient_accumulation_steps: 2
+  batch_size: 1
+  gradient_accumulation_steps: 4
   num_epochs: 10
   learning_rate: 5.0e-5
   weight_decay: 0.01
@@ -38,7 +42,7 @@ training:
   evaluation_strategy: "epoch"
   save_total_limit: 1
   load_best_model_at_end: true
-  metric_for_best_model: "eval_f1"
+  metric_for_best_model: "f1"
   greater_is_better: true
   early_stopping_patience: 3
 
@@ -98,4 +102,4 @@ neptune:
   use_neptune: false
   neptune_project: "your-workspace/cl4ie"
   neptune_api_token: null
-  tags: ["layoutlmv3", "sequential", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
+  tags: ["layoutlmv3", "class_il", "sequential", "funsd", "cord", "sroie", "wildreceipt", "xfund"]

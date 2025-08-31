@@ -141,6 +141,33 @@ class BaseLayoutLMModel(nn.Module, ABC):
         self.classifier = nn.Linear(self.backbone.config.hidden_size, self.num_labels).to(device)
         self._init_weights()
 
+    def expand_classifier(self, new_num_labels: int):
+        """Expand the classification head by adding output rows while keeping existing weights.
+
+        If new_num_labels <= current, does nothing.
+        """
+        new_num_labels = int(new_num_labels)
+        if new_num_labels <= self.num_labels:
+            return
+        device = next(self.parameters()).device
+        old_out = self.num_labels
+        in_dim = self.backbone.config.hidden_size
+        old_layer = self.classifier
+        new_layer = nn.Linear(in_dim, new_num_labels).to(device)
+
+        # Initialize new layer, then copy old weights/bias
+        nn.init.normal_(new_layer.weight, mean=0.0, std=0.02)
+        if new_layer.bias is not None:
+            nn.init.zeros_(new_layer.bias)
+
+        with torch.no_grad():
+            new_layer.weight[:old_out].copy_(old_layer.weight)
+            if old_layer.bias is not None and new_layer.bias is not None:
+                new_layer.bias[:old_out].copy_(old_layer.bias)
+
+        self.classifier = new_layer
+        self.num_labels = new_num_labels
+
 
 class LayoutLMForTokenClassification(BaseLayoutLMModel):
     """LayoutLM v1 model for token classification"""
@@ -235,33 +262,31 @@ class LayoutLMMetrics:
         from sklearn.metrics import (accuracy_score,
                                      precision_recall_fscore_support)
 
-        # Convert predictions and labels to numpy
+        # Convert predictions and labels to numpy.
         predictions = predictions.detach().cpu().numpy()
         labels = labels.detach().cpu().numpy()
         attention_mask = attention_mask.detach().cpu().numpy()
 
-        # Get predictions
+        # Get predictions.
         predictions = np.argmax(predictions, axis=2)
 
-        # Remove ignored index (subword tokens and padding)
-        true_predictions = []
-        true_labels = []
-
+        # Remove ignored index (subword tokens and padding).
+        true_predictions: List[int] = []
+        true_labels: List[int] = []
         for prediction, label, mask in zip(predictions, labels, attention_mask):
-            for pred, lab, m in zip(prediction, label, mask):
-                if m and lab != -100:  # -100 is the ignore index
-                    true_predictions.append(pred)
-                    true_labels.append(lab)
+            for pred, lab, mm in zip(prediction, label, mask):
+                if mm and lab != -100:  # -100 is the ignore index.
+                    true_predictions.append(int(pred))
+                    true_labels.append(int(lab))
 
-        # Token-level metrics
+        # Token-level metrics.
         accuracy = accuracy_score(true_labels, true_predictions)
         precision, recall, f1, _ = precision_recall_fscore_support(
             true_labels, true_predictions, average="macro", zero_division=0
         )
 
-        # Entity-level metrics (if using BIO tagging)
+        # Entity-level metrics (if using BIO tagging).
         entity_f1 = self._compute_entity_level_f1(true_predictions, true_labels)
-
         return {
             "accuracy": accuracy,
             "f1": f1,

@@ -3,6 +3,7 @@ Continual Learning trainer wiring CL strategies into the LayoutLM pipeline.
 """
 
 import copy
+import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -17,6 +18,7 @@ from transformers import get_linear_schedule_with_warmup
 from src.cl_strategies import (AGEM, EWC, GEM, BaseCLStrategy,
                                ExperienceReplay, LwF, SequentialFineTuning)
 from src.models.layoutlm_models import BaseLayoutLMModel, LayoutLMMetrics
+from src.training.cl_metrics import compute_cl_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,7 @@ logger = logging.getLogger(__name__)
 STRATEGY_MAP = {
     "none": SequentialFineTuning,
     "sequential": SequentialFineTuning,
+    "joint": SequentialFineTuning,
     "er": ExperienceReplay,
     "experience_replay": ExperienceReplay,
     "ewc": EWC,
@@ -85,6 +88,12 @@ class ContinualLayoutLMTrainer:
         # Logging
         self.log_steps = int(self.training_config.get("log_steps", 100))
 
+        # CL head setting: 'task_il' (multi-head) or 'class_il' (single head)
+        self.cl_setting = (self.config.get("cl_setting") or "task_il").lower()
+        if self.cl_setting not in {"task_il", "class_il"}:
+            logger.warning(f"Unknown cl_setting '{self.cl_setting}', defaulting to 'task_il'")
+            self.cl_setting = "task_il"
+
     def _setup_optimizer(self) -> torch.optim.Optimizer:
         optimizer_name = self.training_config.get("optimizer", "adamw").lower()
         learning_rate = self.training_config["learning_rate"]
@@ -125,7 +134,6 @@ class ContinualLayoutLMTrainer:
 
     def evaluate(self, dataloader: DataLoader) -> Dict[str, float]:
         self.model.eval()
-        total_loss = 0.0
         num_batches = 0
         all_predictions = []
         all_labels = []
@@ -134,9 +142,10 @@ class ContinualLayoutLMTrainer:
         with torch.no_grad():
             for batch in tqdm(dataloader, desc="Evaluating"):
                 batch = {k: v.to(self.device) for k, v in batch.items()}
-                outputs = self.model(**batch)
-                if outputs["loss"] is not None:
-                    total_loss += outputs["loss"].item()
+                # Do not pass labels to the model during evaluation to avoid
+                # class-range mismatches when heads grow (class-IL).
+                model_inputs = {k: v for k, v in batch.items() if k != "labels"}
+                outputs = self.model(**model_inputs)
                 all_predictions.append(outputs["logits"])
                 all_labels.append(batch["labels"])
                 all_attention_masks.append(batch["attention_mask"])
@@ -146,8 +155,8 @@ class ContinualLayoutLMTrainer:
         all_labels = torch.cat(all_labels, dim=0)
         all_attention_masks = torch.cat(all_attention_masks, dim=0)
         metrics = self.metrics.compute_metrics(all_predictions, all_labels, all_attention_masks)
-        if num_batches > 0:
-            metrics["eval_loss"] = total_loss / num_batches
+        # Loss is omitted in evaluation due to potential class-range mismatches
+        # when growing heads; keep metric keys consistent without eval_loss.
         return metrics
 
     def _activate_head(self, task_name: str, num_labels: int):
@@ -168,18 +177,67 @@ class ContinualLayoutLMTrainer:
                 return
         # Otherwise reset to requested size
         self.model.reset_classifier(num_labels)
+        # After resetting classifier, refresh optimizer so new params are optimized
+        self._refresh_optimizer_params()
 
     def _save_active_head_state(self, task_name: str):
         self.head_states[task_name] = copy.deepcopy(self.model.classifier.state_dict())
+
+    def _refresh_optimizer_params(self):
+        """Rebuild optimizer param groups to include current model params.
+
+        This is necessary after swapping the classifier head (task-IL setting).
+        """
+        optimizer_name = self.training_config.get("optimizer", "adamw").lower()
+        lr = self.training_config["learning_rate"]
+        weight_decay = self.training_config.get("weight_decay", 0.01)
+
+        # Preserve epsilon if using AdamW
+        eps = 1e-8
+        if hasattr(self.optimizer, "param_groups"):
+            for g in self.optimizer.param_groups:
+                if "eps" in g:
+                    eps = g["eps"]
+                    break
+
+        no_decay = ["bias", "LayerNorm.weight"]
+        optimizer_grouped_parameters = [
+            {
+                "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
+                "weight_decay": weight_decay,
+            },
+            {
+                "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
+                "weight_decay": 0.0,
+            },
+        ]
+
+        if optimizer_name == "adamw":
+            self.optimizer = AdamW(optimizer_grouped_parameters, lr=lr, eps=eps)
+        else:
+            self.optimizer = AdamW(optimizer_grouped_parameters, lr=lr, eps=eps)
+            logger.warning(f"Optimizer '{optimizer_name}' not explicitly supported for refresh; using AdamW.")
 
     def train_task(self, train_loader: DataLoader, eval_loader: Optional[DataLoader], task_id: int,
                    save_tag: str = "task", *, label_list: Optional[List[str]] = None,
                    id2label: Optional[Dict[int, str]] = None) -> Dict[str, float]:
         # If provided, refresh metrics and classifier for this task
-        if label_list is not None and id2label is not None:
-            # Update metrics and activate (or create) the per-task head
-            self.metrics = LayoutLMMetrics(label_list, id2label)
-            self._activate_head(save_tag, num_labels=len(label_list))
+        if self.cl_setting == "task_il":
+            if label_list is not None:
+                # Build id2label if not provided
+                id2label = id2label or {i: l for i, l in enumerate(label_list)}
+                # Update metrics and activate (or create) the per-task head
+                self.metrics = LayoutLMMetrics(label_list, id2label)
+                self._activate_head(save_tag, num_labels=len(label_list))
+        else:  # class_il
+            if label_list is not None:
+                id2label = id2label or {i: l for i, l in enumerate(label_list)}
+                # Expand classifier if new labels have been introduced
+                if len(label_list) > self.model.num_labels:
+                    self.model.expand_classifier(len(label_list))
+                    self._refresh_optimizer_params()
+                # Always keep metrics in sync with the current global label list
+                self.metrics = LayoutLMMetrics(label_list, id2label)
         # Determine effective gradient accumulation
         ga_steps_cfg = int(self.training_config.get("gradient_accumulation_steps", 1))
         if isinstance(self.strategy, (AGEM, GEM)) and ga_steps_cfg != 1:
@@ -208,7 +266,7 @@ class ContinualLayoutLMTrainer:
             self.model.train()
             total_loss = 0.0
             num_batches = 0
-            progress = tqdm(train_loader, desc=f"Task {task_id} Epoch {epoch+1}/{num_epochs}")
+            progress = tqdm(train_loader, desc=f"Task {task_id} Epoch {epoch + 1}/{num_epochs}")
 
             for step, batch in enumerate(progress):
                 micro = step % ga_steps
@@ -243,7 +301,7 @@ class ContinualLayoutLMTrainer:
 
                 total_loss += loss.item()
                 num_batches += 1
-                progress.set_postfix({"loss": f"{(total_loss/num_batches):.4f}"})
+                progress.set_postfix({"loss": f"{(total_loss / num_batches):.4f}"})
 
             # Evaluate end of epoch
             eval_metrics = {}
@@ -262,7 +320,7 @@ class ContinualLayoutLMTrainer:
                     early_stop_counter += 1
 
                 if early_stop_counter >= int(self.training_config.get("early_stopping_patience", 10)):
-                    logger.info(f"Early stopping on task {task_id} at epoch {epoch+1}")
+                    logger.info(f"Early stopping on task {task_id} at epoch {epoch + 1}")
                     break
 
         # Optionally load best at end
@@ -277,11 +335,39 @@ class ContinualLayoutLMTrainer:
         self.strategy.after_task(self.model, task_id, train_loader)
         return {"best_metric": best_metric}
 
-    def train(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, float]]:
-        results = []
+    def train(self, tasks: List[Dict[str, Any]]):
+        """Train across tasks and collect CL evaluation metrics.
+
+        Returns a dictionary including per-task training summaries, the
+        accuracy matrix, and aggregated CL metrics (ACC, BWT, FWT, AAA,
+        Forgetting).
+        """
+        per_task_results: List[Dict[str, float]] = []
+        task_names = [t.get("name", f"task{i}") for i, t in enumerate(tasks)]
+        T = len(tasks)
+
+        # Pre-training evaluation on each task (R0)
+        pre_accuracy: List[float] = []
+        for j in range(T):
+            if self.cl_setting == "task_il":
+                lbl_list = tasks[j].get("label_list") or self.metrics.label_list
+                id2label = {i: l for i, l in enumerate(lbl_list)}
+                m = self.evaluate_with_head(tasks[j]["eval_loader"], task_names[j], lbl_list, id2label)
+            else:
+                # Ensure metrics cover the labels in task j to avoid KeyError in entity F1
+                lbl_list = tasks[j].get("label_list") or self.metrics.label_list
+                id2label = tasks[j].get("id2label") or {i: l for i, l in enumerate(lbl_list)}
+                self.metrics = LayoutLMMetrics(lbl_list, id2label)
+                m = self.evaluate(tasks[j]["eval_loader"])  # single head evaluation
+            pre_accuracy.append(float(m.get("accuracy", 0.0)))
+
+        # Accuracy matrix R[i][j] after training task i, evaluated on task j
+        acc_matrix: List[List[float]] = [[0.0 for _ in range(T)] for _ in range(T)]
+
         for i, task in enumerate(tasks):
             train_loader: DataLoader = task["train_loader"]
             eval_loader: Optional[DataLoader] = task.get("eval_loader")
+
             res = self.train_task(
                 train_loader,
                 eval_loader,
@@ -290,8 +376,97 @@ class ContinualLayoutLMTrainer:
                 label_list=task.get("label_list"),
                 id2label=task.get("id2label"),
             )
-            results.append(res)
-        return results
+            per_task_results.append(res)
+
+            # Evaluate on all tasks with the current unified/class head
+            for j in range(T):
+                if self.cl_setting == "task_il":
+                    lbl_list = tasks[j].get("label_list") or self.metrics.label_list
+                    id2label = {i: l for i, l in enumerate(lbl_list)}
+                    metrics = self.evaluate_with_head(tasks[j]["eval_loader"], task_names[j], lbl_list, id2label)
+                else:
+                    # Ensure metrics cover task j's label namespace
+                    lbl_list = tasks[j].get("label_list") or self.metrics.label_list
+                    id2label = tasks[j].get("id2label") or {i: l for i, l in enumerate(lbl_list)}
+                    self.metrics = LayoutLMMetrics(lbl_list, id2label)
+                    metrics = self.evaluate(tasks[j]["eval_loader"])  # single head evaluation
+                acc_matrix[i][j] = float(metrics.get("accuracy", 0.0))
+
+            # Save checkpoint after finishing task i (for later offline evaluation)
+            try:
+                self._save_checkpoint_after_task(i, task_names, tasks, acc_matrix[i])
+            except Exception as e:
+                logger.warning(f"Failed to save checkpoint after task {i}: {e}")
+
+        # Compute CL metrics
+        cl_metrics = compute_cl_metrics(acc_matrix, pre_accuracy, task_names)
+
+        return {
+            "per_task": per_task_results,
+            "task_names": task_names,
+            "pre_accuracy": pre_accuracy,
+            "accuracy_matrix": acc_matrix,
+            "cl_metrics": cl_metrics,
+        }
+
+    def _save_checkpoint_after_task(
+        self,
+        task_idx: int,
+        task_names: List[str],
+        tasks: List[Dict[str, Any]],
+        acc_row: List[float],
+    ) -> None:
+        """Persist model snapshot and metadata after finishing a task.
+
+        Creates a directory `checkpoints/after_task_{i}_{name}` with:
+          - HF backbone weights and current classifier (classifier.pt)
+          - class-IL: label_list.json describing the global label space
+          - task-IL: all per-task heads so far under `heads/*.pt` and heads_meta.json
+          - acc_row.json: accuracies on all tasks evaluated after finishing this task
+        """
+        ckpt_root = self.output_dir / "checkpoints"
+        ckpt_root.mkdir(parents=True, exist_ok=True)
+        ckpt_dir = ckpt_root / f"after_task_{task_idx}_{task_names[task_idx]}"
+        ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save backbone + current active classifier
+        self.model.save_pretrained(str(ckpt_dir))
+
+        # Save accuracy row for this checkpoint
+        acc_payload = {
+            "after_task_index": task_idx,
+            "after_task_name": task_names[task_idx],
+            "task_names": list(task_names),
+            "accuracy_row": list(map(float, acc_row)),
+            "cl_setting": self.cl_setting,
+        }
+        with open(ckpt_dir / "acc_row.json", "w") as f:
+            json.dump(acc_payload, f, indent=2)
+
+        if self.cl_setting == "class_il":
+            # Persist the current global label space for this checkpoint
+            label_list = self.metrics.label_list
+            id2label = self.metrics.id2label
+            with open(ckpt_dir / "label_list.json", "w") as f:
+                json.dump({
+                    "label_list": list(label_list),
+                    "id2label": {int(k): v for k, v in id2label.items()},
+                }, f, indent=2)
+        else:  # task_il
+            # Save all heads we have so far under heads/
+            heads_dir = ckpt_dir / "heads"
+            heads_dir.mkdir(parents=True, exist_ok=True)
+            # Map task name -> label_list for metadata
+            labels_by_task = {t["name"]: t.get("label_list") for t in tasks}
+            heads_meta = {}
+            for head_name, state in self.head_states.items():
+                torch.save(state, heads_dir / f"{head_name}.pt")
+                heads_meta[head_name] = {
+                    "num_labels": int(state.get("weight").shape[0]) if state.get("weight") is not None else None,
+                    "label_list": labels_by_task.get(head_name),
+                }
+            with open(ckpt_dir / "heads_meta.json", "w") as f:
+                json.dump(heads_meta, f, indent=2)
 
     def evaluate_with_head(self, dataloader: DataLoader, task_name: str, label_list: List[str], id2label: Dict[int, str]
                            ) -> Dict[str, float]:
