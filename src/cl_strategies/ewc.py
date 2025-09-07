@@ -66,6 +66,12 @@ class EWC(BaseCLStrategy):
             fisher = self.fishers[task_idx]
             params_star = self.opt_params[task_idx]
             for name, param in model.named_parameters():
+                if name not in params_star:
+                    # Parameter didn't exist in previous task, skip.
+                    continue
+                if name not in fisher:
+                    # Fisher info not available for this parameter, skip.
+                    continue
                 if not param.requires_grad:
                     continue
                 diff = param - params_star[name]

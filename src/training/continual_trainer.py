@@ -299,6 +299,10 @@ class ContinualLayoutLMTrainer:
                     # Update memory after optimization step
                     self.strategy.update_memory(batch)
 
+                    # Clear GPU cache periodically to prevent OOM
+                    if self.global_step % 10 == 0:
+                        torch.cuda.empty_cache()
+
                 total_loss += loss.item()
                 num_batches += 1
                 progress.set_postfix({"loss": f"{(total_loss / num_batches):.4f}"})
