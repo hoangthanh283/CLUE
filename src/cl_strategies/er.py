@@ -27,7 +27,6 @@ class ExperienceReplay(BaseCLStrategy):
                      ) -> torch.Tensor:
         device = next(model.parameters()).device
         base_loss = outputs["loss"]
-
         mem_batch = self.memory.sample(self.replay_batch_size, device=device)
         if mem_batch is None:
             return base_loss

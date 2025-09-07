@@ -1,6 +1,6 @@
-experiment_name: "layoutlmv3_class_il"
+experiment_name: "layoutlmv3_task_il_baseline"
 
-# Base dataset config (will be overridden per task)
+# Base dataset config (overridden per task below)
 dataset:
   name: "funsd"
   hf_dataset_name: "nielsr/funsd"
@@ -19,14 +19,15 @@ model:
   model_type: "layoutlmv3-base"
   pretrained_model_name: "microsoft/layoutlmv3-base"
   config:
-    num_labels: 7    # number of labels for the first task (FUNSD); will grow as new tasks are added.
+    # number of labels for the first task (FUNSD)
+    num_labels: 7
     hidden_dropout_prob: 0.1
     attention_probs_dropout_prob: 0.1
     classifier_dropout: 0.1
 
 # Continual Learning head setting
-# - class_il: single head over the union of labels
-cl_setting: "class_il"
+# - task_il: multi-head (one classifier per task)
+cl_setting: "task_il"
 
 # Training configuration
 training:
@@ -54,7 +55,9 @@ data_processing:
   shuffle_train: true
   seed: 42
 
-# Continual Learning Strategy (sequential fine-tuning)
+# Continual Learning Strategy (sequential fine-tuning baseline)
+# NOTE: The current code only supports joint training under Class-IL with a unified label space.
+#       For Task-IL, keep sequential here unless we extend training to switch heads per-sample.
 cl_strategy:
   name: "sequential"
 
@@ -102,4 +105,5 @@ neptune:
   use_neptune: false
   neptune_project: "your-workspace/cl4ie"
   neptune_api_token: null
-  tags: ["layoutlmv3", "class_il", "sequential", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
+  tags: ["layoutlmv3", "task_il", "sequential", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
+

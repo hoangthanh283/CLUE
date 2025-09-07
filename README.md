@@ -60,8 +60,6 @@ cl4ie/
 - **Python 3.9+**: Recommended for best compatibility
 - **CUDA** (optional): For GPU acceleration with PyTorch
 
-> **Why Conda?** Conda provides better package management for scientific computing libraries, handles binary dependencies more reliably than pip alone, and offers superior environment isolation for machine learning projects.
-
 ### 2. Installation
 
 ```bash
@@ -131,13 +129,6 @@ python scripts/evaluate.py
     --config configs/layoutlm_cord.yaml 
     --model_path results/cord/final_model 
     --save_predictions
-```
-
-### 4. Validate Code Quality
-
-```bash
-# Run all validation checks
-python scripts/validate.py
 ```
 
 ## Configuration
@@ -218,6 +209,39 @@ Based on paper reports and community benchmarks:
 
 ### Code Quality
 
+## Continual Learning (CL)
+
+This repo includes a continual learning pipeline for LayoutLM models with several strategies: sequential fine-tuning, Experience Replay (ER), Elastic Weight Consolidation (EWC), Gradient Episodic Memory (GEM), Averaged-GEM (A-GEM), Learning without Forgetting (LwF), and a joint-training upper bound.
+
+Run CL experiments via `scripts/train_cl.py` with the provided configs:
+
+```bash
+# Sequential (baseline)
+python scripts/train_cl.py --config configs/layoutlmv3_class_il.yaml --output_dir results
+
+# Joint (upper bound over unified label space)
+# NOTE: enable unified labels inside the config
+python scripts/train_cl.py --config configs/layoutlmv3_joint_class_il.yaml --output_dir results
+
+# Experience Replay
+python scripts/train_cl.py --config configs/layoutlmv3_er_class_il.yaml --output_dir results
+
+# EWC
+python scripts/train_cl.py --config configs/layoutlmv3_ewc_class_il.yaml --output_dir results
+
+# GEM / A-GEM
+python scripts/train_cl.py --config configs/layoutlmv3_gem_class_il.yaml --output_dir results
+python scripts/train_cl.py --config configs/layoutlmv3_agem_class_il.yaml --output_dir results
+
+# LwF (requires unified label space)
+python scripts/train_cl.py --config configs/layoutlmv3_lwf_class_il.yaml --output_dir results
+```
+
+Notes:
+- Use `cl_setting: class_il` for these strategies. The trainer grows a single classifier head as new labels are introduced (union-of-labels) and keeps label IDs stable across tasks.
+- LwF requires `label_space.unified: true` so the teacher and student share the same output dimensionality at all times.
+- GEM/A-GEM override gradient accumulation to 1 inside the trainer to ensure correct projection behavior.
+
 The project follows strict code quality standards:
 
 - **PEP 8** compliance via flake8
@@ -233,26 +257,4 @@ conda activate cl4ie
 
 # Run flake8 linting
 flake8 .
-
-# Run validation script
-python scripts/validate.py
-```
-
-### Environment Management
-
-```bash
-# List conda environments
-conda env list
-
-# Update environment from requirements.txt
-pip install -r requirements.txt --upgrade
-
-# Export current environment (for sharing)
-conda env export > environment_backup.yml
-
-# Remove environment (if needed)
-conda env remove -n cl4ie
-
-# Deactivate environment
-conda deactivate
 ```

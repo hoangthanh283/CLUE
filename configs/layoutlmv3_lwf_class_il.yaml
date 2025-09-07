@@ -1,6 +1,5 @@
-experiment_name: "layoutlmv3_class_il"
+experiment_name: "layoutlmv3_lwf_class_il"
 
-# Base dataset config (will be overridden per task)
 dataset:
   name: "funsd"
   hf_dataset_name: "nielsr/funsd"
@@ -13,22 +12,19 @@ dataset:
     normalize_bbox: true
     include_image: false
 
-# Model configuration
 model:
   name: "layoutlmv3"
   model_type: "layoutlmv3-base"
   pretrained_model_name: "microsoft/layoutlmv3-base"
   config:
-    num_labels: 7    # number of labels for the first task (FUNSD); will grow as new tasks are added.
+    # Will be overridden to unified size by train_cl when label_space.unified is true
+    num_labels: 51
     hidden_dropout_prob: 0.1
     attention_probs_dropout_prob: 0.1
     classifier_dropout: 0.1
 
-# Continual Learning head setting
-# - class_il: single head over the union of labels
 cl_setting: "class_il"
 
-# Training configuration
 training:
   batch_size: 1
   gradient_accumulation_steps: 4
@@ -46,7 +42,6 @@ training:
   greater_is_better: true
   early_stopping_patience: 3
 
-# Data processing
 data_processing:
   train_split: "train"
   test_split: "test"
@@ -54,14 +49,14 @@ data_processing:
   shuffle_train: true
   seed: 42
 
-# Continual Learning Strategy (sequential fine-tuning)
 cl_strategy:
-  name: "sequential"
+  name: "lwf"
+  lwf_alpha: 0.5
+  lwf_temperature: 2.0
 
 label_space:
-  unified: false
+  unified: true
 
-# Tasks sequence: FUNSD -> CORD -> SROIE -> WildReceipt -> XFUND (zh)
 tasks:
   - name: "funsd"
     dataset:
@@ -85,21 +80,19 @@ tasks:
       hf_dataset_name: "nnul/xfund-multilingual"
       language: "zh"
 
-# Evaluation settings
 evaluation:
   metrics: ["accuracy", "f1", "precision", "recall"]
   save_predictions: false
 
-# Logging and output
 output:
   log_level: "INFO"
   save_model: true
   save_tokenizer: true
   push_to_hub: false
 
-# Neptune (optional)
 neptune:
   use_neptune: false
   neptune_project: "your-workspace/cl4ie"
   neptune_api_token: null
-  tags: ["layoutlmv3", "class_il", "sequential", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
+  tags: ["layoutlmv3", "class_il", "lwf", "unified", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
+

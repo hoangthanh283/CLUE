@@ -354,10 +354,14 @@ class ContinualLayoutLMTrainer:
                 id2label = {i: l for i, l in enumerate(lbl_list)}
                 m = self.evaluate_with_head(tasks[j]["eval_loader"], task_names[j], lbl_list, id2label)
             else:
-                # Ensure metrics cover the labels in task j to avoid KeyError in entity F1
-                lbl_list = tasks[j].get("label_list") or self.metrics.label_list
-                id2label = tasks[j].get("id2label") or {i: l for i, l in enumerate(lbl_list)}
-                self.metrics = LayoutLMMetrics(lbl_list, id2label)
+                # Class-IL: choose an id2label that covers BOTH current head and task j
+                task_lbl_list = tasks[j].get("label_list") or self.metrics.label_list
+                task_id2label = tasks[j].get("id2label") or {i: l for i, l in enumerate(task_lbl_list)}
+                head_id2label = getattr(self.metrics, "id2label", task_id2label)
+                # Prefer the larger mapping to avoid KeyError in entity F1
+                use_id2label = task_id2label if len(task_id2label) >= len(head_id2label) else head_id2label
+                use_lbl_list = [use_id2label[i] for i in range(len(use_id2label))]
+                self.metrics = LayoutLMMetrics(use_lbl_list, use_id2label)
                 m = self.evaluate(tasks[j]["eval_loader"])  # single head evaluation
             pre_accuracy.append(float(m.get("accuracy", 0.0)))
 
@@ -378,17 +382,21 @@ class ContinualLayoutLMTrainer:
             )
             per_task_results.append(res)
 
-            # Evaluate on all tasks with the current unified/class head
+            # Evaluate on all tasks with a mapping that covers predictions and labels
             for j in range(T):
                 if self.cl_setting == "task_il":
                     lbl_list = tasks[j].get("label_list") or self.metrics.label_list
                     id2label = {i: l for i, l in enumerate(lbl_list)}
                     metrics = self.evaluate_with_head(tasks[j]["eval_loader"], task_names[j], lbl_list, id2label)
                 else:
-                    # Ensure metrics cover task j's label namespace
-                    lbl_list = tasks[j].get("label_list") or self.metrics.label_list
-                    id2label = tasks[j].get("id2label") or {i: l for i, l in enumerate(lbl_list)}
-                    self.metrics = LayoutLMMetrics(lbl_list, id2label)
+                    # Class-IL: choose an id2label that covers BOTH current head and task j
+                    task_lbl_list = tasks[j].get("label_list") or self.metrics.label_list
+                    task_id2label = tasks[j].get("id2label") or {i: l for i, l in enumerate(task_lbl_list)}
+                    head_id2label = getattr(self.metrics, "id2label", task_id2label)
+                    # Prefer the larger mapping to avoid KeyError in entity F1
+                    use_id2label = task_id2label if len(task_id2label) >= len(head_id2label) else head_id2label
+                    use_lbl_list = [use_id2label[i] for i in range(len(use_id2label))]
+                    self.metrics = LayoutLMMetrics(use_lbl_list, use_id2label)
                     metrics = self.evaluate(tasks[j]["eval_loader"])  # single head evaluation
                 acc_matrix[i][j] = float(metrics.get("accuracy", 0.0))
 
