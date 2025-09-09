@@ -28,7 +28,7 @@ cl_setting: "class_il"
 training:
   batch_size: 1
   gradient_accumulation_steps: 4
-  num_epochs: 10
+  num_epochs: 1
   learning_rate: 5.0e-5
   weight_decay: 0.01
   warmup_ratio: 0.1

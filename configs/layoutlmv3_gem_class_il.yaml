@@ -28,7 +28,7 @@ training:
   batch_size: 1
   # Will be overridden to 1 inside trainer for GEM-style strategies
   gradient_accumulation_steps: 4
-  num_epochs: 10
+  num_epochs: 1
   learning_rate: 5.0e-5
   weight_decay: 0.01
   warmup_ratio: 0.1
@@ -52,7 +52,11 @@ data_processing:
 cl_strategy:
   name: "gem"
   memory_size: 2000
-  replay_batch_size: 32
+  replay_batch_size: 4
+  # Numerical stability: allow small constraint violations (default: 0.0)
+  constraint_tolerance: 1e-3
+  # Maximum number of reference gradients/constraints (default: 3)  
+  max_constraints: 3
 
 label_space:
   unified: false

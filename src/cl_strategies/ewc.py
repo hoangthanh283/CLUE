@@ -4,17 +4,29 @@ from typing import Any, Dict, Iterable, Optional
 import os
 import pickle
 import gc
+import logging
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from src.cl_strategies.base import BaseCLStrategy
 
+logger = logging.getLogger(__name__)
+
 
 class EWC(BaseCLStrategy):
-    """Diagonal-Fisher EWC.
-
-    L_total = L_task + (lambda/2) * sum_i F_i (theta_i - theta*_i)^2
+    """Elastic Weight Consolidation (EWC) implementation.
+    
+    Prevents catastrophic forgetting by adding a quadratic penalty term:
+    L_total = L_task + (λ/2) * Σ_i F_i (θ_i - θ*_i)²
+    
+    Where:
+    - F_i is the Fisher Information for parameter i
+    - θ*_i is the optimal parameter value from previous tasks  
+    - λ is the EWC regularization strength
+    
+    Reference: Kirkpatrick et al. "Overcoming catastrophic forgetting in neural networks" (2017)
     """
 
     def __init__(self, config: Dict[str, Any]):
@@ -33,7 +45,11 @@ class EWC(BaseCLStrategy):
 
         # Memory optimization settings
         self.param_chunk_size: int = int(config.get("cl_strategy", {}).get("param_chunk_size", 300))
-        self.fisher_sparsity: float = float(config.get("cl_strategy", {}).get("fisher_sparsity", 0.9))
+        self.fisher_sparsity: float = float(config.get("cl_strategy", {}).get("fisher_sparsity", 0.0))  # Default: no sparsification
+        
+        # Fisher computation method
+        self.fisher_method: str = config.get("cl_strategy", {}).get("fisher_method", "empirical")  # "empirical" or "true"
+        self.fisher_sampling_type: str = config.get("cl_strategy", {}).get("fisher_sampling_type", "true_labels")  # "true_labels" or "predicted"
 
     @torch.no_grad()
     def _snapshot_params(self, model: nn.Module) -> Dict[str, torch.Tensor]:
@@ -47,16 +63,27 @@ class EWC(BaseCLStrategy):
         return {n: torch.zeros_like(p, device=p.device) for n, p in model.named_parameters() if p.requires_grad}
 
     def _estimate_fisher(self, model: nn.Module, loader: Iterable) -> Dict[str, torch.Tensor]:
-        # Switch to eval for a stabler estimate (dropout off); restore mode after
+        """Estimate Fisher Information Matrix.
+        
+        Supports both empirical Fisher (gradient²) and true Fisher Information.
+        The empirical Fisher approximation is F_ii ≈ E[g_i²] where g_i is the gradient.
+        """
+        logger.info(f"Estimating Fisher Information using {self.fisher_method} method")
+        
+        # Switch to eval for stable estimate (dropout off)
         was_training = model.training
         model.train(False)
         fisher = self._init_zero_like(model)
         n_batches = 0
+        n_samples = 0
 
-        # Limit the number of batches used for Fisher estimation to save memory
+        # Limit batches for memory efficiency
         max_fisher_batches = self.max_fisher_batches
         if hasattr(loader, "__len__"):
             max_fisher_batches = min(self.max_fisher_batches, len(loader))
+            
+        logger.info(f"Using {max_fisher_batches} batches for Fisher estimation")
+
         for batch in loader:
             if n_batches >= max_fisher_batches:
                 break
@@ -64,32 +91,85 @@ class EWC(BaseCLStrategy):
             n_batches += 1
             device = next(model.parameters()).device
             batch = {k: v.to(device) for k, v in batch.items()}
+            batch_size = batch["input_ids"].shape[0]
+            n_samples += batch_size
+
+            if self.fisher_method == "empirical":
+                # Empirical Fisher: F ≈ E[∇log p(y|x)²] using true labels
+                model.zero_grad(set_to_none=True)
+                outputs = model(**batch)
+                loss = outputs["loss"]
+                loss.backward()
+
+                # Accumulate squared gradients
+                for (name, param) in model.named_parameters():
+                    if param.grad is not None and param.requires_grad:
+                        fisher[name] += (param.grad.detach() ** 2)
+                        
+            elif self.fisher_method == "true":
+                # True Fisher Information: F_ij = E[∇log p(y|x)_i * ∇log p(y|x)_j]
+                # For diagonal approximation: F_ii = E[∇log p(y|x)_i²]
+                # We compute this by sampling from the model's predicted distribution
+                
+                with torch.no_grad():
+                    outputs = model(**batch)
+                    logits = outputs["logits"]
+                    
+                # Sample from predicted distribution or use true labels
+                if self.fisher_sampling_type == "predicted":
+                    # Sample labels from model's distribution
+                    probs = F.softmax(logits.view(-1, logits.shape[-1]), dim=-1)
+                    sampled_labels = torch.multinomial(probs, 1).view(logits.shape[:-1])
+                    batch_sampled = batch.copy()
+                    batch_sampled["labels"] = sampled_labels
+                else:
+                    # Use true labels (empirical Fisher on true data distribution)
+                    batch_sampled = batch
+                
+                # Compute gradients with respect to sampled/true labels
+                model.zero_grad(set_to_none=True)
+                outputs_sampled = model(**batch_sampled)
+                loss = outputs_sampled["loss"]
+                loss.backward()
+
+                # Accumulate squared gradients (diagonal Fisher approximation)
+                for (name, param) in model.named_parameters():
+                    if param.grad is not None and param.requires_grad:
+                        fisher[name] += (param.grad.detach() ** 2)
+            else:
+                raise ValueError(f"Unknown Fisher method: {self.fisher_method}")
+
+            # Clear gradients to save memory
             model.zero_grad(set_to_none=True)
-            outputs = model(**batch)
-            loss = outputs["loss"]
-            loss.backward()
 
-            # Accumulate Fisher information and immediately clear gradients to save memory
-            for (name, param) in model.named_parameters():
-                if param.grad is not None and param.requires_grad:
-                    fisher[name] += (param.grad.detach() ** 2)
-
-            # Clear gradients immediately to free memory
-            model.zero_grad(set_to_none=True)
-
-            # Periodic GPU memory cleanup
+            # Periodic cleanup
             if n_batches % 10 == 0 and torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-        if n_batches > 0:
+        # Average over samples
+        if n_samples > 0:
             for name in fisher:
-                fisher[name] /= float(n_batches)
-
-        # Detach and optionally move to CPU for storage.
+                fisher[name] /= float(n_samples)
+        
+        # Log Fisher statistics
+        total_fisher = sum(f.sum().item() for f in fisher.values())
+        avg_fisher = total_fisher / sum(f.numel() for f in fisher.values())
+        logger.info(f"Fisher estimation complete: {n_batches} batches, {n_samples} samples")
+        logger.info(f"Average Fisher value: {avg_fisher:.8f}")
+        
+        # Check for zero Fisher values (problematic)
+        zero_params = [(name, (f == 0).sum().item(), f.numel()) for name, f in fisher.items()]
+        total_zero = sum(zero for _, zero, _ in zero_params)
+        total_params = sum(total for _, _, total in zero_params)
+        if total_zero > total_params * 0.5:
+            logger.warning(f"High proportion of zero Fisher values: {total_zero}/{total_params}")
+            
+        # Detach and move to storage device
         fisher_detached = {k: v.detach().clone() for k, v in fisher.items()}
         if self.store_on_cpu:
             fisher_detached = {k: v.to("cpu") for k, v in fisher_detached.items()}
-        # Restore original mode
+            
+        # Restore training mode
         model.train(was_training)
         return fisher_detached
 
@@ -145,8 +225,12 @@ class EWC(BaseCLStrategy):
         optimal_params = self._snapshot_params(model)
         fisher = self._estimate_fisher(model, train_loader)
 
-        # Apply sparsification to reduce memory usage
-        fisher = self._sparsify_fisher(fisher, self.fisher_sparsity)
+        # Apply sparsification to reduce memory usage (if enabled)
+        if self.fisher_sparsity > 0.0:
+            logger.info(f"Applying Fisher sparsification with ratio {self.fisher_sparsity}")
+            fisher = self._sparsify_fisher(fisher, self.fisher_sparsity)
+        else:
+            logger.info("No Fisher sparsification applied")
 
         # Save to disk instead of storing in memory
         self._save_fisher_and_params(fisher, optimal_params, task_id)
@@ -180,6 +264,13 @@ class EWC(BaseCLStrategy):
             gc.collect()
 
         penalty = torch.tensor(total_penalty, device=loss.device, dtype=loss.dtype)
+        
+        # Log penalty information for debugging
+        if self.num_tasks > 0:
+            logger.debug(f"EWC penalty: {penalty.item():.8f} (base loss: {loss.item():.4f})")
+            if penalty.item() < 1e-8:
+                logger.warning("EWC penalty is very small - parameters may not be changing")
+        
         return loss + (self.lambda_ewc / 2.0) * penalty
 
     def _compute_task_penalty_chunked(self, model: nn.Module, fisher: Dict[str, torch.Tensor],
