@@ -186,7 +186,6 @@ class EWC(BaseCLStrategy):
                                       params_star: Dict[str, torch.Tensor]) -> float:
         """Compute EWC penalty for one task using parameter chunking."""
         penalty = 0.0
-
         # Get list of parameters for chunking
         param_items = [(name, param) for name, param in model.named_parameters() if param.requires_grad]
 
@@ -199,14 +198,12 @@ class EWC(BaseCLStrategy):
             # Aggressive garbage collection after each chunk
             if i % (self.param_chunk_size * 2) == 0:
                 gc.collect()
-
         return penalty
 
     def _compute_chunk_penalty(self, chunk_params, fisher: Dict[str, torch.Tensor],
                                params_star: Dict[str, torch.Tensor]) -> float:
         """Compute penalty for a chunk of parameters on CPU."""
         chunk_penalty = 0.0
-
         for name, param in chunk_params:
             if name not in params_star or name not in fisher:
                 continue
@@ -228,5 +225,4 @@ class EWC(BaseCLStrategy):
             else:
                 diff = param_cpu - prev_param_cpu
                 chunk_penalty += (F_cpu * diff.pow(2)).sum().item()
-
         return chunk_penalty
