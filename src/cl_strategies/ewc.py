@@ -1,6 +1,9 @@
 """Elastic Weight Consolidation (EWC)."""
 
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, Optional
+import os
+import pickle
+import gc
 
 import torch
 import torch.nn as nn
@@ -22,8 +25,15 @@ class EWC(BaseCLStrategy):
         self.store_on_cpu: bool = bool(config.get("cl_strategy", {}).get("ewc_store_on_cpu", True))
         # Max number of batches used for Fisher estimation (configurable)
         self.max_fisher_batches: int = int(config.get("cl_strategy", {}).get("ewc_max_fisher_batches", 500))
-        self.fishers: List[Dict[str, torch.Tensor]] = []
-        self.opt_params: List[Dict[str, torch.Tensor]] = []
+
+        # Disk storage for memory efficiency
+        self.ewc_cache_dir = config.get("cl_strategy", {}).get("ewc_cache_dir", "ewc_cache")
+        os.makedirs(self.ewc_cache_dir, exist_ok=True)
+        self.num_tasks = 0
+
+        # Memory optimization settings
+        self.param_chunk_size: int = int(config.get("cl_strategy", {}).get("param_chunk_size", 300))
+        self.fisher_sparsity: float = float(config.get("cl_strategy", {}).get("fisher_sparsity", 0.9))
 
     @torch.no_grad()
     def _snapshot_params(self, model: nn.Module) -> Dict[str, torch.Tensor]:
@@ -42,7 +52,7 @@ class EWC(BaseCLStrategy):
         model.train(False)
         fisher = self._init_zero_like(model)
         n_batches = 0
-        
+
         # Limit the number of batches used for Fisher estimation to save memory
         max_fisher_batches = self.max_fisher_batches
         if hasattr(loader, "__len__"):
@@ -58,23 +68,23 @@ class EWC(BaseCLStrategy):
             outputs = model(**batch)
             loss = outputs["loss"]
             loss.backward()
-            
+
             # Accumulate Fisher information and immediately clear gradients to save memory
             for (name, param) in model.named_parameters():
                 if param.grad is not None and param.requires_grad:
                     fisher[name] += (param.grad.detach() ** 2)
-            
+
             # Clear gradients immediately to free memory
             model.zero_grad(set_to_none=True)
-            
+
             # Periodic GPU memory cleanup
             if n_batches % 10 == 0 and torch.cuda.is_available():
                 torch.cuda.empty_cache()
-                
+
         if n_batches > 0:
             for name in fisher:
                 fisher[name] /= float(n_batches)
-                
+
         # Detach and optionally move to CPU for storage.
         fisher_detached = {k: v.detach().clone() for k, v in fisher.items()}
         if self.store_on_cpu:
@@ -83,55 +93,140 @@ class EWC(BaseCLStrategy):
         model.train(was_training)
         return fisher_detached
 
+    def _sparsify_fisher(self, fisher: Dict[str, torch.Tensor], sparsity_ratio: float = 0.9) -> Dict[str, torch.Tensor]:
+        """Keep only top-(1-sparsity_ratio) most important Fisher values."""
+        sparse_fisher = {}
+        for name, F in fisher.items():
+            F_flat = F.view(-1)
+            k = max(1, int((1 - sparsity_ratio) * F_flat.numel()))
+
+            # Get top-k indices and values
+            _, topk_indices = torch.topk(F_flat.abs(), k)
+
+            # Create sparse representation
+            sparse_F = torch.zeros_like(F_flat)
+            sparse_F[topk_indices] = F_flat[topk_indices]
+            sparse_fisher[name] = sparse_F.view(F.shape)
+
+        return sparse_fisher
+
+    def _save_fisher_and_params(self, fisher: Dict[str, torch.Tensor], params: Dict[str, torch.Tensor], task_id: int):
+        """Save Fisher matrix and optimal parameters to disk."""
+        fisher_path = os.path.join(self.ewc_cache_dir, f"fisher_task_{task_id}.pkl")
+        params_path = os.path.join(self.ewc_cache_dir, f"params_task_{task_id}.pkl")
+
+        with open(fisher_path, "wb") as f:
+            pickle.dump(fisher, f)
+        with open(params_path, "wb") as f:
+            pickle.dump(params, f)
+
+    def _load_fisher_and_params(self, task_id: int):
+        """Load Fisher matrix and optimal parameters from disk."""
+        fisher_path = os.path.join(self.ewc_cache_dir, f"fisher_task_{task_id}.pkl")
+        params_path = os.path.join(self.ewc_cache_dir, f"params_task_{task_id}.pkl")
+
+        if not os.path.exists(fisher_path) or not os.path.exists(params_path):
+            return None, None
+
+        with open(fisher_path, "rb") as f:
+            fisher = pickle.load(f)
+        with open(params_path, "rb") as f:
+            params = pickle.load(f)
+        return fisher, params
+
     def before_task(self, model: nn.Module, task_id: int, train_loader: Optional[Iterable] = None):
         return
 
     def after_task(self, model: nn.Module, task_id: int, train_loader: Optional[Iterable] = None):
         if train_loader is None:
             raise ValueError("EWC.after_task requires the train_loader to estimate Fisher")
-        self.opt_params.append(self._snapshot_params(model))
-        self.fishers.append(self._estimate_fisher(model, train_loader))
+
+        # Compute Fisher and snapshot parameters
+        optimal_params = self._snapshot_params(model)
+        fisher = self._estimate_fisher(model, train_loader)
+
+        # Apply sparsification to reduce memory usage
+        fisher = self._sparsify_fisher(fisher, self.fisher_sparsity)
+
+        # Save to disk instead of storing in memory
+        self._save_fisher_and_params(fisher, optimal_params, task_id)
+        self.num_tasks += 1
+
+        # Force garbage collection
+        del fisher, optimal_params
+        gc.collect()
 
     def compute_loss(self, model: nn.Module, batch: Dict[str, torch.Tensor], outputs: Dict[str, torch.Tensor]
                      ) -> torch.Tensor:
         loss = outputs["loss"]
-        if not self.fishers:
+        if self.num_tasks == 0:
             return loss
 
-        # Accumulate penalty on active device with autograd enabled.
-        penalty = torch.zeros((), device=loss.device, dtype=loss.dtype)
+        # Process tasks one by one to minimize memory usage
+        total_penalty = 0.0
 
-        import sys
-        total_bytes = sum(sum(tensor.element_size() * tensor.nelement() for tensor in fisher.values()) for fisher in self.fishers)
-        print(f"Size of self.fishers: {len(self.fishers)}, total size: {total_bytes / (1024 ** 2):.2f} MB")
+        for task_idx in range(self.num_tasks):
+            # Load only ONE task's Fisher matrix and parameters
+            fisher, params_star = self._load_fisher_and_params(task_idx)
+            if fisher is None or params_star is None:
+                continue
 
-        for task_idx in range(len(self.fishers)):
-            fisher = self.fishers[task_idx]
-            params_star = self.opt_params[task_idx]
-            for name, param in model.named_parameters():
-                if not param.requires_grad:
-                    continue
-                if name not in params_star or name not in fisher:
-                    # Parameter added after earlier tasks or missing fisher; skip.
-                    continue
+            # Compute penalty for this task with parameter chunking
+            task_penalty = self._compute_task_penalty_chunked(model, fisher, params_star)
+            total_penalty += task_penalty
 
-                # Bring stored tensors to the parameter device/dtype (constants, no grads)
-                prev_param = params_star[name].to(param.device, dtype=param.dtype)
-                F = fisher[name].to(param.device, dtype=param.dtype)
+            # CRITICAL: Free memory immediately after processing each task
+            del fisher, params_star
+            gc.collect()
 
-                # Handle parameter size mismatches (e.g., classifier expansion in class-IL)
-                if param.shape != prev_param.shape:
-                    # Only apply penalty to the overlapping dimensions
-                    min_shape = tuple(min(p, pp) for p, pp in zip(param.shape, prev_param.shape))
-                    slices = tuple(slice(0, s) for s in min_shape)
-
-                    param_slice = param[slices]
-                    prev_param_slice = prev_param[slices]
-                    F_slice = F[slices]
-
-                    diff = param_slice - prev_param_slice
-                    penalty = penalty + (F_slice * diff.pow(2)).sum()
-                else:
-                    diff = param - prev_param
-                    penalty = penalty + (F * diff.pow(2)).sum()
+        penalty = torch.tensor(total_penalty, device=loss.device, dtype=loss.dtype)
         return loss + (self.lambda_ewc / 2.0) * penalty
+
+    def _compute_task_penalty_chunked(self, model: nn.Module, fisher: Dict[str, torch.Tensor],
+                                      params_star: Dict[str, torch.Tensor]) -> float:
+        """Compute EWC penalty for one task using parameter chunking."""
+        penalty = 0.0
+
+        # Get list of parameters for chunking
+        param_items = [(name, param) for name, param in model.named_parameters() if param.requires_grad]
+
+        # Process parameters in small chunks to fit in 15GB RAM
+        for i in range(0, len(param_items), self.param_chunk_size):
+            chunk_params = param_items[i:i + self.param_chunk_size]
+            chunk_penalty = self._compute_chunk_penalty(chunk_params, fisher, params_star)
+            penalty += chunk_penalty
+
+            # Aggressive garbage collection after each chunk
+            if i % (self.param_chunk_size * 2) == 0:
+                gc.collect()
+
+        return penalty
+
+    def _compute_chunk_penalty(self, chunk_params, fisher: Dict[str, torch.Tensor],
+                               params_star: Dict[str, torch.Tensor]) -> float:
+        """Compute penalty for a chunk of parameters on CPU."""
+        chunk_penalty = 0.0
+
+        for name, param in chunk_params:
+            if name not in params_star or name not in fisher:
+                continue
+
+            # Move current parameter to CPU for computation (preserves gradients)
+            param_cpu = param.cpu()
+
+            # Fisher and prev_param are already on CPU from disk storage
+            prev_param_cpu = params_star[name]
+            F_cpu = fisher[name]
+
+            # Handle parameter size mismatches
+            if param_cpu.shape != prev_param_cpu.shape:
+                min_shape = tuple(min(p, pp) for p, pp in zip(param_cpu.shape, prev_param_cpu.shape))
+                slices = tuple(slice(0, s) for s in min_shape)
+
+                diff = param_cpu[slices] - prev_param_cpu[slices]
+                chunk_penalty += (F_cpu[slices] * diff.pow(2)).sum().item()
+            else:
+                diff = param_cpu - prev_param_cpu
+                chunk_penalty += (F_cpu * diff.pow(2)).sum().item()
+
+        return chunk_penalty
