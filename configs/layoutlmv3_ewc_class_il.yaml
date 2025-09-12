@@ -26,7 +26,7 @@ cl_setting: "class_il"
 
 training:
   batch_size: 1
-  gradient_accumulation_steps: 4
+  gradient_accumulation_steps: 8
   num_epochs: 10
   learning_rate: 5.0e-5
   weight_decay: 0.01
@@ -50,7 +50,11 @@ data_processing:
 
 cl_strategy:
   name: "ewc"
-  ewc_lambda: 0.4
+  ewc_lambda: 1.0
+  ewc_chunk_size: 500000 # tune based on GPU memory.
+  n_fisher_samples: 500  # null = use all training data, or set to int (e.g., 1000) for sampling.
+  store_fishers_on_cpu: true # whether to store fisher matrices on CPU to save GPU memory.
+  fisher_cache_dir: "ewc_fisher_cache"
 
 label_space:
   unified: false
