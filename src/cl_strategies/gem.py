@@ -3,6 +3,7 @@
 from typing import Any, Dict
 
 import torch
+import quadprog
 import torch.nn as nn
 
 from src.cl_strategies.base import BaseCLStrategy
@@ -17,14 +18,6 @@ class GEM(BaseCLStrategy):
         mem_size = int(cl_cfg.get("memory_size", 2000))
         self.ref_batch_size = int(cl_cfg.get("replay_batch_size", 32))
         self.memory = MemoryBuffer(mem_size)
-        self._qp_available = self._check_qp()
-
-    def _check_qp(self) -> bool:
-        try:
-            import quadprog  # noqa: F401
-            return True
-        except Exception:
-            return False
 
     def update_memory(self, batch: Dict[str, torch.Tensor]):
         self.memory.add_batch(batch)
@@ -56,18 +49,7 @@ class GEM(BaseCLStrategy):
             return
 
         G = torch.stack(G_list, dim=1)  # [P, K]
-
-        # Fallback to A-GEM if quadprog missing or only 1 constraint
-        if not self._qp_available or G.size(1) == 1:
-            g_ref = G.mean(dim=1)
-            if torch.dot(g, g_ref) < 0:
-                proj = g - (torch.dot(g, g_ref) / (g_ref.norm() ** 2 + 1e-12)) * g_ref
-                set_grad_vector(model, proj)
-            return
-
         # Solve QP: min 0.5 ||v - g||^2 s.t. G^T v >= 0
-        import quadprog  # type: ignore
-
         g_np = g.detach().cpu().double().numpy()
         G_np = G.detach().cpu().double().numpy()
         P = g_np.shape[0]
@@ -77,12 +59,6 @@ class GEM(BaseCLStrategy):
         A = G_np
         b = torch.zeros(G_np.shape[1], dtype=torch.double).numpy()
 
-        try:
-            sol = quadprog.solve_qp(Q, c, A, b)[0]
-            v = torch.from_numpy(sol).to(g.device, dtype=g.dtype)
-            set_grad_vector(model, v)
-        except Exception:
-            g_ref = G.mean(dim=1)
-            if torch.dot(g, g_ref) < 0:
-                proj = g - (torch.dot(g, g_ref) / (g_ref.norm() ** 2 + 1e-12)) * g_ref
-                set_grad_vector(model, proj)
+        sol = quadprog.solve_qp(Q, c, A, b)[0]
+        v = torch.from_numpy(sol).to(g.device, dtype=g.dtype)
+        set_grad_vector(model, v)
