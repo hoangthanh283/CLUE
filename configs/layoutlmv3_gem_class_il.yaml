@@ -5,7 +5,7 @@ dataset:
   hf_dataset_name: "nielsr/funsd"
   task_type: "token_classification"
   preprocessing:
-    max_seq_length: 512
+    max_seq_length: 128  # DRASTICALLY reduced from 512 for memory
     max_position_embeddings: 1024
     image_size: [224, 224]
     apply_ocr: false
@@ -26,9 +26,8 @@ cl_setting: "class_il"
 
 training:
   batch_size: 1
-  # Will be overridden to 1 inside trainer for GEM-style strategies
-  gradient_accumulation_steps: 4
-  num_epochs: 10
+  gradient_accumulation_steps: 1  # Must be 1 for memory efficiency
+  num_epochs: 20
   learning_rate: 5.0e-5
   weight_decay: 0.01
   warmup_ratio: 0.1
@@ -51,8 +50,10 @@ data_processing:
 
 cl_strategy:
   name: "gem"
-  memory_size: 2000
-  replay_batch_size: 32
+  memory_size: 50  # DRASTICALLY reduced for 6GB GPU
+  replay_batch_size: 1  # Always 1
+  use_multiple_constraints: false
+  max_constraints: 1
 
 label_space:
   unified: false
@@ -94,5 +95,4 @@ neptune:
   use_neptune: false
   neptune_project: "your-workspace/cl4ie"
   neptune_api_token: null
-  tags: ["layoutlmv3", "class_il", "gem", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
-
+  tags: ["layoutlmv3", "class_il", "gem", "memory_efficient", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
