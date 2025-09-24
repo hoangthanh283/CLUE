@@ -5,7 +5,7 @@ dataset:
   hf_dataset_name: "nielsr/funsd"
   task_type: "token_classification"
   preprocessing:
-    max_seq_length: 512  # DRASTICALLY reduced from 512 for memory to 128
+    max_seq_length: 512
     max_position_embeddings: 1024
     image_size: [224, 224]
     apply_ocr: false
@@ -26,7 +26,7 @@ cl_setting: "class_il"
 
 training:
   batch_size: 1
-  gradient_accumulation_steps: 8  # Must be 1 for memory efficiency
+  gradient_accumulation_steps: 8
   num_epochs: 50
   learning_rate: 5.0e-5
   weight_decay: 0.01
@@ -50,8 +50,8 @@ data_processing:
 
 cl_strategy:
   name: "gem"
-  memory_size: 1000  # DRASTICALLY reduced for 6GB GPU - 50
-  replay_batch_size: 4  # Always 1
+  memory_size: 500
+  replay_batch_size: 1
   use_multiple_constraints: false
   max_constraints: 1
 

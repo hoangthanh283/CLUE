@@ -1,4 +1,4 @@
-"""Gradient Episodic Memory (GEM) - Ultra Memory Efficient for RTX 2060 6GB."""
+"""Gradient Episodic Memory (GEM)"""
 
 from typing import Any, Dict
 
@@ -14,14 +14,12 @@ class GEM(BaseCLStrategy):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         cl_cfg = config.get("cl_strategy", {})
-        
-        # DRASTICALLY REDUCED memory settings for RTX 2060 6GB
-        mem_size = min(50, int(cl_cfg.get("memory_size", 50)))  # Max 50 samples
-        self.ref_batch_size = 1  # ALWAYS 1 to prevent OOM
+        mem_size = int(cl_cfg.get("memory_size", 50))
         self.memory = MemoryBuffer(mem_size)
-        
+        self.replay_batch_size = cl_cfg.get("replay_batch_size", 1)
+
         # Aggressive memory management
-        self.clear_cache_every = 1  # Clear every step
+        self.clear_cache_every = 1  # Clear every step.
         self._step_count = 0
 
     def update_memory(self, batch: Dict[str, torch.Tensor]):
@@ -34,13 +32,12 @@ class GEM(BaseCLStrategy):
         }
         if "token_type_ids" in batch and batch["token_type_ids"] is not None:
             sample_batch["token_type_ids"] = batch["token_type_ids"][:1]
-        
         self.memory.add_batch(sample_batch)
 
     def on_before_backward(self, model: nn.Module, loss: torch.Tensor):
         device = next(model.parameters()).device
-        
-        # Aggressive cache clearing to prevent OOM
+
+        # Aggressive cache clearing to prevent OOM.
         self._step_count += 1
         if self._step_count % self.clear_cache_every == 0:
             torch.cuda.empty_cache()
@@ -54,20 +51,20 @@ class GEM(BaseCLStrategy):
     def _agem_projection(self, model: nn.Module, loss: torch.Tensor, device):
         """A-GEM style projection - prevents OOM by avoiding QP solver."""
         # Get single reference sample (minimal memory)
-        mem_batch = self.memory.sample(1, device=device)
+        mem_batch = self.memory.sample(self.replay_batch_size, device=device)
         if mem_batch is None:
             return
         
-        # Compute reference gradient
+        # Compute reference gradient.
         model.zero_grad(set_to_none=True)
         mem_out = model(**mem_batch)
         mem_loss = mem_out["loss"]
         mem_loss.backward()
         g_ref = get_grad_vector(model).detach()
-        
+
         # Immediate cleanup
         del mem_batch, mem_out, mem_loss
-        
+
         # Compute current gradient
         model.zero_grad(set_to_none=True)
         loss.backward()
@@ -75,7 +72,6 @@ class GEM(BaseCLStrategy):
 
         # A-GEM projection (memory-efficient, no QP solver)
         dot_product = torch.dot(g, g_ref)
-        
         if dot_product < 0:  # Constraint violation
             # Project: g - (g·g_ref / ||g_ref||²) * g_ref
             g_ref_norm_sq = torch.dot(g_ref, g_ref)

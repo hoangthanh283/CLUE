@@ -54,7 +54,6 @@ class MemoryBuffer:
                 if batch.get("pixel_values", None) is not None
                 else None,
             )
-
             if len(self.items) < self.capacity:
                 self.items.append(item)
             else:
