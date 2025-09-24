@@ -30,7 +30,6 @@ class MemoryKey:
     file_path: str
     
     def __post_init__(self):
-        # Ensure parent directory exists
         Path(self.file_path).parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -59,6 +58,7 @@ class MemoryBuffer:
 
     def _save_item(self, item: MemoryItem, file_path: str):
         """Save MemoryItem to disk."""
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
         torch.save(item, file_path)
 
     def _load_item(self, memory_key: MemoryKey) -> Optional[MemoryItem]:
