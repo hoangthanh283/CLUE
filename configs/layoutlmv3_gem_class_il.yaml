@@ -50,8 +50,8 @@ data_processing:
 
 cl_strategy:
   name: "gem"
-  memory_size: 500
-  replay_batch_size: 1
+  memory_size: 1000
+  replay_batch_size: 2
   use_multiple_constraints: false
   max_constraints: 1
 
