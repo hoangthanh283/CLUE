@@ -6,7 +6,7 @@ import random
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import torch
 
@@ -48,7 +48,7 @@ class MemoryBuffer:
     def __len__(self) -> int:
         return len(self.keys)
 
-    def _generate_key_path(self) -> tuple[str, str]:
+    def _generate_key_path(self) -> Tuple[str, str]:
         """Generate unique key and file path."""
         key = f"sample_{self.n_seen}_{uuid.uuid4().hex[:8]}"
         # Simple sharding: use last 2 chars of key for subdirectory

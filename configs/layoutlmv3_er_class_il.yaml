@@ -57,8 +57,8 @@ data_processing:
 # Continual Learning Strategy: Experience Replay
 cl_strategy:
   name: "er"
-  memory_size: 2000
-  replay_batch_size: 1
+  memory_size: 1000
+  replay_batch_size: 4
   replay_weight: 1.0
 
 label_space:

@@ -26,8 +26,7 @@ cl_setting: "class_il"
 
 training:
   batch_size: 1
-  # Will be overridden to 1 inside trainer for (A-)GEM
-  gradient_accumulation_steps: 4
+  gradient_accumulation_steps: 8
   num_epochs: 10
   learning_rate: 5.0e-5
   weight_decay: 0.01
@@ -51,8 +50,10 @@ data_processing:
 
 cl_strategy:
   name: "agem"
-  memory_size: 2000
-  replay_batch_size: 32
+  memory_size: 1000
+  replay_batch_size: 2
+  constraint_threshold: -1e-3  # Allow small positive violations
+  clear_cache_every: 5  # Clear GPU cache every 5 steps
 
 label_space:
   unified: false

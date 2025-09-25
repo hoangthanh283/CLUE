@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from torch.utils.data import ConcatDataset, DataLoader
+import logging
 from transformers.utils import logging as hf_logging
 
 from src.data.label_space import UNIFIED_LABEL2ID, UNIFIED_LABEL_LIST
@@ -87,7 +88,7 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
         for idx, task_overrides in enumerate(tasks_cfg):
             task_config = deep_update(config, task_overrides)
             dataset_loader = get_dataset_loader(task_config)
-            for lab in list(dataset_loader.label_list):
+            for lab in list(dataset_loader.get_label_list()):
                 if lab not in seen:
                     seen[lab] = len(joint_fixed_labels)
                     joint_fixed_labels.append(lab)
@@ -113,7 +114,7 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
                 label2id_use = dict(joint_fixed_label2id)
             else:
                 # Sequential/ER-style progressive union
-                for lab in list(dataset_loader.label_list):
+                for lab in list(dataset_loader.get_label_list()):
                     if lab not in global_label2id:
                         global_label2id[lab] = len(global_labels)
                         global_labels.append(lab)
@@ -121,7 +122,7 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
                 label2id_use = dict(global_label2id)
         else:
             # Task-IL: per-task label spaces
-            label_list_use = list(dataset_loader.label_list)
+            label_list_use = list(dataset_loader.get_label_list())
             label2id_use = {l: i for i, l in enumerate(label_list_use)}
 
         if first_num_labels == -1:
@@ -159,6 +160,7 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
             train_loader = _make_loader_from_dataset(cum_train_ds, task_config, is_training=True)
         else:
             train_loader = _make_loader_from_dataset(train_ds, task_config, is_training=True)
+            cum_train_ds = train_ds  # Initialize cum_train_ds for non-joint case
 
         eval_loader = _make_loader_from_dataset(eval_ds, task_config, is_training=False)
         id2label_use = {ii: ll for ii, ll in enumerate(label_list_use)}
@@ -265,7 +267,12 @@ def _final_eval_and_save(trainer, tasks: List[Dict[str, Any]], output_dir: Path,
 
 
 def main():
-    hf_logging.set_verbosity_error()
+    # Set up transformers logging
+    try:
+        hf_logging.set_verbosity_error()  # type: ignore
+    except (AttributeError, NameError):
+        # Fallback if hf_logging doesn't have set_verbosity_error or isn't available
+        pass
     parser = argparse.ArgumentParser(description="Continual Learning training for LayoutLM")
     parser.add_argument("--config", type=str, required=True, help="Path to experiment config YAML")
     parser.add_argument("--output_dir", type=str, default="results", help="Output directory")
