@@ -13,15 +13,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from torch.utils.data import ConcatDataset, DataLoader
-import logging
 from transformers.utils import logging as hf_logging
 
 from src.data.label_space import UNIFIED_LABEL2ID, UNIFIED_LABEL_LIST
 from src.data.layoutlm_datasets import LayoutLMDataset, get_dataset_loader
 from src.models.layoutlm_models import get_model
 from src.training.cl_metrics import save_aaa_curve_plot
-from src.training.continual_trainer import (create_continual_trainer,
-                                            get_strategy)
+from src.training.continual_trainer import create_continual_trainer, get_strategy
 from src.utils import load_config, setup_logging
 
 _warnings.filterwarnings(
