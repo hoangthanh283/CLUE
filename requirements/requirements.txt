@@ -2,7 +2,6 @@ torch>=1.9.0
 transformers>=4.21.0
 datasets>=2.4.0
 evaluate>=0.2.0
-layoutlm
 pillow>=8.3.0
 timm>=0.6.7
 numpy>=1.21.0
