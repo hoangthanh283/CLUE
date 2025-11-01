@@ -1,4 +1,4 @@
-experiment_name: "layoutlmv3_xfund_zh"
+experiment_name: "layoutlmv3_xfund_de"
 
 # Dataset configuration
 dataset:
@@ -48,7 +48,7 @@ training:
 # Data processing
 data_processing:
   train_split: "train"
-  test_split: "validation"  # XFUND uses validation as test set
+  test_split: "test"
   validation_split: 0.1
   shuffle_train: true
   seed: 42

@@ -46,7 +46,7 @@ training:
 data_processing:
   train_split: "train"
   test_split: "test"
-  validation_split: "validation"
+  validation_split: 0.1
   shuffle_train: true
   seed: 42
 
