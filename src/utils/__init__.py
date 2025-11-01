@@ -22,7 +22,7 @@ def load_config(config_path):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    if not config.neptune:
+    if not config.get("neptune"):
         return config
 
     # Override with environment variables if they exist.

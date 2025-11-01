@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 import neptune
 import torch
+from neptune.utils import stringify_unsupported
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
@@ -81,7 +82,8 @@ class LayoutLMTrainer:
                 tags=neptune_config.get("tags", []),
                 api_token=neptune_config.get("neptune_api_token")
             )
-            self.neptune_run["config"] = config
+            # Use stringify_unsupported to handle lists and None values
+            self.neptune_run["config"] = stringify_unsupported(config)
 
     def _setup_optimizer(self) -> torch.optim.Optimizer:
         """Setup optimizer"""
@@ -220,6 +222,16 @@ class LayoutLMTrainer:
                 self.optimizer.zero_grad()
                 self.global_step += 1
 
+                # Logging - only log after global_step is incremented
+                if self.global_step % self.log_steps == 0:
+                    avg_loss = total_loss / num_batches
+                    self._log_metrics({
+                        "train_loss": avg_loss,
+                        "learning_rate": self.optimizer.param_groups[0]["lr"],
+                        "epoch": self.epoch,
+                        "global_step": self.global_step
+                    })
+
             # Accumulate loss
             total_loss += loss.item()
             num_batches += 1
@@ -227,15 +239,6 @@ class LayoutLMTrainer:
             # Update progress bar
             avg_loss = total_loss / num_batches
             progress_bar.set_postfix({"loss": f"{avg_loss:.4f}"})
-
-            # Logging
-            if self.global_step % self.log_steps == 0:
-                self._log_metrics({
-                    "train_loss": avg_loss,
-                    "learning_rate": self.optimizer.param_groups[0]["lr"],
-                    "epoch": self.epoch,
-                    "global_step": self.global_step
-                })
 
         return {"train_loss": total_loss / num_batches}
 

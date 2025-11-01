@@ -311,21 +311,25 @@ class FUNSDDatasetLoader(BaseDatasetLoader):
         self.id2label = {idx: label for idx, label in enumerate(self.label_list)}
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
-        """Load FUNSD dataset from HuggingFace"""
+        """Load FUNSD dataset from HuggingFace
+
+        FUNSD has official splits: train (149), test (50)
+        No official validation split, so we create one from train if needed.
+        """
         logger.info(f"Loading FUNSD dataset from {self.hf_dataset_name}")
         dataset = load_dataset(self.hf_dataset_name, streaming=False)
         train_dataset = dataset["train"]
         test_dataset = dataset["test"]
         val_dataset = dataset.get("validation", None)
 
-        # Create validation split if we don't have one and validation_split is configured.
         if val_dataset is None:
+            # Only create validation split if we don't have one and validation_split is configured.
             validation_split = self.config["data_processing"].get("validation_split", 0.1)
             if isinstance(validation_split, float) and 0 < validation_split < 1:
-                # Use built-in split for map-style dataset.
                 train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
                 train_dataset = train_val["train"]
                 val_dataset = train_val["test"]
+
         return train_dataset, test_dataset, val_dataset
 
     def _process_single_item(self, item: Dict[str, Any]) -> DocumentExample:
@@ -405,21 +409,25 @@ class CORDDatasetLoader(BaseDatasetLoader):
         ]
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
-        """Load CORD dataset from HuggingFace"""
+        """Load CORD dataset from HuggingFace
+
+        CORD has official splits: train (800), validation (100), test (100)
+        We use these official splits to match public benchmark results.
+        """
         logger.info(f"Loading CORD dataset from {self.hf_dataset_name}")
         dataset = load_dataset(self.hf_dataset_name, streaming=False)
         train_dataset = dataset["train"]
         test_dataset = dataset["test"]
+        val_dataset = dataset.get("validation", None)
 
-        # Always create validation split from train for consistency with other datasets
-        # (CORD has a native validation split but we override it for fair comparison)
-        validation_split = self.config["data_processing"].get("validation_split", 0.1)
-        if isinstance(validation_split, float) and 0 < validation_split < 1:
-            train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-            train_dataset = train_val["train"]
-            val_dataset = train_val["test"]
-        else:
-            val_dataset = None
+        # Only create validation split if we don't have one and validation_split is configured
+        if val_dataset is None:
+            validation_split = self.config["data_processing"].get("validation_split", 0.1)
+            if isinstance(validation_split, float) and 0 < validation_split < 1:
+                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
+                train_dataset = train_val["train"]
+                val_dataset = train_val["test"]
+
         return train_dataset, test_dataset, val_dataset
 
     def _process_single_item(self, item: Dict[str, Any]) -> Optional[DocumentExample]:
@@ -493,20 +501,25 @@ class SROIEDatasetLoader(BaseDatasetLoader):
         self.id2label = {i: label for i, label in enumerate(self.label_list)}
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
-        """Load SROIE dataset from HuggingFace"""
+        """Load SROIE dataset from HuggingFace
+
+        SROIE has official splits: train (626), test (347)
+        No official validation split, so we create one from train if needed.
+        """
         logger.info(f"Loading SROIE dataset from {self.hf_dataset_name}")
         dataset = load_dataset(self.hf_dataset_name, streaming=False)
         train_dataset = dataset["train"]
         test_dataset = dataset["test"]
+        val_dataset = dataset.get("validation", None)
 
-        # Create validation split if needed
-        validation_split = self.config["data_processing"].get("validation_split", 0.1)
-        if isinstance(validation_split, float) and 0 < validation_split < 1:
-            train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-            train_dataset = train_val["train"]
-            val_dataset = train_val["test"]
-        else:
-            val_dataset = None
+        if val_dataset is None:
+            # Only create validation split if we don't have one and validation_split is configured.
+            validation_split = self.config["data_processing"].get("validation_split", 0.1)
+            if isinstance(validation_split, float) and 0 < validation_split < 1:
+                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
+                train_dataset = train_val["train"]
+                val_dataset = train_val["test"]
+
         return train_dataset, test_dataset, val_dataset
 
     def _process_single_item(self, item: Dict[str, Any]) -> DocumentExample:
@@ -563,31 +576,41 @@ class XFUNDDatasetLoader(BaseDatasetLoader):
         self.language = config["dataset"].get("language", "zh")
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
-        """Load XFUND dataset from HuggingFace and filter by language"""
+        """Load XFUND dataset from HuggingFace and filter by language
+
+        XFUND has splits: train, val (val is used as test split)
+        For each language, we create validation from train split.
+        """
         logger.info(f"Loading XFUND dataset from {self.hf_dataset_name} and filtering by language: {self.language}")
         dataset = load_dataset(self.hf_dataset_name, streaming=False)
+
+        # Filter train split by language
         filtered_train: List[Dict[str, Any]] = []
         for item in dataset["train"]:
             if item["id"].startswith(f"{self.language}_"):
                 filtered_train.append(item)
         filtered_train = HFDataset.from_list(filtered_train)
 
-        # Create validation split from filtered training data.
-        validation_split = self.config["data_processing"].get("validation_split", 0.1)
-        if isinstance(validation_split, float) and 0 < validation_split < 1:
-            train_val = filtered_train.train_test_split(test_size=validation_split, seed=42)
-            train_dataset = train_val["train"]
-            val_dataset = train_val["test"]
-        else:
-            train_dataset = filtered_train
-            val_dataset = None
-
-        # Prepare test split separately and filter by language.
+        # Filter test split (val) by language
         filtered_test: List[Dict[str, Any]] = []
         for item in dataset["val"]:
             if item["id"].startswith(f"{self.language}_"):
                 filtered_test.append(item)
         test_dataset = HFDataset.from_list(filtered_test)
+        val_dataset = dataset.get("validation", None)
+
+        if val_dataset is None:
+            # Only create validation split if we don't have one and validation_split is configured.
+            validation_split = self.config["data_processing"].get("validation_split", 0.1)
+            if isinstance(validation_split, float) and 0 < validation_split < 1:
+                train_val = filtered_train.train_test_split(test_size=validation_split, seed=42)
+                train_dataset = train_val["train"]
+                val_dataset = train_val["test"]
+            else:
+                train_dataset = filtered_train
+        else:
+            train_dataset = filtered_train
+
         return train_dataset, test_dataset, val_dataset
 
     def _process_single_item(self, item: Dict[str, Any]) -> DocumentExample:
@@ -653,20 +676,25 @@ class WildReceiptDatasetLoader(BaseDatasetLoader):
         self.id2label = {ii: label for ii, label in enumerate(self.label_list)}
 
     def load_data(self) -> Tuple[HFDataset, HFDataset, Optional[HFDataset]]:
-        """Load WildReceipt dataset from HuggingFace"""
+        """Load WildReceipt dataset from HuggingFace
+
+        WildReceipt (cord-v1) has official splits: train (800), validation (100), test (100)
+        We use these official splits to match public benchmark results.
+        """
         logger.info(f"Loading WildReceipt dataset from {self.hf_dataset_name}")
         dataset = load_dataset(self.hf_dataset_name, streaming=False)
         train_dataset = dataset["train"]
         test_dataset = dataset["test"]
+        val_dataset = dataset.get("validation", None)
 
-        # Create validation split if needed.
-        validation_split = self.config["data_processing"].get("validation_split", 0.1)
-        if isinstance(validation_split, float) and 0 < validation_split < 1:
-            train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-            train_dataset = train_val["train"]
-            val_dataset = train_val["test"]
-        else:
-            val_dataset = None
+        if val_dataset is None:
+            # Only create validation split if we don't have one and validation_split is configured.
+            validation_split = self.config["data_processing"].get("validation_split", 0.1)
+            if isinstance(validation_split, float) and 0 < validation_split < 1:
+                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
+                train_dataset = train_val["train"]
+                val_dataset = train_val["test"]
+
         return train_dataset, test_dataset, val_dataset
 
     def _process_single_item(self, item: Dict[str, Any]) -> DocumentExample:
