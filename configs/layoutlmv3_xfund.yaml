@@ -73,6 +73,6 @@ output:
 # Neptune experiment tracking (optional)
 neptune:
   use_neptune: false
-  neptune_project: "your-workspace/cl4ie"
+  neptune_project: null
   neptune_api_token: null
   tags: ["layoutlmv3", "xfund", "information_extraction", "multilingual"]

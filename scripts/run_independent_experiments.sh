@@ -41,6 +41,75 @@ print_status() {
     echo -e "${color}${message}${NC}" | tee -a "$LOG_FILE"
 }
 
+# Function to check and enable Neptune tracking
+check_and_enable_neptune() {
+    print_status "$CYAN" "🔍 Checking Neptune.ai configuration..."
+    
+    # Load .env file if it exists
+    if [ -f ".env" ]; then
+        export $(grep -v '^#' .env | xargs)
+        print_status "$CYAN" "📄 Loaded environment variables from .env file"
+    fi
+    
+    # Check if Neptune credentials are available
+    if [ -n "$NEPTUNE_PROJECT" ] && [ -n "$NEPTUNE_API_TOKEN" ]; then
+        print_status "$GREEN" "✅ Neptune credentials found!"
+        print_status "$GREEN" "   Project: $NEPTUNE_PROJECT"
+        print_status "$GREEN" "   Token: ${NEPTUNE_API_TOKEN:0:10}...${NEPTUNE_API_TOKEN: -10}"
+        print_status "$GREEN" "🔧 Enabling Neptune tracking in all configs..."
+        
+        # Enable Neptune in all config files
+        local configs=(
+            "configs/layoutlmv3_funsd.yaml"
+            "configs/layoutlmv3_cord.yaml"
+            "configs/layoutlmv3_sroie.yaml"
+            "configs/layoutlmv3_wildreceipt.yaml"
+            "configs/layoutlmv3_xfund.yaml"
+        )
+        
+        for config in "${configs[@]}"; do
+            if [ -f "$config" ]; then
+                # Use sed to change use_neptune from false to true
+                sed -i 's/use_neptune: false/use_neptune: true/g' "$config"
+                print_status "$GREEN" "   ✓ Enabled Neptune in $config"
+            fi
+        done
+        
+        NEPTUNE_ENABLED=true
+        print_status "$GREEN" ""
+    else
+        print_status "$YELLOW" "⚠️  Neptune credentials not found in environment"
+        print_status "$YELLOW" "   Set NEPTUNE_PROJECT and NEPTUNE_API_TOKEN in .env file to enable tracking"
+        print_status "$YELLOW" "   Experiments will run without Neptune tracking"
+        NEPTUNE_ENABLED=false
+        print_status "$YELLOW" ""
+    fi
+}
+
+# Function to restore Neptune config after experiments
+restore_neptune_config() {
+    if [ "$NEPTUNE_ENABLED" = true ]; then
+        print_status "$CYAN" "🔧 Restoring original Neptune configuration..."
+        
+        local configs=(
+            "configs/layoutlmv3_funsd.yaml"
+            "configs/layoutlmv3_cord.yaml"
+            "configs/layoutlmv3_sroie.yaml"
+            "configs/layoutlmv3_wildreceipt.yaml"
+            "configs/layoutlmv3_xfund.yaml"
+        )
+        
+        for config in "${configs[@]}"; do
+            if [ -f "$config" ]; then
+                # Restore use_neptune to false
+                sed -i 's/use_neptune: true/use_neptune: false/g' "$config"
+            fi
+        done
+        
+        print_status "$CYAN" "✅ Configuration restored"
+    fi
+}
+
 # Function to run a single experiment
 run_experiment() {
     local config_file=$1
@@ -172,6 +241,7 @@ main() {
     # Run checks
     check_prerequisites
     check_gpu
+    check_and_enable_neptune
     print_experiment_info
     print_dataset_info
     

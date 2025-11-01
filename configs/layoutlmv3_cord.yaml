@@ -67,10 +67,8 @@ output:
   save_tokenizer: true
   push_to_hub: false
 
-# Neptune experiment tracking (optional)
-# To enable Neptune tracking, set use_neptune to true and provide your credentials
 neptune:
-  use_neptune: false  # Set to true to enable Neptune tracking
-  neptune_project: "your-workspace/cl4ie"  # Replace with your Neptune project
-  neptune_api_token: null  # Set your Neptune API token or use NEPTUNE_API_TOKEN env var
+  use_neptune: false  # Set to true to enable Neptune tracking.
+  neptune_project: null
+  neptune_api_token: null
   tags: ["layoutlmv3", "cord", "information_extraction"]
