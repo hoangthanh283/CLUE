@@ -108,3 +108,6 @@ data/processed/*
 *.pth
 checkpoints/
 wandb/
+CLAUDE.md
+.claude/
+docs/*

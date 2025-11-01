@@ -10,8 +10,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 from seqeval.scheme import IOB2
-from transformers import (LayoutLMConfig, LayoutLMModel, LayoutLMv2Config,
-                          LayoutLMv2Model, LayoutLMv3Config, LayoutLMv3Model)
+from transformers import (LayoutLMConfig, LayoutLMModel, LayoutLMv2Config, LayoutLMv2Model, LayoutLMv3Config,
+                          LayoutLMv3Model)
 
 logger = logging.getLogger(__name__)
 
@@ -259,8 +259,7 @@ class LayoutLMMetrics:
         attention_mask: torch.Tensor
     ) -> Dict[str, float]:
         """Compute token-level and entity-level metrics"""
-        from sklearn.metrics import (accuracy_score,
-                                     precision_recall_fscore_support)
+        from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
         # Convert predictions and labels to numpy.
         predictions = predictions.detach().cpu().numpy()

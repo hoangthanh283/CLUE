@@ -15,8 +15,7 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from transformers import get_linear_schedule_with_warmup
 
-from src.cl_strategies import (AGEM, EWC, GEM, BaseCLStrategy,
-                               ExperienceReplay, LwF, SequentialFineTuning)
+from src.cl_strategies import AGEM, EWC, GEM, BaseCLStrategy, ExperienceReplay, LwF, SequentialFineTuning
 from src.models.layoutlm_models import BaseLayoutLMModel, LayoutLMMetrics
 from src.training.cl_metrics import compute_cl_metrics
 

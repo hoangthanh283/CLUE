@@ -14,11 +14,9 @@ from datasets import Dataset as HFDataset
 from datasets import load_dataset
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
-from transformers import (LayoutLMTokenizerFast, LayoutLMv2Tokenizer,
-                          LayoutLMv3Tokenizer)
+from transformers import LayoutLMTokenizerFast, LayoutLMv2Tokenizer, LayoutLMv3Tokenizer
 
-from src.data.label_space import (UNIFIED_LABEL_LIST, map_cord_entity,
-                                  map_form_entity, map_sroie_entity,
+from src.data.label_space import (UNIFIED_LABEL_LIST, map_cord_entity, map_form_entity, map_sroie_entity,
                                   map_wildreceipt_entity)
 
 logger = logging.getLogger(__name__)
@@ -412,15 +410,16 @@ class CORDDatasetLoader(BaseDatasetLoader):
         dataset = load_dataset(self.hf_dataset_name, streaming=False)
         train_dataset = dataset["train"]
         test_dataset = dataset["test"]
-        val_dataset = dataset.get("validation", None)
 
-        # Create validation split if we don't have one and validation_split is configured.
-        if val_dataset is None:
-            validation_split = self.config["data_processing"].get("validation_split", 0.1)
-            if isinstance(validation_split, float) and 0 < validation_split < 1:
-                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-                train_dataset = train_val["train"]
-                val_dataset = train_val["test"]
+        # Always create validation split from train for consistency with other datasets
+        # (CORD has a native validation split but we override it for fair comparison)
+        validation_split = self.config["data_processing"].get("validation_split", 0.1)
+        if isinstance(validation_split, float) and 0 < validation_split < 1:
+            train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
+            train_dataset = train_val["train"]
+            val_dataset = train_val["test"]
+        else:
+            val_dataset = None
         return train_dataset, test_dataset, val_dataset
 
     def _process_single_item(self, item: Dict[str, Any]) -> Optional[DocumentExample]:

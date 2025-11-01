@@ -28,7 +28,7 @@ class MemoryKey:
     """Key reference for disk-stored memory items."""
     key: str
     file_path: str
-    
+
     def __post_init__(self):
         Path(self.file_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -40,7 +40,7 @@ class MemoryBuffer:
         self.capacity = int(capacity)
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Replace items list with keys list
         self.keys: List[MemoryKey] = []
         self.n_seen = 0
@@ -79,7 +79,7 @@ class MemoryBuffer:
         bsz = batch["input_ids"].size(0)
         for i in range(bsz):
             self.n_seen += 1
-            
+
             # Create item as before
             item = MemoryItem(
                 input_ids=batch["input_ids"][i].detach().cpu(),
@@ -99,12 +99,12 @@ class MemoryBuffer:
                 if batch.get("pixel_values", None) is not None
                 else None,
             )
-            
+
             # Generate key and save to disk
             key, file_path = self._generate_key_path()
             self._save_item(item, file_path)
             memory_key = MemoryKey(key=key, file_path=file_path)
-            
+
             # Reservoir sampling with keys instead of items
             if len(self.keys) < self.capacity:
                 self.keys.append(memory_key)
@@ -118,21 +118,21 @@ class MemoryBuffer:
     def sample(self, batch_size: int, device: torch.device) -> Optional[Dict[str, torch.Tensor]]:
         if len(self.keys) == 0:
             return None
-        
+
         batch_size = min(batch_size, len(self.keys))
         # Randomly sample keys instead of items
         selected_keys = random.sample(self.keys, batch_size)
-        
+
         # Load items from disk on-demand
         samples = []
         for memory_key in selected_keys:
             item = self._load_item(memory_key)
             if item is not None:
                 samples.append(item)
-        
+
         if not samples:
             return None
-        
+
         # Collate samples (same as before)
         collated: Dict[str, List[torch.Tensor]] = {}
         keys = [
@@ -162,12 +162,12 @@ class MemoryBuffer:
         """Debug helper: inspect a stored sample."""
         if index >= len(self.keys):
             return None
-        
+
         memory_key = self.keys[index]
         item = self._load_item(memory_key)
         if item is None:
             return None
-        
+
         return {
             'key': memory_key.key,
             'file_path': memory_key.file_path,

@@ -71,7 +71,7 @@ class GEM(BaseCLStrategy):
         if dot_product < 0:  # Constraint violation.
             # Project: g - (g·g_ref / ||g_ref||²) * g_ref.
             g_ref_norm_sq = torch.dot(g_ref, g_ref)
-            
+
             if g_ref_norm_sq > 1e-12:  # Avoid division by zero.
                 projection_coeff = dot_product / g_ref_norm_sq
                 projected_g = g - projection_coeff * g_ref

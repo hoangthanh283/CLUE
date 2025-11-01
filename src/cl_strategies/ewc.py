@@ -1,11 +1,11 @@
 """Elastic Weight Consolidation (EWC)."""
 
-from typing import Any, Dict, Iterable, List, Optional
 import os
 import pickle
+import random
+from typing import Any, Dict, Iterable, List, Optional
 
 import torch
-import random
 import torch.nn as nn
 
 from src.cl_strategies.base import BaseCLStrategy
@@ -129,14 +129,14 @@ class EWC(BaseCLStrategy):
             fisher_chunk = fisher_flat[idx:end_idx].to(param.device, non_blocking=True)
             params_star_chunk = params_star_flat[idx:end_idx].to(param.device, non_blocking=True)
             diff_chunk = param_chunk - params_star_chunk
-            
+
             # Compute penalty for this chunk and detach immediately to avoid gradient accumulation
             chunk_penalty = (fisher_chunk * (diff_chunk ** 2)).sum().detach()
             penalty += chunk_penalty.item()  # Convert to scalar to avoid tensor accumulation
-            
+
             # Clean up intermediate tensors
             del fisher_chunk, params_star_chunk, diff_chunk, chunk_penalty
-            
+
             # Clear cache every few chunks to prevent memory buildup
             if idx % (self.ewc_chunk_size * 10) == 0:
                 torch.cuda.empty_cache()
