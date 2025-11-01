@@ -340,10 +340,20 @@ main() {
     print_status "$CYAN" "📝 To run continual learning experiments next:"
     print_status "$CYAN" "   ./scripts/run_all_cl_experiments.sh"
     print_status "$CYAN" "======================================================"
+    
+    # Restore Neptune configuration
+    restore_neptune_config
 }
 
-# Handle Ctrl+C gracefully
-trap 'print_status "$YELLOW" "\n⚠️  Experiment interrupted by user. Results so far saved in: $BASE_OUTPUT_DIR"; exit 130' INT
+# Handle Ctrl+C gracefully - restore configs before exit
+cleanup_on_interrupt() {
+    print_status "$YELLOW" "\n⚠️  Experiment interrupted by user."
+    restore_neptune_config
+    print_status "$YELLOW" "Results so far saved in: $BASE_OUTPUT_DIR"
+    exit 130
+}
+
+trap cleanup_on_interrupt INT
 
 # Run main function
 main "$@"

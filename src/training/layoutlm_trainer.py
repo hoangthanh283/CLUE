@@ -186,10 +186,6 @@ class LayoutLMTrainer:
             logger.info(f"Loading best model from {self.best_model_path}")
             self.load_model(self.best_model_path)
 
-        # Close Neptune run
-        if self.neptune_run is not None:
-            self.neptune_run.stop()
-
         return {"best_metric": self.best_metric}
 
     def _train_epoch(self) -> Dict[str, float]:
@@ -342,6 +338,12 @@ class LayoutLMTrainer:
                 self.scheduler.load_state_dict(training_state["scheduler_state_dict"])
 
         logger.info(f"Model loaded from {load_path}")
+
+    def cleanup(self):
+        """Cleanup resources like Neptune run"""
+        if self.neptune_run is not None:
+            self.neptune_run.stop()
+            logger.info("Neptune run stopped")
 
 
 def create_trainer(

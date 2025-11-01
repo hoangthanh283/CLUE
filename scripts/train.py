@@ -128,6 +128,10 @@ def main():
     except Exception as er:
         logger.error(f"Training failed with error: {str(er)}")
         raise
+    finally:
+        # Cleanup resources (e.g., Neptune run)
+        if "trainer" in locals():
+            trainer.cleanup()
 
 
 if __name__ == "__main__":
