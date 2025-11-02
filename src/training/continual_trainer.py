@@ -338,34 +338,42 @@ class ContinualLayoutLMTrainer:
         self.strategy.after_task(self.model, task_id, train_loader)
         return {"best_metric": best_metric}
 
-    def train(self, tasks: List[Dict[str, Any]]):
+    def train(self, tasks: List[Dict[str, Any]], eval_tasks: Optional[List[Dict[str, Any]]] = None):
         """Train across tasks and collect CL evaluation metrics.
+
+        Args:
+            tasks: List of tasks to train on (for true joint, this is a single combined task)
+            eval_tasks: List of tasks to evaluate on (for true joint, this is the original individual tasks)
 
         Returns a dictionary including per-task training summaries, the
         accuracy matrix, and aggregated CL metrics (ACC, BWT, FWT, AAA,
         Forgetting).
         """
+        # For true joint training, we train on combined task but evaluate on individual tasks
+        if eval_tasks is None:
+            eval_tasks = tasks
+
         per_task_results: List[Dict[str, float]] = []
-        task_names = [t.get("name", f"task{i}") for i, t in enumerate(tasks)]
-        T = len(tasks)
+        task_names = [t.get("name", f"task{i}") for i, t in enumerate(eval_tasks)]
+        T = len(eval_tasks)
 
         # Pre-training evaluation on each task (R0)
         pre_accuracy: List[float] = []
         for j in range(T):
             if self.cl_setting == "task_il":
-                lbl_list = tasks[j].get("label_list") or self.metrics.label_list
+                lbl_list = eval_tasks[j].get("label_list") or self.metrics.label_list
                 id2label = {i: l for i, l in enumerate(lbl_list)}
-                m = self.evaluate_with_head(tasks[j]["eval_loader"], task_names[j], lbl_list, id2label)
+                m = self.evaluate_with_head(eval_tasks[j]["eval_loader"], task_names[j], lbl_list, id2label)
             else:
                 # Class-IL: choose an id2label that covers BOTH current head and task j
-                task_lbl_list = tasks[j].get("label_list") or self.metrics.label_list
-                task_id2label = tasks[j].get("id2label") or {i: l for i, l in enumerate(task_lbl_list)}
+                task_lbl_list = eval_tasks[j].get("label_list") or self.metrics.label_list
+                task_id2label = eval_tasks[j].get("id2label") or {i: l for i, l in enumerate(task_lbl_list)}
                 head_id2label = getattr(self.metrics, "id2label", task_id2label)
                 # Prefer the larger mapping to avoid KeyError in entity F1
                 use_id2label = task_id2label if len(task_id2label) >= len(head_id2label) else head_id2label
                 use_lbl_list = [use_id2label[i] for i in range(len(use_id2label))]
                 self.metrics = LayoutLMMetrics(use_lbl_list, use_id2label)
-                m = self.evaluate(tasks[j]["eval_loader"])  # single head evaluation
+                m = self.evaluate(eval_tasks[j]["eval_loader"])  # single head evaluation
             pre_accuracy.append(float(m.get("accuracy", 0.0)))
 
         # Accuracy matrix R[i][j] after training task i, evaluated on task j
@@ -385,27 +393,27 @@ class ContinualLayoutLMTrainer:
             )
             per_task_results.append(res)
 
-            # Evaluate on all tasks with a mapping that covers predictions and labels
+            # Evaluate on all eval_tasks with a mapping that covers predictions and labels
             for j in range(T):
                 if self.cl_setting == "task_il":
-                    lbl_list = tasks[j].get("label_list") or self.metrics.label_list
+                    lbl_list = eval_tasks[j].get("label_list") or self.metrics.label_list
                     id2label = {i: l for i, l in enumerate(lbl_list)}
-                    metrics = self.evaluate_with_head(tasks[j]["eval_loader"], task_names[j], lbl_list, id2label)
+                    metrics = self.evaluate_with_head(eval_tasks[j]["eval_loader"], task_names[j], lbl_list, id2label)
                 else:
                     # Class-IL: choose an id2label that covers BOTH current head and task j
-                    task_lbl_list = tasks[j].get("label_list") or self.metrics.label_list
-                    task_id2label = tasks[j].get("id2label") or {i: l for i, l in enumerate(task_lbl_list)}
+                    task_lbl_list = eval_tasks[j].get("label_list") or self.metrics.label_list
+                    task_id2label = eval_tasks[j].get("id2label") or {i: l for i, l in enumerate(task_lbl_list)}
                     head_id2label = getattr(self.metrics, "id2label", task_id2label)
                     # Prefer the larger mapping to avoid KeyError in entity F1
                     use_id2label = task_id2label if len(task_id2label) >= len(head_id2label) else head_id2label
                     use_lbl_list = [use_id2label[i] for i in range(len(use_id2label))]
                     self.metrics = LayoutLMMetrics(use_lbl_list, use_id2label)
-                    metrics = self.evaluate(tasks[j]["eval_loader"])  # single head evaluation
+                    metrics = self.evaluate(eval_tasks[j]["eval_loader"])  # single head evaluation
                 acc_matrix[i][j] = float(metrics.get("accuracy", 0.0))
 
             # Save checkpoint after finishing task i (for later offline evaluation)
             try:
-                self._save_checkpoint_after_task(i, task_names, tasks, acc_matrix[i])
+                self._save_checkpoint_after_task(i, task_names, eval_tasks, acc_matrix[i])
             except Exception as e:
                 logger.warning(f"Failed to save checkpoint after task {i}: {e}")
 

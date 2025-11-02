@@ -65,6 +65,55 @@ def _make_loader_from_dataset(ds, config: Dict[str, Any], is_training: bool) -> 
     return DataLoader(ds, **dl_kwargs)
 
 
+def _determine_label_space(config, cl_setting, is_joint, joint_fixed_labels, joint_fixed_label2id,
+                           global_labels, global_label2id, dataset_loader, is_true_joint):
+    """Determine label space for current task based on CL setting and strategy."""
+    if cl_setting == "class_il" and config.get("label_space", {}).get("unified", False):
+        return UNIFIED_LABEL_LIST, UNIFIED_LABEL2ID
+
+    if cl_setting == "class_il":
+        if is_joint and joint_fixed_labels and not is_true_joint:
+            return list(joint_fixed_labels), dict(joint_fixed_label2id)
+        for lab in list(dataset_loader.get_label_list()):
+            if lab not in global_label2id:
+                global_label2id[lab] = len(global_labels)
+                global_labels.append(lab)
+        return list(global_labels), dict(global_label2id)
+
+    label_list_use = list(dataset_loader.get_label_list())
+    return label_list_use, {l: i for i, l in enumerate(label_list_use)}
+
+
+def _create_joint_datasets(tasks, first_task_config):
+    """Combine all individual datasets into a single joint training task."""
+    all_train_datasets = [t["_train_ds"] for t in tasks]
+    all_eval_datasets = [t["_eval_ds"] for t in tasks]
+
+    combined_train_ds = ConcatDataset(all_train_datasets)
+    combined_eval_ds = ConcatDataset(all_eval_datasets)
+
+    combined_train_loader = _make_loader_from_dataset(combined_train_ds, first_task_config, is_training=True)
+    combined_eval_loader = _make_loader_from_dataset(combined_eval_ds, first_task_config, is_training=False)
+
+    joint_task = {
+        "name": "joint_all",
+        "train_loader": combined_train_loader,
+        "eval_loader": combined_eval_loader,
+        "label_list": tasks[0]["label_list"],
+        "id2label": tasks[0]["id2label"],
+        "_train_ds": combined_train_ds,
+        "_eval_ds": combined_eval_ds,
+        "_cum_train_ds": combined_train_ds,
+        "_cum_eval_ds": combined_eval_ds,
+    }
+
+    for tt in tasks:
+        if tt["eval_loader"] is None:
+            tt["eval_loader"] = _make_loader_from_dataset(tt["_eval_ds"], first_task_config, is_training=False)
+
+    return joint_task, tasks
+
+
 def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str]:
     tasks_cfg: List[Dict[str, Any]] = config.get("tasks", [{}])
     cl_setting = (config.get("cl_setting") or "task_il").lower()
@@ -77,6 +126,8 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
 
     strat_name = (config.get("cl_strategy", {}).get("name") or "none").lower()
     is_joint = strat_name == "joint"
+    # Check if we want true joint training (all datasets at once) or progressive joint
+    is_true_joint = is_joint and config.get("cl_strategy", {}).get("true_joint", True)
 
     # Pre-compute a fixed global label space for joint baseline when not using unified labels.
     joint_fixed_labels: List[str] = []
@@ -101,27 +152,10 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
         dataset_loader = get_dataset_loader(task_config)
         train_dataset, test_dataset, val_dataset = dataset_loader.load_data()
 
-        if cl_setting == "class_il" and config.get("label_space", {}).get("unified", False):
-            # Single fixed unified space across all tasks
-            label_list_use = UNIFIED_LABEL_LIST
-            label2id_use = UNIFIED_LABEL2ID
-        elif cl_setting == "class_il":
-            if is_joint and joint_fixed_labels:
-                # Use fixed union for all joint datasets
-                label_list_use = list(joint_fixed_labels)
-                label2id_use = dict(joint_fixed_label2id)
-            else:
-                # Sequential/ER-style progressive union
-                for lab in list(dataset_loader.get_label_list()):
-                    if lab not in global_label2id:
-                        global_label2id[lab] = len(global_labels)
-                        global_labels.append(lab)
-                label_list_use = list(global_labels)
-                label2id_use = dict(global_label2id)
-        else:
-            # Task-IL: per-task label spaces
-            label_list_use = list(dataset_loader.get_label_list())
-            label2id_use = {l: i for i, l in enumerate(label_list_use)}
+        label_list_use, label2id_use = _determine_label_space(
+            config, cl_setting, is_joint, joint_fixed_labels, joint_fixed_label2id,
+            global_labels, global_label2id, dataset_loader, is_true_joint
+        )
 
         if first_num_labels == -1:
             first_num_labels = len(label_list_use)
@@ -143,24 +177,39 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
             max_seq_length=task_config["dataset"]["preprocessing"]["max_seq_length"],
         )
 
-        # For joint, cumulatively concatenate training datasets (Class-IL + unified only).
         if is_joint:
             # Joint baseline now supports both unified and non-unified (union-of-labels) label spaces.
             # Requires class-IL (single head) semantics.
             if config.get("cl_setting", "class_il").lower() != "class_il":
                 raise ValueError("Joint training baseline requires cl_setting: class_il")
-            if idx == 0:
-                cum_train_ds = train_ds
+
+            if not is_true_joint:
+                # Progressive joint: accumulate datasets over tasks.
+                if idx == 0:
+                    cum_train_ds = train_ds
+                    cum_eval_ds = eval_ds
+                else:
+                    # Concat with previous cumulative dataset from last task entry.
+                    prev_train = tasks[-1]["_cum_train_ds"]
+                    prev_eval = tasks[-1]["_cum_eval_ds"]
+                    cum_train_ds = ConcatDataset([prev_train, train_ds])
+                    cum_eval_ds = ConcatDataset([prev_eval, eval_ds])
+                train_loader = _make_loader_from_dataset(cum_train_ds, task_config, is_training=True)
+                eval_loader = _make_loader_from_dataset(cum_eval_ds, task_config, is_training=False)
+                cum_train_ds_use = cum_train_ds
+                cum_eval_ds_use = cum_eval_ds
             else:
-                # Concat with previous cumulative dataset from last task entry.
-                prev = tasks[-1]["_cum_train_ds"]
-                cum_train_ds = ConcatDataset([prev, train_ds])
-            train_loader = _make_loader_from_dataset(cum_train_ds, task_config, is_training=True)
+                # True joint: will be handled later by collecting all datasets.
+                train_loader = None
+                eval_loader = None
+                cum_train_ds_use = train_ds
+                cum_eval_ds_use = eval_ds
         else:
             train_loader = _make_loader_from_dataset(train_ds, task_config, is_training=True)
-            cum_train_ds = train_ds  # Initialize cum_train_ds for non-joint case
+            eval_loader = _make_loader_from_dataset(eval_ds, task_config, is_training=False)
+            cum_train_ds_use = train_ds
+            cum_eval_ds_use = eval_ds
 
-        eval_loader = _make_loader_from_dataset(eval_ds, task_config, is_training=False)
         id2label_use = {ii: ll for ii, ll in enumerate(label_list_use)}
         tasks.append({
             "name": task_name,
@@ -168,13 +217,20 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
             "eval_loader": eval_loader,
             "label_list": label_list_use,
             "id2label": id2label_use,
-            # keep references to datasets for joint accumulation.
+            # Keep references to datasets for joint accumulation.
             "_train_ds": train_ds,
             "_eval_ds": eval_ds,
-            "_cum_train_ds": cum_train_ds if is_joint else train_ds,
+            "_cum_train_ds": cum_train_ds_use,
+            "_cum_eval_ds": cum_eval_ds_use,
         })
     if not tasks:
         raise ValueError("No tasks configured for CL training.")
+
+    if is_joint and is_true_joint:
+        first_task_config = deep_update(config, tasks_cfg[0])
+        joint_task, tasks_for_eval = _create_joint_datasets(tasks, first_task_config)
+        return ([joint_task], tasks_for_eval), first_num_labels, cl_setting
+
     return tasks, first_num_labels, cl_setting
 
 
@@ -265,12 +321,7 @@ def _final_eval_and_save(trainer, tasks: List[Dict[str, Any]], output_dir: Path,
 
 
 def main():
-    # Set up transformers logging
-    try:
-        hf_logging.set_verbosity_error()  # type: ignore
-    except (AttributeError, NameError):
-        # Fallback if hf_logging doesn't have set_verbosity_error or isn't available
-        pass
+    hf_logging.set_verbosity_error()
     parser = argparse.ArgumentParser(description="Continual Learning training for LayoutLM")
     parser.add_argument("--config", type=str, required=True, help="Path to experiment config YAML")
     parser.add_argument("--output_dir", type=str, default="results", help="Output directory")
@@ -280,7 +331,18 @@ def main():
     logger.info(f"Starting CL experiment: {config['experiment_name']}")
     logger.info(f"CL strategy: {config.get('cl_strategy', {}).get('name', 'none')}")
 
-    tasks, first_num_labels, cl_setting = _build_tasks(config)
+    tasks_result, first_num_labels, cl_setting = _build_tasks(config)
+
+    # Handle true joint training case where we get (training_tasks, eval_tasks) tuple
+    if isinstance(tasks_result, tuple):
+        tasks_for_training, tasks_for_eval = tasks_result
+        is_true_joint = True
+        logger.info("Using TRUE JOINT TRAINING: all datasets combined in one training run")
+    else:
+        tasks_for_training = tasks_result
+        tasks_for_eval = tasks_result
+        is_true_joint = False
+
     if first_num_labels == -1:
         raise ValueError("Could not infer first task label count.")
 
@@ -293,17 +355,25 @@ def main():
     # Initialize model and trainer.
     model = get_model(config)
     strategy = get_strategy(config)
-    _validate_strategy(config, tasks, cl_setting)
+    _validate_strategy(config, tasks_for_training, cl_setting)
     trainer = create_continual_trainer(
         model=model,
         config=config,
-        label_list=tasks[0]["label_list"],
-        id2label=tasks[0]["id2label"],
+        label_list=tasks_for_training[0]["label_list"],
+        id2label=tasks_for_training[0]["id2label"],
         strategy=strategy,
     )
-    results = trainer.train(tasks)
+
+    # Train using tasks_for_training, but evaluate on tasks_for_eval
+    if is_true_joint:
+        # For true joint, pass both training and eval tasks
+        results = trainer.train(tasks_for_training, eval_tasks=tasks_for_eval)
+    else:
+        # For other strategies, use the same task list for both
+        results = trainer.train(tasks_for_training)
+
     _save_cl_artifacts(output_dir, results, config, logger)
-    _final_eval_and_save(trainer, tasks, output_dir, logger)
+    _final_eval_and_save(trainer, tasks_for_eval, output_dir, logger)
 
 
 if __name__ == "__main__":
