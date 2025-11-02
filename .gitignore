@@ -111,3 +111,4 @@ wandb/
 CLAUDE.md
 .claude/
 docs/*
+.neptune

@@ -302,15 +302,11 @@ main() {
             total_experiments=$((total_experiments + 1))
             exp_name=$(basename "$exp_dir")
             
-            # Check if experiment completed successfully
-            if [ -f "$exp_dir/best_model/config.json" ] || [ -f "$exp_dir/final_model/config.json" ]; then
+            # Check if experiment completed successfully (search recursively for model files)
+            if find "$exp_dir" -name "config.json" -path "*/best_model/*" -o -name "config.json" -path "*/final_model/*" | grep -q .; then
                 # Try to extract F1 score from logs if available
-                if [ -f "$exp_dir/logs/"*".log" ]; then
-                    local f1_score=$(grep -oP "eval_f1['\"]?\s*[:=]\s*\K[0-9]+\.[0-9]+" "$exp_dir/logs/"*".log" 2>/dev/null | tail -1 || echo "N/A")
-                    print_status "$GREEN" "✅ $exp_name: SUCCESS (Best F1: $f1_score)"
-                else
-                    print_status "$GREEN" "✅ $exp_name: SUCCESS"
-                fi
+                local f1_score=$(find "$exp_dir" -name "*.log" -exec grep -oP "eval_f1['\"]?\s*[:=]\s*\K[0-9]+\.[0-9]+" {} \; 2>/dev/null | tail -1 || echo "N/A")
+                print_status "$GREEN" "✅ $exp_name: SUCCESS (Best F1: $f1_score)"
                 successful_experiments=$((successful_experiments + 1))
             else
                 print_status "$RED" "❌ $exp_name: FAILED or INCOMPLETE"

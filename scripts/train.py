@@ -118,7 +118,8 @@ def main():
             # Temporarily replace eval dataloader
             original_eval_dataloader = trainer.eval_dataloader
             trainer.eval_dataloader = test_dataloader
-            test_results = trainer.evaluate()
+            # Increment step to avoid Neptune logging conflicts
+            test_results = trainer.evaluate(increment_step=True)
             logger.info(f"Test results: {test_results}")
             trainer.eval_dataloader = original_eval_dataloader
 

@@ -238,8 +238,13 @@ class LayoutLMTrainer:
 
         return {"train_loss": total_loss / num_batches}
 
-    def evaluate(self) -> Dict[str, float]:
-        """Evaluate the model"""
+    def evaluate(self, increment_step: bool = False) -> Dict[str, float]:
+        """Evaluate the model
+
+        Args:
+            increment_step: If True, increments global_step before logging metrics.
+                          Use this for final test evaluation to avoid duplicate steps.
+        """
         if self.eval_dataloader is None:
             return {}
 
@@ -285,15 +290,22 @@ class LayoutLMTrainer:
         # Add eval_ prefix
         eval_metrics = {f"eval_{k}": v for k, v in metrics.items()}
 
+        # Increment step if requested (for final test evaluation)
+        if increment_step:
+            self.global_step += 1
+            logger.info(f"Incremented global_step to {self.global_step} for final test evaluation")
+
         self._log_metrics(eval_metrics)
 
         return eval_metrics
 
-    def _log_metrics(self, metrics: Dict[str, float]):
+    def _log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
         """Log metrics to Neptune if available"""
         if self.neptune_run is not None:
+            # Use provided step or current global_step
+            log_step = step if step is not None else self.global_step
             for key, value in metrics.items():
-                self.neptune_run[f"metrics/{key}"].log(value, step=self.global_step)
+                self.neptune_run[f"metrics/{key}"].log(value, step=log_step)
 
     def save_model(self, save_path: Path):
         """Save model and tokenizer"""

@@ -70,7 +70,7 @@ output:
 # Neptune experiment tracking (optional)
 # To enable Neptune tracking, set use_neptune to true and provide your credentials
 neptune:
-  use_neptune: false  # Set to true to enable Neptune tracking
+  use_neptune: true  # Set to true to enable Neptune tracking
   neptune_project: null
   neptune_api_token: null
   tags: ["layoutlm", "funsd", "information_extraction"]

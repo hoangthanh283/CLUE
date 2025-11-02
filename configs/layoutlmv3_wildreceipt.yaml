@@ -69,7 +69,7 @@ output:
 
 # Neptune experiment tracking (optional)
 neptune:
-  use_neptune: false
+  use_neptune: true
   neptune_project: null
   neptune_api_token: null
   tags: ["layoutlmv3", "wildreceipt", "information_extraction"]

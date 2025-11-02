@@ -68,7 +68,7 @@ output:
   push_to_hub: false
 
 neptune:
-  use_neptune: false  # Set to true to enable Neptune tracking.
+  use_neptune: true  # Set to true to enable Neptune tracking.
   neptune_project: null
   neptune_api_token: null
   tags: ["layoutlmv3", "cord", "information_extraction"]
