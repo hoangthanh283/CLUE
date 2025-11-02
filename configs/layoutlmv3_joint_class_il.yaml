@@ -57,8 +57,12 @@ data_processing:
 # Continual Learning Strategy (joint training baseline)
 cl_strategy:
   name: "joint"
+  # true_joint: if true, train on ALL datasets together in ONE run (true upper bound). Otherwise, train progressively
+  # with cumulative datasets.
+  true_joint: true
 
 label_space:
+  # Unified label space for all tasks, which means that labels are shared across tasks.
   unified: true
 
 # Tasks sequence: FUNSD -> CORD -> SROIE -> WildReceipt -> XFUND (zh)
