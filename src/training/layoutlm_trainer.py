@@ -3,6 +3,7 @@ Training procedures for LayoutLM models
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -75,12 +76,14 @@ class LayoutLMTrainer:
         # Setup Neptune if configured
         self.neptune_run = None
         neptune_config = config.get("neptune", {})
-        if neptune_config.get("use_neptune", False):
+        neptune_project = neptune_config.get("neptune_project") or os.getenv("NEPTUNE_PROJECT")
+        neptune_api_token = neptune_config.get("neptune_api_token") or os.getenv("NEPTUNE_API_TOKEN")
+        if neptune_config.get("use_neptune", False) and neptune_project and neptune_api_token:
             self.neptune_run = neptune.init_run(
-                project=neptune_config.get("neptune_project", "cl4ie"),
+                project=neptune_project,
                 name=config["experiment_name"],
                 tags=neptune_config.get("tags", []),
-                api_token=neptune_config.get("neptune_api_token")
+                api_token=neptune_api_token
             )
             # Use stringify_unsupported to handle lists and None values
             self.neptune_run["config"] = stringify_unsupported(config)
