@@ -73,7 +73,7 @@ class LayoutLMTrainer:
         if self.eval_steps is not None:
             self.eval_steps = int(self.eval_steps)
 
-        # Setup Neptune if configured
+        # Setup Neptune if configured.
         self.neptune_run = None
         neptune_config = config.get("neptune", {})
         neptune_project = neptune_config.get("neptune_project") or os.getenv("NEPTUNE_PROJECT")

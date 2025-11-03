@@ -332,7 +332,6 @@ def main():
     logger.info(f"CL strategy: {config.get('cl_strategy', {}).get('name', 'none')}")
 
     tasks_result, first_num_labels, cl_setting = _build_tasks(config)
-
     # Handle true joint training case where we get (training_tasks, eval_tasks) tuple
     if isinstance(tasks_result, tuple):
         tasks_for_training, tasks_for_eval = tasks_result

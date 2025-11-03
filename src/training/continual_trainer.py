@@ -5,10 +5,13 @@ Continual Learning trainer wiring CL strategies into the LayoutLM pipeline.
 import copy
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import neptune
 import torch
+from neptune.utils import stringify_unsupported
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
@@ -47,14 +50,8 @@ def get_strategy(config: Dict[str, Any]) -> BaseCLStrategy:
 class ContinualLayoutLMTrainer:
     """Continual training over a sequence of tasks with a chosen CL strategy."""
 
-    def __init__(
-        self,
-        model: BaseLayoutLMModel,
-        config: Dict[str, Any],
-        label_list: List[str],
-        id2label: Dict[int, str],
-        strategy: Optional[BaseCLStrategy] = None,
-    ):
+    def __init__(self, model: BaseLayoutLMModel, config: Dict[str, Any], label_list: List[str],
+                 id2label: Dict[int, str], strategy: Optional[BaseCLStrategy] = None):
         self.model = model
         self.config = config
         self.training_config = config["training"]
@@ -92,6 +89,21 @@ class ContinualLayoutLMTrainer:
         if self.cl_setting not in {"task_il", "class_il"}:
             logger.warning(f"Unknown cl_setting '{self.cl_setting}', defaulting to 'task_il'")
             self.cl_setting = "task_il"
+
+        # Setup Neptune if configured.
+        self.neptune_run = None
+        neptune_config = config.get("neptune", {})
+        neptune_project = neptune_config.get("neptune_project") or os.getenv("NEPTUNE_PROJECT")
+        neptune_api_token = neptune_config.get("neptune_api_token") or os.getenv("NEPTUNE_API_TOKEN")
+        if neptune_config.get("use_neptune", False) and neptune_project and neptune_api_token:
+            self.neptune_run = neptune.init_run(
+                project=neptune_project,
+                name=config["experiment_name"],
+                tags=neptune_config.get("tags", []),
+                api_token=neptune_api_token
+            )
+            # Use stringify_unsupported to handle lists and None values.
+            self.neptune_run["config"] = stringify_unsupported(config)
 
     def _setup_optimizer(self) -> torch.optim.Optimizer:
         optimizer_name = self.training_config.get("optimizer", "adamw").lower()
@@ -257,7 +269,6 @@ class ContinualLayoutLMTrainer:
         best_metric = -1e9
         best_path = self.output_dir / f"{save_tag}_{task_id}_best_model"
         early_stop_counter = 0
-
         self.strategy.before_task(self.model, task_id, train_loader)
 
         for epoch in range(num_epochs):
@@ -307,9 +318,10 @@ class ContinualLayoutLMTrainer:
                 progress.set_postfix({"loss": f"{(total_loss / num_batches):.4f}"})
 
             # Evaluate end of epoch
-            eval_metrics = {}
+            eval_metrics: Dict[str, float] = {}
             if eval_loader is not None:
                 eval_metrics = self.evaluate(eval_loader)
+                self._log_metrics(eval_metrics, prefix=f"task_{task_id}")
                 metric_key = self.training_config.get("metric_for_best_model", "eval_f1")
                 current = float(eval_metrics.get(metric_key, -1e9))
                 if current > best_metric:
@@ -325,6 +337,10 @@ class ContinualLayoutLMTrainer:
                 if early_stop_counter >= int(self.training_config.get("early_stopping_patience", 10)):
                     logger.info(f"Early stopping on task {task_id} at epoch {epoch + 1}")
                     break
+
+            # Log training loss to Neptune.
+            avg_train_loss = total_loss / num_batches if num_batches > 0 else 0.0
+            self._log_metrics({"train_loss": avg_train_loss}, prefix=f"task_{task_id}")
 
         # Optionally load best at end
         if self.training_config.get("load_best_model_at_end", True) and best_metric > -1e8 and best_path.exists():
@@ -489,18 +505,29 @@ class ContinualLayoutLMTrainer:
 
     def evaluate_with_head(self, dataloader: DataLoader, task_name: str, label_list: List[str], id2label: Dict[int, str]
                            ) -> Dict[str, float]:
-        # Activate task-specific head and update metrics
+        # Activate task-specific head and update metrics.
         self._activate_head(task_name, num_labels=len(label_list))
         self.metrics = LayoutLMMetrics(label_list, id2label)
         return self.evaluate(dataloader)
 
+    def _log_metrics(self, metrics: Dict[str, float], prefix: str = "", step: Optional[int] = None):
+        """Log metrics to Neptune if available"""
+        if self.neptune_run is not None:
+            log_step = step if step is not None else self.global_step
+            for key, value in metrics.items():
+                metric_key = f"{prefix}/{key}" if prefix else key
+                self.neptune_run[f"metrics/{metric_key}"].log(value, step=log_step)
 
-def create_continual_trainer(
-    model: BaseLayoutLMModel,
-    config: Dict[str, Any],
-    label_list: List[str],
-    id2label: Dict[int, str],
-    strategy: Optional[BaseCLStrategy] = None,
-) -> ContinualLayoutLMTrainer:
-    return ContinualLayoutLMTrainer(model=model, config=config, label_list=label_list, id2label=id2label,
-                                    strategy=strategy)
+    def cleanup(self):
+        """Cleanup resources like Neptune run"""
+        if self.neptune_run is not None:
+            self.neptune_run.stop()
+            logger.info("Neptune run stopped")
+
+
+def create_continual_trainer(model: BaseLayoutLMModel, config: Dict[str, Any], label_list: List[str],
+                             id2label: Dict[int, str], strategy: Optional[BaseCLStrategy] = None
+                             ) -> ContinualLayoutLMTrainer:
+    return ContinualLayoutLMTrainer(
+        model=model, config=config, label_list=label_list, id2label=id2label, strategy=strategy
+    )
