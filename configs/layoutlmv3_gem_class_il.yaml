@@ -1,4 +1,4 @@
-experiment_name: "layoutlmv3_gem_class_il"
+experiment_name: "layoutlmv3_gem_task_il"
 
 dataset:
   name: "funsd"
@@ -22,7 +22,7 @@ model:
     attention_probs_dropout_prob: 0.1
     classifier_dropout: 0.1
 
-cl_setting: "class_il"
+cl_setting: "task_il"
 
 training:
   batch_size: 1
@@ -39,7 +39,7 @@ training:
   load_best_model_at_end: true
   metric_for_best_model: "f1"
   greater_is_better: true
-  early_stopping_patience: 3
+  early_stopping_patience: 10
 
 data_processing:
   train_split: "train"
@@ -49,14 +49,20 @@ data_processing:
   seed: 42
 
 cl_strategy:
-  name: "gem"
-  memory_size: 1000
-  replay_batch_size: 2
-  use_multiple_constraints: false
-  max_constraints: 1
+  name: "gem"                   # Task-IL with GEM fine-tuning
+  memory_size: 500              # Total episodic memory samples across all tasks
+  samples_per_task: 64          # Samples per task for computing constraint gradients (increased from 5)
+  max_tasks: 5                  # Maximum number of previous tasks to enforce constraints for
+  # QP solver settings
+  qp_tolerance: 1e-3            # Convergence tolerance for constraint satisfaction
+  qp_regularization: 1e-6       # Regularization for numerical stability in QP solver
+  margin: 0.5                   # Constraint margin (matches original GEM implementation)
+
+  # Memory management
+  clear_cache_every: 5          # Clear GPU cache every N steps to prevent OOM
 
 label_space:
-  unified: false
+  unified: false  # Task-IL uses separate classifier per task
 
 tasks:
   - name: "funsd"
@@ -95,4 +101,4 @@ neptune:
   use_neptune: false
   neptune_project: "your-workspace/cl4ie"
   neptune_api_token: null
-  tags: ["layoutlmv3", "class_il", "gem", "memory_efficient", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
+  tags: ["layoutlmv3", "task_il", "gem", "exact_qp", "replication", "funsd", "cord", "sroie", "wildreceipt", "xfund"]

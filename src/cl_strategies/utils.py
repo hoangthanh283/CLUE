@@ -23,3 +23,29 @@ def set_grad_vector(model: nn.Module, new_grads: torch.Tensor):
         if pp.requires_grad:
             pp.grad = new_grads[pointer: pointer + numel].view_as(pp).clone()
         pointer += numel
+
+
+def get_grad_vector_exclude_classifier(model: nn.Module) -> torch.Tensor:
+    """Get gradient vector excluding classifier parameters for task-IL."""
+    grads = []
+    for name, pp in model.named_parameters():
+        # Skip classifier parameters
+        if 'classifier' in name:
+            continue
+        if pp.grad is not None:
+            grads.append(pp.grad.view(-1))
+        else:
+            grads.append(torch.zeros_like(pp).view(-1))
+    return torch.cat(grads)
+
+
+def set_grad_vector_exclude_classifier(model: nn.Module, new_grads: torch.Tensor):
+    """Set gradient vector excluding classifier parameters for task-IL."""
+    pointer = 0
+    for name, pp in model.named_parameters():
+        if 'classifier' in name:
+            continue
+        numel = pp.numel()
+        if pp.requires_grad:
+            pp.grad = new_grads[pointer: pointer + numel].view_as(pp).clone()
+        pointer += numel

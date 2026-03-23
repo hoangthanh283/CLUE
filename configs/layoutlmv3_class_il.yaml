@@ -59,7 +59,7 @@ cl_strategy:
   name: "sequential"
 
 label_space:
-  unified: false
+  unified: true  # REQUIRED for class-IL! Maps all tasks to same global label space
 
 # Tasks sequence: FUNSD -> CORD -> SROIE -> WildReceipt -> XFUND (zh)
 tasks:
@@ -99,7 +99,7 @@ output:
 
 # Neptune (optional)
 neptune:
-  use_neptune: false
-  neptune_project: "your-workspace/cl4ie"
+  use_neptune: true
+  neptune_project: null
   neptune_api_token: null
   tags: ["layoutlmv3", "class_il", "sequential", "funsd", "cord", "sroie", "wildreceipt", "xfund"]

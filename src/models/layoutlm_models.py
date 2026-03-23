@@ -129,7 +129,7 @@ class BaseLayoutLMModel(nn.Module, ABC):
         # Load the classification head
         classifier_path = f"{load_directory}/classifier.pt"
         # Load to CPU first; caller can move model to desired device afterward
-        self.classifier.load_state_dict(torch.load(classifier_path, map_location="cpu"))
+        self.classifier.load_state_dict(torch.load(classifier_path, map_location="cpu", weights_only=False))
 
     def reset_classifier(self, num_labels: int):
         """Reset the classification head to a new label count (for sequential FT).

@@ -148,6 +148,9 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
         task_config = deep_update(config, task_overrides)
         if cl_setting == "class_il" and config.get("label_space", {}).get("unified", False):
             task_config = deep_update(task_config, {"label_space": {"unified": True}})
+        elif cl_setting == "task_il":
+            # For task-IL, explicitly disable unified labels to use native task labels
+            task_config = deep_update(task_config, {"label_space": {"unified": False}})
 
         dataset_loader = get_dataset_loader(task_config)
         train_dataset, test_dataset, val_dataset = dataset_loader.load_data()
@@ -245,12 +248,8 @@ def _validate_strategy(config: Dict[str, Any], tasks: List[Dict[str, Any]], cl_s
             raise ValueError(
                 "LwF requires cl_setting: class_il and label_space.unified: true to keep logits dimensions stable."
             )
-    if strat_name not in {"none", "sequential"} and cl_setting != "class_il":
-        first = set(tasks[0]["label_list"])
-        for tt in tasks[1:]:
-            if set(tt["label_list"]) != first:
-                raise ValueError(f"CL strategy {strat_name} requires a shared label space across tasks; tasks have "
-                                 "mismatched label sets.")
+    # Note: GEM, EWC, and AGEM work with both task-IL and class-IL
+    # They don't inherently require unified label space - they just need memory/importance weights
 
 
 def _save_cl_artifacts(output_dir: Path, results: Dict[str, Any], config: Dict[str, Any], logger: Any) -> None:

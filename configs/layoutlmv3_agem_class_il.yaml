@@ -50,13 +50,14 @@ data_processing:
 
 cl_strategy:
   name: "agem"
-  memory_size: 1000
-  replay_batch_size: 2
-  constraint_threshold: -1e-3  # Allow small positive violations
-  clear_cache_every: 5  # Clear GPU cache every 5 steps
+  memory_size: 1000             # Total episodic memory samples
+  replay_batch_size: 4          # Samples for computing reference gradient
+  constraint_threshold: -1e-6   # Numerical stability tolerance (close to 0)
+  clear_cache_every: 5          # Clear GPU cache every N steps
+  use_balanced_sampling: false  # Enable task-balanced sampling (experimental)
 
 label_space:
-  unified: false
+  unified: true  # REQUIRED for class-IL! Maps all tasks to same global label space
 
 tasks:
   - name: "funsd"
@@ -96,4 +97,3 @@ neptune:
   neptune_project: "your-workspace/cl4ie"
   neptune_api_token: null
   tags: ["layoutlmv3", "class_il", "agem", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
-

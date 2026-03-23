@@ -57,7 +57,7 @@ cl_strategy:
   fisher_cache_dir: "ewc_fisher_cache"
 
 label_space:
-  unified: false
+  unified: true  # REQUIRED for class-IL! Maps all tasks to same global label space
 
 tasks:
   - name: "funsd"

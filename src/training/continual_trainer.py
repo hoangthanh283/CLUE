@@ -165,6 +165,24 @@ class ContinualLayoutLMTrainer:
         all_predictions = torch.cat(all_predictions, dim=0)
         all_labels = torch.cat(all_labels, dim=0)
         all_attention_masks = torch.cat(all_attention_masks, dim=0)
+        
+        # Debug logging: check model output dimensions and prediction distribution
+        logger.info(f"Model output shape: {all_predictions.shape} (expected: [..., {self.model.num_labels}])")
+        logger.info(f"Labels shape: {all_labels.shape}")
+        logger.info(f"Num labels in model: {self.model.num_labels}, in metrics: {len(self.metrics.label_list)}")
+        
+        pred_classes = torch.argmax(all_predictions, dim=-1)
+        valid_mask = (all_attention_masks == 1) & (all_labels != -100)
+        valid_preds = pred_classes[valid_mask]
+        valid_labels = all_labels[valid_mask]
+        
+        unique_preds, pred_counts = torch.unique(valid_preds, return_counts=True)
+        unique_labels, label_counts = torch.unique(valid_labels, return_counts=True)
+        
+        logger.info(f"Evaluation stats: {valid_preds.numel()} valid tokens")
+        logger.info(f"  Predicted label distribution: {dict(zip(unique_preds.cpu().tolist()[:10], pred_counts.cpu().tolist()[:10]))}...")
+        logger.info(f"  Ground truth label distribution: {dict(zip(unique_labels.cpu().tolist()[:10], label_counts.cpu().tolist()[:10]))}...")
+        
         metrics = self.metrics.compute_metrics(all_predictions, all_labels, all_attention_masks)
         # Loss is omitted in evaluation due to potential class-range mismatches
         # when growing heads; keep metric keys consistent without eval_loss.
@@ -284,18 +302,43 @@ class ContinualLayoutLMTrainer:
                     self.model.zero_grad(set_to_none=True)
 
                 batch = {k: v.to(self.device) for k, v in batch.items()}
+                
+                # Debug: log training batch labels on first batch of first epoch
+                if epoch == 0 and step == 0:
+                    train_labels = batch['labels'][batch['labels'] != -100]
+                    unique_train_labels = torch.unique(train_labels)
+                    logger.info(f"Task {task_id} training batch labels: {unique_train_labels.cpu().tolist()}")
+                    logger.info(f"Model classifier output size: {self.model.num_labels}")
+                    # Check classifier weight norms for different label ranges
+                    with torch.no_grad():
+                        weights = self.model.classifier.weight.data
+                        logger.info(f"Classifier weight norms - Labels 0-6: {weights[:7].norm().item():.4f}, Labels 21-32: {weights[21:33].norm().item():.4f}")
+                
                 outputs = self.model(**batch)
                 loss = self.strategy.compute_loss(self.model, batch, outputs)
+                
+                # Log loss values periodically
+                if step % 100 == 0:
+                    logger.info(f"Task {task_id} Epoch {epoch+1} Step {step}: loss = {loss.item():.4f}")
 
                 # Scale for accumulation
                 loss_scaled = loss / ga_steps
 
-                # Let strategy project/compute grads if needed
+                # Let strategy hook before backward (for strategies that need it)
                 self.strategy.on_before_backward(self.model, loss_scaled)
 
-                # If no grads were set by strategy, backprop now
-                if not any(p.grad is not None for p in self.model.parameters()):
-                    loss_scaled.backward()
+                # Compute gradients
+                loss_scaled.backward()
+
+                # Let strategy project/modify gradients after backward (for GEM, A-GEM, etc.)
+                # Only project on final accumulation step (when we're about to optimizer.step())
+                is_final_accumulation_step = (micro == ga_steps - 1)
+                self.strategy.on_after_backward(self.model, is_final_accumulation_step)
+
+                # Update memory BEFORE optimization step, for EVERY batch
+                # This ensures vanilla ER behavior: store examples before model is updated,
+                # and store ALL batches regardless of gradient accumulation
+                self.strategy.update_memory(batch)
 
                 # Step if end of accumulation window
                 if micro == ga_steps - 1:
@@ -305,9 +348,6 @@ class ContinualLayoutLMTrainer:
                         scheduler.step()
                     self.optimizer.zero_grad(set_to_none=True)
                     self.global_step += 1
-
-                    # Update memory after optimization step
-                    self.strategy.update_memory(batch)
 
                     # Clear GPU cache periodically to prevent OOM
                     if self.global_step % 10 == 0:
@@ -322,24 +362,35 @@ class ContinualLayoutLMTrainer:
             if eval_loader is not None:
                 eval_metrics = self.evaluate(eval_loader)
                 self._log_metrics(eval_metrics, prefix=f"task_{task_id}")
-                metric_key = self.training_config.get("metric_for_best_model", "eval_f1")
+                
+                # Log eval metrics to console for visibility
+                logger.info(f"Task {task_id} Epoch {epoch + 1}/{num_epochs} - Eval metrics: {eval_metrics}")
+                
+                metric_key = self.training_config.get("metric_for_best_model", "f1")  # Changed default from eval_f1 to f1
                 current = float(eval_metrics.get(metric_key, -1e9))
+                
+                if current == -1e9:
+                    logger.warning(f"Metric key '{metric_key}' not found in eval_metrics. Available keys: {list(eval_metrics.keys())}")
+                
                 if current > best_metric:
                     best_metric = current
                     early_stop_counter = 0
+                    logger.info(f"New best {metric_key}: {current:.4f}")
                     if self.training_config.get("save_best_model", True):
                         self.model.save_pretrained(str(best_path))
                         # Cache the best head state for this task
                         self._save_active_head_state(save_tag)
                 else:
                     early_stop_counter += 1
+                    logger.info(f"No improvement. Early stop counter: {early_stop_counter}/{self.training_config.get('early_stopping_patience', 10)}")
 
                 if early_stop_counter >= int(self.training_config.get("early_stopping_patience", 10)):
                     logger.info(f"Early stopping on task {task_id} at epoch {epoch + 1}")
                     break
 
-            # Log training loss to Neptune.
+            # Log training loss to Neptune and console.
             avg_train_loss = total_loss / num_batches if num_batches > 0 else 0.0
+            logger.info(f"Task {task_id} Epoch {epoch + 1}/{num_epochs} - Train loss: {avg_train_loss:.4f}")
             self._log_metrics({"train_loss": avg_train_loss}, prefix=f"task_{task_id}")
 
         # Optionally load best at end
@@ -373,27 +424,16 @@ class ContinualLayoutLMTrainer:
         task_names = [t.get("name", f"task{i}") for i, t in enumerate(eval_tasks)]
         T = len(eval_tasks)
 
-        # Pre-training evaluation on each task (R0)
-        pre_accuracy: List[float] = []
-        for j in range(T):
-            if self.cl_setting == "task_il":
-                lbl_list = eval_tasks[j].get("label_list") or self.metrics.label_list
-                id2label = {i: l for i, l in enumerate(lbl_list)}
-                m = self.evaluate_with_head(eval_tasks[j]["eval_loader"], task_names[j], lbl_list, id2label)
-            else:
-                # Class-IL: choose an id2label that covers BOTH current head and task j
-                task_lbl_list = eval_tasks[j].get("label_list") or self.metrics.label_list
-                task_id2label = eval_tasks[j].get("id2label") or {i: l for i, l in enumerate(task_lbl_list)}
-                head_id2label = getattr(self.metrics, "id2label", task_id2label)
-                # Prefer the larger mapping to avoid KeyError in entity F1
-                use_id2label = task_id2label if len(task_id2label) >= len(head_id2label) else head_id2label
-                use_lbl_list = [use_id2label[i] for i in range(len(use_id2label))]
-                self.metrics = LayoutLMMetrics(use_lbl_list, use_id2label)
-                m = self.evaluate(eval_tasks[j]["eval_loader"])  # single head evaluation
-            pre_accuracy.append(float(m.get("accuracy", 0.0)))
+        # Pre-training evaluation: skip to save time
+        # For CL metrics, we only need post-training accuracies
+        pre_accuracy: List[float] = [0.0] * T  # Placeholder, not used in CL metrics
 
         # Accuracy matrix R[i][j] after training task i, evaluated on task j
-        acc_matrix: List[List[float]] = [[0.0 for _ in range(T)] for _ in range(T)]
+        # For true joint training, tasks has 1 element but eval_tasks has multiple,
+        # so we need to build the matrix based on eval_tasks length
+        is_joint_training = eval_tasks is not None and eval_tasks != tasks
+        num_matrix_rows = len(eval_tasks) if is_joint_training else T
+        acc_matrix: List[List[float]] = [[0.0 for _ in range(T)] for _ in range(num_matrix_rows)]
 
         for i, task in enumerate(tasks):
             train_loader: DataLoader = task["train_loader"]
@@ -409,23 +449,30 @@ class ContinualLayoutLMTrainer:
             )
             per_task_results.append(res)
 
-            # Evaluate on all eval_tasks with a mapping that covers predictions and labels
-            for j in range(T):
+            # Incremental evaluation: only evaluate on tasks we've trained so far (0..i)
+            # This is the standard continual learning protocol
+            for j in range(i + 1):
                 if self.cl_setting == "task_il":
                     lbl_list = eval_tasks[j].get("label_list") or self.metrics.label_list
-                    id2label = {i: l for i, l in enumerate(lbl_list)}
+                    id2label = {idx: l for idx, l in enumerate(lbl_list)}
                     metrics = self.evaluate_with_head(eval_tasks[j]["eval_loader"], task_names[j], lbl_list, id2label)
                 else:
                     # Class-IL: choose an id2label that covers BOTH current head and task j
                     task_lbl_list = eval_tasks[j].get("label_list") or self.metrics.label_list
-                    task_id2label = eval_tasks[j].get("id2label") or {i: l for i, l in enumerate(task_lbl_list)}
+                    task_id2label = eval_tasks[j].get("id2label") or {idx: l for idx, l in enumerate(task_lbl_list)}
                     head_id2label = getattr(self.metrics, "id2label", task_id2label)
                     # Prefer the larger mapping to avoid KeyError in entity F1
                     use_id2label = task_id2label if len(task_id2label) >= len(head_id2label) else head_id2label
-                    use_lbl_list = [use_id2label[i] for i in range(len(use_id2label))]
+                    use_lbl_list = [use_id2label[idx] for idx in range(len(use_id2label))]
                     self.metrics = LayoutLMMetrics(use_lbl_list, use_id2label)
                     metrics = self.evaluate(eval_tasks[j]["eval_loader"])  # single head evaluation
                 acc_matrix[i][j] = float(metrics.get("accuracy", 0.0))
+
+            # For joint training, replicate row 0 to all rows (all trained on same joint data)
+            if is_joint_training and i == 0:
+                for row_idx in range(1, num_matrix_rows):
+                    for j in range(T):
+                        acc_matrix[row_idx][j] = acc_matrix[0][j]
 
             # Save checkpoint after finishing task i (for later offline evaluation)
             try:

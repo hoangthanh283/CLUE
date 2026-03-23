@@ -62,7 +62,7 @@ cl_strategy:
   replay_weight: 1.0
 
 label_space:
-  unified: false
+  unified: true  # REQUIRED for class-IL! Maps all tasks to same global label space
 
 # Tasks sequence: FUNSD -> CORD -> SROIE -> WildReceipt -> XFUND (zh)
 tasks:

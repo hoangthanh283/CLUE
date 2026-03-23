@@ -1,6 +1,6 @@
-experiment_name: "layoutlmv3_seq_ft"
+experiment_name: "layoutlmv3_progressive_joint_class_il"
 
-# Base dataset config (will be overridden per task)
+# Base dataset config (overridden per task below)
 dataset:
   name: "funsd"
   hf_dataset_name: "nielsr/funsd"
@@ -11,7 +11,7 @@ dataset:
     image_size: [224, 224]
     apply_ocr: false
     normalize_bbox: true
-    include_image: false   # use text+layout only for speed (LayoutLMv3)
+    include_image: false
 
 # Model configuration
 model:
@@ -19,15 +19,19 @@ model:
   model_type: "layoutlmv3-base"
   pretrained_model_name: "microsoft/layoutlmv3-base"
   config:
-    num_labels: 51   # unified BIO label space across 5 datasets.
+    num_labels: 51  # 51 = O + 2 * (3 FORM + 22 RCPT unified entities).
     hidden_dropout_prob: 0.1
     attention_probs_dropout_prob: 0.1
     classifier_dropout: 0.1
 
+# Continual Learning head setting
+# - class_il: single head over the unified label space
+cl_setting: "class_il"
+
 # Training configuration
 training:
-  batch_size: 4
-  gradient_accumulation_steps: 2
+  batch_size: 1
+  gradient_accumulation_steps: 8
   num_epochs: 100
   learning_rate: 5.0e-5
   weight_decay: 0.01
@@ -38,9 +42,9 @@ training:
   evaluation_strategy: "epoch"
   save_total_limit: 1
   load_best_model_at_end: true
-  metric_for_best_model: "eval_f1"
+  metric_for_best_model: "f1"
   greater_is_better: true
-  early_stopping_patience: 3
+  early_stopping_patience: 10
 
 # Data processing
 data_processing:
@@ -50,11 +54,19 @@ data_processing:
   shuffle_train: true
   seed: 42
 
-# Continual Learning Strategy (sequential fine-tuning)
+# Continual Learning Strategy (progressive joint training baseline)
 cl_strategy:
-  name: "sequential"
+  name: "joint"
+  # true_joint: false means progressive joint training
+  # Task 0: train on FUNSD
+  # Task 1: train on FUNSD+CORD
+  # Task 2: train on FUNSD+CORD+SROIE
+  # Task 3: train on FUNSD+CORD+SROIE+WildReceipt
+  # Task 4: train on FUNSD+CORD+SROIE+WildReceipt+XFUND
+  true_joint: false
 
 label_space:
+  # Unified label space for all tasks, which means that labels are shared across tasks.
   unified: true
 
 # Tasks sequence: FUNSD -> CORD -> SROIE -> WildReceipt -> XFUND (zh)
@@ -95,7 +107,8 @@ output:
 
 # Neptune (optional)
 neptune:
-  use_neptune: false
-  neptune_project: "your-workspace/cl4ie"
+  use_neptune: true
+  neptune_project: null
   neptune_api_token: null
-  tags: ["layoutlmv3", "sequential", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
+  tags: ["layoutlmv3", "class_il", "progressive_joint", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
+

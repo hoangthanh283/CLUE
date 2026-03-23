@@ -1,4 +1,15 @@
-"""Experience Replay (ER)."""
+"""Experience Replay (ER).
+
+This is a vanilla implementation of Experience Replay following:
+    Rolnick et al. (2019) "Experience Replay for Continual Learning"
+
+The algorithm maintains a fixed-size memory buffer using reservoir sampling
+and combines the loss from current data with replayed examples:
+
+    L_total = L(current batch) + λ * L(replay batch)
+
+This implementation is suitable as a baseline for continual learning research.
+"""
 
 from typing import Any, Dict
 
@@ -10,9 +21,19 @@ from src.cl_strategies.memory import MemoryBuffer
 
 
 class ExperienceReplay(BaseCLStrategy):
-    """Experience Replay with reservoir sampling memory.
+    """Vanilla Experience Replay with reservoir sampling memory.
 
-    L_total = L(current) + lambda * L(memory)
+    References:
+        Rolnick et al. (2019) "Experience Replay for Continual Learning"
+        https://arxiv.org/abs/1811.11682
+
+    Algorithm:
+        1. Store training examples in a fixed-size memory buffer using reservoir sampling
+        2. During training on new tasks, sample a batch from memory
+        3. Combine losses: L_total = L(current) + replay_weight * L(memory)
+
+    This is a basic implementation without class-balancing or other enhancements,
+    making it suitable as a vanilla baseline for comparisons.
     """
 
     def __init__(self, config: Dict[str, Any]):

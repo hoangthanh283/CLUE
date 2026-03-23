@@ -100,7 +100,7 @@ output:
 
 # Neptune (optional)
 neptune:
-  use_neptune: false
-  neptune_project: "your-workspace/cl4ie"
+  use_neptune: true
+  neptune_project: null
   neptune_api_token: null
   tags: ["layoutlmv3", "task_il", "sequential", "funsd", "cord", "sroie", "wildreceipt", "xfund"]

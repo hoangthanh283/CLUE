@@ -48,6 +48,7 @@ class BaseDatasetLoader(ABC):
         # Initialize tokenizer based on model type
         model_name = config["model"]["pretrained_model_name"]
         if "layoutlmv3" in model_name.lower():
+            # Use Slow tokenizer to avoid TypeError with is_split_into_words in older transformers
             self.tokenizer = LayoutLMv3Tokenizer.from_pretrained(model_name)
         elif "layoutlmv2" in model_name.lower():
             self.tokenizer = LayoutLMv2Tokenizer.from_pretrained(model_name)
@@ -278,20 +279,63 @@ class LayoutLMDataset(Dataset):
         item = self.hf_dataset[int(idx)]
         example = self.dataset_loader._process_single_item(item)
         integer_labels = [self.label2id.get(label, 0) for label in example.labels]
-        encoding = self.tokenizer(
-            example.words,
-            boxes=example.bboxes,
-            word_labels=integer_labels,
-            truncation=True,
-            padding="max_length",
-            max_length=self.max_seq_length,
-            return_tensors="pt",
-        )
+        # Manual tokenization to support is_split_into_words behavior with Slow tokenizer
+        # This workaround is necessary because LayoutLMv3Tokenizer (Slow) in this environment
+        # does not support is_split_into_words=True, and Fast tokenizer is crashing.
+        
+        tokens = []
+        bboxes = []
+        labels = []
+
+        # Add CLS token
+        tokens.append(self.tokenizer.cls_token_id)
+        bboxes.append([0, 0, 0, 0])
+        labels.append(-100)
+
+        for word, box, label in zip(example.words, example.bboxes, integer_labels):
+            # LayoutLMv3 uses RoBERTa tokenizer (byte-level BPE). 
+            # We add prefix space to ensure proper tokenization for words in list.
+            word_tokens = self.tokenizer.tokenize(word, add_prefix_space=True)
+            word_ids = self.tokenizer.convert_tokens_to_ids(word_tokens)
+
+            for i, w_id in enumerate(word_ids):
+                tokens.append(w_id)
+                bboxes.append(box)
+                # Label alignment: Assign label to first subword, ignore others (-100)
+                if i == 0:
+                    labels.append(label)
+                else:
+                    labels.append(-100)
+
+        # Truncate to max_seq_length - 1 (for SEP)
+        # Note: We effectively replicate 'truncation=True' manually
+        special_tokens_count = 2 # CLS and SEP
+        if len(tokens) > self.max_seq_length - 1:
+            tokens = tokens[:self.max_seq_length - 1]
+            bboxes = bboxes[:self.max_seq_length - 1]
+            labels = labels[:self.max_seq_length - 1]
+
+        # Add SEP token
+        tokens.append(self.tokenizer.sep_token_id)
+        bboxes.append([0, 0, 0, 0])
+        labels.append(-100)
+
+        # Create Attention Mask
+        attention_mask = [1] * len(tokens)
+
+        # Padding
+        padding_length = self.max_seq_length - len(tokens)
+        if padding_length > 0:
+            tokens = tokens + [self.tokenizer.pad_token_id] * padding_length
+            bboxes = bboxes + [[0, 0, 0, 0]] * padding_length
+            labels = labels + [-100] * padding_length
+            attention_mask = attention_mask + [0] * padding_length
+
         return {
-            "input_ids": encoding["input_ids"].squeeze(),
-            "attention_mask": encoding["attention_mask"].squeeze(),
-            "bbox": encoding["bbox"].squeeze(),
-            "labels": encoding["labels"].squeeze(),
+            "input_ids": torch.tensor(tokens, dtype=torch.long),
+            "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
+            "bbox": torch.tensor(bboxes, dtype=torch.long),
+            "labels": torch.tensor(labels, dtype=torch.long),
         }
 
 

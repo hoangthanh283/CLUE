@@ -1,4 +1,21 @@
-"""Elastic Weight Consolidation (EWC)."""
+"""Elastic Weight Consolidation (EWC).
+
+This is a vanilla implementation of EWC following:
+    Kirkpatrick et al. (2017) "Overcoming catastrophic forgetting in neural networks"
+
+The algorithm protects important parameters from previous tasks by adding a
+quadratic penalty based on the Fisher Information Matrix:
+
+    L_total = L_task + (λ/2) * Σ_i F_i (θ_i - θ*_i)²
+
+where:
+    - F_i is the diagonal Fisher information (importance of parameter i)
+    - θ*_i is the learned parameter value from previous task
+    - λ is the regularization strength
+
+This implementation uses the diagonal Fisher approximation with empirical Fisher
+(computed from true labels), which is the standard vanilla EWC baseline.
+"""
 
 import os
 import pickle
@@ -12,9 +29,24 @@ from src.cl_strategies.base import BaseCLStrategy
 
 
 class EWC(BaseCLStrategy):
-    """Diagonal-Fisher EWC.
+    """Vanilla Elastic Weight Consolidation with diagonal Fisher approximation.
 
-    L_total = L_task + (lambda/2) * sum_i F_i (theta_i - theta*_i)^2
+    References:
+        Kirkpatrick et al. (2017) "Overcoming catastrophic forgetting in neural networks"
+        https://www.pnas.org/doi/10.1073/pnas.1611835114
+
+    Algorithm:
+        1. After training on task T, compute diagonal Fisher: F_i = E[(∂L/∂θ_i)²]
+        2. Store current parameters: θ* = θ_current
+        3. When training on new tasks, add penalty: (λ/2) * Σ F_i(θ_i - θ*_i)²
+
+    This is a basic implementation using:
+        - Diagonal Fisher approximation (not full matrix)
+        - Empirical Fisher with true labels (standard in EWC paper)
+        - Per-task Fisher accumulation for multi-task scenarios
+
+    The implementation includes optimizations for large models (chunked computation,
+    CPU storage) while maintaining vanilla algorithm correctness.
     """
 
     def __init__(self, config: Dict[str, Any]):
@@ -38,6 +70,27 @@ class EWC(BaseCLStrategy):
         return {n: torch.zeros_like(p, device=p.device) for n, p in model.named_parameters() if p.requires_grad}
 
     def _estimate_fisher(self, model: nn.Module, loader: Iterable) -> Dict[str, torch.Tensor]:
+        """Estimate diagonal Fisher information matrix.
+
+        This implementation uses the empirical Fisher with true labels, following
+        Kirkpatrick et al. (2017). The diagonal Fisher is approximated as:
+
+            F_ii ≈ E[(∂L/∂θ_i)²]
+
+        where L is the cross-entropy loss on the training data. This is a standard
+        approximation used in the original EWC paper and is suitable for vanilla
+        baseline comparisons.
+
+        Note: Some papers use the "expected Fisher" (Fisher over model predictions
+        instead of true labels), but we follow the original EWC formulation here.
+
+        Args:
+            model: The model to estimate Fisher for.
+            loader: DataLoader with training data.
+
+        Returns:
+            Dictionary mapping parameter names to Fisher diagonal values.
+        """
         model.eval()
         fisher = self._init_zero_like(model)
         n_batches = 0
@@ -65,9 +118,9 @@ class EWC(BaseCLStrategy):
                 fisher[name] /= float(n_batches)
         # Move Fisher matrices to CPU if configured to save GPU memory.
         if self.store_fishers_on_cpu:
-            fisher = {k: v.detach().clone().cpu() for k, v in fisher.items()}
+            fisher = {k: v.clone().cpu() for k, v in fisher.items()}
         else:
-            fisher = {k: v.detach().clone() for k, v in fisher.items()}
+            fisher = {k: v.clone() for k, v in fisher.items()}
         return fisher
 
     def before_task(self, model: nn.Module, task_id: int, train_loader: Optional[Iterable] = None):
@@ -117,11 +170,17 @@ class EWC(BaseCLStrategy):
 
         Returns:
             The computed EWC penalty for the parameter tensor.
+
+        Note:
+            This function maintains gradient flow by accumulating penalty as a tensor,
+            not as a scalar. This is critical for EWC to work correctly.
         """
         param_flat = param.flatten()
         fisher_flat = fisher_param.flatten()
         params_star_flat = params_star_param.flatten()
-        penalty = 0.0
+
+        # Initialize penalty as a tensor to maintain gradient flow
+        penalty = torch.tensor(0.0, device=param.device, requires_grad=False)
 
         for idx in range(0, param_flat.numel(), self.ewc_chunk_size):
             end_idx = min(idx + self.ewc_chunk_size, param_flat.numel())
@@ -130,17 +189,18 @@ class EWC(BaseCLStrategy):
             params_star_chunk = params_star_flat[idx:end_idx].to(param.device, non_blocking=True)
             diff_chunk = param_chunk - params_star_chunk
 
-            # Compute penalty for this chunk and detach immediately to avoid gradient accumulation
-            chunk_penalty = (fisher_chunk * (diff_chunk ** 2)).sum().detach()
-            penalty += chunk_penalty.item()  # Convert to scalar to avoid tensor accumulation
+            # Compute penalty for this chunk - DO NOT detach to maintain gradient flow
+            chunk_penalty = (fisher_chunk * (diff_chunk ** 2)).sum()
+            penalty = penalty + chunk_penalty  # Accumulate as tensor, not scalar
 
-            # Clean up intermediate tensors
-            del fisher_chunk, params_star_chunk, diff_chunk, chunk_penalty
+            # Clean up intermediate tensors (but not chunk_penalty yet, it's in the graph)
+            del fisher_chunk, params_star_chunk, diff_chunk
 
-            # Clear cache every few chunks to prevent memory buildup
+            # Clear cache periodically to prevent memory buildup
             if idx % (self.ewc_chunk_size * 10) == 0:
                 torch.cuda.empty_cache()
-        return torch.tensor(penalty, device=param.device, requires_grad=True)
+
+        return penalty
 
     def compute_loss(self, model: nn.Module, batch: Dict[str, torch.Tensor], outputs: Dict[str, torch.Tensor]
                      ) -> torch.Tensor:

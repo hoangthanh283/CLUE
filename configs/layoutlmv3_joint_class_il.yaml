@@ -103,7 +103,7 @@ output:
 
 # Neptune (optional)
 neptune:
-  use_neptune: false
+  use_neptune: true
   neptune_project: null
   neptune_api_token: null
   tags: ["layoutlmv3", "class_il", "joint", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
