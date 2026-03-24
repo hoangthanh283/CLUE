@@ -43,3 +43,44 @@ def build_adamw_optimizer(model: nn.Module, training_config: Union[TrainingConfi
     optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=1e-8)
     logger.info(f"Setup adamw optimizer with lr={learning_rate}")
     return optimizer
+
+
+def rebuild_adamw_optimizer(
+    model: nn.Module,
+    training_config: Union[TrainingConfig, dict],
+    eps: float = 1e-8,
+) -> AdamW:
+    """Rebuild an AdamW optimizer for model, preserving no-decay grouping and eps.
+
+    Used to refresh the optimizer after the classifier head changes (e.g., task-IL
+    head swap or class-IL expansion), so new parameters are included.
+
+    Args:
+        model: Model with updated parameters.
+        training_config: TrainingConfig dataclass (or legacy dict).
+        eps: Epsilon value preserved from the previous optimizer.
+
+    Returns:
+        New AdamW optimizer with current model parameters.
+    """
+    if isinstance(training_config, dict):
+        learning_rate = training_config["learning_rate"]
+        weight_decay = training_config.get("weight_decay", 0.01)
+    else:
+        learning_rate = training_config.learning_rate
+        weight_decay = training_config.weight_decay
+
+    no_decay = ["bias", "LayerNorm.weight"]
+    grouped = [
+        {
+            "params": [p for n, p in model.named_parameters()
+                       if not any(nd in n for nd in no_decay)],
+            "weight_decay": weight_decay,
+        },
+        {
+            "params": [p for n, p in model.named_parameters()
+                       if any(nd in n for nd in no_decay)],
+            "weight_decay": 0.0,
+        },
+    ]
+    return AdamW(grouped, lr=learning_rate, eps=eps)
