@@ -78,7 +78,7 @@ class LwF(BaseCLStrategy):
         self.teacher: Optional[nn.Module] = None
         self.kldiv = nn.KLDivLoss(reduction="batchmean")
 
-    def before_task(self, model: nn.Module, task_id: int, train_loader=None):
+    def before_task(self, model: nn.Module, task_id: int, train_loader=None) -> None:
         """Prepare for new task by creating teacher from current model.
 
         Args:
@@ -91,6 +91,7 @@ class LwF(BaseCLStrategy):
             - For task > 0: Create frozen teacher = deepcopy(current model)
             - Teacher captures knowledge from all previous tasks
         """
+        super().before_task(model, task_id, train_loader)
         if task_id == 0:
             self.teacher = None  # No previous knowledge for first task
         else:

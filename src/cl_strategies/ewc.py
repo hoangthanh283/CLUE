@@ -20,7 +20,7 @@ This implementation uses the diagonal Fisher approximation with empirical Fisher
 import os
 import pickle
 import random
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -65,8 +65,6 @@ class EWC(BaseCLStrategy):
             self.n_fisher_samples = config.n_fisher_samples
             self.ewc_chunk_size = config.ewc_chunk_size
             self.store_fishers_on_cpu = config.store_fishers_on_cpu
-        self.stored_task_ids: List[int] = []
-
         # In-memory cache to avoid disk reads on every training step
         self._fisher_cache: Dict[int, Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]] = {}
 
@@ -134,8 +132,9 @@ class EWC(BaseCLStrategy):
             fisher = {k: v.clone() for k, v in fisher.items()}
         return fisher
 
-    def before_task(self, model: nn.Module, task_id: int, train_loader: Optional[Iterable] = None):
-        return
+    def before_task(self, model: nn.Module, task_id: int,
+                    train_loader: Optional[Iterable] = None) -> None:
+        super().before_task(model, task_id, train_loader)
 
     def _save_fisher_data(self, task_id: int, fisher: Dict[str, torch.Tensor], params: Dict[str, torch.Tensor]):
         """Save Fisher information and parameters to disk."""
@@ -182,7 +181,7 @@ class EWC(BaseCLStrategy):
         self._save_fisher_data(task_id, fisher, params)
         # Populate in-memory cache for faster access during training
         self._fisher_cache[task_id] = (fisher, params)
-        self.stored_task_ids.append(task_id)
+        super().after_task(model, task_id, train_loader)
         torch.cuda.empty_cache()
 
     def ewc_penalty_chunked(self, param, fisher_param, params_star_param):
@@ -240,11 +239,11 @@ class EWC(BaseCLStrategy):
             The total loss including EWC penalty.
         """
         loss = outputs["loss"]
-        if not self.stored_task_ids:
+        if not self.seen_tasks:
             return loss
 
         penalty = 0.0
-        for task_id in self.stored_task_ids:
+        for task_id in self.seen_tasks:
             fisher, params_star = self._get_fisher_data(task_id)
             for name, param in model.named_parameters():
                 if name not in params_star or name not in fisher or not param.requires_grad:

@@ -1,50 +1,49 @@
-"""Mixin for episodic memory-based continual learning strategies (GEM, A-GEM)."""
+"""Episodic memory utilities for continual learning strategies (GEM, A-GEM)."""
 
-from typing import Dict, List
+from typing import TYPE_CHECKING, Dict
 
 import torch
-import torch.nn as nn
+
+if TYPE_CHECKING:
+    from src.cl_strategies.memory import MemoryBuffer
 
 
 class EpisodicMemoryMixin:
-    """Mixin providing shared episodic memory tracking for GEM/A-GEM strategies.
+    """Deprecated. Functionality absorbed into BaseCLStrategy.
 
-    Initializes current_task_id and seen_tasks via cooperative __init__.
-    Subclasses must set self.memory = MemoryBuffer(...) before update_memory is called.
+    BaseCLStrategy now provides current_task_id, seen_tasks, before_task, and
+    after_task directly. Drop EpisodicMemoryMixin from the inheritance list:
+
+        # Before:
+        class GEM(EpisodicMemoryMixin, BaseCLStrategy): ...
+        # After:
+        class GEM(BaseCLStrategy): ...
     """
+    pass
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.current_task_id: int = 0
-        self.seen_tasks: List[int] = []
 
-    def before_task(self, model: nn.Module, task_id: int, train_loader=None):
-        """Mark the start of a new task."""
-        self.current_task_id = task_id
+def store_episodic_sample(
+    memory: "MemoryBuffer",
+    batch: Dict[str, torch.Tensor],
+    task_id: int,
+) -> None:
+    """Store first sample from batch into episodic memory with task_id.
 
-    def after_task(self, model: nn.Module, task_id: int, train_loader=None):
-        """Mark that we've completed training on a task."""
-        if task_id not in self.seen_tasks:
-            self.seen_tasks.append(task_id)
+    Stores only the first sample to minimise memory usage while maintaining
+    task-aware sampling capability for GEM-style constraint gradients.
 
-    def update_memory(self, batch: Dict[str, torch.Tensor]):
-        """Store samples from the current task into episodic memory.
-
-        Uses reservoir sampling to maintain a representative subset across all tasks.
-        Stores only first sample from batch to minimize memory usage.
-        Subclass must set self.memory = MemoryBuffer(...) before calling this.
-
-        Args:
-            batch: Training batch with 'input_ids', 'attention_mask', 'bbox', 'labels',
-                   and optional 'token_type_ids'.
-        """
-        sample_batch = {
-            "input_ids": batch["input_ids"][:1],
-            "attention_mask": batch["attention_mask"][:1],
-            "bbox": batch["bbox"][:1],
-            "labels": batch["labels"][:1],
-        }
-        if "token_type_ids" in batch and batch["token_type_ids"] is not None:
-            sample_batch["token_type_ids"] = batch["token_type_ids"][:1]
-
-        self.memory.add_batch(sample_batch, task_id=self.current_task_id)
+    Args:
+        memory: MemoryBuffer instance to store the sample in.
+        batch: Training batch with 'input_ids', 'attention_mask', 'bbox', 'labels',
+               and optional 'token_type_ids'.
+        task_id: Task ID to tag the stored sample with.
+    """
+    sample_batch: Dict[str, torch.Tensor] = {
+        "input_ids": batch["input_ids"][:1],
+        "attention_mask": batch["attention_mask"][:1],
+        "bbox": batch["bbox"][:1],
+        "labels": batch["labels"][:1],
+    }
+    if "token_type_ids" in batch and batch["token_type_ids"] is not None:
+        sample_batch["token_type_ids"] = batch["token_type_ids"][:1]
+    memory.add_batch(sample_batch, task_id=task_id)

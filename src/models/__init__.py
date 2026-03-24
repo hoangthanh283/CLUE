@@ -2,6 +2,8 @@
 Model implementations and wrappers for Information Extraction
 """
 
+from src.models.head_manager import HeadManager  # noqa: F401
+
 
 class BaseModel:
     """Base class for IE models"""

@@ -2,7 +2,6 @@
 Continual Learning trainer wiring CL strategies into the LayoutLM pipeline.
 """
 
-import copy
 import json
 import logging
 from pathlib import Path
@@ -17,6 +16,7 @@ from transformers import get_linear_schedule_with_warmup
 
 from src.cl_strategies import AGEM, EWC, GEM, BaseCLStrategy, ExperienceReplay, LwF, SequentialFineTuning
 from src.config import ExperimentConfig
+from src.models.head_manager import HeadManager
 from src.models.layoutlm_models import BaseLayoutLMModel, LayoutLMMetrics
 from src.training.cl_metrics import compute_cl_metrics
 from src.training.neptune_utils import init_neptune_run
@@ -81,9 +81,6 @@ class ContinualLayoutLMTrainer:
         # Metrics (set per task as label spaces can change under sequential FT)
         self.metrics = LayoutLMMetrics(label_list, id2label)
 
-        # Per-task classifier head states (state_dicts), keyed by task name
-        self.head_states: Dict[str, Dict[str, torch.Tensor]] = {}
-
         # Optimizer (single across tasks)
         self.optimizer = self._setup_optimizer()
 
@@ -106,6 +103,9 @@ class ContinualLayoutLMTrainer:
         if self.cl_setting not in {"task_il", "class_il"}:
             logger.warning(f"Unknown cl_setting '{self.cl_setting}', defaulting to 'task_il'")
             self.cl_setting = "task_il"
+
+        # Classifier head lifecycle manager
+        self.head_manager = HeadManager(self.model, self.cl_setting)
 
         # Setup Neptune if configured (pass raw neptune dict).
         self.neptune_run = init_neptune_run(config.neptune)
@@ -178,30 +178,6 @@ class ContinualLayoutLMTrainer:
         # when growing heads; keep metric keys consistent without eval_loss.
         return metrics
 
-    def _activate_head(self, task_name: str, num_labels: int):
-        """Ensure classifier matches the requested head for this task.
-
-        If a saved head exists for task_name and matches num_labels, load it.
-        Otherwise, reset classifier to num_labels.
-        """
-        # Load existing head if available and compatible
-        state = self.head_states.get(task_name)
-        if state is not None:
-            # Check output dimension compatibility
-            # Infer out_features from any weight tensor in state
-            w = state.get('weight')
-            if w is not None and w.size(0) == num_labels:
-                self.model.reset_classifier(num_labels)
-                self.model.classifier.load_state_dict(copy.deepcopy(state))
-                return
-        # Otherwise reset to requested size
-        self.model.reset_classifier(num_labels)
-        # After resetting classifier, refresh optimizer so new params are optimized
-        self._refresh_optimizer_params()
-
-    def _save_active_head_state(self, task_name: str):
-        self.head_states[task_name] = copy.deepcopy(self.model.classifier.state_dict())
-
     def _refresh_optimizer_params(self):
         """Rebuild optimizer param groups to include current model params.
 
@@ -241,22 +217,11 @@ class ContinualLayoutLMTrainer:
                    save_tag: str = "task", *, label_list: Optional[List[str]] = None,
                    id2label: Optional[Dict[int, str]] = None) -> Dict[str, float]:
         # If provided, refresh metrics and classifier for this task
-        if self.cl_setting == "task_il":
-            if label_list is not None:
-                # Build id2label if not provided
-                id2label = id2label or {i: l for i, l in enumerate(label_list)}
-                # Update metrics and activate (or create) the per-task head
-                self.metrics = LayoutLMMetrics(label_list, id2label)
-                self._activate_head(save_tag, num_labels=len(label_list))
-        else:  # class_il
-            if label_list is not None:
-                id2label = id2label or {i: l for i, l in enumerate(label_list)}
-                # Expand classifier if new labels have been introduced
-                if len(label_list) > self.model.num_labels:
-                    self.model.expand_classifier(len(label_list))
-                    self._refresh_optimizer_params()
-                # Always keep metrics in sync with the current global label list
-                self.metrics = LayoutLMMetrics(label_list, id2label)
+        if label_list is not None:
+            id2label = id2label or {i: l for i, l in enumerate(label_list)}
+            self.metrics = LayoutLMMetrics(label_list, id2label)
+            if self.head_manager.prepare_for_task(save_tag, label_list):
+                self._refresh_optimizer_params()
         # Determine effective gradient accumulation
         ga_steps_cfg = self.training_config.gradient_accumulation_steps
         if isinstance(self.strategy, (AGEM, GEM)) and ga_steps_cfg != 1:
@@ -376,7 +341,7 @@ class ContinualLayoutLMTrainer:
                     if self.training_config.save_best_model:
                         self.model.save_pretrained(str(best_path))
                         # Cache the best head state for this task
-                        self._save_active_head_state(save_tag)
+                        self.head_manager.save(save_tag)
                 else:
                     early_stop_counter += 1
                     patience = self.training_config.early_stopping_patience
@@ -398,7 +363,7 @@ class ContinualLayoutLMTrainer:
             self.model.load_pretrained(str(best_path))
             self.model.to(self.device)
             # Ensure head state registry holds the final best for this task
-            self._save_active_head_state(save_tag)
+            self.head_manager.save(save_tag)
 
         self.strategy.after_task(self.model, task_id, train_loader)
         return {"best_metric": best_metric}
@@ -534,24 +499,15 @@ class ContinualLayoutLMTrainer:
                 }, f, indent=2)
         else:  # task_il
             # Save all heads we have so far under heads/
-            heads_dir = ckpt_dir / "heads"
-            heads_dir.mkdir(parents=True, exist_ok=True)
-            # Map task name -> label_list for metadata
             labels_by_task = {t["name"]: t.get("label_list") for t in tasks}
-            heads_meta = {}
-            for head_name, state in self.head_states.items():
-                torch.save(state, heads_dir / f"{head_name}.pt")
-                heads_meta[head_name] = {
-                    "num_labels": int(state.get("weight").shape[0]) if state.get("weight") is not None else None,
-                    "label_list": labels_by_task.get(head_name),
-                }
+            heads_meta = self.head_manager.save_to_disk(ckpt_dir / "heads", labels_by_task)
             with open(ckpt_dir / "heads_meta.json", "w") as f:
                 json.dump(heads_meta, f, indent=2)
 
     def evaluate_with_head(self, dataloader: DataLoader, task_name: str, label_list: List[str], id2label: Dict[int, str]
                            ) -> Dict[str, float]:
         # Activate task-specific head and update metrics.
-        self._activate_head(task_name, num_labels=len(label_list))
+        self.head_manager.activate(task_name, len(label_list))
         self.metrics = LayoutLMMetrics(label_list, id2label)
         return self.evaluate(dataloader)
 

@@ -14,12 +14,12 @@ import torch.nn as nn
 
 from src.cl_strategies.base import BaseCLStrategy
 from src.cl_strategies.memory import MemoryBuffer
-from src.cl_strategies.memory_strategy_mixin import EpisodicMemoryMixin
+from src.cl_strategies.memory_strategy_mixin import store_episodic_sample
 from src.cl_strategies.utils import get_grad_vector, set_grad_vector
 from src.config import AGEMConfig
 
 
-class AGEM(EpisodicMemoryMixin, BaseCLStrategy):
+class AGEM(BaseCLStrategy):
     """
     Averaged Gradient Episodic Memory (A-GEM) strategy.
 
@@ -54,6 +54,10 @@ class AGEM(EpisodicMemoryMixin, BaseCLStrategy):
 
         self.memory = MemoryBuffer(mem_size)
         self._step_count = 0
+
+    def update_memory(self, batch: Dict[str, torch.Tensor]) -> None:
+        """Store first sample from batch into episodic memory tagged with current task."""
+        store_episodic_sample(self.memory, batch, self.current_task_id)
 
     def on_after_backward(self, model: nn.Module, is_final_accumulation_step: bool = True):
         """
