@@ -13,7 +13,7 @@ import random
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
 import torch
 
@@ -69,7 +69,7 @@ class MemoryBuffer:
         # Replace items list with keys list
         self.keys: List[MemoryKey] = []
         self.n_seen = 0
-        
+
         # Cache for task-specific keys to improve sampling efficiency
         self._task_key_cache: Dict[int, List[MemoryKey]] = {}
         self._cache_valid = True
@@ -138,7 +138,7 @@ class MemoryBuffer:
             position_ids = batch.get("position_ids")
             image = batch.get("image")
             pixel_values = batch.get("pixel_values")
-            
+
             # Create item with task_id
             item = MemoryItem(
                 input_ids=batch["input_ids"][i].detach().cpu(),
@@ -171,7 +171,9 @@ class MemoryBuffer:
                     # Invalidate cache since we replaced an item
                     self._invalidate_cache()
 
-    def sample(self, batch_size: int, device: torch.device, task_id: Optional[int] = None) -> Optional[Dict[str, torch.Tensor]]:
+    def sample(
+        self, batch_size: int, device: torch.device, task_id: Optional[int] = None
+    ) -> Optional[Dict[str, torch.Tensor]]:
         """Sample from memory buffer, optionally filtered by task_id.
 
         Args:
@@ -190,7 +192,7 @@ class MemoryBuffer:
             # Use cached task keys for efficiency
             self._update_cache()
             task_keys = self._task_key_cache.get(task_id, [])
-            
+
             if len(task_keys) == 0:
                 return None
 

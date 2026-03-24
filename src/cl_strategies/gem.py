@@ -26,10 +26,10 @@ logger = logging.getLogger(__name__)
 class GEM(EpisodicMemoryMixin, BaseCLStrategy):
     """
     Gradient Episodic Memory (GEM) strategy with exact QP solver.
-    
+
     GEM enforces inequality constraints: g^T · g_k >= 0 for all previous tasks k,
     ensuring that the loss on each previous task does not increase.
-    
+
     This implementation uses the exact QP formulation from the original paper:
     minimize   0.5 * ||v - g||^2
     subject to v^T · g_k >= 0  for all k (previous tasks)
@@ -112,7 +112,11 @@ class GEM(EpisodicMemoryMixin, BaseCLStrategy):
         original_norm = g.norm().item()
         projected_g = self._project_gradient_qp_exact(g, constraint_gradients)
         projected_norm = projected_g.norm().item()
-        logger.info(f"  Original gradient norm: {original_norm:.4f}, Projected norm: {projected_norm:.4f}, Reduction: {(1 - projected_norm/original_norm)*100:.1f}%")
+        reduction = (1 - projected_norm / original_norm) * 100
+        logger.info(
+            f"  Original gradient norm: {original_norm:.4f}, Projected norm: {projected_norm:.4f}, "
+            f"Reduction: {reduction:.1f}%"
+        )
 
         # Set the projected gradient
         # For task-IL, only update backbone gradients
@@ -234,7 +238,7 @@ class GEM(EpisodicMemoryMixin, BaseCLStrategy):
         # Convert to numpy for quadprog
         g_np = g.cpu().double().numpy()
         G_np = torch.stack(constraint_gradients, dim=0).cpu().double().numpy()
-        
+
         # Dual QP formulation as in the original paper:
         # minimize 0.5 * x^T * P * x + q^T * x
         # subject to G * x >= h
@@ -262,27 +266,27 @@ class GEM(EpisodicMemoryMixin, BaseCLStrategy):
         # h includes margin for constraint relaxation (v^T · g_k >= -margin)
         G = np.eye(t)
         h = np.zeros(t) + self.margin
-        
+
         # Solve QP with enhanced error handling
         try:
             # Solve the QP problem to get Lagrange multipliers
             solution = quadprog.solve_qp(P, q, G, h)
             lagrange_multipliers = solution[0]
-            
+
             # Compute projected gradient: v = g + sum(lambda_i * g_i)
             # Note: This is different from what I had before
             # In the original paper's formulation, the projection is:
             # v = g + G_np^T * lambda (where lambda >= 0)
             v_np = g_np + np.dot(lagrange_multipliers, G_np)
-            
+
             # Convert back to torch tensor
             v = torch.from_numpy(v_np).float().to(g.device)
-            
+
         except Exception as e:
             # If QP solver fails, fall back to greedy projection
             print(f"Warning: QP solver failed with error: {e}. Falling back to greedy projection.")
             v = self._project_gradient_qp_greedy(g, constraint_gradients)
-        
+
         return v
 
     def _project_gradient_qp_greedy(self, g: torch.Tensor, constraint_gradients: List[torch.Tensor]) -> torch.Tensor:
@@ -294,7 +298,7 @@ class GEM(EpisodicMemoryMixin, BaseCLStrategy):
 
         # Maximum iterations for convergence
         max_iter = 50
-        
+
         # Projected gradient descent with improved convergence check
         for iteration in range(max_iter):
             # Check each constraint individually

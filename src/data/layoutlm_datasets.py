@@ -70,6 +70,29 @@ class BaseDatasetLoader(ABC):
         """Process a single dataset item into DocumentExample format"""
         pass
 
+    def _maybe_create_val_split(
+        self, train_dataset: HFDataset, val_dataset: Optional[HFDataset]
+    ) -> Tuple[HFDataset, Optional[HFDataset]]:
+        """Create validation split from train set if not provided.
+
+        Args:
+            train_dataset: Training dataset.
+            val_dataset: Validation dataset (may be None).
+
+        Returns:
+            (train_dataset, val_dataset) — train_dataset is trimmed when a split is created,
+            ensuring no overlap between training and validation data.
+        """
+        if val_dataset is not None:
+            return train_dataset, val_dataset
+
+        validation_split = self.config["data_processing"].get("validation_split", 0.1)
+        if isinstance(validation_split, float) and 0 < validation_split < 1:
+            split = train_dataset.train_test_split(test_size=validation_split, seed=42)
+            return split["train"], split["test"]
+
+        return train_dataset, val_dataset
+
     def _compute_dataset_length(self, dataset_name: str, hf_dataset_name: str, split_name: str, quick_mode: bool = True
                                 ) -> int:
         """Compute actual dataset length by loading the dataset
@@ -282,7 +305,7 @@ class LayoutLMDataset(Dataset):
         # Manual tokenization to support is_split_into_words behavior with Slow tokenizer
         # This workaround is necessary because LayoutLMv3Tokenizer (Slow) in this environment
         # does not support is_split_into_words=True, and Fast tokenizer is crashing.
-        
+
         tokens = []
         bboxes = []
         labels = []
@@ -293,7 +316,7 @@ class LayoutLMDataset(Dataset):
         labels.append(-100)
 
         for word, box, label in zip(example.words, example.bboxes, integer_labels):
-            # LayoutLMv3 uses RoBERTa tokenizer (byte-level BPE). 
+            # LayoutLMv3 uses RoBERTa tokenizer (byte-level BPE).
             # We add prefix space to ensure proper tokenization for words in list.
             word_tokens = self.tokenizer.tokenize(word, add_prefix_space=True)
             word_ids = self.tokenizer.convert_tokens_to_ids(word_tokens)
@@ -309,7 +332,7 @@ class LayoutLMDataset(Dataset):
 
         # Truncate to max_seq_length - 1 (for SEP)
         # Note: We effectively replicate 'truncation=True' manually
-        special_tokens_count = 2 # CLS and SEP
+        # special_tokens_count = 2  # CLS and SEP
         if len(tokens) > self.max_seq_length - 1:
             tokens = tokens[:self.max_seq_length - 1]
             bboxes = bboxes[:self.max_seq_length - 1]
@@ -366,13 +389,7 @@ class FUNSDDatasetLoader(BaseDatasetLoader):
         test_dataset = dataset["test"]
         val_dataset = dataset.get("validation", None)
 
-        if val_dataset is None:
-            # Only create validation split if we don't have one and validation_split is configured.
-            validation_split = self.config["data_processing"].get("validation_split", 0.1)
-            if isinstance(validation_split, float) and 0 < validation_split < 1:
-                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-                train_dataset = train_val["train"]
-                val_dataset = train_val["test"]
+        train_dataset, val_dataset = self._maybe_create_val_split(train_dataset, val_dataset)
 
         return train_dataset, test_dataset, val_dataset
 
@@ -464,13 +481,7 @@ class CORDDatasetLoader(BaseDatasetLoader):
         test_dataset = dataset["test"]
         val_dataset = dataset.get("validation", None)
 
-        # Only create validation split if we don't have one and validation_split is configured
-        if val_dataset is None:
-            validation_split = self.config["data_processing"].get("validation_split", 0.1)
-            if isinstance(validation_split, float) and 0 < validation_split < 1:
-                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-                train_dataset = train_val["train"]
-                val_dataset = train_val["test"]
+        train_dataset, val_dataset = self._maybe_create_val_split(train_dataset, val_dataset)
 
         return train_dataset, test_dataset, val_dataset
 
@@ -556,13 +567,7 @@ class SROIEDatasetLoader(BaseDatasetLoader):
         test_dataset = dataset["test"]
         val_dataset = dataset.get("validation", None)
 
-        if val_dataset is None:
-            # Only create validation split if we don't have one and validation_split is configured.
-            validation_split = self.config["data_processing"].get("validation_split", 0.1)
-            if isinstance(validation_split, float) and 0 < validation_split < 1:
-                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-                train_dataset = train_val["train"]
-                val_dataset = train_val["test"]
+        train_dataset, val_dataset = self._maybe_create_val_split(train_dataset, val_dataset)
 
         return train_dataset, test_dataset, val_dataset
 
@@ -643,17 +648,7 @@ class XFUNDDatasetLoader(BaseDatasetLoader):
         test_dataset = HFDataset.from_list(filtered_test)
         val_dataset = dataset.get("validation", None)
 
-        if val_dataset is None:
-            # Only create validation split if we don't have one and validation_split is configured.
-            validation_split = self.config["data_processing"].get("validation_split", 0.1)
-            if isinstance(validation_split, float) and 0 < validation_split < 1:
-                train_val = filtered_train.train_test_split(test_size=validation_split, seed=42)
-                train_dataset = train_val["train"]
-                val_dataset = train_val["test"]
-            else:
-                train_dataset = filtered_train
-        else:
-            train_dataset = filtered_train
+        train_dataset, val_dataset = self._maybe_create_val_split(filtered_train, val_dataset)
 
         return train_dataset, test_dataset, val_dataset
 
@@ -731,13 +726,7 @@ class WildReceiptDatasetLoader(BaseDatasetLoader):
         test_dataset = dataset["test"]
         val_dataset = dataset.get("validation", None)
 
-        if val_dataset is None:
-            # Only create validation split if we don't have one and validation_split is configured.
-            validation_split = self.config["data_processing"].get("validation_split", 0.1)
-            if isinstance(validation_split, float) and 0 < validation_split < 1:
-                train_val = train_dataset.train_test_split(test_size=validation_split, seed=42)
-                train_dataset = train_val["train"]
-                val_dataset = train_val["test"]
+        train_dataset, val_dataset = self._maybe_create_val_split(train_dataset, val_dataset)
 
         return train_dataset, test_dataset, val_dataset
 

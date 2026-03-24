@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 # Model config
 # ---------------------------------------------------------------------------
 
+
 @dataclasses.dataclass
 class ModelInnerConfig:
     """Maps to model.config.* in YAML."""

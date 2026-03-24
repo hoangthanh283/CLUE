@@ -153,24 +153,26 @@ class ContinualLayoutLMTrainer:
         all_predictions = torch.cat(all_predictions, dim=0)
         all_labels = torch.cat(all_labels, dim=0)
         all_attention_masks = torch.cat(all_attention_masks, dim=0)
-        
+
         # Debug logging: check model output dimensions and prediction distribution
         logger.info(f"Model output shape: {all_predictions.shape} (expected: [..., {self.model.num_labels}])")
         logger.info(f"Labels shape: {all_labels.shape}")
         logger.info(f"Num labels in model: {self.model.num_labels}, in metrics: {len(self.metrics.label_list)}")
-        
+
         pred_classes = torch.argmax(all_predictions, dim=-1)
         valid_mask = (all_attention_masks == 1) & (all_labels != -100)
         valid_preds = pred_classes[valid_mask]
         valid_labels = all_labels[valid_mask]
-        
+
         unique_preds, pred_counts = torch.unique(valid_preds, return_counts=True)
         unique_labels, label_counts = torch.unique(valid_labels, return_counts=True)
-        
+
         logger.info(f"Evaluation stats: {valid_preds.numel()} valid tokens")
-        logger.info(f"  Predicted label distribution: {dict(zip(unique_preds.cpu().tolist()[:10], pred_counts.cpu().tolist()[:10]))}...")
-        logger.info(f"  Ground truth label distribution: {dict(zip(unique_labels.cpu().tolist()[:10], label_counts.cpu().tolist()[:10]))}...")
-        
+        pred_dist = dict(zip(unique_preds.cpu().tolist()[:10], pred_counts.cpu().tolist()[:10]))
+        label_dist = dict(zip(unique_labels.cpu().tolist()[:10], label_counts.cpu().tolist()[:10]))
+        logger.info(f"  Predicted label distribution: {pred_dist}...")
+        logger.info(f"  Ground truth label distribution: {label_dist}...")
+
         metrics = self.metrics.compute_metrics(all_predictions, all_labels, all_attention_masks)
         # Loss is omitted in evaluation due to potential class-range mismatches
         # when growing heads; keep metric keys consistent without eval_loss.
@@ -235,7 +237,7 @@ class ContinualLayoutLMTrainer:
             self.optimizer = AdamW(optimizer_grouped_parameters, lr=lr, eps=eps)
             logger.warning(f"Optimizer '{optimizer_name}' not explicitly supported for refresh; using AdamW.")
 
-    def train_task(self, train_loader: DataLoader, eval_loader: Optional[DataLoader], task_id: int,
+    def train_task(self, train_loader: DataLoader, eval_loader: Optional[DataLoader], task_id: int,  # noqa: C901
                    save_tag: str = "task", *, label_list: Optional[List[str]] = None,
                    id2label: Optional[Dict[int, str]] = None) -> Dict[str, float]:
         # If provided, refresh metrics and classifier for this task
@@ -290,7 +292,7 @@ class ContinualLayoutLMTrainer:
                     self.model.zero_grad(set_to_none=True)
 
                 batch = {k: v.to(self.device) for k, v in batch.items()}
-                
+
                 # Debug: log training batch labels on first batch of first epoch
                 if epoch == 0 and step == 0:
                     train_labels = batch['labels'][batch['labels'] != -100]
@@ -300,14 +302,18 @@ class ContinualLayoutLMTrainer:
                     # Check classifier weight norms for different label ranges
                     with torch.no_grad():
                         weights = self.model.classifier.weight.data
-                        logger.info(f"Classifier weight norms - Labels 0-6: {weights[:7].norm().item():.4f}, Labels 21-32: {weights[21:33].norm().item():.4f}")
-                
+                        norm_0_6 = weights[:7].norm().item()
+                        norm_21_32 = weights[21:33].norm().item()
+                        logger.info(
+                            f"Classifier weight norms - Labels 0-6: {norm_0_6:.4f}, Labels 21-32: {norm_21_32:.4f}"
+                        )
+
                 outputs = self.model(**batch)
                 loss = self.strategy.compute_loss(self.model, batch, outputs)
-                
+
                 # Log loss values periodically
                 if step % 100 == 0:
-                    logger.info(f"Task {task_id} Epoch {epoch+1} Step {step}: loss = {loss.item():.4f}")
+                    logger.info(f"Task {task_id} Epoch {epoch + 1} Step {step}: loss = {loss.item():.4f}")
 
                 # Scale for accumulation
                 loss_scaled = loss / ga_steps
@@ -350,16 +356,19 @@ class ContinualLayoutLMTrainer:
             if eval_loader is not None:
                 eval_metrics = self.evaluate(eval_loader)
                 self._log_metrics(eval_metrics, prefix=f"task_{task_id}")
-                
+
                 # Log eval metrics to console for visibility
                 logger.info(f"Task {task_id} Epoch {epoch + 1}/{num_epochs} - Eval metrics: {eval_metrics}")
-                
+
                 metric_key = self.training_config.metric_for_best_model
                 current = float(eval_metrics.get(metric_key, -1e9))
-                
+
                 if current == -1e9:
-                    logger.warning(f"Metric key '{metric_key}' not found in eval_metrics. Available keys: {list(eval_metrics.keys())}")
-                
+                    logger.warning(
+                        f"Metric key '{metric_key}' not found in eval_metrics. "
+                        f"Available keys: {list(eval_metrics.keys())}"
+                    )
+
                 if current > best_metric:
                     best_metric = current
                     early_stop_counter = 0
@@ -370,7 +379,8 @@ class ContinualLayoutLMTrainer:
                         self._save_active_head_state(save_tag)
                 else:
                     early_stop_counter += 1
-                    logger.info(f"No improvement. Early stop counter: {early_stop_counter}/{self.training_config.early_stopping_patience}")
+                    patience = self.training_config.early_stopping_patience
+                    logger.info(f"No improvement. Early stop counter: {early_stop_counter}/{patience}")
 
                 if early_stop_counter >= self.training_config.early_stopping_patience:
                     logger.info(f"Early stopping on task {task_id} at epoch {epoch + 1}")
