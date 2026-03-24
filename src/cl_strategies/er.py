@@ -58,21 +58,33 @@ class ExperienceReplay(BaseCLStrategy):
         if mem_batch is None:
             return base_loss
 
-        # AGENT FIX: On GPU with limited VRAM (5.6 GiB), the main forward pass
-        # consumes ~5.4 GiB, leaving no room for a second replay forward pass
-        # while both computation graphs must remain alive for the combined backward.
-        # Fix: backward through base_loss immediately to free its activations, then
-        # run the replay forward with the reclaimed VRAM. The outer training loop
-        # (continual_trainer.py) will backward through the returned mem_loss.
-        # Net gradient effect is identical: grad += d(base_loss) + replay_weight * d(mem_loss).
-        # Assumes gradient_accumulation_steps=1 (true for ER config) and that
-        # on_before_backward is a no-op for ER (confirmed from base.py).
+        # AGENT FIX v2: On GPU with limited VRAM (5.6 GiB), the main forward pass
+        # consumes ~5.4 GiB. Even after base_loss.backward() frees activations,
+        # the replay batch (replay_batch_size=4, seq_len=512) still OOMs because
+        # LayoutLMv3 attention allocates O(batch*seq^2) tensors.
+        # Fix: backward base_loss first (frees ~200 MiB of activations), then
+        # process each replay sample one-at-a-time to keep peak memory at O(seq^2).
+        # Gradients are accumulated across all replay samples and the mean is applied.
+        # Net gradient effect is identical to batched replay; only memory layout differs.
+        # Assumes gradient_accumulation_steps=1 (true for ER config).
         base_loss.backward(retain_graph=False)
         torch.cuda.empty_cache()
 
-        mem_outputs = model(**mem_batch)
-        mem_loss = self.replay_weight * mem_outputs["loss"]
-        return mem_loss
+        # Count how many samples are actually in mem_batch (first tensor's batch dim)
+        first_val = next(iter(mem_batch.values()))
+        n_replay = first_val.shape[0]
+        accumulated_mem_loss = torch.tensor(0.0, device=device, requires_grad=False)
+        for i in range(n_replay):
+            single_sample = {k: v[i:i + 1] for k, v in mem_batch.items()}
+            single_out = model(**single_sample)
+            single_loss = self.replay_weight * single_out["loss"] / n_replay
+            single_loss.backward()
+            accumulated_mem_loss = accumulated_mem_loss + single_loss.detach()
+            torch.cuda.empty_cache()
+
+        # Return a zero-grad tensor so the outer loop's loss.backward() is a no-op
+        # (all replay gradients already accumulated above).
+        return torch.tensor(0.0, device=device, requires_grad=True)
 
     def update_memory(self, batch: Dict[str, torch.Tensor]):
         self.memory.add_batch(batch)
