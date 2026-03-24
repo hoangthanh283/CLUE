@@ -7,17 +7,19 @@ per-task constraints like GEM, providing similar performance with O(1) constrain
 Reference: Chaudhry et al. (2019). Efficient Lifelong Learning with A-GEM. ICLR.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 import torch
 import torch.nn as nn
 
 from src.cl_strategies.base import BaseCLStrategy
 from src.cl_strategies.memory import MemoryBuffer
+from src.cl_strategies.memory_strategy_mixin import EpisodicMemoryMixin
 from src.cl_strategies.utils import get_grad_vector, set_grad_vector
+from src.config import AGEMConfig
 
 
-class AGEM(BaseCLStrategy):
+class AGEM(EpisodicMemoryMixin, BaseCLStrategy):
     """
     Averaged Gradient Episodic Memory (A-GEM) strategy.
 
@@ -34,58 +36,24 @@ class AGEM(BaseCLStrategy):
     - More memory and computationally efficient
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Union[AGEMConfig, Dict[str, Any]]):
         super().__init__(config)
-        cl_cfg = config.get("cl_strategy", {})
+        if isinstance(config, dict):
+            cl_cfg = config.get("cl_strategy", {})
+            mem_size = int(cl_cfg.get("memory_size", 1000))
+            self.ref_batch_size = int(cl_cfg.get("replay_batch_size", 4))
+            self.constraint_threshold = float(cl_cfg.get("constraint_threshold", -1e-6))
+            self.clear_cache_every = int(cl_cfg.get("clear_cache_every", 5))
+            self.use_balanced_sampling = bool(cl_cfg.get("use_balanced_sampling", False))
+        else:
+            mem_size = config.memory_size
+            self.ref_batch_size = config.replay_batch_size
+            self.constraint_threshold = config.constraint_threshold
+            self.clear_cache_every = config.clear_cache_every
+            self.use_balanced_sampling = config.use_balanced_sampling
 
-        # Memory settings optimized for RTX 2060 6GB
-        mem_size = int(cl_cfg.get("memory_size", 1000))
         self.memory = MemoryBuffer(mem_size)
-
-        # Reference batch size for computing average gradient
-        self.ref_batch_size = int(cl_cfg.get("replay_batch_size", 4))
-
-        # Constraint threshold (should be close to 0 for standard A-GEM)
-        # Negative values allow small violations for numerical stability
-        self.constraint_threshold = float(cl_cfg.get("constraint_threshold", -1e-6))
-
-        # Memory management
-        self.clear_cache_every = int(cl_cfg.get("clear_cache_every", 5))
         self._step_count = 0
-
-        # Optional: Track task information for balanced sampling
-        self.use_balanced_sampling = bool(cl_cfg.get("use_balanced_sampling", False))
-        self.current_task_id = 0
-        self.seen_tasks = []  # Track completed tasks
-
-    def before_task(self, model: nn.Module, task_id: int, train_loader=None):
-        """Update current task ID for tracking."""
-        self.current_task_id = task_id
-
-    def after_task(self, model: nn.Module, task_id: int, train_loader=None):
-        """Mark that we've completed training on a task."""
-        if task_id not in self.seen_tasks:
-            self.seen_tasks.append(task_id)
-
-    def update_memory(self, batch: Dict[str, torch.Tensor]):
-        """
-        Store samples from current task into episodic memory.
-
-        Uses reservoir sampling to maintain a representative subset across all tasks.
-        Stores only first sample from batch to minimize memory usage.
-        """
-        # Extract single sample to minimize memory footprint
-        sample_batch = {
-            "input_ids": batch["input_ids"][:1],
-            "attention_mask": batch["attention_mask"][:1],
-            "bbox": batch["bbox"][:1],
-            "labels": batch["labels"][:1]
-        }
-        if "token_type_ids" in batch and batch["token_type_ids"] is not None:
-            sample_batch["token_type_ids"] = batch["token_type_ids"][:1]
-
-        # Pass task_id for potential future task-aware analysis
-        self.memory.add_batch(sample_batch, task_id=self.current_task_id)
 
     def on_after_backward(self, model: nn.Module, is_final_accumulation_step: bool = True):
         """

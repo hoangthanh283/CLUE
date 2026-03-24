@@ -21,12 +21,13 @@ This implementation is suitable as a baseline for continual learning research.
 """
 
 import copy
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import torch
 import torch.nn as nn
 
 from src.cl_strategies.base import BaseCLStrategy
+from src.config import LwFConfig
 
 
 class LwF(BaseCLStrategy):
@@ -57,21 +58,25 @@ class LwF(BaseCLStrategy):
     as a vanilla baseline for comparisons.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Union[LwFConfig, Dict[str, Any]]):
         super().__init__(config)
-        cl_cfg = config.get("cl_strategy", {})
-        self.alpha = float(cl_cfg.get("lwf_alpha", 0.5))
-        self.temperature = float(cl_cfg.get("lwf_temperature", 2.0))
+        if isinstance(config, dict):
+            cl_cfg = config.get("cl_strategy", {})
+            self.alpha = float(cl_cfg.get("lwf_alpha", 0.5))
+            self.temperature = float(cl_cfg.get("lwf_temperature", 2.0))
+            if not config.get("label_space", {}).get("unified", False):
+                raise ValueError(
+                    "LwF requires unified label space! "
+                    "Set 'label_space.unified: true' in config. "
+                    "This ensures teacher and student have same output dimensions."
+                )
+        else:
+            self.alpha = config.lwf_alpha
+            self.temperature = config.lwf_temperature
+            # Validation already done in LwFConfig.__post_init__
+
         self.teacher: Optional[nn.Module] = None
         self.kldiv = nn.KLDivLoss(reduction="batchmean")
-
-        # Verify unified label space requirement
-        if not config.get("label_space", {}).get("unified", False):
-            raise ValueError(
-                "LwF requires unified label space! "
-                "Set 'label_space.unified: true' in config. "
-                "This ensures teacher and student have same output dimensions."
-            )
 
     def before_task(self, model: nn.Module, task_id: int, train_loader=None):
         """Prepare for new task by creating teacher from current model.

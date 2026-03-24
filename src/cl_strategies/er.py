@@ -11,13 +11,14 @@ and combines the loss from current data with replayed examples:
 This implementation is suitable as a baseline for continual learning research.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 import torch
 import torch.nn as nn
 
 from src.cl_strategies.base import BaseCLStrategy
 from src.cl_strategies.memory import MemoryBuffer
+from src.config import ERConfig
 
 
 class ExperienceReplay(BaseCLStrategy):
@@ -36,12 +37,17 @@ class ExperienceReplay(BaseCLStrategy):
     making it suitable as a vanilla baseline for comparisons.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Union[ERConfig, Dict[str, Any]]):
         super().__init__(config)
-        clcfg = config.get("cl_strategy", {})
-        mem_size = int(clcfg.get("memory_size", 2000))
-        self.replay_batch_size = int(clcfg.get("replay_batch_size", 32))
-        self.replay_weight = float(clcfg.get("replay_weight", 1.0))
+        if isinstance(config, dict):
+            clcfg = config.get("cl_strategy", {})
+            mem_size = int(clcfg.get("memory_size", 2000))
+            self.replay_batch_size = int(clcfg.get("replay_batch_size", 32))
+            self.replay_weight = float(clcfg.get("replay_weight", 1.0))
+        else:
+            mem_size = config.memory_size
+            self.replay_batch_size = config.replay_batch_size
+            self.replay_weight = config.replay_weight
         self.memory = MemoryBuffer(mem_size)
 
     def compute_loss(self, model: nn.Module, batch: Dict[str, torch.Tensor], outputs: Dict[str, torch.Tensor]

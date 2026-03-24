@@ -3,20 +3,19 @@ Training procedures for LayoutLM models
 """
 
 import logging
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
-import neptune
 import torch
-from neptune.utils import stringify_unsupported
-from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from transformers import get_linear_schedule_with_warmup
 
+from src.config import ExperimentConfig
 from src.models.layoutlm_models import BaseLayoutLMModel, LayoutLMMetrics
+from src.training.neptune_utils import init_neptune_run
+from src.training.optimizer import build_adamw_optimizer
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +28,19 @@ class LayoutLMTrainer:
         model: BaseLayoutLMModel,
         train_dataloader: DataLoader,
         eval_dataloader: Optional[DataLoader],
-        config: Dict[str, Any],
+        config,
         label_list: List[str],
         id2label: Dict[int, str]
     ):
+        # Accept both ExperimentConfig and legacy dict
+        if isinstance(config, dict):
+            config = ExperimentConfig.from_dict(config)
+
         self.model = model
         self.train_dataloader = train_dataloader
         self.eval_dataloader = eval_dataloader
         self.config = config
-        self.training_config = config["training"]
+        self.training_config = config.training
 
         # Setup device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -47,7 +50,7 @@ class LayoutLMTrainer:
         self.metrics = LayoutLMMetrics(label_list, id2label)
 
         # Gradient accumulation.
-        self.gradient_accumulation_steps = self.training_config.get("gradient_accumulation_steps", 1)
+        self.gradient_accumulation_steps = self.training_config.gradient_accumulation_steps
 
         # Setup optimizer and scheduler
         self.optimizer = self._setup_optimizer()
@@ -60,75 +63,38 @@ class LayoutLMTrainer:
         self.best_model_path = None
 
         # Setup output directory
-        self.output_dir = Path(config.get("output_dir", "results"))
+        self.output_dir = Path(config.output_dir or "results")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Early stopping
-        self.early_stopping_patience = self.training_config.get("early_stopping_patience", 10)
+        self.early_stopping_patience = self.training_config.early_stopping_patience
         self.early_stopping_counter = 0
 
         # Logging
-        self.log_steps = self.training_config.get("log_steps", 100)
-        self.eval_steps = self.training_config.get("eval_steps", None)
-        if self.eval_steps is not None:
-            self.eval_steps = int(self.eval_steps)
+        self.log_steps = self.training_config.log_steps
+        self.eval_steps = self.training_config.eval_steps
 
         # Setup Neptune if configured.
-        self.neptune_run = None
-        neptune_config = config.get("neptune", {})
-        neptune_project = neptune_config.get("neptune_project") or os.getenv("NEPTUNE_PROJECT")
-        neptune_api_token = neptune_config.get("neptune_api_token") or os.getenv("NEPTUNE_API_TOKEN")
-        if neptune_config.get("use_neptune", False) and neptune_project and neptune_api_token:
-            self.neptune_run = neptune.init_run(
-                project=neptune_project,
-                name=config["experiment_name"],
-                tags=neptune_config.get("tags", []),
-                api_token=neptune_api_token
-            )
-            # Use stringify_unsupported to handle lists and None values
-            self.neptune_run["config"] = stringify_unsupported(config)
+        self.neptune_run = init_neptune_run(config.neptune)
 
     def _setup_optimizer(self) -> torch.optim.Optimizer:
         """Setup optimizer"""
-        optimizer_name = self.training_config.get("optimizer", "adamw").lower()
-        learning_rate = self.training_config["learning_rate"]
-        weight_decay = self.training_config.get("weight_decay", 0.01)
-
-        # No decay for bias and LayerNorm.
-        no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": weight_decay,
-            },
-            {
-                "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
-                "weight_decay": 0.0,
-            },
-        ]
-
+        optimizer_name = self.training_config.optimizer.lower()
         if optimizer_name == "adamw":
-            optimizer = AdamW(
-                optimizer_grouped_parameters,
-                lr=learning_rate,
-                eps=1e-8
-            )
+            return build_adamw_optimizer(self.model, self.training_config)
         else:
             raise ValueError(f"Unsupported optimizer: {optimizer_name}")
 
-        logger.info(f"Setup {optimizer_name} optimizer with lr={learning_rate}")
-        return optimizer
-
     def _setup_scheduler(self) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
         """Setup learning rate scheduler"""
-        scheduler_name = self.training_config.get("scheduler", "linear").lower()
+        scheduler_name = self.training_config.scheduler.lower()
         if scheduler_name == "none":
             return None
 
-        num_epochs = self.training_config["num_epochs"]
+        num_epochs = self.training_config.num_epochs
         dataloader_length = len(self.train_dataloader)
         num_training_steps = dataloader_length * num_epochs // self.gradient_accumulation_steps
-        warmup_ratio = self.training_config.get("warmup_ratio", 0.1)
+        warmup_ratio = self.training_config.warmup_ratio
         num_warmup_steps = int(warmup_ratio * num_training_steps)
 
         if scheduler_name == "linear":
@@ -151,7 +117,7 @@ class LayoutLMTrainer:
 
     def train(self) -> Dict[str, float]:
         """Main training loop"""
-        num_epochs = self.training_config["num_epochs"]
+        num_epochs = self.training_config.num_epochs
         for epoch in range(num_epochs):
             self.epoch = epoch
 
@@ -165,14 +131,14 @@ class LayoutLMTrainer:
                 logger.info(f"Epoch {epoch + 1}/{num_epochs} - Eval: {eval_metrics}")
 
                 # Check for improvement
-                current_metric = eval_metrics[self.training_config.get("metric_for_best_model", "eval_f1")]
+                current_metric = eval_metrics[self.training_config.metric_for_best_model]
 
                 if current_metric > self.best_metric:
                     self.best_metric = current_metric
                     self.early_stopping_counter = 0
 
                     # Save best model
-                    if self.training_config.get("save_best_model", True):
+                    if self.training_config.save_best_model:
                         self.best_model_path = self.output_dir / "best_model"
                         self.save_model(self.best_model_path)
                         logger.info(f"New best model saved: {current_metric:.4f}")
@@ -185,7 +151,7 @@ class LayoutLMTrainer:
                     break
 
         logger.info("Training completed!")
-        if self.best_model_path and self.training_config.get("load_best_model_at_end", True):
+        if self.best_model_path and self.training_config.load_best_model_at_end:
             logger.info(f"Loading best model from {self.best_model_path}")
             self.load_model(self.best_model_path)
 
@@ -365,7 +331,7 @@ def create_trainer(
     model: BaseLayoutLMModel,
     train_dataloader: DataLoader,
     eval_dataloader: Optional[DataLoader],
-    config: Dict[str, Any],
+    config,
     label_list: List[str],
     id2label: Dict[int, str]
 ) -> LayoutLMTrainer:

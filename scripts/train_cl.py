@@ -5,8 +5,8 @@ Continual Learning training script for LayoutLM-based IE.
 Runs a sequence of tasks using a chosen CL strategy.
 """
 import argparse
-import copy
 import csv
+import dataclasses
 import json
 import warnings as _warnings
 from pathlib import Path
@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Tuple
 from torch.utils.data import ConcatDataset, DataLoader
 from transformers.utils import logging as hf_logging
 
+from src.config import ExperimentConfig
 from src.data.label_space import UNIFIED_LABEL2ID, UNIFIED_LABEL_LIST
 from src.data.layoutlm_datasets import LayoutLMDataset, get_dataset_loader
 from src.models.layoutlm_models import get_model
@@ -30,45 +31,37 @@ _warnings.filterwarnings(
 )
 
 
-def deep_update(base: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
-    out = copy.deepcopy(base)
-    for kk, vv in updates.items():
-        if isinstance(vv, dict) and isinstance(out.get(kk), dict):
-            out[kk] = deep_update(out[kk], vv)
-        else:
-            out[kk] = vv
-    return out
-
-
-def _setup_experiment(args: argparse.Namespace) -> Tuple[Dict[str, Any], Path, Any]:
-    config = load_config(args.config)
-    output_dir = Path(args.output_dir) / config["experiment_name"]
+def _setup_experiment(args: argparse.Namespace) -> Tuple[ExperimentConfig, Path, Any]:
+    raw = load_config(args.config)
+    config = ExperimentConfig.from_dict(raw)
+    output_dir = Path(args.output_dir) / config.experiment_name
     output_dir.mkdir(parents=True, exist_ok=True)
-    config["output_dir"] = str(output_dir)
-    logger = setup_logging(str(output_dir / "logs"), f"{config['experiment_name']}_cl")
+    config = config.with_output_dir(str(output_dir))
+    logger = setup_logging(str(output_dir / "logs"), f"{config.experiment_name}_cl")
     return config, output_dir, logger
 
 
-def _make_loader_from_dataset(ds, config: Dict[str, Any], is_training: bool) -> DataLoader:
-    workers = int(config["training"].get("num_workers", 4))
+def _make_loader_from_dataset(ds, config: ExperimentConfig, is_training: bool) -> DataLoader:
+    tc = config.training
+    workers = tc.num_workers
     dl_kwargs = {
-        "batch_size": config["training"]["batch_size"],
-        "shuffle": is_training and config.get("data_processing", {}).get("shuffle_train", False),
+        "batch_size": tc.batch_size,
+        "shuffle": is_training and bool(config.data_processing.get("shuffle_train", False)),
         "num_workers": workers,
         "pin_memory": True,
     }
     if workers > 0:
-        if "persistent_workers" in config["training"]:
-            dl_kwargs["persistent_workers"] = bool(config["training"]["persistent_workers"])
-        if "prefetch_factor" in config["training"]:
-            dl_kwargs["prefetch_factor"] = int(config["training"]["prefetch_factor"])
+        if tc.persistent_workers is not None:
+            dl_kwargs["persistent_workers"] = tc.persistent_workers
+        if tc.prefetch_factor is not None:
+            dl_kwargs["prefetch_factor"] = tc.prefetch_factor
     return DataLoader(ds, **dl_kwargs)
 
 
-def _determine_label_space(config, cl_setting, is_joint, joint_fixed_labels, joint_fixed_label2id,
+def _determine_label_space(config: ExperimentConfig, cl_setting, is_joint, joint_fixed_labels, joint_fixed_label2id,
                            global_labels, global_label2id, dataset_loader, is_true_joint):
     """Determine label space for current task based on CL setting and strategy."""
-    if cl_setting == "class_il" and config.get("label_space", {}).get("unified", False):
+    if cl_setting == "class_il" and config.label_space.get("unified", False):
         return UNIFIED_LABEL_LIST, UNIFIED_LABEL2ID
 
     if cl_setting == "class_il":
@@ -114,9 +107,29 @@ def _create_joint_datasets(tasks, first_task_config):
     return joint_task, tasks
 
 
-def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str]:
-    tasks_cfg: List[Dict[str, Any]] = config.get("tasks", [{}])
-    cl_setting = (config.get("cl_setting") or "task_il").lower()
+def _to_legacy_dict(config: ExperimentConfig) -> Dict[str, Any]:
+    """Convert ExperimentConfig to legacy dict shape for components not yet ported (e.g. dataset loaders)."""
+    d = {
+        "experiment_name": config.experiment_name,
+        "output_dir": config.output_dir,
+        "cl_setting": config.cl_setting,
+        "model": dataclasses.asdict(config.model),
+        "training": dataclasses.asdict(config.training),
+        "cl_strategy": dataclasses.asdict(config.cl_strategy),
+        "label_space": config.label_space,
+        "dataset": config.dataset,
+        "data_processing": config.data_processing,
+        "tasks": config.tasks,
+        "evaluation": config.evaluation,
+        "output": config.output,
+        "neptune": config.neptune,
+    }
+    return d
+
+
+def _build_tasks(config: ExperimentConfig) -> Tuple[List[Dict[str, Any]], int, str]:
+    tasks_cfg: List[Dict[str, Any]] = config.tasks or [{}]
+    cl_setting = config.cl_setting or "task_il"
     tasks: List[Dict[str, Any]] = []
     first_num_labels: int = -1
 
@@ -124,19 +137,19 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
     global_labels: List[str] = []
     global_label2id: Dict[str, int] = {}
 
-    strat_name = (config.get("cl_strategy", {}).get("name") or "none").lower()
+    strat_name = (config.cl_strategy.name or "none").lower()
     is_joint = strat_name == "joint"
     # Check if we want true joint training (all datasets at once) or progressive joint
-    is_true_joint = is_joint and config.get("cl_strategy", {}).get("true_joint", True)
+    is_true_joint = is_joint and getattr(config.cl_strategy, "true_joint", True)
 
     # Pre-compute a fixed global label space for joint baseline when not using unified labels.
     joint_fixed_labels: List[str] = []
     joint_fixed_label2id: Dict[str, int] = {}
-    if is_joint and cl_setting == "class_il" and not config.get("label_space", {}).get("unified", False):
+    if is_joint and cl_setting == "class_il" and not config.label_space.get("unified", False):
         seen: Dict[str, int] = {}
         for idx, task_overrides in enumerate(tasks_cfg):
-            task_config = deep_update(config, task_overrides)
-            dataset_loader = get_dataset_loader(task_config)
+            task_config = config.with_task_overrides(task_overrides)
+            dataset_loader = get_dataset_loader(_to_legacy_dict(task_config))
             for lab in list(dataset_loader.get_label_list()):
                 if lab not in seen:
                     seen[lab] = len(joint_fixed_labels)
@@ -145,14 +158,15 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
 
     for idx, task_overrides in enumerate(tasks_cfg):
         task_name = task_overrides.get("name", f"task{idx}")
-        task_config = deep_update(config, task_overrides)
-        if cl_setting == "class_il" and config.get("label_space", {}).get("unified", False):
-            task_config = deep_update(task_config, {"label_space": {"unified": True}})
+        task_config = config.with_task_overrides(task_overrides)
+        if cl_setting == "class_il" and config.label_space.get("unified", False):
+            task_config = dataclasses.replace(task_config, label_space={**task_config.label_space, "unified": True})
         elif cl_setting == "task_il":
             # For task-IL, explicitly disable unified labels to use native task labels
-            task_config = deep_update(task_config, {"label_space": {"unified": False}})
+            task_config = dataclasses.replace(task_config, label_space={**task_config.label_space, "unified": False})
 
-        dataset_loader = get_dataset_loader(task_config)
+        task_config_dict = _to_legacy_dict(task_config)
+        dataset_loader = get_dataset_loader(task_config_dict)
         train_dataset, test_dataset, val_dataset = dataset_loader.load_data()
 
         label_list_use, label2id_use = _determine_label_space(
@@ -163,13 +177,15 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
         if first_num_labels == -1:
             first_num_labels = len(label_list_use)
 
+        max_seq_length = task_config.dataset.get("preprocessing", {}).get("max_seq_length", 512)
+
         # Build per-task datasets so we can optionally concat for joint training.
         train_ds = LayoutLMDataset(
             dataset_loader=dataset_loader,
             hf_dataset=train_dataset,
             tokenizer=dataset_loader.tokenizer,
             label2id=label2id_use,
-            max_seq_length=task_config["dataset"]["preprocessing"]["max_seq_length"],
+            max_seq_length=max_seq_length,
         )
         eval_dataset = val_dataset if val_dataset else test_dataset
         eval_ds = LayoutLMDataset(
@@ -177,13 +193,13 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
             hf_dataset=eval_dataset,
             tokenizer=dataset_loader.tokenizer,
             label2id=label2id_use,
-            max_seq_length=task_config["dataset"]["preprocessing"]["max_seq_length"],
+            max_seq_length=max_seq_length,
         )
 
         if is_joint:
             # Joint baseline now supports both unified and non-unified (union-of-labels) label spaces.
             # Requires class-IL (single head) semantics.
-            if config.get("cl_setting", "class_il").lower() != "class_il":
+            if config.cl_setting.lower() != "class_il":
                 raise ValueError("Joint training baseline requires cl_setting: class_il")
 
             if not is_true_joint:
@@ -230,21 +246,21 @@ def _build_tasks(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, str
         raise ValueError("No tasks configured for CL training.")
 
     if is_joint and is_true_joint:
-        first_task_config = deep_update(config, tasks_cfg[0])
+        first_task_config = config.with_task_overrides(tasks_cfg[0])
         joint_task, tasks_for_eval = _create_joint_datasets(tasks, first_task_config)
         return ([joint_task], tasks_for_eval), first_num_labels, cl_setting
 
     return tasks, first_num_labels, cl_setting
 
 
-def _validate_strategy(config: Dict[str, Any], tasks: List[Dict[str, Any]], cl_setting: str) -> None:
-    strat_name = (config.get("cl_strategy", {}).get("name") or "none").lower()
+def _validate_strategy(config: ExperimentConfig, tasks: List[Dict[str, Any]], cl_setting: str) -> None:
+    strat_name = (config.cl_strategy.name or "none").lower()
     # Extra guardrails for strategies with specific requirements
     if strat_name in {"lwf"}:
         # LwF uses distillation between student and a frozen teacher; this
         # implementation assumes a single, fixed-size head (same logits dim)
         # across tasks. Enforce class-IL with unified label space.
-        if cl_setting != "class_il" or not config.get("label_space", {}).get("unified", False):
+        if cl_setting != "class_il" or not config.label_space.get("unified", False):
             raise ValueError(
                 "LwF requires cl_setting: class_il and label_space.unified: true to keep logits dimensions stable."
             )
@@ -252,7 +268,7 @@ def _validate_strategy(config: Dict[str, Any], tasks: List[Dict[str, Any]], cl_s
     # They don't inherently require unified label space - they just need memory/importance weights
 
 
-def _save_cl_artifacts(output_dir: Path, results: Dict[str, Any], config: Dict[str, Any], logger: Any) -> None:
+def _save_cl_artifacts(output_dir: Path, results: Dict[str, Any], config: ExperimentConfig, logger: Any) -> None:
     try:
         cl_out_path = output_dir / "cl_results.json"
         with open(cl_out_path, "w") as fp:
@@ -279,7 +295,7 @@ def _save_cl_artifacts(output_dir: Path, results: Dict[str, Any], config: Dict[s
         save_aaa_curve_plot(results["cl_metrics"]["AAA_curve"], results["task_names"], str(aaa_png))
         report_md = output_dir / "CL_REPORT.md"
         with open(report_md, "w") as fp:
-            fp.write(f"# Continual Learning Report - {config['experiment_name']}\n\n")
+            fp.write(f"# Continual Learning Report - {config.experiment_name}\n\n")
             fp.write("## Summary Metrics\n")
             fp.write(f"- ACC: {results['cl_metrics']['ACC']:.4f}\n")
             fp.write(f"- BWT: {results['cl_metrics']['BWT']:.4f}\n")
@@ -327,8 +343,8 @@ def main():
     args = parser.parse_args()
 
     config, output_dir, logger = _setup_experiment(args)
-    logger.info(f"Starting CL experiment: {config['experiment_name']}")
-    logger.info(f"CL strategy: {config.get('cl_strategy', {}).get('name', 'none')}")
+    logger.info(f"Starting CL experiment: {config.experiment_name}")
+    logger.info(f"CL strategy: {config.cl_strategy.name}")
 
     tasks_result, first_num_labels, cl_setting = _build_tasks(config)
     # Handle true joint training case where we get (training_tasks, eval_tasks) tuple
@@ -345,10 +361,10 @@ def main():
         raise ValueError("Could not infer first task label count.")
 
     # Initialize model and trainer.
-    if cl_setting == "class_il" and config.get("label_space", {}).get("unified", False):
-        config["model"]["config"]["num_labels"] = len(UNIFIED_LABEL_LIST)
+    if cl_setting == "class_il" and config.label_space.get("unified", False):
+        config = config.replace_model_num_labels(len(UNIFIED_LABEL_LIST))
     else:
-        config["model"]["config"]["num_labels"] = first_num_labels
+        config = config.replace_model_num_labels(first_num_labels)
 
     # Initialize model and trainer.
     model = get_model(config)

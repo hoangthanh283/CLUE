@@ -20,12 +20,13 @@ This implementation uses the diagonal Fisher approximation with empirical Fisher
 import os
 import pickle
 import random
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
 
 from src.cl_strategies.base import BaseCLStrategy
+from src.config import EWCConfig
 
 
 class EWC(BaseCLStrategy):
@@ -49,15 +50,25 @@ class EWC(BaseCLStrategy):
     CPU storage) while maintaining vanilla algorithm correctness.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Union[EWCConfig, Dict[str, Any]]):
         super().__init__(config)
-        cl_config = config.get("cl_strategy", {})
-        self.lambda_ewc = float(config.get("cl_strategy", {}).get("ewc_lambda", 0.4))
-        self.fisher_cache_dir = cl_config.get("fisher_cache_dir", "ewc_cache")
-        self.n_fisher_samples = cl_config.get("n_fisher_samples", None)
-        self.ewc_chunk_size = int(cl_config.get("ewc_chunk_size", 1_000_000))
-        self.store_fishers_on_cpu = cl_config.get("store_fishers_on_cpu", True)
+        if isinstance(config, dict):
+            cl_config = config.get("cl_strategy", {})
+            self.lambda_ewc = float(cl_config.get("ewc_lambda", 0.4))
+            self.fisher_cache_dir = cl_config.get("fisher_cache_dir", "ewc_cache")
+            self.n_fisher_samples = cl_config.get("n_fisher_samples", None)
+            self.ewc_chunk_size = int(cl_config.get("ewc_chunk_size", 1_000_000))
+            self.store_fishers_on_cpu = cl_config.get("store_fishers_on_cpu", True)
+        else:
+            self.lambda_ewc = config.ewc_lambda
+            self.fisher_cache_dir = config.fisher_cache_dir
+            self.n_fisher_samples = config.n_fisher_samples
+            self.ewc_chunk_size = config.ewc_chunk_size
+            self.store_fishers_on_cpu = config.store_fishers_on_cpu
         self.stored_task_ids: List[int] = []
+
+        # In-memory cache to avoid disk reads on every training step
+        self._fisher_cache: Dict[int, Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]] = {}
 
         # Create cache directory.
         os.makedirs(self.fisher_cache_dir, exist_ok=True)
@@ -145,6 +156,19 @@ class EWC(BaseCLStrategy):
             params = pickle.load(fp)
         return fisher, params
 
+    def _get_fisher_data(self, task_id: int) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        """Get Fisher data from in-memory cache or load from disk.
+
+        Args:
+            task_id: Task ID to retrieve Fisher data for.
+
+        Returns:
+            Tuple of (fisher, params) dictionaries.
+        """
+        if task_id not in self._fisher_cache:
+            self._fisher_cache[task_id] = self._load_fisher_data(task_id)
+        return self._fisher_cache[task_id]
+
     def after_task(self, model: nn.Module, task_id: int, train_loader: Optional[Iterable] = None):
         if train_loader is None:
             raise ValueError("EWC.after_task requires the train_loader to estimate Fisher")
@@ -156,8 +180,9 @@ class EWC(BaseCLStrategy):
         # Estimate Fisher information.
         fisher = self._estimate_fisher(model, train_loader)
         self._save_fisher_data(task_id, fisher, params)
+        # Populate in-memory cache for faster access during training
+        self._fisher_cache[task_id] = (fisher, params)
         self.stored_task_ids.append(task_id)
-        del fisher, params
         torch.cuda.empty_cache()
 
     def ewc_penalty_chunked(self, param, fisher_param, params_star_param):
@@ -220,7 +245,7 @@ class EWC(BaseCLStrategy):
 
         penalty = 0.0
         for task_id in self.stored_task_ids:
-            fisher, params_star = self._load_fisher_data(task_id)
+            fisher, params_star = self._get_fisher_data(task_id)
             for name, param in model.named_parameters():
                 if name not in params_star or name not in fisher or not param.requires_grad:
                     # Parameter didn't exist in previous task, or fisher info not available for this parameter, skip.

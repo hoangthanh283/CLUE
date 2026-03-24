@@ -5,13 +5,10 @@ Continual Learning trainer wiring CL strategies into the LayoutLM pipeline.
 import copy
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import neptune
 import torch
-from neptune.utils import stringify_unsupported
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
@@ -19,8 +16,11 @@ from tqdm.auto import tqdm
 from transformers import get_linear_schedule_with_warmup
 
 from src.cl_strategies import AGEM, EWC, GEM, BaseCLStrategy, ExperienceReplay, LwF, SequentialFineTuning
+from src.config import ExperimentConfig
 from src.models.layoutlm_models import BaseLayoutLMModel, LayoutLMMetrics
 from src.training.cl_metrics import compute_cl_metrics
+from src.training.neptune_utils import init_neptune_run
+from src.training.optimizer import build_adamw_optimizer
 
 logger = logging.getLogger(__name__)
 
@@ -39,22 +39,39 @@ STRATEGY_MAP = {
 }
 
 
-def get_strategy(config: Dict[str, Any]) -> BaseCLStrategy:
-    name = (config.get("cl_strategy", {}).get("name") or "none").lower()
-    if name not in STRATEGY_MAP:
-        raise ValueError(f"Unknown CL strategy '{name}'. Available: {list(STRATEGY_MAP.keys())}")
-    strategy_cls = STRATEGY_MAP[name]
-    return strategy_cls(config)
+def get_strategy(config) -> BaseCLStrategy:
+    if isinstance(config, ExperimentConfig):
+        strategy_cfg = config.cl_strategy
+        name = (strategy_cfg.name or "none").lower()
+        if name not in STRATEGY_MAP:
+            raise ValueError(f"Unknown CL strategy '{name}'. Available: {list(STRATEGY_MAP.keys())}")
+        strategy_cls = STRATEGY_MAP[name]
+        # GEM needs cl_setting passed separately
+        if strategy_cls is GEM:
+            return strategy_cls(strategy_cfg, cl_setting=config.cl_setting)
+        return strategy_cls(strategy_cfg)
+    else:
+        # Legacy dict path
+        name = (config.get("cl_strategy", {}).get("name") or "none").lower()
+        if name not in STRATEGY_MAP:
+            raise ValueError(f"Unknown CL strategy '{name}'. Available: {list(STRATEGY_MAP.keys())}")
+        strategy_cls = STRATEGY_MAP[name]
+        return strategy_cls(config)
 
 
 class ContinualLayoutLMTrainer:
     """Continual training over a sequence of tasks with a chosen CL strategy."""
 
-    def __init__(self, model: BaseLayoutLMModel, config: Dict[str, Any], label_list: List[str],
+    def __init__(self, model: BaseLayoutLMModel, config, label_list: List[str],
                  id2label: Dict[int, str], strategy: Optional[BaseCLStrategy] = None):
+        # Accept both ExperimentConfig and legacy dict
+        if isinstance(config, dict):
+            from src.config import ExperimentConfig as _EC
+            config = _EC.from_dict(config)
+
         self.model = model
         self.config = config
-        self.training_config = config["training"]
+        self.training_config = config.training
         self.strategy = strategy or get_strategy(config)
 
         # Device
@@ -75,62 +92,33 @@ class ContinualLayoutLMTrainer:
         self.epoch = 0
 
         # Output directory
-        self.output_dir = Path(config.get("output_dir", "results"))
+        self.output_dir = Path(config.output_dir or "results")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Early stopping
-        self.early_stopping_patience = int(self.training_config.get("early_stopping_patience", 10))
+        self.early_stopping_patience = self.training_config.early_stopping_patience
 
         # Logging
-        self.log_steps = int(self.training_config.get("log_steps", 100))
+        self.log_steps = self.training_config.log_steps
 
         # CL head setting: 'task_il' (multi-head) or 'class_il' (single head)
-        self.cl_setting = (self.config.get("cl_setting") or "task_il").lower()
+        self.cl_setting = config.cl_setting or "task_il"
         if self.cl_setting not in {"task_il", "class_il"}:
             logger.warning(f"Unknown cl_setting '{self.cl_setting}', defaulting to 'task_il'")
             self.cl_setting = "task_il"
 
-        # Setup Neptune if configured.
-        self.neptune_run = None
-        neptune_config = config.get("neptune", {})
-        neptune_project = neptune_config.get("neptune_project") or os.getenv("NEPTUNE_PROJECT")
-        neptune_api_token = neptune_config.get("neptune_api_token") or os.getenv("NEPTUNE_API_TOKEN")
-        if neptune_config.get("use_neptune", False) and neptune_project and neptune_api_token:
-            self.neptune_run = neptune.init_run(
-                project=neptune_project,
-                name=config["experiment_name"],
-                tags=neptune_config.get("tags", []),
-                api_token=neptune_api_token
-            )
-            # Use stringify_unsupported to handle lists and None values.
-            self.neptune_run["config"] = stringify_unsupported(config)
+        # Setup Neptune if configured (pass raw neptune dict).
+        self.neptune_run = init_neptune_run(config.neptune)
 
     def _setup_optimizer(self) -> torch.optim.Optimizer:
-        optimizer_name = self.training_config.get("optimizer", "adamw").lower()
-        learning_rate = self.training_config["learning_rate"]
-        weight_decay = self.training_config.get("weight_decay", 0.01)
-
-        no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": weight_decay,
-            },
-            {
-                "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
-                "weight_decay": 0.0,
-            },
-        ]
-
+        optimizer_name = self.training_config.optimizer.lower()
         if optimizer_name == "adamw":
-            optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=1e-8)
+            return build_adamw_optimizer(self.model, self.training_config)
         else:
             raise ValueError(f"Unsupported optimizer: {optimizer_name}")
-        logger.info(f"Setup {optimizer_name} optimizer with lr={learning_rate}")
-        return optimizer
 
     def _setup_scheduler(self, num_training_steps: int, num_warmup_steps: int):
-        scheduler_name = self.training_config.get("scheduler", "linear").lower()
+        scheduler_name = self.training_config.scheduler.lower()
         if scheduler_name == "none":
             return None
         if scheduler_name == "linear":
@@ -217,9 +205,9 @@ class ContinualLayoutLMTrainer:
 
         This is necessary after swapping the classifier head (task-IL setting).
         """
-        optimizer_name = self.training_config.get("optimizer", "adamw").lower()
-        lr = self.training_config["learning_rate"]
-        weight_decay = self.training_config.get("weight_decay", 0.01)
+        optimizer_name = self.training_config.optimizer.lower()
+        lr = self.training_config.learning_rate
+        weight_decay = self.training_config.weight_decay
 
         # Preserve epsilon if using AdamW
         eps = 1e-8
@@ -268,19 +256,19 @@ class ContinualLayoutLMTrainer:
                 # Always keep metrics in sync with the current global label list
                 self.metrics = LayoutLMMetrics(label_list, id2label)
         # Determine effective gradient accumulation
-        ga_steps_cfg = int(self.training_config.get("gradient_accumulation_steps", 1))
+        ga_steps_cfg = self.training_config.gradient_accumulation_steps
         if isinstance(self.strategy, (AGEM, GEM)) and ga_steps_cfg != 1:
             logger.warning("Overriding gradient_accumulation_steps to 1 for (A-)GEM to ensure correct projection.")
             ga_steps = 1
         else:
             ga_steps = ga_steps_cfg
 
-        num_epochs = int(self.training_config.get("num_epochs", 5))
+        num_epochs = self.training_config.num_epochs
 
         # Scheduler per task
         steps_per_epoch = len(train_loader)
         total_steps = max(1, (steps_per_epoch * num_epochs) // max(1, ga_steps))
-        warmup_ratio = float(self.training_config.get("warmup_ratio", 0.1))
+        warmup_ratio = self.training_config.warmup_ratio
         warmup_steps = int(warmup_ratio * total_steps)
         scheduler = self._setup_scheduler(total_steps, warmup_steps)
 
@@ -366,7 +354,7 @@ class ContinualLayoutLMTrainer:
                 # Log eval metrics to console for visibility
                 logger.info(f"Task {task_id} Epoch {epoch + 1}/{num_epochs} - Eval metrics: {eval_metrics}")
                 
-                metric_key = self.training_config.get("metric_for_best_model", "f1")  # Changed default from eval_f1 to f1
+                metric_key = self.training_config.metric_for_best_model
                 current = float(eval_metrics.get(metric_key, -1e9))
                 
                 if current == -1e9:
@@ -376,15 +364,15 @@ class ContinualLayoutLMTrainer:
                     best_metric = current
                     early_stop_counter = 0
                     logger.info(f"New best {metric_key}: {current:.4f}")
-                    if self.training_config.get("save_best_model", True):
+                    if self.training_config.save_best_model:
                         self.model.save_pretrained(str(best_path))
                         # Cache the best head state for this task
                         self._save_active_head_state(save_tag)
                 else:
                     early_stop_counter += 1
-                    logger.info(f"No improvement. Early stop counter: {early_stop_counter}/{self.training_config.get('early_stopping_patience', 10)}")
+                    logger.info(f"No improvement. Early stop counter: {early_stop_counter}/{self.training_config.early_stopping_patience}")
 
-                if early_stop_counter >= int(self.training_config.get("early_stopping_patience", 10)):
+                if early_stop_counter >= self.training_config.early_stopping_patience:
                     logger.info(f"Early stopping on task {task_id} at epoch {epoch + 1}")
                     break
 
@@ -394,7 +382,7 @@ class ContinualLayoutLMTrainer:
             self._log_metrics({"train_loss": avg_train_loss}, prefix=f"task_{task_id}")
 
         # Optionally load best at end
-        if self.training_config.get("load_best_model_at_end", True) and best_metric > -1e8 and best_path.exists():
+        if self.training_config.load_best_model_at_end and best_metric > -1e8 and best_path.exists():
             # Reuse logic to load backbone & head and move to device
             # We cannot import circularly; manually perform a lightweight load
             self.model.load_pretrained(str(best_path))
@@ -572,7 +560,7 @@ class ContinualLayoutLMTrainer:
             logger.info("Neptune run stopped")
 
 
-def create_continual_trainer(model: BaseLayoutLMModel, config: Dict[str, Any], label_list: List[str],
+def create_continual_trainer(model: BaseLayoutLMModel, config, label_list: List[str],
                              id2label: Dict[int, str], strategy: Optional[BaseCLStrategy] = None
                              ) -> ContinualLayoutLMTrainer:
     return ContinualLayoutLMTrainer(

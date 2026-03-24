@@ -319,9 +319,22 @@ MODEL_CLASSES = {
 }
 
 
-def get_model(config: Dict[str, Any]) -> BaseLayoutLMModel:
-    """Factory function to get appropriate LayoutLM model"""
-    model_type = config["model"]["model_type"].lower()
+def get_model(config) -> BaseLayoutLMModel:
+    """Factory function to get appropriate LayoutLM model.
+
+    Accepts either ExperimentConfig or a legacy dict.
+    """
+    import dataclasses
+
+    from src.config import ExperimentConfig
+
+    if isinstance(config, ExperimentConfig):
+        model_type = config.model.model_type.lower()
+        # Build legacy dict shape expected by BaseLayoutLMModel.__init__
+        config_dict = {"model": dataclasses.asdict(config.model)}
+    else:
+        model_type = config["model"]["model_type"].lower()
+        config_dict = config
 
     # Handle model type variations
     for key in MODEL_CLASSES.keys():
@@ -331,5 +344,5 @@ def get_model(config: Dict[str, Any]) -> BaseLayoutLMModel:
     else:
         raise ValueError(f"Unsupported model type: {model_type}. Supported types: {list(MODEL_CLASSES.keys())}")
 
-    logger.info(f"Creating {model_class.__name__} with config: {config['model']}")
-    return model_class(config)
+    logger.info(f"Creating {model_class.__name__} with config: {config_dict['model']}")
+    return model_class(config_dict)

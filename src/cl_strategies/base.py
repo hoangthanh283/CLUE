@@ -2,16 +2,18 @@
 Base interfaces for Continual Learning strategies.
 """
 
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional, Union
 
 import torch
 import torch.nn as nn
+
+from src.config import StrategyConfig
 
 
 class BaseCLStrategy:
     """Base class for Continual Learning strategies."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Union[StrategyConfig, Dict[str, Any]]):
         self.config = config
 
     # Lifecycle hooks

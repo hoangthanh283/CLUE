@@ -5,22 +5,25 @@ Exact replication of the original GEM algorithm using quadratic programming solv
 Reference: Lopez-Paz & Ranzato (2017). Gradient Episodic Memory for Continual Learning. NeurIPS.
 """
 
-from typing import Any, Dict, List, Optional
+import logging
+from typing import Any, Dict, List, Optional, Union
 
-import torch
-import torch.nn as nn
 import numpy as np
 import quadprog
+import torch
+import torch.nn as nn
 
 from src.cl_strategies.base import BaseCLStrategy
 from src.cl_strategies.memory import MemoryBuffer
-from src.cl_strategies.utils import (
-    get_grad_vector, set_grad_vector,
-    get_grad_vector_exclude_classifier, set_grad_vector_exclude_classifier
-)
+from src.cl_strategies.memory_strategy_mixin import EpisodicMemoryMixin
+from src.cl_strategies.utils import (get_grad_vector, get_grad_vector_exclude_classifier, set_grad_vector,
+                                     set_grad_vector_exclude_classifier)
+from src.config import GEMConfig
+
+logger = logging.getLogger(__name__)
 
 
-class GEM(BaseCLStrategy):
+class GEM(EpisodicMemoryMixin, BaseCLStrategy):
     """
     Gradient Episodic Memory (GEM) strategy with exact QP solver.
     
@@ -32,55 +35,30 @@ class GEM(BaseCLStrategy):
     subject to v^T · g_k >= 0  for all k (previous tasks)
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Union[GEMConfig, Dict[str, Any]], cl_setting: str = "class_il"):
         super().__init__(config)
-        self.cl_setting = config.get("cl_setting", "class_il")
-        cl_cfg = config.get("cl_strategy", {})
+        if isinstance(config, dict):
+            self.cl_setting = config.get("cl_setting", "class_il")
+            cl_cfg = config.get("cl_strategy", {})
+            mem_size = int(cl_cfg.get("memory_size", 500))
+            self.samples_per_task = int(cl_cfg.get("samples_per_task", 5))
+            self.max_tasks_for_constraints = int(cl_cfg.get("max_tasks", 10))
+            self.qp_tolerance = float(cl_cfg.get("qp_tolerance", 1e-3))
+            self.qp_regularization = float(cl_cfg.get("qp_regularization", 1e-6))
+            self.margin = float(cl_cfg.get("margin", 0.5))
+            self.clear_cache_every = int(cl_cfg.get("clear_cache_every", 5))
+        else:
+            self.cl_setting = cl_setting
+            mem_size = config.memory_size
+            self.samples_per_task = config.samples_per_task
+            self.max_tasks_for_constraints = config.max_tasks
+            self.qp_tolerance = config.qp_tolerance
+            self.qp_regularization = config.qp_regularization
+            self.margin = config.margin
+            self.clear_cache_every = config.clear_cache_every
 
-        # Memory settings
-        mem_size = int(cl_cfg.get("memory_size", 500))  # Total samples across all tasks
         self.memory = MemoryBuffer(mem_size)
-
-        # Per-task constraint settings
-        self.samples_per_task = int(cl_cfg.get("samples_per_task", 5))  # Samples per task for constraint
-        self.max_tasks_for_constraints = int(cl_cfg.get("max_tasks", 10))  # Max tasks to consider
-
-        # QP solver settings
-        self.qp_tolerance = float(cl_cfg.get("qp_tolerance", 1e-3))
-        self.qp_regularization = float(cl_cfg.get("qp_regularization", 1e-6))  # Regularization for numerical stability
-        self.margin = float(cl_cfg.get("margin", 0.5))  # Constraint margin (0.5 in original GEM)
-
-        # Memory management
-        self.clear_cache_every = int(cl_cfg.get("clear_cache_every", 5))
         self._step_count = 0
-
-        # Track current task
-        self.current_task_id = 0
-        self.seen_tasks: List[int] = []  # List of task IDs we've seen
-
-    def before_task(self, model: nn.Module, task_id: int, train_loader=None):
-        """Mark the start of a new task."""
-        self.current_task_id = task_id
-
-    def after_task(self, model: nn.Module, task_id: int, train_loader=None):
-        """Mark that we've completed training on a task."""
-        if task_id not in self.seen_tasks:
-            self.seen_tasks.append(task_id)
-
-    def update_memory(self, batch: Dict[str, torch.Tensor]):
-        """Store samples from the current task."""
-        # Store only first sample to minimize memory usage
-        sample_batch = {
-            "input_ids": batch["input_ids"][:1],
-            "attention_mask": batch["attention_mask"][:1],
-            "bbox": batch["bbox"][:1],
-            "labels": batch["labels"][:1]
-        }
-        if "token_type_ids" in batch and batch["token_type_ids"] is not None:
-            sample_batch["token_type_ids"] = batch["token_type_ids"][:1]
-
-        # Pass task_id to memory buffer for task-aware sampling
-        self.memory.add_batch(sample_batch, task_id=self.current_task_id)
 
     def on_after_backward(self, model: nn.Module, is_final_accumulation_step: bool = True):
         """
