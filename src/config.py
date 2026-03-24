@@ -123,6 +123,9 @@ class StrategyConfig:
         """Dispatch factory: reads 'name' and returns the correct subclass."""
         name = (d.get("name") or "sequential").lower()
         target_cls = _STRATEGY_CONFIG_MAP.get(name, StrategyConfig)
+        # Delegate to subclass from_dict so type-casting (float(), int()) is applied.
+        if target_cls is not StrategyConfig and target_cls is not cls:
+            return target_cls.from_dict(d, unified_label_space=unified_label_space)
         known = {f.name for f in dataclasses.fields(target_cls)}
         kwargs = {k: v for k, v in d.items() if k in known}
         if target_cls is LwFConfig:
