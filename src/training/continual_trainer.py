@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import torch
-from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
@@ -20,7 +19,7 @@ from src.models.head_manager import HeadManager
 from src.models.layoutlm_models import BaseLayoutLMModel, LayoutLMMetrics
 from src.training.cl_metrics import compute_cl_metrics
 from src.training.neptune_utils import init_neptune_run
-from src.training.optimizer import build_adamw_optimizer
+from src.training.optimizer import build_adamw_optimizer, rebuild_adamw_optimizer
 
 logger = logging.getLogger(__name__)
 
@@ -178,191 +177,177 @@ class ContinualLayoutLMTrainer:
         # when growing heads; keep metric keys consistent without eval_loss.
         return metrics
 
-    def _refresh_optimizer_params(self):
-        """Rebuild optimizer param groups to include current model params.
-
-        This is necessary after swapping the classifier head (task-IL setting).
-        """
-        optimizer_name = self.training_config.optimizer.lower()
-        lr = self.training_config.learning_rate
-        weight_decay = self.training_config.weight_decay
-
-        # Preserve epsilon if using AdamW
+    def _refresh_optimizer_params(self) -> None:
+        """Rebuild optimizer to include current model params after classifier change."""
         eps = 1e-8
         if hasattr(self.optimizer, "param_groups"):
             for g in self.optimizer.param_groups:
                 if "eps" in g:
                     eps = g["eps"]
                     break
+        self.optimizer = rebuild_adamw_optimizer(self.model, self.training_config, eps)
 
-        no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": weight_decay,
-            },
-            {
-                "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
-                "weight_decay": 0.0,
-            },
-        ]
+    def _log_first_batch_debug(self, task_id: int, batch: Dict[str, torch.Tensor]) -> None:
+        """Log diagnostic info for the first batch of the first epoch."""
+        train_labels = batch["labels"][batch["labels"] != -100]
+        logger.info(f"Task {task_id} training batch labels: {torch.unique(train_labels).cpu().tolist()}")
+        logger.info(f"Model classifier output size: {self.model.num_labels}")
+        with torch.no_grad():
+            weights = self.model.classifier.weight.data
+            norm_0_6 = weights[:7].norm().item()
+            norm_21_32 = weights[21:33].norm().item()
+            logger.info(f"Classifier weight norms - Labels 0-6: {norm_0_6:.4f}, Labels 21-32: {norm_21_32:.4f}")
 
-        if optimizer_name == "adamw":
-            self.optimizer = AdamW(optimizer_grouped_parameters, lr=lr, eps=eps)
+    def _run_training_epoch(
+        self,
+        epoch: int,
+        task_id: int,
+        train_loader: DataLoader,
+        ga_steps: int,
+        scheduler,
+    ):
+        """Run one full training epoch. Returns (total_loss, num_batches)."""
+        self.model.train()
+        total_loss = 0.0
+        num_batches = 0
+        progress = tqdm(train_loader, desc=f"Task {task_id} Epoch {epoch + 1}")
+
+        for step, batch in enumerate(progress):
+            micro = step % ga_steps
+            if micro == 0:
+                self.model.zero_grad(set_to_none=True)
+
+            batch = {k: v.to(self.device) for k, v in batch.items()}
+            if epoch == 0 and step == 0:
+                self._log_first_batch_debug(task_id, batch)
+
+            outputs = self.model(**batch)
+            loss = self.strategy.compute_loss(self.model, batch, outputs)
+
+            if step % 100 == 0:
+                logger.info(f"Task {task_id} Epoch {epoch + 1} Step {step}: loss = {loss.item():.4f}")
+
+            loss_scaled = loss / ga_steps
+            self.strategy.on_before_backward(self.model, loss_scaled)
+            loss_scaled.backward()
+
+            is_final = (micro == ga_steps - 1)
+            self.strategy.on_after_backward(self.model, is_final)
+            self.strategy.update_memory(batch)
+
+            if is_final:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                self.optimizer.step()
+                if scheduler is not None:
+                    scheduler.step()
+                self.optimizer.zero_grad(set_to_none=True)
+                self.global_step += 1
+                if self.global_step % 10 == 0:
+                    torch.cuda.empty_cache()
+
+            total_loss += loss.item()
+            num_batches += 1
+            progress.set_postfix({"loss": f"{(total_loss / num_batches):.4f}"})
+
+        return total_loss, num_batches
+
+    def _run_epoch_eval(
+        self,
+        epoch: int,
+        task_id: int,
+        num_epochs: int,
+        eval_loader: Optional[DataLoader],
+        save_tag: str,
+        best_metric: float,
+        early_stop_counter: int,
+        best_path: Path,
+    ):
+        """Evaluate end of epoch, update best model, check early stopping.
+
+        Returns (best_metric, early_stop_counter, should_stop).
+        """
+        if eval_loader is None:
+            return best_metric, early_stop_counter, False
+
+        eval_metrics = self.evaluate(eval_loader)
+        self._log_metrics(eval_metrics, prefix=f"task_{task_id}")
+        logger.info(f"Task {task_id} Epoch {epoch + 1}/{num_epochs} - Eval metrics: {eval_metrics}")
+
+        metric_key = self.training_config.metric_for_best_model
+        current = float(eval_metrics.get(metric_key, -1e9))
+        if current == -1e9:
+            logger.warning(f"Metric '{metric_key}' not found. Available: {list(eval_metrics.keys())}")
+
+        if current > best_metric:
+            best_metric = current
+            early_stop_counter = 0
+            logger.info(f"New best {metric_key}: {current:.4f}")
+            if self.training_config.save_best_model:
+                self.model.save_pretrained(str(best_path))
+                self.head_manager.save(save_tag)
         else:
-            self.optimizer = AdamW(optimizer_grouped_parameters, lr=lr, eps=eps)
-            logger.warning(f"Optimizer '{optimizer_name}' not explicitly supported for refresh; using AdamW.")
+            early_stop_counter += 1
+            patience = self.training_config.early_stopping_patience
+            logger.info(f"No improvement. Early stop counter: {early_stop_counter}/{patience}")
 
-    def train_task(self, train_loader: DataLoader, eval_loader: Optional[DataLoader], task_id: int,  # noqa: C901
-                   save_tag: str = "task", *, label_list: Optional[List[str]] = None,
-                   id2label: Optional[Dict[int, str]] = None) -> Dict[str, float]:
-        # If provided, refresh metrics and classifier for this task
+        should_stop = early_stop_counter >= self.training_config.early_stopping_patience
+        if should_stop:
+            logger.info(f"Early stopping on task {task_id} at epoch {epoch + 1}")
+        return best_metric, early_stop_counter, should_stop
+
+    def train_task(
+        self,
+        train_loader: DataLoader,
+        eval_loader: Optional[DataLoader],
+        task_id: int,
+        save_tag: str = "task",
+        *,
+        label_list: Optional[List[str]] = None,
+        id2label: Optional[Dict[int, str]] = None,
+    ) -> Dict[str, float]:
+        """Train on a single task. Returns {best_metric}."""
         if label_list is not None:
             id2label = id2label or {i: l for i, l in enumerate(label_list)}
             self.metrics = LayoutLMMetrics(label_list, id2label)
             if self.head_manager.prepare_for_task(save_tag, label_list):
                 self._refresh_optimizer_params()
-        # Determine effective gradient accumulation
+
         ga_steps_cfg = self.training_config.gradient_accumulation_steps
         if isinstance(self.strategy, (AGEM, GEM)) and ga_steps_cfg != 1:
-            logger.warning("Overriding gradient_accumulation_steps to 1 for (A-)GEM to ensure correct projection.")
+            logger.warning("Overriding gradient_accumulation_steps to 1 for (A-)GEM.")
             ga_steps = 1
         else:
             ga_steps = ga_steps_cfg
 
         num_epochs = self.training_config.num_epochs
-
-        # Scheduler per task
         steps_per_epoch = len(train_loader)
         total_steps = max(1, (steps_per_epoch * num_epochs) // max(1, ga_steps))
-        warmup_ratio = self.training_config.warmup_ratio
-        warmup_steps = int(warmup_ratio * total_steps)
+        warmup_steps = int(self.training_config.warmup_ratio * total_steps)
         scheduler = self._setup_scheduler(total_steps, warmup_steps)
 
-        best_metric = -1e9
+        best_metric, early_stop_counter = -1e9, 0
         best_path = self.output_dir / f"{save_tag}_{task_id}_best_model"
-        early_stop_counter = 0
         self.strategy.before_task(self.model, task_id, train_loader)
 
         for epoch in range(num_epochs):
             self.epoch = epoch
-            self.model.train()
-            total_loss = 0.0
-            num_batches = 0
-            progress = tqdm(train_loader, desc=f"Task {task_id} Epoch {epoch + 1}/{num_epochs}")
+            total_loss, num_batches = self._run_training_epoch(
+                epoch, task_id, train_loader, ga_steps, scheduler
+            )
+            avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
+            logger.info(f"Task {task_id} Epoch {epoch + 1}/{num_epochs} - Train loss: {avg_loss:.4f}")
+            self._log_metrics({"train_loss": avg_loss}, prefix=f"task_{task_id}")
 
-            for step, batch in enumerate(progress):
-                micro = step % ga_steps
-                if micro == 0:
-                    self.model.zero_grad(set_to_none=True)
+            best_metric, early_stop_counter, should_stop = self._run_epoch_eval(
+                epoch, task_id, num_epochs, eval_loader, save_tag,
+                best_metric, early_stop_counter, best_path,
+            )
+            if should_stop:
+                break
 
-                batch = {k: v.to(self.device) for k, v in batch.items()}
-
-                # Debug: log training batch labels on first batch of first epoch
-                if epoch == 0 and step == 0:
-                    train_labels = batch['labels'][batch['labels'] != -100]
-                    unique_train_labels = torch.unique(train_labels)
-                    logger.info(f"Task {task_id} training batch labels: {unique_train_labels.cpu().tolist()}")
-                    logger.info(f"Model classifier output size: {self.model.num_labels}")
-                    # Check classifier weight norms for different label ranges
-                    with torch.no_grad():
-                        weights = self.model.classifier.weight.data
-                        norm_0_6 = weights[:7].norm().item()
-                        norm_21_32 = weights[21:33].norm().item()
-                        logger.info(
-                            f"Classifier weight norms - Labels 0-6: {norm_0_6:.4f}, Labels 21-32: {norm_21_32:.4f}"
-                        )
-
-                outputs = self.model(**batch)
-                loss = self.strategy.compute_loss(self.model, batch, outputs)
-
-                # Log loss values periodically
-                if step % 100 == 0:
-                    logger.info(f"Task {task_id} Epoch {epoch + 1} Step {step}: loss = {loss.item():.4f}")
-
-                # Scale for accumulation
-                loss_scaled = loss / ga_steps
-
-                # Let strategy hook before backward (for strategies that need it)
-                self.strategy.on_before_backward(self.model, loss_scaled)
-
-                # Compute gradients
-                loss_scaled.backward()
-
-                # Let strategy project/modify gradients after backward (for GEM, A-GEM, etc.)
-                # Only project on final accumulation step (when we're about to optimizer.step())
-                is_final_accumulation_step = (micro == ga_steps - 1)
-                self.strategy.on_after_backward(self.model, is_final_accumulation_step)
-
-                # Update memory BEFORE optimization step, for EVERY batch
-                # This ensures vanilla ER behavior: store examples before model is updated,
-                # and store ALL batches regardless of gradient accumulation
-                self.strategy.update_memory(batch)
-
-                # Step if end of accumulation window
-                if micro == ga_steps - 1:
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-                    self.optimizer.step()
-                    if scheduler is not None:
-                        scheduler.step()
-                    self.optimizer.zero_grad(set_to_none=True)
-                    self.global_step += 1
-
-                    # Clear GPU cache periodically to prevent OOM
-                    if self.global_step % 10 == 0:
-                        torch.cuda.empty_cache()
-
-                total_loss += loss.item()
-                num_batches += 1
-                progress.set_postfix({"loss": f"{(total_loss / num_batches):.4f}"})
-
-            # Evaluate end of epoch
-            eval_metrics: Dict[str, float] = {}
-            if eval_loader is not None:
-                eval_metrics = self.evaluate(eval_loader)
-                self._log_metrics(eval_metrics, prefix=f"task_{task_id}")
-
-                # Log eval metrics to console for visibility
-                logger.info(f"Task {task_id} Epoch {epoch + 1}/{num_epochs} - Eval metrics: {eval_metrics}")
-
-                metric_key = self.training_config.metric_for_best_model
-                current = float(eval_metrics.get(metric_key, -1e9))
-
-                if current == -1e9:
-                    logger.warning(
-                        f"Metric key '{metric_key}' not found in eval_metrics. "
-                        f"Available keys: {list(eval_metrics.keys())}"
-                    )
-
-                if current > best_metric:
-                    best_metric = current
-                    early_stop_counter = 0
-                    logger.info(f"New best {metric_key}: {current:.4f}")
-                    if self.training_config.save_best_model:
-                        self.model.save_pretrained(str(best_path))
-                        # Cache the best head state for this task
-                        self.head_manager.save(save_tag)
-                else:
-                    early_stop_counter += 1
-                    patience = self.training_config.early_stopping_patience
-                    logger.info(f"No improvement. Early stop counter: {early_stop_counter}/{patience}")
-
-                if early_stop_counter >= self.training_config.early_stopping_patience:
-                    logger.info(f"Early stopping on task {task_id} at epoch {epoch + 1}")
-                    break
-
-            # Log training loss to Neptune and console.
-            avg_train_loss = total_loss / num_batches if num_batches > 0 else 0.0
-            logger.info(f"Task {task_id} Epoch {epoch + 1}/{num_epochs} - Train loss: {avg_train_loss:.4f}")
-            self._log_metrics({"train_loss": avg_train_loss}, prefix=f"task_{task_id}")
-
-        # Optionally load best at end
         if self.training_config.load_best_model_at_end and best_metric > -1e8 and best_path.exists():
-            # Reuse logic to load backbone & head and move to device
-            # We cannot import circularly; manually perform a lightweight load
             self.model.load_pretrained(str(best_path))
             self.model.to(self.device)
-            # Ensure head state registry holds the final best for this task
             self.head_manager.save(save_tag)
 
         self.strategy.after_task(self.model, task_id, train_loader)
