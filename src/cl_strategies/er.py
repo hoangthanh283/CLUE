@@ -58,6 +58,13 @@ class ExperienceReplay(BaseCLStrategy):
         if mem_batch is None:
             return base_loss
 
+        # AGENT FIX: empty CUDA cache before replay forward pass to release
+        # PyTorch-reserved-but-unallocated memory back to CUDA, preventing OOM
+        # on GPUs with limited VRAM (e.g. 5.6 GiB) where fragmentation accumulates
+        # over training epochs despite expandable_segments being enabled.
+        import torch.cuda
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         mem_outputs = model(**mem_batch)
         mem_loss = mem_outputs["loss"]
         return base_loss + self.replay_weight * mem_loss
