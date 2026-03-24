@@ -58,16 +58,21 @@ class ExperienceReplay(BaseCLStrategy):
         if mem_batch is None:
             return base_loss
 
-        # AGENT FIX: empty CUDA cache before replay forward pass to release
-        # PyTorch-reserved-but-unallocated memory back to CUDA, preventing OOM
-        # on GPUs with limited VRAM (e.g. 5.6 GiB) where fragmentation accumulates
-        # over training epochs despite expandable_segments being enabled.
-        import torch.cuda
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        # AGENT FIX: On GPU with limited VRAM (5.6 GiB), the main forward pass
+        # consumes ~5.4 GiB, leaving no room for a second replay forward pass
+        # while both computation graphs must remain alive for the combined backward.
+        # Fix: backward through base_loss immediately to free its activations, then
+        # run the replay forward with the reclaimed VRAM. The outer training loop
+        # (continual_trainer.py) will backward through the returned mem_loss.
+        # Net gradient effect is identical: grad += d(base_loss) + replay_weight * d(mem_loss).
+        # Assumes gradient_accumulation_steps=1 (true for ER config) and that
+        # on_before_backward is a no-op for ER (confirmed from base.py).
+        base_loss.backward(retain_graph=False)
+        torch.cuda.empty_cache()
+
         mem_outputs = model(**mem_batch)
-        mem_loss = mem_outputs["loss"]
-        return base_loss + self.replay_weight * mem_loss
+        mem_loss = self.replay_weight * mem_outputs["loss"]
+        return mem_loss
 
     def update_memory(self, batch: Dict[str, torch.Tensor]):
         self.memory.add_batch(batch)
