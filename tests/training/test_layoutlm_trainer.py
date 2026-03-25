@@ -403,7 +403,7 @@ def test_linear_scheduler_steps_during_train(base_config_dict, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# cleanup with Neptune = None (lines 325-327 NOT triggered; just smoke test)
+# cleanup with wandb = None (lines 325-327 NOT triggered; just smoke test)
 # ---------------------------------------------------------------------------
 
 

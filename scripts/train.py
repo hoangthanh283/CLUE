@@ -118,7 +118,7 @@ def main():
             # Temporarily replace eval dataloader
             original_eval_dataloader = trainer.eval_dataloader
             trainer.eval_dataloader = test_dataloader
-            # Increment step to avoid Neptune logging conflicts
+            # Increment step to avoid wandb logging conflicts
             test_results = trainer.evaluate(increment_step=True)
             logger.info(f"Test results: {test_results}")
             trainer.eval_dataloader = original_eval_dataloader
@@ -130,7 +130,7 @@ def main():
         logger.error(f"Training failed with error: {str(er)}")
         raise
     finally:
-        # Cleanup resources (e.g., Neptune run)
+        # Cleanup resources (e.g., wandb run)
         if "trainer" in locals():
             trainer.cleanup()
 
