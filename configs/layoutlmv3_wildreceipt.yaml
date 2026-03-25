@@ -68,8 +68,9 @@ output:
   push_to_hub: false
 
 # Neptune experiment tracking (optional)
-neptune:
-  use_neptune: false
-  neptune_project: null
-  neptune_api_token: null
+wandb:
+  use_wandb: false
+  wandb_entity: null
+  wandb_project: null
+  #wandb_api_key: null  # Use WANDB_API_KEY env var
   tags: ["layoutlmv3", "wildreceipt", "information_extraction"]

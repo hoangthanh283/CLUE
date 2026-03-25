@@ -407,28 +407,29 @@ def test_linear_scheduler_steps_during_train(base_config_dict, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_cleanup_no_neptune(trainer):
-    """cleanup() does nothing when neptune_run is None (line 325 is False)."""
-    assert trainer.neptune_run is None
+def test_cleanup_no_wandb(trainer):
+    """cleanup() does nothing when wandb_run is None (line 325 is False)."""
+    assert trainer.wandb_run is None
     trainer.cleanup()  # should not raise
 
 
 # ---------------------------------------------------------------------------
-# Neptune logging in _log_metrics (lines 275-277) + cleanup (lines 326-327)
+# wandb logging in _log_metrics (lines 275-277) + cleanup (lines 326-327)
 # ---------------------------------------------------------------------------
 
 
-def test_log_metrics_with_neptune(trainer):
-    """When neptune_run is set, _log_metrics logs to it (lines 275-277)."""
+def test_log_metrics_with_wandb(trainer):
+    """When wandb_run is set, _log_metrics logs to it (lines 275-277)."""
     mock_run = MagicMock()
-    trainer.neptune_run = mock_run
-    trainer._log_metrics({"eval_f1": 0.85})
-    mock_run.__getitem__.assert_called()
+    trainer.wandb_run = mock_run
+    with patch('src.training.layoutlm_trainer.wandb') as mock_wandb:
+        trainer._log_metrics({"eval_f1": 0.85})
+        mock_wandb.log.assert_called()
 
 
-def test_cleanup_with_neptune(trainer):
-    """cleanup() stops Neptune run when neptune_run is set (lines 326-327)."""
+def test_cleanup_with_wandb(trainer):
+    """cleanup() finishes wandb run when wandb_run is set (lines 326-327)."""
     mock_run = MagicMock()
-    trainer.neptune_run = mock_run
+    trainer.wandb_run = mock_run
     trainer.cleanup()
-    mock_run.stop.assert_called_once()
+    mock_run.finish.assert_called_once()

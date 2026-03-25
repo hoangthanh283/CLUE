@@ -69,8 +69,9 @@ output:
 
 # Neptune experiment tracking (optional)
 # To enable Neptune tracking, set use_neptune to true and provide your credentials
-neptune:
-  use_neptune: false  # Set to true to enable Neptune tracking
-  neptune_project: null
-  neptune_api_token: null
+wandb:
+  use_wandb: false  # Set to true to enable Neptune tracking
+  wandb_entity: null
+  wandb_project: null
+  #wandb_api_key: null  # Use WANDB_API_KEY env var
   tags: ["layoutlm", "funsd", "information_extraction"]
