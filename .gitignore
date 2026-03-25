@@ -111,4 +111,3 @@ wandb/
 CLAUDE.md
 .claude/
 docs/*
-.neptune  # Legacy: old experiment tracking cache (not tracked)
