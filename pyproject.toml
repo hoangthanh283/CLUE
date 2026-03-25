@@ -11,7 +11,7 @@ name = "cl4ie"
 version = "0.1.0"
 description = "Continual Learning for Information Extraction on Document Images using LayoutLM"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 authors = [
     {name = "Thanh", email = "thanh@example.com"}
 ]
@@ -41,6 +41,7 @@ dependencies = [
     "pydantic>=1.10.0,<3.0",
     "seqeval>=1.2.2",
     "quadprog>=0.1.11",
+    "openhands-ai>=1.0.0",
 ]
 
 [project.optional-dependencies]
