@@ -111,4 +111,4 @@ wandb/
 CLAUDE.md
 .claude/
 docs/*
-.neptune  # Legacy: old Neptune async cache (Neptune deprecated, using wandb now)
+.neptune  # Legacy: old experiment tracking cache (not tracked)
