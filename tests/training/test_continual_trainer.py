@@ -660,7 +660,7 @@ def test_save_checkpoint_exception_silenced(base_config_dict, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Neptune logging and cleanup (lines 502-505, 509-511)
+# wandb logging and cleanup (lines 502-505, 509-511)
 # ---------------------------------------------------------------------------
 
 

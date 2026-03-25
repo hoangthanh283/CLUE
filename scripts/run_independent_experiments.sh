@@ -41,24 +41,23 @@ print_status() {
     echo -e "${color}${message}${NC}" | tee -a "$LOG_FILE"
 }
 
-# Function to check and enable Neptune tracking
-check_and_enable_neptune() {
-    print_status "$CYAN" "🔍 Checking Neptune.ai configuration..."
-    
+# Function to check and enable Weights & Biases tracking
+check_and_enable_wandb() {
+    print_status "$CYAN" "🔍 Checking Weights & Biases configuration..."
+
     # Load .env file if it exists
     if [ -f ".env" ]; then
         export $(grep -v '^#' .env | xargs)
         print_status "$CYAN" "📄 Loaded environment variables from .env file"
     fi
-    
-    # Check if Neptune credentials are available
-    if [ -n "$NEPTUNE_PROJECT" ] && [ -n "$NEPTUNE_API_TOKEN" ]; then
-        print_status "$GREEN" "✅ Neptune credentials found!"
-        print_status "$GREEN" "   Project: $NEPTUNE_PROJECT"
-        print_status "$GREEN" "   Token: ${NEPTUNE_API_TOKEN:0:10}...${NEPTUNE_API_TOKEN: -10}"
-        print_status "$GREEN" "🔧 Enabling Neptune tracking in all configs..."
-        
-        # Enable Neptune in all config files
+
+    # Check if wandb credentials are available
+    if [ -n "$WANDB_API_KEY" ]; then
+        print_status "$GREEN" "✅ Weights & Biases API key found!"
+        print_status "$GREEN" "   Token: ${WANDB_API_KEY:0:10}...${WANDB_API_KEY: -10}"
+        print_status "$GREEN" "🔧 Enabling wandb tracking in all configs..."
+
+        # Enable wandb in all config files
         local configs=(
             "configs/layoutlmv3_funsd.yaml"
             "configs/layoutlmv3_cord.yaml"
@@ -66,31 +65,31 @@ check_and_enable_neptune() {
             "configs/layoutlmv3_wildreceipt.yaml"
             "configs/layoutlmv3_xfund.yaml"
         )
-        
+
         for config in "${configs[@]}"; do
             if [ -f "$config" ]; then
-                # Use sed to change use_neptune from false to true
-                sed -i 's/use_neptune: false/use_neptune: true/g' "$config"
-                print_status "$GREEN" "   ✓ Enabled Neptune in $config"
+                # Use sed to change use_wandb from false to true
+                sed -i 's/use_wandb: false/use_wandb: true/g' "$config"
+                print_status "$GREEN" "   ✓ Enabled wandb in $config"
             fi
         done
-        
-        NEPTUNE_ENABLED=true
+
+        WANDB_ENABLED=true
         print_status "$GREEN" ""
     else
-        print_status "$YELLOW" "⚠️  Neptune credentials not found in environment"
-        print_status "$YELLOW" "   Set NEPTUNE_PROJECT and NEPTUNE_API_TOKEN in .env file to enable tracking"
-        print_status "$YELLOW" "   Experiments will run without Neptune tracking"
-        NEPTUNE_ENABLED=false
+        print_status "$YELLOW" "⚠️  Weights & Biases API key not found in environment"
+        print_status "$YELLOW" "   Set WANDB_API_KEY in .env file to enable tracking"
+        print_status "$YELLOW" "   Experiments will run without wandb tracking"
+        WANDB_ENABLED=false
         print_status "$YELLOW" ""
     fi
 }
 
-# Function to restore Neptune config after experiments
-restore_neptune_config() {
-    if [ "$NEPTUNE_ENABLED" = true ]; then
-        print_status "$CYAN" "🔧 Restoring original Neptune configuration..."
-        
+# Function to restore wandb config after experiments
+restore_wandb_config() {
+    if [ "$WANDB_ENABLED" = true ]; then
+        print_status "$CYAN" "🔧 Restoring original wandb configuration..."
+
         local configs=(
             "configs/layoutlmv3_funsd.yaml"
             "configs/layoutlmv3_cord.yaml"
@@ -98,14 +97,14 @@ restore_neptune_config() {
             "configs/layoutlmv3_wildreceipt.yaml"
             "configs/layoutlmv3_xfund.yaml"
         )
-        
+
         for config in "${configs[@]}"; do
             if [ -f "$config" ]; then
-                # Restore use_neptune to false
-                sed -i 's/use_neptune: true/use_neptune: false/g' "$config"
+                # Restore use_wandb to false
+                sed -i 's/use_wandb: true/use_wandb: false/g' "$config"
             fi
         done
-        
+
         print_status "$CYAN" "✅ Configuration restored"
     fi
 }
@@ -241,7 +240,7 @@ main() {
     # Run checks
     check_prerequisites
     check_gpu
-    check_and_enable_neptune
+    check_and_enable_wandb
     print_experiment_info
     print_dataset_info
     
@@ -337,14 +336,14 @@ main() {
     print_status "$CYAN" "   ./scripts/run_all_cl_experiments.sh"
     print_status "$CYAN" "======================================================"
     
-    # Restore Neptune configuration
-    restore_neptune_config
+    # Restore wandb configuration
+    restore_wandb_config
 }
 
 # Handle Ctrl+C gracefully - restore configs before exit
 cleanup_on_interrupt() {
     print_status "$YELLOW" "\n⚠️  Experiment interrupted by user."
-    restore_neptune_config
+    restore_wandb_config
     print_status "$YELLOW" "Results so far saved in: $BASE_OUTPUT_DIR"
     exit 130
 }

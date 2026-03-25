@@ -106,7 +106,7 @@ output:
   save_tokenizer: true
   push_to_hub: false
 
-# Neptune (optional)
+# Weights & Biases (wandb) - optional
 wandb:
   use_wandb: false
   wandb_entity: null

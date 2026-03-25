@@ -67,7 +67,7 @@ output:
   save_tokenizer: true
   push_to_hub: false
 
-# Neptune experiment tracking (optional)
+# Weights & Biases (wandb) experiment tracking - optional
 wandb:
   use_wandb: false
   wandb_entity: null
