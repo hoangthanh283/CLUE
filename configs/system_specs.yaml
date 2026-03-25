@@ -1,0 +1,167 @@
+# Machine Specifications Configuration
+# This file documents hardware constraints agents must consider when planning
+# experiments, training runs, and resource-intensive operations.
+#
+# Updated: 2026-03-26
+# Verified against: AMD Ryzen 5 5600X + RTX 2060 + 15GB RAM
+
+system:
+  # CPU Specifications
+  cpu:
+    processor: "AMD Ryzen 5 5600X"
+    cores_physical: 6
+    cores_logical: 12  # with hyperthreading (2 threads per core)
+    max_cpu_percent: 80  # Never exceed this to avoid thermal throttling
+    recommended_workers: 4  # Safe number of parallel workers for dataloaders
+
+  # Memory Specifications
+  memory:
+    total_gb: 15
+    # Safe usage levels (in GB)
+    safe_buffer_gb: 2  # Always keep 2GB free for system
+    available_for_training: 13  # 15 - 2 buffer
+    oom_risk_threshold_gb: 12  # Warn if allocation approaches this
+    swap_gb: 4  # Available but try to avoid using
+
+  # GPU Specifications
+  gpu:
+    type: "NVIDIA GeForce RTX 2060"
+    vram_gb: 6  # Total video memory
+    # Conservative allocation (leave headroom for gradients, attention, etc.)
+    safe_vram_gb: 4  # Safe ceiling - don't allocate more than this
+    per_experiment_vram_gb: 4  # Only ONE experiment at a time
+    attention_optimization_required: true  # Use scaled_dot_product_attention to save VRAM
+    quantization_available: true  # Can use 8-bit quantization if OOM
+
+  # Storage Specifications
+  storage:
+    total_gb: 233
+    free_gb: 89
+    used_percent: 61
+    models_dir: "/home/thanh/Workspace/Master-HUST/Thesis/cl4ie/models"
+    results_dir: "/home/thanh/Workspace/Master-HUST/Thesis/cl4ie/results"
+    # Estimated space per experiment: ~2-5GB (model checkpoints + logs)
+
+# Training Constraints
+training:
+  # Batch size recommendations (considering 6GB GPU + 15GB RAM)
+  batch_sizes:
+    # For LayoutLMv3 with full precision (float32)
+    layoutlmv3_conservative: 1  # Always safe, slowest
+    layoutlmv3_balanced: 4  # Recommended starting point
+    layoutlmv3_aggressive: 8  # Risk of OOM without optimization
+    # For 8-bit quantized models
+    quantized_balanced: 8  # 8-bit LayoutLM can handle larger batches
+    quantized_aggressive: 16
+
+  gradient_accumulation_steps: 4  # Simulate larger batch size without VRAM cost
+  num_workers_dataloader: 2  # Conservative; avoid > 4
+
+  # Training loop safety
+  max_grad_norm: 1.0  # Standard value
+  gradient_checkpointing: true  # Trade compute for VRAM savings
+  mixed_precision: "fp16"  # Use automatic mixed precision to save VRAM
+
+# Resource Planning Rules for Agents
+planning_rules:
+  # Rule 1: Memory estimation
+  - rule: "Estimate RAM before training"
+    formula: "model_params * 4 bytes (fp32) + batch_size * sequence_length * hidden_dim * 4"
+    example: "LayoutLMv3 (~310M params) ≈ 1.2GB + batch overhead → keep < 13GB"
+
+  # Rule 2: GPU memory estimation
+  - rule: "Estimate VRAM before training"
+    formula: "model_weights + activations + gradients + optimizer_state"
+    LayoutLMv3_example: "model=1.2GB + batch_4_activations=1.5GB + gradients=1.2GB + optimizer=0.6GB ≈ 4.5GB"
+    LayoutLMv3_with_8bit: "model=0.6GB (8-bit) + rest=2.5GB ≈ 3.1GB"
+
+  # Rule 3: Parallel experiments
+  - rule: "NEVER run multiple GPU experiments in parallel"
+    reason: "RTX 2060 VRAM is fixed; competing experiments will cause OOM"
+    action: "Queue experiments sequentially using `bd` - use overnight mode"
+
+  # Rule 4: CPU utilization
+  - rule: "Monitor CPU usage during training"
+    max_target_percent: 80
+    action: "If exceeding 80%, reduce num_workers or dataset prefetching"
+
+  # Rule 5: Disk space
+  - rule: "Check disk space before experiment"
+    min_free_gb: 10
+    action: "If < 10GB free, clean up old results before proceeding"
+
+  # Rule 6: OOM Recovery
+  - rule: "If OOM occurs, apply fixes in this order"
+    step_1: "Enable scaled_dot_product_attention (PyTorch 2.2+) - saves ~10-20x VRAM"
+    step_2: "Enable gradient_checkpointing if not already - trades compute for VRAM"
+    step_3: "Reduce batch_size from 4 → 2 → 1"
+    step_4: "Enable 8-bit quantization (BitsAndBytes) - halves model VRAM"
+    step_5: "If still OOM, reduce sequence_length or dataset size"
+
+# Experiment Configuration Templates
+experiment_templates:
+  # Template 1: Standard continual learning experiment
+  standard_cl:
+    estimated_runtime: "6-12 hours (depends on dataset size)"
+    estimated_vram: "4-5GB"
+    estimated_ram: "8-10GB"
+    safe: true
+    notes: "Default choice for most CL strategies (ER, EWC, GEM)"
+
+  # Template 2: Large batch size experiment (batch_size > 8)
+  large_batch:
+    estimated_vram: "5-6GB"
+    requires_optimization: true
+    steps:
+      - "Enable mixed_precision: fp16"
+      - "Enable gradient_checkpointing: true"
+      - "Consider 8-bit quantization"
+    safe: false
+    notes: "Verify with `nvidia-smi` before starting; be prepared for OOM"
+
+  # Template 3: Multi-task evaluation (running multiple models)
+  multi_task_eval:
+    requires_sequential_execution: true
+    notes: "Run one model at a time; use script automation to queue"
+    safe: true
+
+# Agent Planning Checklist
+agent_checklist:
+  before_starting_experiment:
+    - "✓ Check current GPU memory: `nvidia-smi`"
+    - "✓ Check current RAM: `free -h`"
+    - "✓ Check disk space: `df -h`"
+    - "✓ Estimate resources using planning_rules above"
+    - "✓ If batch_size > 4, enable mixed_precision and gradient_checkpointing"
+    - "✓ If estimated VRAM > 4GB, prepare 8-bit quantization fallback"
+    - "✓ Kill any stray Python/CUDA processes: `pkill -f python`"
+    - "✓ Set PYTORCH_CUDA_ALLOC_CONF env var for memory efficiency"
+
+  during_experiment:
+    - "Monitor `nvidia-smi` every 10 minutes for VRAM creep"
+    - "If VRAM exceeds 5.5GB, be ready to kill and retry"
+    - "Check CPU: `top -bn1 | head -20` - alert if > 85%"
+    - "Watch disk space - can fill up from checkpoint accumulation"
+
+  if_oom_occurs:
+    - "Do NOT immediately retry with same config"
+    - "Diagnose root cause first (model size? batch size? activations?)"
+    - "Apply ONE fix and retest (see planning_rules.oom_recovery)"
+    - "After 3 attempts, escalate to professor-master for strategy review"
+
+# Reference: Current Performance Baseline
+baseline_performance:
+  layoutlmv3_sequential_class_il:
+    runtime_hours: 8
+    vram_peak: 4.2
+    ram_peak: 9.5
+    success_rate: 100%
+    notes: "Baseline continual learning configuration"
+
+  layoutlmv3_er_class_il:
+    runtime_hours: 10
+    vram_peak: 4.5
+    ram_peak: 10.2
+    memory_buffer_size: 5000
+    success_rate: 95%  # occasional OOM if memory buffer too large
+    notes: "Experience replay - watch for memory creep if buffer > 5k"
