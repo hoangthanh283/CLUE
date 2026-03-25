@@ -18,11 +18,11 @@ from typing import Any, Dict, Union
 import torch
 import torch.nn as nn
 
-logger = logging.getLogger(__name__)
-
 from src.cl_strategies.base import BaseCLStrategy
 from src.cl_strategies.memory import MemoryBuffer
 from src.config import ERConfig
+
+logger = logging.getLogger(__name__)
 
 
 class ExperienceReplay(BaseCLStrategy):
