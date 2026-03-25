@@ -43,7 +43,7 @@ def init_wandb_run(config) -> Optional[object]:
         name=experiment_name,
         tags=wandb_config.get("tags", []),
         config=wandb_config,
-        reinit=True,
+        force=True,  # Allow reinitializing if already running
     )
     logger.info(f"wandb run initialized: {run.id}")
     return run

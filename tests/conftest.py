@@ -1,5 +1,6 @@
 """Shared fixtures for cl4ie tests."""
 
+import os
 import types
 from pathlib import Path
 from typing import Dict, List
@@ -9,6 +10,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
+
+# Load .env file for integration tests (e.g., WANDB_API_KEY)
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+except ImportError:
+    pass  # python-dotenv not available
 
 
 # ---------------------------------------------------------------------------
