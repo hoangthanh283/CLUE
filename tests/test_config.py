@@ -222,7 +222,7 @@ def test_experiment_config_empty_overrides(minimal_config_dict):
 def test_experiment_config_defaults_label_space(minimal_config_dict):
     cfg = ExperimentConfig.from_dict(minimal_config_dict)
     assert cfg.label_space == {}
-    assert cfg.neptune == {}
+    assert cfg.wandb == {}
     assert cfg.tasks == []
 
 
@@ -261,9 +261,9 @@ def test_with_task_overrides_model_field(minimal_config_dict):
 
 
 def test_with_task_overrides_dict_field(minimal_config_dict):
-    """Dict field (label_space, neptune) merging exercises lines 340-346."""
+    """Dict field (label_space, wandb) merging exercises lines 340-346."""
     cfg = ExperimentConfig.from_dict(minimal_config_dict)
-    overrides = {"label_space": {"unified": True}, "neptune": {"use_neptune": False}}
+    overrides = {"label_space": {"unified": True}, "wandb": {"use_wandb": False}}
     new_cfg = cfg.with_task_overrides(overrides)
     assert new_cfg.label_space.get("unified") is True
 
@@ -284,7 +284,7 @@ def test_deep_merge_dicts():
 def test_with_task_overrides_non_dict_value(minimal_config_dict):
     """Non-dict override for a dict field exercises the else branch (line 346)."""
     cfg = ExperimentConfig.from_dict(minimal_config_dict)
-    # "neptune" is normally a dict; override it with a non-dict to hit else branch
-    overrides = {"neptune": "disabled"}
+    # "wandb" is normally a dict; override it with a non-dict to hit else branch
+    overrides = {"wandb": "disabled"}
     new_cfg = cfg.with_task_overrides(overrides)
-    assert new_cfg.neptune == "disabled"
+    assert new_cfg.wandb == "disabled"

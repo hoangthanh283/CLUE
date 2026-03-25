@@ -171,5 +171,5 @@ def base_config_dict(tmp_path) -> dict:
             "num_workers": 0,
         },
         "cl_strategy": {"name": "sequential"},
-        "neptune": {"use_neptune": False},
+        "wandb": {"use_wandb": False},
     }

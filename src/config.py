@@ -289,7 +289,7 @@ class ExperimentConfig:
     tasks: List[Dict[str, Any]] = dataclasses.field(default_factory=list)
     evaluation: Dict[str, Any] = dataclasses.field(default_factory=dict)
     output: Dict[str, Any] = dataclasses.field(default_factory=dict)
-    neptune: Dict[str, Any] = dataclasses.field(default_factory=dict)
+    wandb: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "ExperimentConfig":
@@ -311,7 +311,7 @@ class ExperimentConfig:
             tasks=copy.deepcopy(d.get("tasks", [])),
             evaluation=copy.deepcopy(d.get("evaluation", {})),
             output=copy.deepcopy(d.get("output", {})),
-            neptune=copy.deepcopy(d.get("neptune", {})),
+            wandb=copy.deepcopy(d.get("wandb", {})),
         )
 
     def with_output_dir(self, output_dir: str) -> "ExperimentConfig":
@@ -347,7 +347,7 @@ class ExperimentConfig:
             updates["model"] = ModelConfig.from_dict(merged_model)
 
         # Raw dict fields: shallow merge
-        for key in ("dataset", "label_space", "data_processing", "evaluation", "output", "neptune"):
+        for key in ("dataset", "label_space", "data_processing", "evaluation", "output", "wandb"):
             if key in overrides:
                 current = getattr(self, key)
                 if isinstance(overrides[key], dict) and isinstance(current, dict):

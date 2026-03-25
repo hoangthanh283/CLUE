@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import torch
+import wandb
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
@@ -18,7 +19,7 @@ from src.config import ExperimentConfig
 from src.models.head_manager import HeadManager
 from src.models.layoutlm_models import BaseLayoutLMModel, LayoutLMMetrics
 from src.training.cl_metrics import compute_cl_metrics
-from src.training.neptune_utils import init_neptune_run
+from src.training.wandb_utils import init_wandb_run
 from src.training.optimizer import build_adamw_optimizer, rebuild_adamw_optimizer
 
 logger = logging.getLogger(__name__)
@@ -106,8 +107,8 @@ class ContinualLayoutLMTrainer:
         # Classifier head lifecycle manager
         self.head_manager = HeadManager(self.model, self.cl_setting)
 
-        # Setup Neptune if configured (pass raw neptune dict).
-        self.neptune_run = init_neptune_run(config.neptune)
+        # Setup wandb if configured (pass raw wandb dict).
+        self.wandb_run = init_wandb_run(config.wandb)
 
     def _setup_optimizer(self) -> torch.optim.Optimizer:
         optimizer_name = self.training_config.optimizer.lower()
@@ -497,18 +498,18 @@ class ContinualLayoutLMTrainer:
         return self.evaluate(dataloader)
 
     def _log_metrics(self, metrics: Dict[str, float], prefix: str = "", step: Optional[int] = None):
-        """Log metrics to Neptune if available"""
-        if self.neptune_run is not None:
+        """Log metrics to wandb if available"""
+        if self.wandb_run is not None:
             log_step = step if step is not None else self.global_step
             for key, value in metrics.items():
                 metric_key = f"{prefix}/{key}" if prefix else key
-                self.neptune_run[f"metrics/{metric_key}"].log(value, step=log_step)
+                wandb.log({metric_key: value}, step=log_step)
 
     def cleanup(self):
-        """Cleanup resources like Neptune run"""
-        if self.neptune_run is not None:
-            self.neptune_run.stop()
-            logger.info("Neptune run stopped")
+        """Cleanup resources like wandb run"""
+        if self.wandb_run is not None:
+            self.wandb_run.finish()
+            logger.info("wandb run finished")
 
 
 def create_continual_trainer(model: BaseLayoutLMModel, config, label_list: List[str],

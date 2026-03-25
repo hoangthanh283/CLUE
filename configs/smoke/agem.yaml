@@ -79,5 +79,6 @@ output:
   save_tokenizer: false
   push_to_hub: false
 
-neptune:
-  use_neptune: false
+wandb:
+  use_wandb: false
+  wandb_entity: null

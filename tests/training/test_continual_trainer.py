@@ -664,8 +664,8 @@ def test_save_checkpoint_exception_silenced(base_config_dict, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_log_metrics_with_neptune(base_config_dict):
-    """When neptune_run is set, _log_metrics logs to it (lines 502-505)."""
+def test_log_metrics_with_wandb(base_config_dict):
+    """When wandb_run is set, _log_metrics logs to it (lines 502-505)."""
     config = ExperimentConfig.from_dict(base_config_dict)
     trainer = ContinualLayoutLMTrainer(
         model=TinyModel(),
@@ -674,14 +674,15 @@ def test_log_metrics_with_neptune(base_config_dict):
         id2label=ID2LABEL,
     )
     mock_run = MagicMock()
-    trainer.neptune_run = mock_run
-    trainer._log_metrics({"f1": 0.9}, prefix="task_0")
-    # Verify Neptune was called
-    mock_run.__getitem__.assert_called()
+    trainer.wandb_run = mock_run
+    with patch('src.training.continual_trainer.wandb') as mock_wandb:
+        trainer._log_metrics({"f1": 0.9}, prefix="task_0")
+        # Verify wandb.log was called with correct arguments
+        mock_wandb.log.assert_called()
 
 
-def test_cleanup_with_neptune(base_config_dict):
-    """cleanup() stops Neptune run when it's set (lines 509-511)."""
+def test_cleanup_with_wandb(base_config_dict):
+    """cleanup() finishes wandb run when it's set (lines 509-511)."""
     config = ExperimentConfig.from_dict(base_config_dict)
     trainer = ContinualLayoutLMTrainer(
         model=TinyModel(),
@@ -690,6 +691,6 @@ def test_cleanup_with_neptune(base_config_dict):
         id2label=ID2LABEL,
     )
     mock_run = MagicMock()
-    trainer.neptune_run = mock_run
+    trainer.wandb_run = mock_run
     trainer.cleanup()
-    mock_run.stop.assert_called_once()
+    mock_run.finish.assert_called_once()

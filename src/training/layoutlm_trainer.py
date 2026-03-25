@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import torch
+import wandb
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
@@ -14,7 +15,7 @@ from transformers import get_linear_schedule_with_warmup
 
 from src.config import ExperimentConfig
 from src.models.layoutlm_models import BaseLayoutLMModel, LayoutLMMetrics
-from src.training.neptune_utils import init_neptune_run
+from src.training.wandb_utils import init_wandb_run
 from src.training.optimizer import build_adamw_optimizer
 
 logger = logging.getLogger(__name__)
@@ -74,8 +75,8 @@ class LayoutLMTrainer:
         self.log_steps = self.training_config.log_steps
         self.eval_steps = self.training_config.eval_steps
 
-        # Setup Neptune if configured.
-        self.neptune_run = init_neptune_run(config.neptune)
+        # Setup wandb if configured.
+        self.wandb_run = init_wandb_run(config.wandb)
 
     def _setup_optimizer(self) -> torch.optim.Optimizer:
         """Setup optimizer"""
@@ -269,12 +270,12 @@ class LayoutLMTrainer:
         return eval_metrics
 
     def _log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
-        """Log metrics to Neptune if available"""
-        if self.neptune_run is not None:
+        """Log metrics to wandb if available"""
+        if self.wandb_run is not None:
             # Use provided step or current global_step
             log_step = step if step is not None else self.global_step
             for key, value in metrics.items():
-                self.neptune_run[f"metrics/{key}"].log(value, step=log_step)
+                wandb.log({key: value}, step=log_step)
 
     def save_model(self, save_path: Path):
         """Save model and tokenizer"""
@@ -321,10 +322,10 @@ class LayoutLMTrainer:
         logger.info(f"Model loaded from {load_path}")
 
     def cleanup(self):
-        """Cleanup resources like Neptune run"""
-        if self.neptune_run is not None:
-            self.neptune_run.stop()
-            logger.info("Neptune run stopped")
+        """Cleanup resources like wandb run"""
+        if self.wandb_run is not None:
+            self.wandb_run.finish()
+            logger.info("wandb run finished")
 
 
 def create_trainer(

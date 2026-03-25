@@ -106,9 +106,10 @@ output:
   push_to_hub: false
 
 # Neptune (optional)
-neptune:
-  use_neptune: true
-  neptune_project: null
-  neptune_api_token: null
+wandb:
+  use_wandb: true
+  wandb_entity: null
+  wandb_project: null
+  #wandb_api_key: null  # Use WANDB_API_KEY env var
   tags: ["layoutlmv3", "class_il", "progressive_joint", "funsd", "cord", "sroie", "wildreceipt", "xfund"]
 

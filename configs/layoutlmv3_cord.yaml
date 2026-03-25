@@ -67,8 +67,9 @@ output:
   save_tokenizer: true
   push_to_hub: false
 
-neptune:
-  use_neptune: false  # Set to true to enable Neptune tracking.
-  neptune_project: null
-  neptune_api_token: null
+wandb:
+  use_wandb: false  # Set to true to enable Neptune tracking.
+  wandb_entity: null
+  wandb_project: null
+  #wandb_api_key: null  # Use WANDB_API_KEY env var
   tags: ["layoutlmv3", "cord", "information_extraction"]
