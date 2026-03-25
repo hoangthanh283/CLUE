@@ -22,15 +22,19 @@ def load_config(config_path):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    if not config.get("neptune"):
+    if not config.get("wandb"):
         return config
 
     # Override with environment variables if they exist.
-    neptune_project = os.getenv("NEPTUNE_PROJECT")
-    neptune_token = os.getenv("NEPTUNE_API_TOKEN")
-    if neptune_project and neptune_token:
-        config["neptune"]["neptune_project"] = neptune_project
-        config["neptune"]["neptune_api_token"] = neptune_token
+    wandb_api_key = os.getenv("WANDB_API_KEY")
+    wandb_project = os.getenv("WANDB_PROJECT")
+    wandb_entity = os.getenv("WANDB_ENTITY")
+    if wandb_api_key:
+        config["wandb"]["wandb_api_key"] = wandb_api_key
+    if wandb_project:
+        config["wandb"]["wandb_project"] = wandb_project
+    if wandb_entity:
+        config["wandb"]["wandb_entity"] = wandb_entity
     return config
 
 

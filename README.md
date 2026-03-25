@@ -9,7 +9,7 @@ This project provides a comprehensive framework for conducting continual learnin
 - **Flexible Configuration**: YAML-based experiment configuration
 - **Best Practices**: Following SOLID principles with clean, maintainable code
 - **Comprehensive Evaluation**: Token-level and entity-level metrics
-- **Experiment Tracking**: Support for Neptune integration
+- **Experiment Tracking**: Weights & Biases (wandb) integration
 
 ## Supported Datasets
 
@@ -108,7 +108,7 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvi
 # Train LayoutLM on FUNSD dataset
 python scripts/train.py --config configs/layoutlm_funsd.yaml --output_dir results/funsd
 
-# Train with Neptune logging (configure in YAML file)
+# Train with wandb logging (configure in YAML file)
 python scripts/train.py --config configs/layoutlm_cord.yaml --output_dir results/cord
 
 # Resume from checkpoint
@@ -167,32 +167,33 @@ training:
   early_stopping_patience: 10
 ```
 
-## Neptune Experiment Tracking
+## Weights & Biases (wandb) Experiment Tracking
 
-The framework supports Neptune for experiment tracking and monitoring. To enable Neptune:
+The framework supports Weights & Biases (wandb) for experiment tracking and monitoring. To enable wandb:
 
-1. **Install Neptune**: Already included in requirements.txt
-2. **Get Neptune credentials**: Sign up at [neptune.ai](https://neptune.ai) and get your API token
+1. **Install wandb**: Already included in pyproject.toml
+2. **Create wandb account**: Sign up at [wandb.ai](https://wandb.ai) and get your API key
 3. **Configure in YAML**:
 
 ```yaml
-neptune:
-  use_neptune: true
-  neptune_project: "your-workspace/cl4ie"  # Replace with your project
-  neptune_api_token: "your-api-token"      # Or set NEPTUNE_API_TOKEN env var
+wandb:
+  use_wandb: true
+  wandb_project: "cl4ie"                   # Your project name
+  wandb_entity: "your-username-or-team"    # Optional: your username or team
   tags: ["layoutlm", "funsd", "information_extraction"]
 ```
 
 4. **Set environment variable** (recommended):
 ```bash
-export NEPTUNE_API_TOKEN="your-api-token"
+export WANDB_API_KEY="your-api-key"
 ```
 
-Neptune will automatically log:
+wandb will automatically log:
 - Training and validation metrics (loss, accuracy, F1)
 - Model configuration and hyperparameters
 - Training progress and timing
 - Best model checkpoints
+- Full visualization dashboard and versioning
 
 ## Expected Performance
 

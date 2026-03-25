@@ -122,7 +122,7 @@ def _to_legacy_dict(config: ExperimentConfig) -> Dict[str, Any]:
         "tasks": config.tasks,
         "evaluation": config.evaluation,
         "output": config.output,
-        "neptune": config.neptune,
+        "wandb": config.wandb,
     }
     return d
 

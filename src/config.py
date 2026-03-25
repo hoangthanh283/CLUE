@@ -275,7 +275,7 @@ _STRATEGY_CONFIG_MAP: Dict[str, type] = {
 @dataclasses.dataclass
 class ExperimentConfig:
     """Root experiment config. Typed fields for model, training, cl_strategy.
-    dataset, tasks, data_processing, neptune etc. remain as raw dicts (Phase 1 scope).
+    dataset, tasks, data_processing, wandb etc. remain as raw dicts (Phase 1 scope).
     """
     experiment_name: str
     output_dir: str
