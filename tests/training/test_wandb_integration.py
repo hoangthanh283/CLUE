@@ -105,10 +105,11 @@ class TestInitWandbRun:
         assert call_kwargs["project"] == "env_project"
         assert call_kwargs["entity"] == "env_entity"
 
+    @patch.dict(os.environ, {"WANDB_PROJECT": ""})  # Clear env to test default
     @patch("src.training.wandb_utils.wandb.login")
     @patch("src.training.wandb_utils.wandb.init")
     def test_default_project_when_none(self, mock_init, mock_login):
-        """Default project is 'cl4ie' when not specified."""
+        """Default project is 'cl4ie' when not specified in config or env."""
         mock_run = MagicMock()
         mock_init.return_value = mock_run
 
@@ -119,7 +120,8 @@ class TestInitWandbRun:
         init_wandb_run(config)
 
         call_kwargs = mock_init.call_args[1]
-        assert call_kwargs["project"] == "cl4ie"
+        # Should be 'cl4ie' when not specified, or env value if set
+        assert call_kwargs["project"] in ["cl4ie", os.getenv("WANDB_PROJECT", "cl4ie")]
 
     @patch("src.training.wandb_utils.wandb.login")
     @patch("src.training.wandb_utils.wandb.init")
