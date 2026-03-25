@@ -75,7 +75,14 @@ class TrainingConfig:
     gradient_accumulation_steps: int = 1
     optimizer: str = "adamw"
     scheduler: str = "linear"
-    num_workers: int = 4
+    # AGENT FIX: Changed default from 4 to 0.
+    # Root cause: on this 7.7 GB RAM system, all 5 task datasets are pre-loaded into
+    # Python heap (~4 GB). When PyTorch's DataLoader forks num_workers=4 child
+    # processes, each child inherits the full heap via copy-on-write, multiplying
+    # RAM consumption by ~5 and triggering the OOM killer (confirmed in journalctl).
+    # Setting num_workers=0 eliminates the fork-based RAM multiplication; data
+    # loading is handled on the main thread (slightly slower but OOM-safe).
+    num_workers: int = 0
     warmup_ratio: float = 0.1
     early_stopping_patience: int = 10
     log_steps: int = 100
@@ -96,7 +103,7 @@ class TrainingConfig:
             gradient_accumulation_steps=int(d.get("gradient_accumulation_steps", 1)),
             optimizer=str(d.get("optimizer", "adamw")),
             scheduler=str(d.get("scheduler", "linear")),
-            num_workers=int(d.get("num_workers", 4)),
+            num_workers=int(d.get("num_workers", 0)),
             warmup_ratio=float(d.get("warmup_ratio", 0.1)),
             early_stopping_patience=int(d.get("early_stopping_patience", 10)),
             log_steps=int(d.get("log_steps", 100)),
