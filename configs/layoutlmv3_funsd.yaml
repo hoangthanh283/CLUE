@@ -67,10 +67,10 @@ output:
   save_tokenizer: true
   push_to_hub: false
 
-# Neptune experiment tracking (optional)
-# To enable Neptune tracking, set use_neptune to true and provide your credentials
+# Weights & Biases (wandb) experiment tracking (optional)
+# To enable wandb tracking, set use_wandb to true and provide your credentials
 wandb:
-  use_wandb: false  # Set to true to enable Neptune tracking
+  use_wandb: false  # Set to true to enable wandb tracking
   wandb_entity: null
   wandb_project: null
   #wandb_api_key: null  # Use WANDB_API_KEY env var
