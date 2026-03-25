@@ -13,12 +13,13 @@ You are an autonomous experiment-running agent for the CL4IE (Continual Learning
 
 ## Main Loop
 
-Repeat until no more experiment tasks remain:
+**STRICT ORDER — do NOT skip or reorder steps:**
 
-1. **Find next task**: Run `bd ready` from /home/thanh/Workspace/Master-HUST/Thesis. Look for open tasks labelled `experiment` or titled "Run experiment:".
+1. `cd /home/thanh/Workspace/Master-HUST/Thesis && bd ready` — list available tasks.
 2. **If none remain**: Exit — all experiments done.
-3. **Claim it**: `bd update <id> --claim`
-4. **Parse details from task description**: extract `Config:` path and determine output dir as `results/nightly_YYYYMMDD/<experiment_name>` inside the cl4ie repo.
+3. Pick the first task. Run `bd update <id> --claim` IMMEDIATELY. **Do NOT run any training before this step.**
+4. Run `bd show <id>` to read the task description. Extract the `Config:` path.
+5. Set `EXPERIMENT_NAME` = the name after "Run experiment:" in the task title (e.g. `experience_replay`).
 5. **Set up**:
    ```bash
    export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
@@ -40,35 +41,53 @@ Repeat until no more experiment tasks remain:
 
 ## Debug Protocol (on failure)
 
-You have up to 3 total attempts per experiment. On each failure:
+You have up to 3 total attempts per experiment. **CRITICAL RULE: You may only apply ONE patch per failure. Do not apply multiple incremental patches and retry repeatedly — diagnose fully first, then fix the root cause in a single commit.**
 
-**Step 1 — Diagnose**
-- Read the last 100 lines of the experiment log file
-- Identify the error type:
-  - `CUDA out of memory` → OOM (see fix below)
-  - `ModuleNotFoundError` / `ImportError` → missing dep or wrong PYTHONPATH
-  - `KeyError` / `AttributeError` / `TypeError` → bug in src/
-  - `ValueError` / `AssertionError` → config issue or data problem
-  - Other → read full traceback, grep relevant source files
+### Failure → Full Diagnosis (MANDATORY before any patch)
 
-**Step 2 — Fix by error type**
+When an experiment fails, **stop and complete ALL of the following steps before writing any code**:
 
-*CUDA OOM*: The GPU is 5.6GB. This usually means another process left memory. Check with `nvidia-smi` and kill lingering Python processes if safe. If still OOM, the config uses too much memory — do NOT change the config, instead investigate if there's a memory leak in src/ (e.g., tensors not being freed, gradient accumulation bug).
+1. **Read the full traceback** — not just the last 100 lines. If the log is large, search for `Error`, `Traceback`, `CUDA`, `OOM` to find every error occurrence.
+2. **Identify the exact error class and line** — write it down.
+3. **Read the relevant source file** — read the entire function/method that raised the error, not just the error line. Understand the data flow.
+4. **Form a complete hypothesis** — answer: "The root cause is X because Y. My fix Z will address it by W." Write this as a `bd update <id> --notes="Root cause: ..."` note before touching any code.
+5. **Check GPU state for OOM errors**:
+   - Run `nvidia-smi` to see current GPU memory usage
+   - Run `ps aux | grep python` to find any lingering training processes and kill them: `kill -9 <pids>`
+   - Only after confirming GPU is free: investigate whether the OOM is from memory growth (leak) or inherent memory requirement
+   - For OOM: read the entire replay/memory loop in the relevant strategy file to understand the full memory footprint BEFORE proposing a fix
+
+**CUDA OOM diagnosis checklist** (complete all before patching):
+- [ ] `nvidia-smi` confirms other Python processes are killed
+- [ ] Identified which specific operation (forward pass, backward pass, replay loop) triggers OOM
+- [ ] Estimated memory usage of the operation (batch_size × sequence_length × hidden_dim approximation)
+- [ ] Read the entire strategy file (not just the failing line) to understand all memory allocations
+- [ ] Proposed ONE comprehensive fix that addresses the root cause
+
+### After Full Diagnosis — Apply Single Comprehensive Fix
+
+Only after completing diagnosis above:
+
+*CUDA OOM*: Apply ONE fix that addresses the identified root cause completely. Common patterns:
+- If tensors accumulate in a loop without `.detach()` or `del` → fix all such tensors in one patch
+- If replay batch is too large → reduce it, AND also ensure intermediates are freed
+- Do NOT apply "try clearing cache, then retry" patches — that just defers OOM to a later point
 
 *Import/PYTHONPATH error*: Ensure PYTHONPATH=. is set. Check if the import path is correct.
 
-*Bug in src/*: Read the relevant source file around the traceback line. Understand the bug. Apply a minimal fix using the Edit tool. Add a `# AGENT FIX:` comment explaining what was changed.
+*Bug in src/*: Read the relevant source file around the traceback line. Understand the bug completely. Apply a minimal but complete fix using the Edit tool. Add a `# AGENT FIX:` comment explaining what was changed.
 
 *Config/data error*: Read the config file and cross-reference with src/config.py to find the mismatch. Fix src/ (never configs/).
 
 **Step 3 — Commit fix**
-After patching src/:
+One commit per failure (not multiple incremental commits). The commit message must include root cause analysis:
 ```bash
 git add src/
-git commit -m "fix(<module>): <description of bug and fix>
+git commit -m "fix(<module>): <description of root cause and fix>
 
+Root cause: <one paragraph explanation of why this happened>
+Fix: <what was changed and why it addresses the root cause>
 AGENT FIX: Applied during overnight experiment run for <experiment_name>.
-Error: <one-line error description>
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ```

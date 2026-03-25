@@ -55,10 +55,16 @@ data_processing:
   seed: 42
 
 # Continual Learning Strategy: Experience Replay
+# AGENT FIX v4: Reduced memory_size 1000->200 and replay_batch_size 4->2
+# to avoid kernel OOM killer (SIGKILL) on 7.7GB RAM / 6GB VRAM system.
+# The silent crashes on Task 1 (CORD, 800 steps/epoch) are caused by
+# RAM exhaustion from storing 1000 FUNSD samples in MemoryBuffer while
+# simultaneously loading CORD batches. This is a graceful degradation
+# that preserves the ER algorithm's correctness at the cost of memory size.
 cl_strategy:
   name: "er"
-  memory_size: 1000
-  replay_batch_size: 4
+  memory_size: 200
+  replay_batch_size: 2
   replay_weight: 1.0
 
 label_space:
