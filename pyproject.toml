@@ -42,6 +42,7 @@ dependencies = [
     "seqeval>=1.2.2",
     "quadprog>=0.1.11",
     "openhands-ai>=1.0.0",
+    "langgraph>=0.0.1",
 ]
 
 [project.optional-dependencies]

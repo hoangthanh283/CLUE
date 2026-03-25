@@ -93,8 +93,14 @@ echo ""
 
 # Run Claude Code non-interactively with full permissions
 # --dangerously-skip-permissions: skips all tool confirmation prompts
+#
+# NOTE: We pass a short bootstrap prompt rather than inlining the full
+# AGENT_PROMPT.md. The agent reads the file itself at startup, so edits
+# to AGENT_PROMPT.md take effect without restarting the agent.
+BOOTSTRAP="Read the file at $PROMPT_FILE using the Read tool, then follow every instruction in it exactly. Begin immediately."
+
 claude --dangerously-skip-permissions \
-  -p "$(cat "$PROMPT_FILE")" \
+  -p "$BOOTSTRAP" \
   2>&1 | tee -a "$LOG"
 
 EXIT_CODE=${PIPESTATUS[0]}
