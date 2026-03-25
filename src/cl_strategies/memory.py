@@ -152,24 +152,29 @@ class MemoryBuffer:
                 pixel_values=pixel_values[i].detach().cpu() if pixel_values is not None else None,
             )
 
-            # Generate key and save to disk
-            key, file_path = self._generate_key_path()
-            self._save_item(item, file_path)
-            memory_key = MemoryKey(key=key, file_path=file_path)
-
-            # Reservoir sampling with keys instead of items
+            # Reservoir sampling: decide BEFORE saving to disk to avoid orphaned files.
+            # Bug fix: previously, items were always saved to disk first and then
+            # discarded by reservoir sampling without deleting the file, causing
+            # thousands of orphaned .pt files that consumed disk space and caused
+            # SIGKILL when disk fills up during long training runs.
             if len(self.keys) < self.capacity:
+                # Buffer not full: always keep this item
+                key, file_path = self._generate_key_path()
+                self._save_item(item, file_path)
+                memory_key = MemoryKey(key=key, file_path=file_path)
                 self.keys.append(memory_key)
-                # Invalidate cache since we added a new item
                 self._invalidate_cache()
             else:
                 j = random.randint(0, self.n_seen - 1)
                 if j < self.capacity:
-                    # Delete old item from disk
+                    # This item wins the lottery: save to disk and replace slot j
+                    key, file_path = self._generate_key_path()
+                    self._save_item(item, file_path)
+                    memory_key = MemoryKey(key=key, file_path=file_path)
                     self._delete_item(self.keys[j])
                     self.keys[j] = memory_key
-                    # Invalidate cache since we replaced an item
                     self._invalidate_cache()
+                # else: item is discarded — no disk write, no orphaned file
 
     def sample(
         self, batch_size: int, device: torch.device, task_id: Optional[int] = None
