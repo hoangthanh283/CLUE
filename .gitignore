@@ -90,3 +90,8 @@ Desktop.ini
 # Local project documentation
 CLAUDE.md
 PLAN.md
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
