@@ -50,10 +50,12 @@ dev = [
     "jupyter>=1.0.0",
 ]
 
+# Console entry points. Training is intentionally NOT exposed here: scripts/train.py
+# is a Hydra entry that lives outside the installed package — run it directly with
+# `python scripts/train.py method=naive scenario=single_funsd`.
 [project.scripts]
-doccl-train = "doccl.cli.train:main"
-doccl-pilot = "doccl.cli.pilot:main"
-doccl-analyze = "doccl.cli.analyze:main"
+doccl-pilot = "doccl.pilot.run_pilot:main"
+doccl-pilot-analyze = "doccl.pilot.analyze:main"
 
 [tool.setuptools.packages.find]
 include = ["doccl*"]

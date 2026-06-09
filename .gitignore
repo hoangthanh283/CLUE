@@ -58,9 +58,10 @@ multirun/
 # W&B
 wandb/
 
-# Datasets (downloaded or preprocessed)
-data/
-!data/.gitkeep
+# Datasets (downloaded or preprocessed) — anchored to repo root so it does
+# NOT match the doccl/data/ package source.
+/data/
+!/data/.gitkeep
 
 # Model checkpoints / large artifacts
 *.pt
@@ -70,9 +71,9 @@ data/
 *.pth
 checkpoints/
 
-# Results (track only structure, not contents)
-results/
-!results/.gitkeep
+# Results (track only structure, not contents) — anchored to repo root.
+/results/
+!/results/.gitkeep
 
 # Logs
 *.log
