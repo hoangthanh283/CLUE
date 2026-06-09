@@ -30,3 +30,69 @@
 \newacronym{re}{RE}{Relation Extraction}
 \newacronym{til}{TIL}{Task-Incremental Learning}
 \newacronym{vrdu}{VRDU}{Visually-Rich Document Understanding}
+
+% =====================================================================
+%  Notation glossary (printed as "List of Notations" by main.tex).
+%  sort keys give a logical (not alphabetical) ordering.
+% =====================================================================
+\newglossary[nlg]{notation}{not}{ntn}{Notation}
+
+\newglossaryentry{not:doc}{
+  name={\ensuremath{D=(W,B,I)}},
+  description={a document: OCR token sequence $W$, bounding boxes $B$, and page image $I$},
+  type=notation, sort=01}
+
+\newglossaryentry{not:N}{
+  name={\ensuremath{N}},
+  description={number of tokens in a document},
+  type=notation, sort=02}
+
+\newglossaryentry{not:T}{
+  name={\ensuremath{T}},
+  description={number of tasks in the continual sequence},
+  type=notation, sort=03}
+
+\newglossaryentry{not:task}{
+  name={\ensuremath{\mathcal{T}_t}},
+  description={the $t$-th task (data and, in CIL, its label space)},
+  type=notation, sort=04}
+
+\newglossaryentry{not:theta}{
+  name={\ensuremath{\theta,\ \theta^{(t)}}},
+  description={encoder parameters; parameters after training task $t$},
+  type=notation, sort=05}
+
+\newglossaryentry{not:Y}{
+  name={\ensuremath{Y}},
+  description={sequence of BIO labels $(y_1,\dots,y_N)$},
+  type=notation, sort=06}
+
+\newglossaryentry{not:labelset}{
+  name={\ensuremath{\mathcal{L}_{\text{task}}}},
+  description={dataset-specific BIO tag set},
+  type=notation, sort=07}
+
+\newglossaryentry{not:R}{
+  name={\ensuremath{R[i,j]}},
+  description={accuracy matrix: entity-F1 on task $j$ after training task $i$},
+  type=notation, sort=08}
+
+\newglossaryentry{not:cka}{
+  name={\ensuremath{\mathrm{CKA}(X,Y)}},
+  description={linear Centered Kernel Alignment between activation matrices},
+  type=notation, sort=09}
+
+\newglossaryentry{not:fisher}{
+  name={\ensuremath{F_g}},
+  description={empirical Fisher information of parameter group $g$},
+  type=notation, sort=10}
+
+\newglossaryentry{not:phi}{
+  name={\ensuremath{\phi(\text{boxes})}},
+  description={layout signature: $4\times4$ grid histogram of box centres (16-dim)},
+  type=notation, sort=11}
+
+\newglossaryentry{not:lambda}{
+  name={\ensuremath{\lambda}},
+  description={regularisation strength (e.g.\ $\lambda_{\text{layout}}$, $\lambda_{\text{other}}$ in L-EWC)},
+  type=notation, sort=12}
