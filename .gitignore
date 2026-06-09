@@ -85,3 +85,7 @@ Desktop.ini
 
 # Notebook caches
 .local/
+
+# Local project documentation
+CLAUDE.md
+PLAN.md
