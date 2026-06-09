@@ -172,10 +172,141 @@
   note      = {arXiv:2310.14152}
 }
 
-% ---- Continual learning for IE ----
+% ---- Regularisation / optimisation-based CL ----
+@inproceedings{zenke2017si,
+  title     = {Continual Learning Through Synaptic Intelligence},
+  author    = {Zenke, Friedemann and Poole, Ben and Ganguli, Surya},
+  booktitle = {Proceedings of the 34th International Conference on Machine Learning (ICML)},
+  year      = {2017}
+}
+
+@inproceedings{aljundi2018mas,
+  title     = {Memory Aware Synapses: Learning What (Not) to Forget},
+  author    = {Aljundi, Rahaf and Babiloni, Francesca and Elhoseiny, Mohamed and Rohrbach, Marcus and Tuytelaars, Tinne},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year      = {2018}
+}
+
+@inproceedings{saha2021gpm,
+  title     = {Gradient Projection Memory for Continual Learning},
+  author    = {Saha, Gobinda and Garg, Isha and Roy, Kaushik},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2021}
+}
+
+% ---- Replay-based CL ----
+@inproceedings{chaudhry2019agem,
+  title     = {Efficient Lifelong Learning with {A-GEM}},
+  author    = {Chaudhry, Arslan and Ranzato, Marc'Aurelio and Rohrbach, Marcus and Elhoseiny, Mohamed},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2019}
+}
+
+@inproceedings{rebuffi2017icarl,
+  title     = {{iCaRL}: Incremental Classifier and Representation Learning},
+  author    = {Rebuffi, Sylvestre-Alvise and Kolesnikov, Alexander and Sperl, Georg and Lampert, Christoph H.},
+  booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2017}
+}
+
+% ---- Representation-based / PEFT CL ----
+@inproceedings{mcdonnell2023ranpac,
+  title     = {{RanPAC}: Random Projections and Pre-trained Models for Continual Learning},
+  author    = {McDonnell, Mark D. and Gong, Dong and Parvaneh, Amin and Abbasnejad, Ehsan and van den Hengel, Anton},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2023}
+}
+
+% TODO: verify SAFE author list and exact title before submission.
+@inproceedings{zhou2024safe,
+  title     = {{SAFE}: Slow and Fast Parameter-Efficient Tuning for Continual Learning with Pre-Trained Models},
+  author    = {Zhao and others},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2024}
+}
+
+@inproceedings{liang2024inflora,
+  title     = {{InfLoRA}: Interference-Free Low-Rank Adaptation for Continual Learning},
+  author    = {Liang, Yan-Shuo and Li, Wu-Jun},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2024}
+}
+
+% ---- Continual learning for IE (NER / RE) ----
+% TODO: verify CFNER author list and venue (COLING 2022) before submission.
+@inproceedings{zheng2022cfner,
+  title     = {Distilling Causal Effect from Miscellaneous Other-Class for Continual Named Entity Recognition},
+  author    = {Zheng, Junhao and others},
+  booktitle = {Proceedings of the 2022 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  year      = {2022}
+}
+
+@inproceedings{liu2023ice,
+  title     = {Teamwork Is Not Always Good: An Empirical Study of Classifier Drift in Class-incremental Information Extraction},
+  author    = {Liu, Minqian and Huang, Lifu},
+  booktitle = {Findings of the Association for Computational Linguistics: ACL},
+  year      = {2023}
+}
+
+% TODO: verify SpanKL author list and exact title before submission.
+@inproceedings{zheng2023spankl,
+  title     = {{SpanKL}: A Span-based Knowledge-Localisation Method for Continual Named Entity Recognition},
+  author    = {Zheng, Junhao and others},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  year      = {2023}
+}
+
+% TODO: verify ProtoNER author list before submission.
+@inproceedings{kumar2024protoner,
+  title     = {{ProtoNER}: Few-shot Incremental Named Entity Recognition for Visually-Rich Documents},
+  author    = {Kumar and others},
+  booktitle = {International Workshop on Document Analysis Systems (DAS)},
+  year      = {2024},
+  note      = {arXiv:2310.02372}
+}
+
 @inproceedings{zhang2023cpfd,
   title     = {Continual Named Entity Recognition without Catastrophic Forgetting},
   author    = {Zhang, Duzhen and Cong, Wei and Dong, Jiahua and Yu, Yahan and Chen, Xiuyi and Zhang, Yonggang and Fang, Zhen},
   booktitle = {Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
   year      = {2023}
+}
+
+% ---- Multimodal CL benchmarks / analysis ----
+@inproceedings{srinivasan2022climb,
+  title     = {{CLiMB}: A Continual Learning Benchmark for Vision-and-Language Tasks},
+  author    = {Srinivasan, Tejas and Chang, Ting-Yun and Pinto Alva, Leticia and Chochlakis, Georgios and Rostami, Mohammad and Thomason, Jesse},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS), Datasets and Benchmarks Track},
+  year      = {2022}
+}
+
+@inproceedings{zhang2025clcrossvqa,
+  title     = {{CL-CrossVQA}: A Continual Learning Benchmark for Cross-Domain Visual Question Answering},
+  author    = {Zhang, Yao and others},
+  booktitle = {Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
+  year      = {2025}
+}
+
+% TODO: verify CLOVE author list before submission.
+@inproceedings{lei2023clove,
+  title     = {Symbolic Replay: Scene Graph as Prompt for Continual Learning on {VQA} Task},
+  author    = {Lei and others},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  year      = {2023}
+}
+
+% TODO: verify DAHR author list and venue before submission.
+@inproceedings{zhao2024dahr,
+  title     = {Depth-Aware Hierarchical Replay for Continual Learning in Knowledge-Based Question Answering},
+  author    = {Zhao and others},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  year      = {2024}
+}
+
+% TODO: verify SEFE author list and exact venue before submission.
+@inproceedings{chen2024sefe,
+  title     = {{SEFE}: Superficial and Essential Forgetting Eliminator for Multimodal Continual Instruction Tuning},
+  author    = {Chen and others},
+  booktitle = {Proceedings of the International Conference on Machine Learning (ICML)},
+  year      = {2025}
 }

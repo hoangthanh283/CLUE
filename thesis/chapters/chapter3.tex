@@ -13,21 +13,40 @@ the primary contribution and constrains the remedy.
 \section{Problem Formulation}
 \label{sec:method-formulation}
 
-We study continual key-information extraction as token-level sequence labelling. A
-document is a triple $D = (W, B, I)$ where $W = (w_1,\dots,w_N)$ is a sequence of
-OCR tokens, $B = (b_1,\dots,b_N)$ with $b_i \in [0,1000]^4$ are normalised
-bounding boxes, and $I \in \mathbb{R}^{3\times224\times224}$ is the page image.
-The model produces BIO labels $Y = (y_1,\dots,y_N)$ with $y_i \in
-\mathcal{L}_{\text{task}}$, trained by token-level cross-entropy with ignored
-positions masked out. Performance is measured by entity-level F1 with BIO-aware
-span matching.
+We study continual \gls{kie} as token-level sequence labelling. It is useful to
+separate three layers of ``input/output'' that are easily conflated: at the
+\emph{user} level the input is a document scan and the output is extracted
+information; at the \emph{machine-learning} level the input is a stream of
+datasets $(\mathcal{D}_1,\mathcal{D}_2,\dots)$ and the output is the trained
+parameters; at the \emph{technical} level---the one we formalise---the input is a
+document tuple and the output is a label sequence. (All symbols introduced here
+are collected in the List of Notations.)
+
+A document is a triple $D = (W, B, I)$ where $W = (w_1,\dots,w_N)$ is a sequence of
+$N$ \gls{ocr} tokens, $B = (b_1,\dots,b_N)$ with $b_i \in [0,1000]^4$ are
+normalised bounding boxes, and $I \in \mathbb{R}^{3\times224\times224}$ is the page
+image. The model $f_\theta$ produces \gls{bio} labels $Y = (y_1,\dots,y_N)$ with
+$y_i \in \mathcal{L}_{\text{task}}$, trained by token-level cross-entropy $\ell$
+with ignored positions masked out. Performance is measured by entity-level F1 with
+\gls{bio}-aware span matching.
 
 In the continual setting the model sees a sequence of tasks $\mathcal{T}_1, \dots,
-\mathcal{T}_T$, each with its own data and (in CIL) its own growing label space.
-Let $\theta$ denote the encoder parameters and let $\theta^{(t)}$ be the
-parameters after training task $t$. The object of study is how performance on
-earlier tasks degrades as later tasks are learned, and---uniquely here---how that
-degradation is distributed across the \emph{components} of $\theta$.
+\mathcal{T}_T$, each with its own data and (in \gls{cil}) its own growing label
+space. Let $\theta$ denote the encoder parameters and $\theta^{(t)}$ the parameters
+after training task $t$; the learner may access only $\mathcal{D}_t$ and (if any) a
+memory $M$ at task $t$. The continual objective minimises the summed risk over all
+tasks,
+\[
+  \theta_T = \arg\min_{\theta}\ \sum_{t=1}^{T}
+    \mathbb{E}_{(x,y)\sim\mathcal{D}_t}\big[\ell(f_\theta(x), y)\big]
+  \quad \text{s.t.}\quad |M| \le M_{\max},\ \ \lVert\Delta\theta\rVert \le P,
+\]
+under a bounded memory $M$ (at most $M_{\max}$ exemplars) and a parameter budget
+$P$ (both relevant because the document setting favours memory-light,
+privacy-preserving methods). The object of
+study is how performance on earlier tasks degrades as later tasks are learned,
+and---uniquely here---how that degradation is distributed across the
+\emph{components} of $\theta$.
 
 \subsection{Defining a Component}
 \label{sec:method-components}
@@ -174,15 +193,34 @@ Algorithm~\ref{alg:forgetting-decomposition} summarises the procedure.
 \label{sec:method-diag-hypotheses}
 
 We test a null hypothesis $H_0$ that forgetting is uniform across components
-against $H_1$ that it concentrates in specific ones, using a Mann--Whitney U test
-on per-component CKA drops with Bonferroni correction across the eight parameter
-groups. Three sub-patterns are of particular interest because each implies a
-different remedy: fusion-focused forgetting (favours
-Candidate~A, \S\ref{sec:method-cand-a}), uniform forgetting with fast-drifting 2D
-position embeddings (favours Candidate~B, \S\ref{sec:method-cand-b}), and
-scenario-dependent patterns (favours Candidate~C, \S\ref{sec:method-cand-c}). If
-$H_0$ cannot be rejected, the thesis falls back to a characterisation-only
-contribution (\S\ref{sec:method-fallback}).
+against $H_1$ that it concentrates in specific ones. The test compares the
+per-component \gls{cka} drop (or per-group \gls{fim} drop) of a candidate group
+against the remaining groups with a Mann--Whitney U test; ``strongly supported''
+means $p < 0.05$ after Bonferroni correction across the eight parameter groups
+($\alpha = 0.05/8 \approx 0.0063$). Beyond the binary $H_0$/$H_1$, three
+sub-patterns are of particular interest because each implies a different remedy;
+Table~\ref{tab:subhypotheses} maps them to the candidate they trigger. If $H_0$
+cannot be rejected, the thesis falls back to a characterisation-only contribution
+(\S\ref{sec:method-fallback}).
+
+\begin{table}[t]
+  \centering
+  \caption[Diagnostic sub-hypotheses and the candidate each triggers]{Sub-hypotheses
+  considered in the diagnosis and the remedy each one selects. The pilot does not
+  pre-commit to any; the dominant pattern decides
+  (\S\ref{sec:method-selection}).}
+  \label{tab:subhypotheses}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Pattern} & \textbf{Signature} & \textbf{Triggers} \\
+    \midrule
+    $H_a$ fusion-heavy & Fusion group drops most in C4, not C1--C3 & Candidate~A (\S\ref{sec:method-cand-a}) \\
+    $H_b$ position-drift & 2D position embeddings drift fastest, broadly uniform else & Candidate~B (\S\ref{sec:method-cand-b}) \\
+    $H_c$ scenario-dependent & Pattern differs across task transitions & Candidate~C (\S\ref{sec:method-cand-c}) \\
+    $H_0$ no clear pattern & No group separates after correction & Characterisation-only (\S\ref{sec:method-fallback}) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \section{Mechanism-Targeted Continual Learning (DocCL)}
 \label{sec:method-remedy}

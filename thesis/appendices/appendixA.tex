@@ -13,22 +13,35 @@ recorded in the corresponding configuration files.
 
 \begin{table}[h]
   \centering
-  \caption[Default hyperparameters]{Default training hyperparameters. Method- and
-  scenario-specific values are recorded in the released configurations.}
+  \caption[Default hyperparameters]{Shared training defaults (top) and the main
+  method-specific hyperparameters with their sweep ranges (bottom). Scenario-specific
+  values are recorded in the released configurations.}
   \label{tab:hyperparameters}
   \begin{tabular}{ll}
     \toprule
     \textbf{Hyperparameter} & \textbf{Value} \\
     \midrule
+    \multicolumn{2}{l}{\emph{Shared}} \\
     Backbone               & LayoutLMv3-base (12 layers, hidden 768) \\
-    Optimiser              & AdamW \\
+    Optimiser              & AdamW (weight decay $0.01$) \\
     Learning rate          & $5\times10^{-5}$ \\
+    Warmup ratio           & $0.1$ \\
+    Gradient clipping       & max-norm $1.0$ \\
     Batch size             & 8 \\
-    Epochs per task        & TODO (confirm from configs) \\
+    Epochs per task        & 10 \\
+    Mixed precision        & fp16 \\
     Image resolution       & $224\times224$ \\
     Box coordinate range   & $[0,1000]^4$ \\
     Seeds                  & 42, 123, 7 \\
     Determinism            & fixed seeds; deterministic cuDNN \\
+    \midrule
+    \multicolumn{2}{l}{\emph{Method-specific (default; sweep)}} \\
+    EWC penalty $\lambda$  & $1000$; $\{10^2,10^3,10^4\}$ \\
+    LwF $\alpha$, temp.\ $T$ & $1.0$, $2.0$; $\alpha\in\{0.5,1,2\}$ \\
+    Replay buffer          & $200$; $\{200,500\}$ \\
+    DER++ logit weight     & $0.5$; $\{0.1,0.5,1\}$ \\
+    L2P pool / length / top-$K$ & $10$ / $5$ / $5$ \\
+    LoRA rank / $\alpha$ / dropout & $8$ / $16$ / $0.1$; rank $\in\{4,8,16\}$ \\
     \bottomrule
   \end{tabular}
 \end{table}

@@ -10,47 +10,46 @@ Modern organisations process a continuous stream of \emph{visually-rich
 documents}---forms, invoices, receipts, contracts, and reports---whose meaning
 depends not only on the words they contain but on \emph{where} those words sit on
 the page. Extracting structured information from such documents is the task of
-\emph{key-information extraction} (KIE), the cornerstone of document-understanding
-systems deployed in finance, logistics, healthcare, and public administration.
-The dominant approach casts KIE as token-level sequence labelling over a tri-modal
-input: text obtained by optical character recognition (OCR), the two-dimensional
-layout encoded as bounding boxes, and the page image. Multimodal document
-encoders such as LayoutLMv3~\citep{huang2022layoutlmv3}, LiLT~\citep{wang2022lilt},
-and BROS~\citep{hong2022bros} fuse these signals and define the state of the art.
+\gls{kie}, the cornerstone of document-understanding systems deployed in finance,
+logistics, healthcare, and public administration. The dominant approach casts
+\gls{kie} as token-level sequence labelling over a tri-modal input: text obtained
+by \gls{ocr}, the two-dimensional layout encoded as bounding boxes, and the page
+image. Multimodal document encoders such as LayoutLMv3~\citep{huang2022layoutlmv3},
+LiLT~\citep{wang2022lilt}, and BROS~\citep{hong2022bros} fuse these signals and
+define the state of the art.
 
 Deployed document systems are not static. New document types appear, annotation
 schemas are extended, and the distribution of incoming documents drifts as an
 organisation enters new markets or adopts new templates. A model must therefore
 \emph{evolve}---learning new entity types and new domains over time---without
-re-training from scratch on all historical data, which is often impossible
-because earlier data is unavailable, expensive to store, or restricted for
-privacy reasons. This is the setting of \emph{continual learning} (CL): learning a
-sequence of tasks while retaining performance on those seen earlier.
+re-training from scratch on all historical data, which is often impossible because
+earlier data is unavailable, expensive to store, or restricted for privacy reasons
+(\gls{pii} under \gls{gdpr}). This is the setting of \gls{cl}: learning a sequence
+of tasks while retaining performance on those seen earlier.
 
-The central obstacle to continual learning is \emph{catastrophic
-forgetting}~\citep{mccloskey1989catastrophic}: when a neural network is fine-tuned
-on a new task, gradient updates overwrite the parameters that encoded earlier
-tasks, and performance on those tasks collapses. A large literature has developed
-remedies---regularising important weights~\citep{kirkpatrick2017ewc},
-distilling from past models~\citep{li2017lwf}, replaying stored
-exemplars~\citep{rolnick2019er,buzzega2020der}, learning task-specific
-prompts~\citep{wang2022l2p,wang2022dualprompt,smith2023coda}, or allocating
-low-rank adapters per task~\citep{wang2023olora}. Almost all of these methods,
-however, were developed and evaluated on \emph{unimodal} image- or text-classification
-benchmarks, and they treat the network as a homogeneous block: regularisation is
-applied uniformly across parameters, or layers are frozen by hand-tuned heuristics.
+The central obstacle to \gls{cl} is \gls{cf}~\citep{mccloskey1989catastrophic}:
+when a neural network is fine-tuned on a new task, gradient updates overwrite the
+parameters that encoded earlier tasks, and performance on those tasks collapses. A
+large literature has developed remedies---regularising important
+weights~\citep{kirkpatrick2017ewc}, distilling from past models~\citep{li2017lwf},
+replaying stored exemplars~\citep{rolnick2019er,buzzega2020der}, learning
+task-specific prompts~\citep{wang2022l2p,wang2022dualprompt,smith2023coda}, or
+allocating low-rank adapters per task~\citep{wang2023olora}. Almost all of these
+methods, however, were developed and evaluated on \emph{unimodal} image- or
+text-classification benchmarks, and they treat the network as a homogeneous block:
+regularisation is applied uniformly across parameters, or layers are frozen by
+hand-tuned heuristics.
 
 For a \emph{tri-modal} document encoder this uniform treatment is unsatisfying,
 because the network is manifestly heterogeneous: it contains a text stream, a
 visual/patch stream, layout (2D position) embeddings, and cross-modal fusion
-layers that combine them. It is not known which of these components forgets
-most, nor whether the pattern is stable across continual scenarios. Answering
-that question is a prerequisite for designing a continual-learning method that
-spends its capacity where forgetting actually happens rather than spreading it
-thinly across the whole network. This thesis takes a \emph{measure-first,
-then-fix} stance: it first \emph{diagnoses} where forgetting lives in a multimodal
-document encoder, and only then proposes a remedy whose design is justified by
-the diagnosis.
+layers that combine them. It is not known which of these components forgets most,
+nor whether the pattern is stable across continual scenarios. Answering that
+question is a prerequisite for designing a \gls{cl} method that spends its capacity
+where forgetting actually happens rather than spreading it thinly across the whole
+network. This thesis takes a \emph{measure-first, then-fix} stance: it first
+\emph{diagnoses} where forgetting lives in a multimodal document encoder, and only
+then proposes a remedy whose design is justified by the diagnosis.
 
 \section{Objectives}
 \label{sec:intro-objectives}
@@ -58,27 +57,26 @@ the diagnosis.
 The thesis pursues the following concrete objectives:
 
 \begin{enumerate}
-  \item \textbf{Formulate continual document KIE as a unified problem.} Cast
-        key-information extraction across heterogeneous datasets (FUNSD, CORD,
-        SROIE) as continual token-level sequence labelling, and define three
-        continual scenarios---class-incremental (CIL), domain-incremental (DIL),
-        and a mixed scenario---over a shared output format
-        (Chapter~\ref{ch:experimental-setup}).
+  \item \textbf{Formulate continual document \gls{kie} as a unified problem.} Cast
+        \gls{kie} across heterogeneous datasets (FUNSD, CORD, SROIE) as continual
+        token-level sequence labelling, and define three continual
+        scenarios---\gls{cil}, \gls{dil}, and a mixed scenario---over a shared
+        output format (Chapter~\ref{ch:experimental-setup}).
   \item \textbf{Build a per-component forgetting diagnostic.} Develop an
         instrumentation protocol that attributes forgetting to individual
         components of a tri-modal encoder using representational drift (linear
-        CKA), per-parameter-group Fisher information, and standard forgetting
-        metrics, under a controlled modality-ablation design
+        \gls{cka}), per-parameter-group \gls{fim}, and standard forgetting metrics,
+        under a controlled modality-ablation design
         (Chapter~\ref{ch:methodology}, \S\ref{sec:method-diagnostic}).
-  \item \textbf{Characterise where forgetting concentrates.} Apply the
-        diagnostic to naive sequential fine-tuning and test whether forgetting is
-        uniform across components or concentrates in specific ones, establishing
-        the stability of any finding across seeds and task orders
+  \item \textbf{Characterise where forgetting concentrates.} Apply the diagnostic
+        to naive sequential fine-tuning and test whether forgetting is uniform
+        across components or concentrates in specific ones, establishing the
+        stability of any finding across seeds and task orders
         (Chapter~\ref{ch:results}, \S\ref{sec:results-diagnosis}).
   \item \textbf{Derive and evaluate a mechanism-targeted remedy.} Propose a
-        continual-learning method whose mechanism is concentrated on the
-        dominant-forgetting component identified by the diagnosis, and evaluate it
-        against ten baselines spanning the major CL families
+        \gls{cl} method whose mechanism is concentrated on the dominant-forgetting
+        component identified by the diagnosis, and evaluate it against ten
+        baselines spanning the major method families
         (Chapters~\ref{ch:methodology} and~\ref{ch:results}).
   \item \textbf{Establish a reproducible benchmark.} Release the FCS-CL benchmark
         (FUNSD/CORD/SROIE continual scenarios), the diagnostic tooling, and all
@@ -94,44 +92,43 @@ The thesis pursues the following concrete objectives:
 
 \noindent\textbf{A per-component forgetting diagnosis for tri-modal document
 encoders.} We introduce, to our knowledge, the first protocol that decomposes
-catastrophic forgetting in a multimodal document encoder into its text, visual,
-layout, and fusion contributions. By masking input modalities of a \emph{single}
-LayoutLMv3 architecture we isolate each modality's contribution without the
-confound of comparing different architectures.
+\gls{cf} in a multimodal document encoder into its text, visual, layout, and fusion
+contributions. By masking input modalities of a \emph{single} LayoutLMv3
+architecture we isolate each modality's contribution without the confound of
+comparing different architectures.
 % TODO: state headline finding + effect size once pilot is analysed.
 
-\noindent\textbf{A mechanism-targeted continual-learning method (DocCL).} Guided
-by the diagnosis, we design a method that concentrates its continual-learning
-mechanism on the dominant-forgetting component rather than treating the network
-uniformly.
+\noindent\textbf{A mechanism-targeted continual-learning method (DocCL).} Guided by
+the diagnosis, we design a method that concentrates its \gls{cl} mechanism on the
+dominant-forgetting component rather than treating the network uniformly.
 % TODO: state the improvement over the best component-agnostic baseline
 % (e.g. "+X entity-F1, -Y BWT on 2/3 scenarios") once the main grid is complete.
 
 \noindent\textbf{The FCS-CL benchmark and reproducible tooling.} We provide a
-unified continual-learning benchmark over three public document datasets with
-three scenarios, ten baselines, and per-component instrumentation, all under a
-single configuration system and tracked experiment log, enabling like-for-like
-comparison that the fragmented prior literature has lacked.
+unified \gls{cl} benchmark over three public document datasets with three
+scenarios, ten baselines, and per-component instrumentation, all under a single
+configuration system and tracked experiment log, enabling like-for-like comparison
+that the fragmented prior literature has lacked.
 
 \section{Overview of the Dissertation}
 \label{sec:intro-overview}
 
-\textbf{Chapter~\ref{ch:background}} reviews document understanding and
-information extraction, the continual-learning problem and its method families,
-the nascent literature on continual learning for information extraction, evidence
-on where forgetting lives in multimodal models, and the backbones relevant to
-this work; it closes by identifying the research gaps the thesis addresses.
+\textbf{Chapter~\ref{ch:background}} reviews document understanding and \gls{ie},
+the \gls{cl} problem and its method families, the nascent literature on \gls{cl}
+for \gls{ie}, evidence on where forgetting lives in multimodal models, and the
+backbones relevant to this work; it closes by identifying the research gaps the
+thesis addresses.
 \textbf{Chapter~\ref{ch:methodology}} presents the two methodological
 contributions: the per-component forgetting diagnostic and the mechanism-targeted
-continual-learning method derived from it.
+\gls{cl} method derived from it.
 \textbf{Chapter~\ref{ch:implementation}} describes the framework, the
-document-IE pipeline, and the system architecture, including the instrumentation
-hooks and experiment tracking.
+document-\gls{ie} pipeline, and the system architecture, including the
+instrumentation hooks and experiment tracking.
 \textbf{Chapter~\ref{ch:experimental-setup}} details the datasets, the continual
 task construction, the model and training configuration, the baselines, and the
 evaluation methodology.
 \textbf{Chapter~\ref{ch:results}} reports the diagnosis as the headline result,
 compares the remedy against baselines, presents ablations and a computational-cost
 analysis, and discusses implications and threats to validity.
-\textbf{Chapter~\ref{ch:conclusions}} states limitations, conclusions, and
-future work.
+\textbf{Chapter~\ref{ch:conclusions}} states limitations, conclusions, and future
+work.

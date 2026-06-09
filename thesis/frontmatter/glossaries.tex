@@ -30,6 +30,37 @@
 \newacronym{re}{RE}{Relation Extraction}
 \newacronym{til}{TIL}{Task-Incremental Learning}
 \newacronym{vrdu}{VRDU}{Visually-Rich Document Understanding}
+% --- IE / task acronyms ---
+\newacronym{ee}{EE}{Event Extraction}
+\newacronym{cner}{CNER}{Continual Named-Entity Recognition}
+\newacronym{cre}{CRE}{Continual Relation Extraction}
+\newacronym{kgc}{KGC}{Knowledge-Graph Completion}
+\newacronym{kbqa}{KBQA}{Knowledge-Based Question Answering}
+\newacronym{vqa}{VQA}{Visual Question Answering}
+\newacronym{oie}{OIE}{Open Information Extraction}
+% --- CL methods / mechanisms ---
+\newacronym{gem}{GEM}{Gradient Episodic Memory}
+\newacronym{agem}{A-GEM}{Averaged Gradient Episodic Memory}
+\newacronym{icarl}{iCaRL}{incremental Classifier and Representation Learning}
+\newacronym{si}{SI}{Synaptic Intelligence}
+\newacronym{mas}{MAS}{Memory-Aware Synapses}
+\newacronym{gpm}{GPM}{Gradient Projection Memory}
+\newacronym{ogd}{OGD}{Orthogonal Gradient Descent}
+\newacronym{olora}{O-LoRA}{Orthogonal Low-Rank Adaptation}
+\newacronym{kd}{KD}{Knowledge Distillation}
+\newacronym{moe}{MoE}{Mixture of Experts}
+\newacronym{peft}{PEFT}{Parameter-Efficient Fine-Tuning}
+% --- pre-training objectives / analysis tools ---
+\newacronym{mlm}{MLM}{Masked Language Modelling}
+\newacronym{mim}{MIM}{Masked Image Modelling}
+\newacronym{wpa}{WPA}{Word--Patch Alignment}
+\newacronym{svd}{SVD}{Singular Value Decomposition}
+\newacronym{fim}{FIM}{Fisher Information Matrix}
+% --- architectures / misc ---
+\newacronym{bert}{BERT}{Bidirectional Encoder Representations from Transformers}
+\newacronym{vit}{ViT}{Vision Transformer}
+\newacronym{pii}{PII}{Personally Identifiable Information}
+\newacronym{gdpr}{GDPR}{General Data Protection Regulation}
 
 % =====================================================================
 %  Notation glossary (printed as "List of Notations" by main.tex).
@@ -96,3 +127,43 @@
   name={\ensuremath{\lambda}},
   description={regularisation strength (e.g.\ $\lambda_{\text{layout}}$, $\lambda_{\text{other}}$ in L-EWC)},
   type=notation, sort=12}
+
+\newglossaryentry{not:M}{
+  name={\ensuremath{M}},
+  description={replay memory buffer of stored past exemplars (size $|M|$)},
+  type=notation, sort=13}
+
+\newglossaryentry{not:P}{
+  name={\ensuremath{P}},
+  description={parameter budget (bound on $\lVert\Delta\theta\rVert$)},
+  type=notation, sort=14}
+
+\newglossaryentry{not:d}{
+  name={\ensuremath{d}},
+  description={encoder hidden dimension ($768$ for the base model)},
+  type=notation, sort=15}
+
+\newglossaryentry{not:L}{
+  name={\ensuremath{L}},
+  description={number of transformer layers ($12$ for the base model)},
+  type=notation, sort=16}
+
+\newglossaryentry{not:r}{
+  name={\ensuremath{r}},
+  description={LoRA rank (low-rank adapter dimension)},
+  type=notation, sort=17}
+
+\newglossaryentry{not:q}{
+  name={\ensuremath{q(x)}},
+  description={layout-aware prompt query for input $x$},
+  type=notation, sort=18}
+
+\newglossaryentry{not:hcls}{
+  name={\ensuremath{h_{\mathrm{CLS}}}},
+  description={the \textsc{cls}-token embedding},
+  type=notation, sort=19}
+
+\newglossaryentry{not:Wlayout}{
+  name={\ensuremath{W_{\text{layout}}}},
+  description={trainable projection of the layout signature $\phi(\text{boxes})$},
+  type=notation, sort=20}
