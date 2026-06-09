@@ -72,7 +72,7 @@ output:
 
 # Weights & Biases (wandb) experiment tracking - optional
 wandb:
-  use_wandb: false
+  use_wandb: true
   wandb_entity: null
   wandb_project: null
   #wandb_api_key: null  # Use WANDB_API_KEY env var

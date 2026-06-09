@@ -79,5 +79,5 @@ output:
   push_to_hub: false
 
 wandb:
-  use_wandb: false
+  use_wandb: true
   wandb_entity: null
