@@ -62,8 +62,13 @@ Catastrophic Forgetting in LayoutLMv3 and a Mechanism-Targeted Remedy}
 \listoftables
 
 \glsaddall
-\printglossary[type=\acronymtype, title=List of Acronyms, toctitle=List of Acronyms]
+% Ragged-right inside the two-column glossary lists so narrow columns don't
+% stretch inter-word spacing (e.g. long tokens like "Begin--Inside--Outside").
+\begingroup
+\RaggedRight
+\printglossary[type=\acronymtype, title=List of Acronyms, toctitle=List of Acronyms, nonumberlist]
 \printglossary[type=notation, title=List of Notations, toctitle=List of Notations, nonumberlist]
+\endgroup
 
 \newpage
 \pagenumbering{arabic}
