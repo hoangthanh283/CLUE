@@ -12,9 +12,23 @@ Built on the **official HUST thesis class** `hust-thesis` (Ngoc Bui, CC BY 4.0).
 bundled OTF fonts) + **BibTeX**. A `latexmkrc` (`$pdf_mode = 5`) forces XeLaTeX, so
 the project builds correctly on Overleaf and locally without any manual setting.
 
+### Compile locally (no Overleaf)
+
+You need a TeX distribution with XeLaTeX (e.g. MacTeX / TeX Live). Times New Roman
+must be available as a system font (it is on macOS by default).
+
 ```bash
-latexmk -interaction=nonstopmode main.tex   # latexmkrc selects xelatex
+cd thesis
+latexmk -interaction=nonstopmode main.tex   # latexmkrc selects xelatex + bibtex + glossaries
+# output: thesis/main.pdf      (clean aux files with:  latexmk -c)
 ```
+
+### Compile via GitHub CI (no Overleaf, no local TeX)
+
+`.github/workflows/build-thesis.yml` builds the PDF on every push that touches
+`thesis/**` (and on manual *Run workflow*). It installs TeX Live + Times New Roman
+in the runner and uploads the result. Download it from the Actions run page →
+**Artifacts → `thesis-pdf`**. No timeout, free for public repos.
 
 > On Overleaf, if you still see an `\RequireXeTeX` / `mathspec` "Emergency stop",
 > the project is being built with pdfLaTeX — set *Menu → Compiler → XeLaTeX* and

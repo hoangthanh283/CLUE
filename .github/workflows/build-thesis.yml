@@ -1,0 +1,54 @@
+name: Build thesis PDF
+
+# Builds thesis/main.pdf with XeLaTeX on every push that touches the thesis,
+# and on manual dispatch. The compiled PDF is uploaded as a downloadable
+# artifact (Actions run -> Artifacts -> thesis-pdf).
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "thesis/**"
+      - ".github/workflows/build-thesis.yml"
+  pull_request:
+    paths:
+      - "thesis/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install TeX Live, latexmk, and Times New Roman
+        run: |
+          # The hust-thesis class needs XeLaTeX (fontspec/mathspec) and the
+          # "Times New Roman" font (\setmainfont). ttf-mscorefonts-installer
+          # provides it; fonts-liberation is a free metric-compatible fallback.
+          echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" \
+            | sudo debconf-set-selections
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            texlive-full latexmk ttf-mscorefonts-installer fonts-liberation
+          sudo fc-cache -f
+
+      - name: Compile (XeLaTeX via latexmkrc)
+        working-directory: thesis
+        run: latexmk -interaction=nonstopmode -halt-on-error main.tex
+
+      - name: Upload PDF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: thesis-pdf
+          path: thesis/main.pdf
+          if-no-files-found: error
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: thesis-build-log
+          path: thesis/main.log
+          if-no-files-found: ignore
