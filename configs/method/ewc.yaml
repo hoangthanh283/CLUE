@@ -1,0 +1,8 @@
+name: ewc
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+lambda_: 1000.0
+fisher_n_samples: 200
+ewc_gamma: 1.0

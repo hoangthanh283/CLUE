@@ -1,0 +1,13 @@
+defaults:
+  - scenario: single_funsd
+  - method: naive
+  - model: layoutlmv3_base
+  - training: default
+  - _self_
+
+seed: 42
+output_dir: ./results
+
+wandb:
+  project: doccl-aaai2027
+  mode: online  # set to "offline" for vast.ai with no internet

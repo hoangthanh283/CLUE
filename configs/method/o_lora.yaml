@@ -1,0 +1,13 @@
+name: o_lora
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.1
+lambda_ortho: 0.5
+target_modules:
+  - query
+  - key
+  - value

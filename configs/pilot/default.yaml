@@ -1,0 +1,8 @@
+name: pilot
+condition: c4_full  # one of: c1_bert, c2_no_text, c3_no_image, c4_full
+seeds: [42, 123, 7]
+epochs_per_task: 10
+batch_size: 8
+cka_n_samples: 500
+fisher_n_samples: 200
+output_dir: results/pilot

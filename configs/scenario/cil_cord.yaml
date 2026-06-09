@@ -1,0 +1,3 @@
+name: cil_cord
+kwargs:
+  num_sessions: 5
