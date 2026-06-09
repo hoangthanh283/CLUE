@@ -1,0 +1,149 @@
+% =====================================================================
+\chapter{Experimental Setup}
+\label{ch:experimental-setup}
+% =====================================================================
+
+This chapter specifies the datasets (\S\ref{sec:exp-datasets}), the continual
+task construction (\S\ref{sec:exp-tasks}), the model and training configuration
+(\S\ref{sec:exp-config}), the baselines (\S\ref{sec:exp-baselines}), and the
+evaluation methodology (\S\ref{sec:exp-eval}). Together these define the FCS-CL
+benchmark used in Chapter~\ref{ch:results}.
+
+\section{Datasets}
+\label{sec:exp-datasets}
+
+We use three public visually-rich document datasets that together span forms and
+receipts and a wide range of label-space sizes. Their statistics are summarised in
+Table~\ref{tab:dataset-stats}.
+
+\begin{description}
+  \item[FUNSD] noisy scanned forms with three entity types (HEADER, QUESTION,
+        ANSWER) plus background, giving 7 BIO tags. Small and noisy, it is the
+        clearest test of the KEY/VALUE relation.
+  \item[CORD] receipt understanding with 30 fine-grained classes grouped into five
+        super-classes (menu, sub\_total, total, void\_menu, sub), giving 61 BIO
+        tags. Its fine-grained label space makes it the natural host for the
+        class-incremental scenario.
+  \item[SROIE] scanned receipts with four fields (company, address, date, total),
+        giving 9 BIO tags.
+\end{description}
+
+\begin{table}[t]
+  \centering
+  \caption[Dataset statistics]{Statistics of the three datasets. Tag counts are
+  BIO-aware and include the background ``O'' tag. Split sizes follow the standard
+  releases used in this work.}
+  \label{tab:dataset-stats}
+  \begin{tabular}{lcccl}
+    \toprule
+    \textbf{Dataset} & \textbf{Train} & \textbf{Test} & \textbf{BIO tags} & \textbf{Domain} \\
+    \midrule
+    FUNSD & 149 & 50  & 7  & scanned forms \\
+    CORD  & 800 & 100 & 61 & receipts (fine-grained) \\
+    SROIE & 626 & 347 & 9  & scanned receipts \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Continual-Learning Task Construction}
+\label{sec:exp-tasks}
+
+Three scenarios are constructed over these datasets.
+
+\paragraph{Class-incremental (CIL-CORD).} CORD's 30 fine-grained classes are split
+into five sessions of six classes each. The partition follows super-class
+boundaries where possible, ordered as a curriculum from core menu fields to
+auxiliary void/sub categories, with sessions balanced to roughly equal training
+size. Each session tags its super-class context as metadata so that forgetting can
+be analysed within versus across super-classes.
+
+\paragraph{Domain-incremental (DIL).} FUNSD, SROIE, and CORD are remapped onto a
+unified four-entity schema (HEADER, KEY, VALUE, OTHER; 9 BIO tags) and presented
+in order of increasing distance from that canonical schema:
+FUNSD\,$\rightarrow$\,SROIE\,$\rightarrow$\,CORD. FUNSD's QUESTION/ANSWER maps to
+KEY/VALUE; SROIE's COMPANY maps to KEY and its other fields to VALUE; CORD's
+productive super-classes map to VALUE and its void/sub categories to OTHER. The
+mapping and its trade-offs (notably the sparsity of KEY outside FUNSD) are recorded
+as part of the benchmark.
+
+\paragraph{Mixed.} A six-session scenario interleaves class-incremental and domain
+shifts to stress methods under combined non-stationarity.
+
+For robustness, the diagnosis is additionally repeated under at least one alternate
+task order, and all scenarios are run for three seeds.
+
+\section{Model Architecture and Training Configuration}
+\label{sec:exp-config}
+
+The backbone is LayoutLMv3-base (\S\ref{sec:impl-framework}) with a token-classification
+head expanded as new labels appear. Unless otherwise stated, training uses the
+pilot defaults---learning rate $5\times10^{-5}$, batch size 8, and a fixed number
+of epochs per task---with AdamW. Hyperparameter sensitivity is treated as a
+separate ablation in the main grid rather than tuned per method, to keep the
+comparison fair. Determinism is enforced via fixed seeds and deterministic cuDNN.
+Full hyperparameters are listed in Appendix~\ref{app:hyperparameters}.
+
+\section{Baselines and Continual-Learning Strategies}
+\label{sec:exp-baselines}
+
+We compare against ten baselines spanning the major families, plus the selected
+DocCL method, all under the shared interface of \S\ref{sec:impl-cl-core}:
+
+\begin{itemize}
+  \item \textbf{Bounds:} \emph{Naive} sequential fine-tuning (lower bound) and
+        \emph{Joint} multi-task training on all data (oracle upper bound).
+  \item \textbf{Regularisation:} EWC~\citep{kirkpatrick2017ewc},
+        LwF~\citep{li2017lwf}.
+  \item \textbf{Replay:} ER~\citep{rolnick2019er}, DER++~\citep{buzzega2020der}.
+  \item \textbf{Prompt-based:} L2P~\citep{wang2022l2p},
+        DualPrompt~\citep{wang2022dualprompt}, CODA-Prompt~\citep{smith2023coda}.
+  \item \textbf{LoRA-based:} O-LoRA~\citep{wang2023olora}.
+\end{itemize}
+
+Methods are reproduced and validated against their published behaviour before being
+extended (for example, ER is made to work before DER++). The selected DocCL method
+is added once the diagnosis fixes its design (\S\ref{sec:method-selected}).
+
+\section{Evaluation Methodology}
+\label{sec:exp-eval}
+
+\subsection{Validation Protocol}
+\label{sec:eval-protocol}
+
+After each task the model is evaluated on all tasks seen so far, populating the
+accuracy matrix $R$. The primary task metric is entity-level F1 with BIO-aware
+span matching (\texttt{seqeval}).
+
+\subsection{Metrics}
+\label{sec:eval-metrics}
+
+From the accuracy matrix $R[i,j]$ (F1 on task $j$ after training task $i$) we
+report the standard continual-learning metrics~\citep{lopezpaz2017gem}:
+
+\begin{align}
+  \mathrm{AA}  &= \frac{1}{T}\sum_{j=1}^{T} R[T,j] && \text{(average accuracy)},\\
+  \mathrm{BWT} &= \frac{1}{T-1}\sum_{j=1}^{T-1}\big(R[T,j]-R[j,j]\big) && \text{(backward transfer)},\\
+  \mathrm{FWT} &= \frac{1}{T-1}\sum_{j=2}^{T}\big(R[j-1,j]-\bar{b}_j\big) && \text{(forward transfer)},
+\end{align}
+where $\bar{b}_j$ is a random-initialisation reference for task $j$, and average
+forgetting is $\mathrm{AF}=-\mathrm{BWT}$. In addition we report the
+\emph{per-component} drift metrics of \S\ref{sec:method-diag-metrics} (per-layer
+CKA and per-group Fisher), which are the diagnostic contribution of this thesis.
+
+\subsection{Repeated-Seed Protocol and Statistical Testing}
+\label{sec:eval-seeds}
+
+All main results are reported as mean\,$\pm$\,standard deviation over three seeds
+(42, 123, 7). Comparisons between the selected method and the strongest baseline
+use a paired test (paired $t$-test or Wilcoxon signed-rank), and the per-component
+diagnosis uses a Mann--Whitney U test with Bonferroni correction across the eight
+parameter groups (\S\ref{sec:method-diag-hypotheses}).
+
+\section{Summary}
+\label{sec:exp-summary}
+
+The FCS-CL benchmark comprises three datasets, three continual scenarios, ten
+baselines plus the selected method, and a dual evaluation: standard
+continual-learning metrics (AA, BWT, FWT, AF) together with the per-component
+diagnostic metrics. All results are reported over three seeds with statistical
+tests. The next chapter presents the findings.

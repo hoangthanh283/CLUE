@@ -1,0 +1,181 @@
+% =====================================================================
+%  References for the DocCL thesis.
+%  Seeded from the works cited in the thesis text. Expand from the 65-source
+%  CL4IE wiki as additional citations are added. Verify exact page numbers /
+%  venues before final submission.
+% =====================================================================
+
+% ---- Backbones ----
+@inproceedings{huang2022layoutlmv3,
+  title     = {{LayoutLMv3}: Pre-training for Document {AI} with Unified Text and Image Masking},
+  author    = {Huang, Yupan and Lv, Tengchao and Cui, Lei and Lu, Yutong and Wei, Furu},
+  booktitle = {Proceedings of the 30th ACM International Conference on Multimedia (MM)},
+  year      = {2022},
+  note      = {arXiv:2204.08387}
+}
+
+@inproceedings{wang2022lilt,
+  title     = {{LiLT}: A Simple yet Effective Language-Independent Layout Transformer for Structured Document Understanding},
+  author    = {Wang, Jiapeng and Jin, Lianwen and Ding, Kai},
+  booktitle = {Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (ACL)},
+  year      = {2022},
+  note      = {arXiv:2202.13669}
+}
+
+@inproceedings{hong2022bros,
+  title     = {{BROS}: A Pre-trained Language Model Focusing on Text and Layout for Better Key Information Extraction from Documents},
+  author    = {Hong, Teakgyu and Kim, Donghyun and Ji, Mingi and Hwang, Wonseok and Nam, Daehyun and Park, Sungrae},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  year      = {2022}
+}
+
+@inproceedings{appalaraju2021docformer,
+  title     = {{DocFormer}: End-to-End Transformer for Document Understanding},
+  author    = {Appalaraju, Srikar and Jasani, Bhavan and Kota, Bhargava Urala and Xie, Yusheng and Manmatha, R.},
+  booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+  year      = {2021}
+}
+
+% ---- Catastrophic forgetting and continual-learning surveys ----
+@article{mccloskey1989catastrophic,
+  title   = {Catastrophic Interference in Connectionist Networks: The Sequential Learning Problem},
+  author  = {McCloskey, Michael and Cohen, Neal J.},
+  journal = {Psychology of Learning and Motivation},
+  volume  = {24},
+  pages   = {109--165},
+  year    = {1989}
+}
+
+@article{wang2024survey,
+  title   = {A Comprehensive Survey of Continual Learning: Theory, Method and Application},
+  author  = {Wang, Liyuan and Zhang, Xingxing and Su, Hang and Zhu, Jun},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI)},
+  year    = {2024}
+}
+
+% ---- Diagnostic / analysis foundations ----
+@inproceedings{ramasesh2021anatomy,
+  title     = {Anatomy of Catastrophic Forgetting: Hidden Representations and Task Semantics},
+  author    = {Ramasesh, Vinay V. and Dyer, Ethan and Raghu, Maithra},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2021},
+  note      = {arXiv:2007.07400}
+}
+
+@article{zhai2023investigating,
+  title   = {Investigating the Catastrophic Forgetting in Multimodal Large Language Models},
+  author  = {Zhai, Yuexiang and Tong, Shengbang and Li, Xiao and Cai, Mu and Qu, Qing and Lee, Yong Jae and Ma, Yi},
+  journal = {arXiv preprint arXiv:2309.10313},
+  year    = {2023}
+}
+
+@inproceedings{kornblith2019similarity,
+  title     = {Similarity of Neural Network Representations Revisited},
+  author    = {Kornblith, Simon and Norouzi, Mohammad and Lee, Honglak and Hinton, Geoffrey},
+  booktitle = {Proceedings of the 36th International Conference on Machine Learning (ICML)},
+  year      = {2019},
+  note      = {arXiv:1905.00414}
+}
+
+% ---- Regularisation-based CL ----
+@article{kirkpatrick2017ewc,
+  title   = {Overcoming Catastrophic Forgetting in Neural Networks},
+  author  = {Kirkpatrick, James and Pascanu, Razvan and Rabinowitz, Neil and Veness, Joel and Desjardins, Guillaume and Rusu, Andrei A. and Milan, Kieran and Quan, John and Ramalho, Tiago and Grabska-Barwinska, Agnieszka and others},
+  journal = {Proceedings of the National Academy of Sciences (PNAS)},
+  volume  = {114},
+  number  = {13},
+  pages   = {3521--3526},
+  year    = {2017}
+}
+
+@inproceedings{li2017lwf,
+  title     = {Learning without Forgetting},
+  author    = {Li, Zhizhong and Hoiem, Derek},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year      = {2016}
+}
+
+% ---- Replay-based CL ----
+@inproceedings{lopezpaz2017gem,
+  title     = {Gradient Episodic Memory for Continual Learning},
+  author    = {Lopez-Paz, David and Ranzato, Marc'Aurelio},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2017}
+}
+
+@inproceedings{rolnick2019er,
+  title     = {Experience Replay for Continual Learning},
+  author    = {Rolnick, David and Ahuja, Arun and Schwarz, Jonathan and Lillicrap, Timothy P. and Wayne, Greg},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2019}
+}
+
+@inproceedings{buzzega2020der,
+  title     = {Dark Experience for General Continual Learning: A Strong, Simple Baseline},
+  author    = {Buzzega, Pietro and Boschini, Matteo and Porrello, Angelo and Abati, Davide and Calderara, Simone},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2020},
+  note      = {arXiv:2004.07211}
+}
+
+% ---- Prompt-based CL ----
+@inproceedings{wang2022l2p,
+  title     = {Learning to Prompt for Continual Learning},
+  author    = {Wang, Zifeng and Zhang, Zizhao and Lee, Chen-Yu and Zhang, Han and Sun, Ruoxi and Ren, Xiaoqi and Su, Guolong and Perot, Vincent and Dy, Jennifer and Pfister, Tomas},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2022}
+}
+
+@inproceedings{wang2022dualprompt,
+  title     = {{DualPrompt}: Complementary Prompting for Rehearsal-free Continual Learning},
+  author    = {Wang, Zifeng and Zhang, Zizhao and Ebrahimi, Sayna and Sun, Ruoxi and Zhang, Han and Lee, Chen-Yu and Ren, Xiaoqi and Su, Guolong and Perot, Vincent and Dy, Jennifer and Pfister, Tomas},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year      = {2022}
+}
+
+@inproceedings{smith2023coda,
+  title     = {{CODA-Prompt}: COntinual Decomposed Attention-based Prompting for Rehearsal-Free Continual Learning},
+  author    = {Smith, James Seale and Karlinsky, Leonid and Gutta, Vyshnavi and Cascante-Bonilla, Paola and Kim, Donghyun and Arbelle, Assaf and Panda, Rameswar and Feris, Rogerio and Kira, Zsolt},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2023}
+}
+
+% ---- LoRA / parameter-efficient ----
+@inproceedings{hu2022lora,
+  title     = {{LoRA}: Low-Rank Adaptation of Large Language Models},
+  author    = {Hu, Edward J. and Shen, Yelong and Wallis, Phillip and Allen-Zhu, Zeyuan and Li, Yuanzhi and Wang, Shean and Wang, Lu and Chen, Weizhu},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2022}
+}
+
+% TODO: complete the D-MoLE author list before submission.
+@inproceedings{ge2025dmole,
+  title     = {{D-MoLE}: Dynamic Layer-wise Mixture-of-LoRA-Experts for Continual Multimodal Instruction Tuning},
+  author    = {Ge and others},
+  booktitle = {Proceedings of the International Conference on Machine Learning (ICML)},
+  year      = {2025}
+}
+
+@inproceedings{wang2022sprompt,
+  title     = {{S-Prompts} Learning with Pre-trained Transformers: An Occam's Razor for Domain Incremental Learning},
+  author    = {Wang, Yabin and Huang, Zhiwu and Hong, Xiaopeng},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2022}
+}
+
+% ---- LoRA-based CL ----
+@inproceedings{wang2023olora,
+  title     = {Orthogonal Subspace Learning for Language Model Continual Learning},
+  author    = {Wang, Xiao and Chen, Tianze and Ge, Qiming and Xia, Han and Bao, Rong and Zheng, Rui and Zhang, Qi and Gui, Tao and Huang, Xuanjing},
+  booktitle = {Findings of the Association for Computational Linguistics: EMNLP},
+  year      = {2023},
+  note      = {arXiv:2310.14152}
+}
+
+% ---- Continual learning for IE ----
+@inproceedings{zhang2023cpfd,
+  title     = {Continual Named Entity Recognition without Catastrophic Forgetting},
+  author    = {Zhang, Duzhen and Cong, Wei and Dong, Jiahua and Yu, Yahan and Chen, Xiuyi and Zhang, Yonggang and Fang, Zhen},
+  booktitle = {Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  year      = {2023}
+}

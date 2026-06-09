@@ -1,0 +1,361 @@
+% =====================================================================
+\chapter{Methodology}
+\label{ch:methodology}
+% =====================================================================
+
+This chapter presents the two methodological contributions of the thesis. First,
+a \emph{per-component forgetting diagnostic} for tri-modal document encoders
+(\S\ref{sec:method-diagnostic}). Second, a \emph{mechanism-targeted continual-learning
+method}, DocCL, whose design is derived from the diagnosis rather than chosen in
+advance (\S\ref{sec:method-remedy}). The ordering is deliberate: the diagnosis is
+the primary contribution and constrains the remedy.
+
+\section{Problem Formulation}
+\label{sec:method-formulation}
+
+We study continual key-information extraction as token-level sequence labelling. A
+document is a triple $D = (W, B, I)$ where $W = (w_1,\dots,w_N)$ is a sequence of
+OCR tokens, $B = (b_1,\dots,b_N)$ with $b_i \in [0,1000]^4$ are normalised
+bounding boxes, and $I \in \mathbb{R}^{3\times224\times224}$ is the page image.
+The model produces BIO labels $Y = (y_1,\dots,y_N)$ with $y_i \in
+\mathcal{L}_{\text{task}}$, trained by token-level cross-entropy with ignored
+positions masked out. Performance is measured by entity-level F1 with BIO-aware
+span matching.
+
+In the continual setting the model sees a sequence of tasks $\mathcal{T}_1, \dots,
+\mathcal{T}_T$, each with its own data and (in CIL) its own growing label space.
+Let $\theta$ denote the encoder parameters and let $\theta^{(t)}$ be the
+parameters after training task $t$. The object of study is how performance on
+earlier tasks degrades as later tasks are learned, and---uniquely here---how that
+degradation is distributed across the \emph{components} of $\theta$.
+
+\subsection{Defining a Component}
+\label{sec:method-components}
+
+We partition the encoder parameters into interpretable groups corresponding to the
+tri-modal structure of the backbone:
+
+\begin{itemize}
+  \item \textbf{Text stream} --- word embeddings and the query/key/value
+        projections of the text self-attention.
+  \item \textbf{Visual stream} --- image-patch projection and visual
+        self-attention.
+  \item \textbf{Layout embeddings} --- the 2D position embeddings encoding
+        bounding-box geometry.
+  \item \textbf{Cross-modal fusion} --- the projections that combine modalities
+        across the shared attention.
+  \item \textbf{Task head} --- the token-classification layer (tracked separately
+        as it is expanded for new labels).
+\end{itemize}
+
+Concretely the parameters are aggregated into eight groups for Fisher analysis
+(\texttt{text\_word\_embed}, \texttt{layout\_2d\_pos\_embed},
+\texttt{image\_patch\_embed}, \texttt{text\_attn}, \texttt{visual\_attn},
+\texttt{fusion}, \texttt{ffn}, \texttt{classifier}) and six representative layers
+for CKA tracking (low/mid/high text layers, embeddings, patch embedding, and the
+classifier).
+
+\section{A Per-Component Forgetting Diagnostic}
+\label{sec:method-diagnostic}
+
+\subsection{Motivation}
+\label{sec:method-diag-motivation}
+
+If forgetting concentrates in a particular component, a continual-learning method
+should spend its stability budget there; if it is uniform, uniform methods are
+justified. Either way the answer is informative. To obtain it we need (i) a way to
+isolate each modality's contribution without confounds, and (ii) metrics that
+attribute forgetting to components.
+
+\subsection{Controlled Modality Ablation}
+\label{sec:method-diag-ablation}
+
+A naive comparison---``BERT versus LayoutLMv3''---confounds the modality
+contribution with architectural differences (layer counts, attention structure,
+positional encodings). Instead we hold the architecture fixed and mask input
+modalities of a \emph{single} LayoutLMv3, defining four apples-to-apples
+conditions, summarised in Table~\ref{tab:diagnostic-conditions}. The same model is
+run with text only (C1), image+layout (C2), text+layout (C3), and the full
+tri-modal input (C4). Because only the inputs differ, any difference in forgetting
+is attributable to the modalities in play rather than to the network. We note one
+caveat: the text-only condition still carries zeroed layout and visual pathways,
+so it is the closest same-architecture text baseline rather than a true unimodal
+encoder; a dedicated text-only backbone is a possible follow-up if the results
+warrant it.
+
+\begin{table}[t]
+  \centering
+  \caption[The four diagnostic conditions]{The four apples-to-apples diagnostic
+  conditions. The same LayoutLMv3 architecture is used throughout; only the active
+  input modalities differ, isolating each modality's contribution to forgetting.}
+  \label{tab:diagnostic-conditions}
+  \begin{tabular}{cll}
+    \toprule
+    \textbf{ID} & \textbf{Active modalities} & \textbf{Purpose} \\
+    \midrule
+    C1 & text only          & closest same-architecture text baseline \\
+    C2 & image + layout     & isolate visual+layout-only forgetting \\
+    C3 & text + layout      & isolate text+layout-only forgetting \\
+    C4 & text + image + layout (full) & main subject of analysis \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Forgetting Decomposition Metrics}
+\label{sec:method-diag-metrics}
+
+We measure forgetting with three complementary instruments, following the
+multiple-instrument principle motivated in \S\ref{sec:bg-superficial-essential}.
+
+\paragraph{Representational drift (linear CKA).} For each tracked layer we compute
+the linear CKA~\citep{kornblith2019similarity} between activations of the model
+after task $t-1$ and after task $t$ on a fixed probe set. Given two centred
+activation matrices $X \in \mathbb{R}^{n\times p}$ and $Y \in \mathbb{R}^{n\times
+q}$,
+\[
+  \mathrm{CKA}(X,Y) = \frac{\lVert Y^\top X \rVert_F^2}
+  {\lVert X^\top X \rVert_F \, \lVert Y^\top Y \rVert_F}.
+\]
+A large drop in CKA at a layer marks it as a forgetting hotspot.
+
+\paragraph{Per-group Fisher information.} For each parameter group $g$ we compute
+the empirical Fisher (squared-gradient) importance on a task's data,
+\[
+  F_g = \frac{1}{|\mathcal{D}|}\sum_{(x,y)\in\mathcal{D}}
+        \sum_{\phi\in g}\Big(\frac{\partial \log p_\theta(y\mid x)}{\partial \phi}\Big)^2 ,
+\]
+and track how $F_g$ shifts across tasks. Groups whose importance drops most are
+losing their task-relevant representations.
+
+\paragraph{Forgetting matrix.} We record the standard accuracy matrix
+$R[i,j]$, the entity-F1 on task $j$ after training task $i$, from which we derive
+average accuracy, backward transfer, and average forgetting
+(\S\ref{sec:eval-metrics}). This is the conventional, component-agnostic view that
+the per-component metrics refine.
+
+\subsection{Diagnostic Protocol}
+\label{sec:method-diag-protocol}
+
+For each condition C1--C4 and each seed we train naively and sequentially on
+FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE with no continual-learning
+strategy, expanding the classifier head at each task. At every task boundary we
+capture per-layer CKA, per-group Fisher, and the forgetting matrix.
+Algorithm~\ref{alg:forgetting-decomposition} summarises the procedure.
+
+\begin{algorithm}[t]
+  \caption{Per-component forgetting decomposition}
+  \label{alg:forgetting-decomposition}
+  \begin{algorithmic}[1]
+    \Require condition $c \in \{C1,C2,C3,C4\}$, task sequence $\mathcal{T}_{1:T}$,
+             probe set $\mathcal{P}$, layer set $\mathcal{G}_{\text{CKA}}$,
+             parameter groups $\mathcal{G}_{\text{F}}$
+    \State initialise $\theta^{(0)}$ from the pre-trained backbone
+    \For{$t = 1$ \textbf{to} $T$}
+      \State expand classifier head to $\mathcal{L}_{\mathcal{T}_t}$
+      \State $A_{t-1} \gets \textsc{Activations}(\theta^{(t-1)}, \mathcal{P})$
+      \State $\theta^{(t)} \gets \textsc{FineTune}(\theta^{(t-1)}, \mathcal{T}_t)$
+        \Comment{naive, modality mask $c$}
+      \State $A_{t} \gets \textsc{Activations}(\theta^{(t)}, \mathcal{P})$
+      \ForAll{$\ell \in \mathcal{G}_{\text{CKA}}$}
+        \State $\mathrm{CKA}_{t,\ell} \gets \textsc{LinearCKA}(A_{t-1}[\ell], A_t[\ell])$
+      \EndFor
+      \ForAll{$g \in \mathcal{G}_{\text{F}}$}
+        \State $F_{t,g} \gets \textsc{Fisher}(\theta^{(t)}, g, \mathcal{T}_t)$
+      \EndFor
+      \ForAll{$j \le t$}
+        \State $R[t,j] \gets \textsc{EvalF1}(\theta^{(t)}, \mathcal{T}_j)$
+      \EndFor
+    \EndFor
+    \State \Return $\{\mathrm{CKA}_{t,\ell}\}, \{F_{t,g}\}, R$
+  \end{algorithmic}
+\end{algorithm}
+
+\subsection{Hypotheses and Decision Rule}
+\label{sec:method-diag-hypotheses}
+
+We test a null hypothesis $H_0$ that forgetting is uniform across components
+against $H_1$ that it concentrates in specific ones, using a Mann--Whitney U test
+on per-component CKA drops with Bonferroni correction across the eight parameter
+groups. Three sub-patterns are of particular interest because each implies a
+different remedy: fusion-focused forgetting (favours
+Candidate~A, \S\ref{sec:method-cand-a}), uniform forgetting with fast-drifting 2D
+position embeddings (favours Candidate~B, \S\ref{sec:method-cand-b}), and
+scenario-dependent patterns (favours Candidate~C, \S\ref{sec:method-cand-c}). If
+$H_0$ cannot be rejected, the thesis falls back to a characterisation-only
+contribution (\S\ref{sec:method-fallback}).
+
+\section{Mechanism-Targeted Continual Learning (DocCL)}
+\label{sec:method-remedy}
+
+\subsection{Why Component-Agnostic Continual Learning Is Insufficient}
+\label{sec:method-remedy-motivation}
+
+Generic continual-learning methods treat the encoder uniformly. EWC penalises all
+important parameters with a single Fisher-weighted term regardless of which
+component they belong to; LW-AFT freezes layers by a fixed heuristic. If
+forgetting concentrates in one component, both spend stability budget where it is
+not needed and may under-protect where it is. The hypothesis of DocCL is that
+\emph{concentrating} the continual-learning mechanism---be it regularisation
+strength, freezing, or replay weighting---on the dominant-forgetting component
+improves the stability--plasticity trade-off at negligible extra cost.
+
+\subsection{Design Space: Mapping CL Families to LayoutLMv3}
+\label{sec:method-design-space}
+
+The candidates are constructed from three continual-learning families
+(\S\ref{sec:bg-cl-families}), each adapted to the tri-modal structure of
+LayoutLMv3. What is novel here is not the families themselves but \emph{where} they
+attach to a document encoder, since no published method exploits the layout stream.
+
+\paragraph{Where LoRA injects.} Low-rank adapters~\citep{hu2022lora} can be placed
+at four sites in LayoutLMv3: the text self-attention Q/K/V projections (the
+standard NLP recipe), the image-patch projection and visual self-attention, the 2D
+position (layout) embeddings, and the cross-modal fusion projection. The fusion
+projection offers the most leverage per parameter because it is the only site where
+the three streams interact; the layout site is the least explored and is plausibly
+where forms-versus-receipts shift concentrates gradient. O-LoRA~\citep{wang2023olora}
+keeps per-task subspaces globally orthogonal, which exhausts rank as tasks
+accumulate; allocating \emph{separate banks per component} relaxes this to a
+per-bank constraint.
+
+\paragraph{Where prompts attach.} Prompt-pool methods such as
+L2P~\citep{wang2022l2p} select learnable tokens by querying a frozen backbone with
+a CLS feature. For a tri-modal encoder this raises two design questions: which
+stream(s) the prompts prepend to (text, visual, fusion), and whether the
+query/key mechanism should be made \emph{layout-aware} rather than CLS-only. Both
+are exploited by the candidates below.
+
+\paragraph{Where regularisation applies.} Rather than a single Fisher-weighted
+penalty over all parameters (EWC~\citep{kirkpatrick2017ewc}), the importance weight
+can be made \emph{component-specific}, concentrating protection on whichever group
+the diagnosis flags as fastest-drifting.
+
+\subsection{Candidate Designs}
+\label{sec:method-candidates}
+
+Because the method must be derived from the diagnosis, three candidate designs are
+specified in advance; one is selected once the diagnosis is known
+(\S\ref{sec:method-selection}). This pre-specification is the safety net for the
+measure-first approach. All three are privacy-friendly (memory-free), in keeping
+with the soft no-storage preference appropriate to documents that carry personally
+identifiable information.
+
+\subsubsection{Candidate A: Layout-Aware Prompts with Hierarchical LoRA (LAPP + H-LoRA)}
+\label{sec:method-cand-a}
+\emph{Triggered if the diagnosis shows fusion layers forget most and
+layout-sensitivity matters.} This candidate combines two components.
+
+\noindent\emph{LAPP (Layout-Aware Prompt Pool).} L2P's CLS-only query is replaced
+by a query that concatenates the CLS embedding with a projected layout signature,
+\[
+  q(x) = \big[\, h_{\mathrm{CLS}} \;;\; W_{\text{layout}}\,\phi(\text{boxes}) \,\big],
+\]
+where $\phi(\text{boxes}) \in \mathbb{R}^{16}$ is the histogram of bounding-box
+centres over a $4\times4$ grid (the \texttt{get\_layout\_signature} descriptor of
+\S\ref{sec:impl-instrumentation}) and $W_{\text{layout}}\colon\mathbb{R}^{16}\!\to\!
+\mathbb{R}^{768}$ is trainable. Prompt-pool keys are enriched the same way, so that
+documents are routed to prompts by spatial layout, not text alone.
+
+\noindent\emph{H-LoRA (Hierarchical LoRA).} Three rank-$8$ LoRA banks are
+allocated by component: Bank~1 on the text Q/K/V projections, Bank~2 on the
+patch projection and visual self-attention, and Bank~3 on the cross-modal fusion
+projection---the key bank when fusion dominates. Orthogonality is enforced
+\emph{per bank} (relaxing O-LoRA's global constraint and its rank-exhaustion), and
+a task may activate only a subset of banks, which is compatible with a
+D-MoLE-style~\citep{ge2025dmole} layer-wise allocation. The per-task parameter cost
+is small: at rank $8$, hidden $768$, and $12$ layers, the adapters add on the order
+of $10^5$ parameters per task against the $\sim$133M frozen backbone.
+
+\subsubsection{Candidate B: Layout-Protected Regularisation (L-EWC)}
+\label{sec:method-cand-b}
+\emph{Triggered if forgetting is broadly uniform but the 2D position embeddings
+drift fastest.} A selective EWC variant applies a high importance weight to the
+layout (2D position) embeddings and a low weight elsewhere,
+\[
+  \mathcal{L} = \mathcal{L}_{\mathrm{CE}}
+    + \lambda_{\text{layout}}\, F_{\text{layout}}\,(\theta_{\text{layout}} - \theta^{*}_{\text{layout}})^2
+    + \lambda_{\text{other}}\, F_{\text{other}}\,(\theta_{\text{other}} - \theta^{*}_{\text{other}})^2,
+\]
+with $\lambda_{\text{layout}} \gg \lambda_{\text{other}}$ and $F$ the per-group
+Fisher of \S\ref{sec:method-diag-metrics}. An optional layout-embedding
+distillation term from the previous-task model can be added. The method is cheap,
+theoretically motivated, and adds no inference-time parameters.
+
+\subsubsection{Candidate C: Modality-Routed Prompts}
+\label{sec:method-cand-c}
+\emph{Triggered if the forgetting pattern is scenario-dependent or per-modality.}
+Three prompt sub-pools $P_{\text{text}}, P_{\text{visual}}, P_{\text{layout}}$ are
+maintained, and a router activates one or more from input features,
+\[
+  r(x) = \mathrm{softmax}\!\big(\mathrm{MLP}([\,h_{\mathrm{CLS}};\,
+  \phi(\text{boxes});\, \bar{v}\,])\big),
+\]
+where $\bar{v}$ is a pooled visual feature; the selected sub-pool is prepended to
+its corresponding stream. This combines L2P's pool concept with explicit modality
+routing and naturally fits domain-incremental shifts (where S-Prompt-style
+per-domain prompts excel~\citep{wang2022sprompt}).
+
+\subsection{Testable Component Hypotheses}
+\label{sec:method-component-hypotheses}
+
+Independently of which candidate is selected, two component-level hypotheses are
+pre-registered and map one-to-one to ablations in
+Chapter~\ref{ch:results}:
+
+\begin{itemize}
+  \item \textbf{H\textsubscript{LAPP}.} A layout signature $\phi(\text{boxes})$
+        injected into the prompt query improves entity-F1 by $\ge 3$ points on the
+        domain-incremental scenario over a CLS-only query (the L2P baseline).
+  \item \textbf{H\textsubscript{H-LoRA}.} Hierarchical (text\,+\,visual\,+\,fusion)
+        LoRA banks outperform a single-bank O-LoRA by $\ge 2$ points on the mixed
+        scenario at the same total parameter budget.
+\end{itemize}
+
+A falsified hypothesis remains informative and is reported as such.
+
+\subsection{Selection Criterion}
+\label{sec:method-selection}
+
+The selected method follows directly from the dominant pattern: fusion-dominant
+$\rightarrow$ Candidate~A; uniform-with-position-drift $\rightarrow$ Candidate~B;
+scenario- or modality-dependent $\rightarrow$ Candidate~C; no clear pattern
+$\rightarrow$ fallback (\S\ref{sec:method-fallback}). Beyond alignment with the
+diagnosis, the selected candidate must be implementable within the Week 10--11
+budget, defensible under reviewer scrutiny, and compatible with the existing
+LAPP/H-LoRA infrastructure where applicable.
+
+\subsection{The Selected Method}
+\label{sec:method-selected}
+
+% =========================== TODO (Week 4) ===========================
+% LOCKED AT THE PILOT DECISION POINT. After the diagnosis of
+% \S\ref{sec:method-diagnostic} is analysed, fill in:
+%   - the selected candidate and the evidence that selected it;
+%   - the full method specification and design choices;
+%   - Algorithm 2 (mechanism-targeted continual learning);
+%   - the complexity/overhead analysis.
+% Do NOT pre-commit the method before the pilot completes.
+% =====================================================================
+\textbf{[To be completed at the Week-4 method-decision point.]} The specific
+mechanism, its algorithm block (Algorithm~2), and its complexity analysis are
+finalised once the diagnosis identifies the dominant-forgetting component, per the
+selection criterion above.
+
+\subsection{Fallback: Characterisation-Only}
+\label{sec:method-fallback}
+
+If no component dominates ($H_0$ not rejected), the diagnostic of
+\S\ref{sec:method-diagnostic} and the FCS-CL benchmark become the headline
+contributions, and the thesis is framed as a measurement-and-benchmark study. The
+value of the diagnosis is independent of the remedy's success.
+
+\section{Summary}
+\label{sec:method-summary}
+
+We have defined components of a tri-modal document encoder, a controlled
+modality-ablation protocol, and three complementary metrics (CKA, per-group
+Fisher, forgetting matrix) that together attribute forgetting to components. The
+remedy, DocCL, concentrates its mechanism on the dominant-forgetting component;
+its concrete form is selected from three pre-specified candidates once the
+diagnosis is known. The next chapter describes how this methodology is realised in
+software.

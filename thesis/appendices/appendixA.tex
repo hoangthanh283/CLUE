@@ -1,0 +1,67 @@
+% =====================================================================
+\chapter{Supplementary Material}
+\label{app:supplementary}
+% =====================================================================
+
+\section{Key Hyperparameters}
+\label{app:hyperparameters}
+
+Table~\ref{tab:hyperparameters} lists the default training hyperparameters shared
+across runs. Method-specific hyperparameters (e.g.\ the EWC penalty $\lambda$, the
+replay-buffer size, the prompt-pool size, the LoRA rank) are set per method and
+recorded in the corresponding configuration files.
+
+\begin{table}[h]
+  \centering
+  \caption[Default hyperparameters]{Default training hyperparameters. Method- and
+  scenario-specific values are recorded in the released configurations.}
+  \label{tab:hyperparameters}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Hyperparameter} & \textbf{Value} \\
+    \midrule
+    Backbone               & LayoutLMv3-base (12 layers, hidden 768) \\
+    Optimiser              & AdamW \\
+    Learning rate          & $5\times10^{-5}$ \\
+    Batch size             & 8 \\
+    Epochs per task        & TODO (confirm from configs) \\
+    Image resolution       & $224\times224$ \\
+    Box coordinate range   & $[0,1000]^4$ \\
+    Seeds                  & 42, 123, 7 \\
+    Determinism            & fixed seeds; deterministic cuDNN \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Per-Component Metric Definitions}
+\label{app:metric-definitions}
+
+\paragraph{Linear CKA.} For centred activation matrices $X\in\mathbb{R}^{n\times
+p}$ and $Y\in\mathbb{R}^{n\times q}$ collected on a fixed probe set,
+\[
+  \mathrm{CKA}(X,Y) = \frac{\lVert Y^\top X\rVert_F^2}
+  {\lVert X^\top X\rVert_F\,\lVert Y^\top Y\rVert_F},
+\]
+which is invariant to orthogonal transforms and isotropic
+scaling~\citep{kornblith2019similarity}. Layer-wise CKA between checkpoints
+quantifies representational drift.
+
+\paragraph{Per-group Fisher information.} For parameter group $g$ and data
+$\mathcal{D}$,
+\[
+  F_g = \frac{1}{|\mathcal{D}|}\sum_{(x,y)\in\mathcal{D}}
+        \sum_{\phi\in g}\Big(\frac{\partial\log p_\theta(y\mid x)}{\partial\phi}\Big)^2 .
+\]
+Parameters are aggregated into the eight groups of \S\ref{sec:method-components}.
+
+\paragraph{Continual-learning metrics.} Average accuracy, backward transfer,
+forward transfer, and average forgetting are defined in \S\ref{sec:eval-metrics}.
+
+\section{Extended Per-Task Result Tables}
+\label{app:extended-results}
+
+% TODO: full per-task accuracy matrices R[i,j] for each method, scenario, and
+% seed; per-condition CKA and Fisher tables. Fill from results/ once experiments
+% complete.
+\textbf{[To be added once the full grid completes --- per-task accuracy matrices,
+per-condition CKA and Fisher tables, and per-seed breakdowns.]}

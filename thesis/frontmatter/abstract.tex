@@ -1,0 +1,44 @@
+% =====================================================================
+%  Abstract  (rendered via the class \abstractpage command).
+%  Write the numeric blanks last — see TODO markers.
+% =====================================================================
+\abstractpage{
+Continual document understanding requires models to absorb new document types,
+schemas, and domains without forgetting previously acquired capabilities.
+Multimodal document encoders such as LayoutLMv3 combine text, layout, and visual
+pathways, yet it is unknown \emph{which} of these components drives catastrophic
+forgetting: existing continual-learning methods treat the network uniformly or
+freeze layers heuristically. This thesis presents a per-layer, per-parameter-group
+diagnosis of how forgetting distributes across the text, visual, layout, and
+cross-modal fusion components of a tri-modal document encoder under continual
+sequence-labelling for key-information extraction. Using a controlled,
+apples-to-apples protocol that masks individual input modalities of a single
+LayoutLMv3 architecture, and measuring representational drift (linear CKA),
+per-group Fisher information, and standard forgetting metrics across the
+FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE task sequence, we characterise
+where forgetting concentrates.
+% TODO (after pilot, Week 4): 1--2 sentences stating the dominant-forgetting
+% component, e.g. "We find forgetting concentrates in the cross-modal fusion
+% layers, while the text stream remains comparatively stable."
+
+Guided by this measurement, we propose \textbf{DocCL}, a mechanism-targeted
+continual-learning method that concentrates its regularisation/adaptation on the
+dominant-forgetting component identified by the diagnosis. Across three continual
+scenarios (class-incremental, domain-incremental, and mixed) and ten baselines
+spanning regularisation, replay, prompt-based, and LoRA-based families
+(EWC, LwF, ER, DER++, L2P, DualPrompt, CODA-Prompt, O-LoRA, plus naive and joint
+bounds), the targeted method
+% TODO (after main grid): "reduces forgetting (BWT) by X points / improves
+% average entity-F1 by Y" over component-agnostic continual learning while
+% adding negligible overhead.
+improves continual performance over component-agnostic baselines on the FCS-CL
+benchmark. These results establish the per-component diagnostic protocol as a
+practical tool for designing continual-learning methods for multimodal document
+encoders.\footnote{Source code: \url{https://github.com/hoangthanh283/doccl}
+(\texttt{doccl} branch); experiments tracked on Weights \& Biases
+(\texttt{doccl-aaai2027}).}
+
+\vspace{0.5em}
+\noindent\textbf{Keywords:} continual learning, catastrophic forgetting, document
+understanding, key-information extraction, LayoutLMv3, multimodal representation.
+}

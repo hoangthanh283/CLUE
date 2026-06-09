@@ -1,0 +1,138 @@
+% =====================================================================
+\chapter{Implementation and Integration}
+\label{ch:implementation}
+% =====================================================================
+
+This chapter describes how the methodology of Chapter~\ref{ch:methodology} is
+realised as a research framework: the backbone and software stack
+(\S\ref{sec:impl-framework}), the document-IE data pipeline
+(\S\ref{sec:impl-pipeline}), and the system architecture, including the
+per-component instrumentation and experiment tracking
+(\S\ref{sec:impl-architecture}).
+
+\section{Framework Selection}
+\label{sec:impl-framework}
+
+\paragraph{Backbone.} The primary backbone is LayoutLMv3-base
+(\texttt{microsoft/layoutlmv3-base}, $\approx$\,133M parameters, 12 layers, hidden
+size 768). It was chosen because it is document-specific, encoder-only, and small
+enough to run the full experimental grid---ten baselines and the selected method
+across three scenarios and three seeds---within the compute budget, while exposing
+the four separable components central to the diagnosis. LiLT-base and BROS-base
+serve as secondary backbones for a generalisation study on a reduced method
+subset. Table~\ref{tab:backbone-comparison} compares the candidates.
+
+\begin{table}[t]
+  \centering
+  \caption[Backbone comparison]{Backbones considered for the study. LayoutLMv3-base
+  is the primary subject; LiLT and BROS test generalisation of the diagnosis; large
+  multimodal LLMs are noted as comparison targets but are out of scope for the
+  controlled per-component study.}
+  \label{tab:backbone-comparison}
+  \begin{tabular}{llll}
+    \toprule
+    \textbf{Backbone} & \textbf{Type} & \textbf{Scale} & \textbf{Role} \\
+    \midrule
+    LayoutLMv3-base & encoder-only, tri-modal & $\approx$\,133M & primary \\
+    LiLT-base       & encoder-only, decoupled layout & $\approx$\,130M & secondary \\
+    BROS-base       & encoder-only, spatial & $\approx$\,110M & secondary \\
+    InternVL3-8B    & multimodal LLM & 8B & comparison target (out of scope) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Software stack.} The framework is implemented in Python with PyTorch
+and the HuggingFace Transformers library for the backbones, \texttt{seqeval} for
+BIO-aware entity-F1, and Hydra for composable configuration. Experiments are
+launched through a single entry point and configured by composition, e.g.
+\begin{quote}\small
+\texttt{python scripts/train.py method=ewc scenario=cil\_cord seed=42
+method.lambda\_=1000}
+\end{quote}
+so that every run is fully specified by its config and reproducible.
+
+\section{Document-IE Pipeline Integration}
+\label{sec:impl-pipeline}
+
+Each document is loaded as OCR tokens with normalised bounding boxes
+($[0,1000]^4$) and a $224\times224$ page image. Tokens are WordPiece-tokenised and
+aligned to their boxes; sub-tokens inherit their word's box and only the first
+sub-token carries the label, with the remainder masked to the ignore index. Image
+patches are extracted by the backbone's vision module. The same preprocessing is
+shared across all datasets so that the only thing that changes between continual
+tasks is the data and label space, not the pipeline. For the diagnostic conditions
+(C1--C4) a modality mask is applied at the input layer---zeroing image pixels,
+replacing text with padding tokens, or zeroing layout positions---through the
+backbone wrapper's \texttt{forward\_with\_modality\_mask} extension point.
+
+\section{System Architecture Overview}
+\label{sec:impl-architecture}
+
+\begin{figure}[t]
+  \centering
+  % TODO: add figure file (e.g. figures/system_architecture.pdf)
+  \fbox{\parbox[c][4.5cm][c]{0.9\linewidth}{\centering\itshape
+  Placeholder --- system architecture: continual-learning core (method interface),
+  backbone wrapper with extension points, document pipeline, per-component
+  instrumentation hooks, and experiment tracking.}}
+  \caption[System architecture]{System architecture. The continual-learning core
+  exposes a uniform method interface; the backbone wrapper exposes extension points
+  for classifier expansion, prompts, and LoRA banks; the instrumentation layer
+  records per-layer CKA and per-group Fisher; all runs report to the experiment
+  tracker.}
+  \label{fig:system-architecture}
+\end{figure}
+
+\subsection{Continual-Learning Core}
+\label{sec:impl-cl-core}
+
+All methods implement a common \texttt{ContinualMethod} interface with four hooks:
+\texttt{before\_task} (e.g.\ expand the classifier head or allocate a LoRA bank),
+\texttt{train\_task} (the training loop), \texttt{after\_task} (update the replay
+buffer, compute Fisher, freeze weights), and \texttt{evaluate} (evaluate on all
+tasks seen so far). This interface lets regularisation, replay, prompt-based, and
+LoRA-based methods share the same training and evaluation harness, which is
+essential for like-for-like comparison.
+
+\subsection{Per-Component Instrumentation}
+\label{sec:impl-instrumentation}
+
+The diagnostic of \S\ref{sec:method-diagnostic} is implemented as a set of hooks
+that, at each task boundary, capture activations at the tracked layers (for CKA)
+and accumulate squared gradients per parameter group (for Fisher), writing
+per-run JSON dumps that are later aggregated into a long-format dataframe for
+analysis and plotting. The instrumentation is decoupled from the methods so that
+it can be attached to any run, including the naive-sequential pilot runs.
+
+\subsection{Datasets and Scenario Builders}
+\label{sec:impl-datasets}
+
+Dataset loaders expose FUNSD, CORD, and SROIE in the shared format, and scenario
+builders assemble them into continual sequences (class-incremental, domain-incremental,
+mixed) through a registry, so that a scenario is selected by name from the config.
+
+\subsection{Compute and Deployment}
+\label{sec:impl-compute}
+
+Experiments run on a single RTX 4090 (cloud), with a local RTX 2060 reserved for
+debugging only; paper-result experiments are never run on the debug machine.
+Determinism is enforced (fixed seeds, deterministic cuDNN) so that CKA and Fisher
+patterns reflect signal rather than run-to-run noise.
+
+\subsection{Experiment Tracking and Monitoring}
+\label{sec:impl-tracking}
+
+All runs report to Weights \& Biases under a single project, with a structured tag
+schema (\texttt{\{phase\}/\{scenario\}/\{method\}/seed\{seed\}}; pilot runs use
+\texttt{pilot/\{condition\}/seed\{seed\}}), so that the full grid is queryable and
+the result tables of Chapter~\ref{ch:results} can be regenerated from the tracked
+logs.
+
+\section{Summary}
+\label{sec:impl-summary}
+
+The framework pairs a small, component-separable backbone with a uniform
+continual-method interface, a shared document pipeline, decoupled per-component
+instrumentation, and structured experiment tracking. This design makes the
+diagnosis attachable to any run and the baseline comparison strictly like-for-like,
+which the next chapter relies upon.

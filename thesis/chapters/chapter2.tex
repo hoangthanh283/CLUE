@@ -1,0 +1,320 @@
+% =====================================================================
+\chapter{Background Theory and Literature Review}
+\label{ch:background}
+% =====================================================================
+
+This chapter establishes the foundations on which the thesis builds. It proceeds
+from the application domain (document understanding and information extraction),
+through the continual-learning problem and its method families, to the specific
+and still-nascent literature on continual learning for information extraction. It
+then reviews what is known about \emph{where} forgetting occurs in multimodal
+models, surveys the backbones relevant to continual document IE, and closes by
+isolating the research gaps that motivate the contributions of
+Chapter~\ref{ch:methodology}.
+
+\section{Document Understanding and Information Extraction}
+\label{sec:bg-document-ie}
+
+\subsection{Information-Extraction Tasks}
+\label{sec:bg-ie-tasks}
+
+Information extraction (IE) converts unstructured content into structured records.
+Its canonical sub-tasks are named-entity recognition (NER), which labels spans
+with semantic types; relation extraction (RE), which links entity pairs; and
+event or key-information extraction (KIE), which populates schema fields. In the
+document setting these tasks differ from their sentence-level counterparts in
+three ways that matter for continual learning. First, documents are
+\emph{spatially structured}: the role of a token (a form's question versus its
+answer, a receipt's label versus its total) is often signalled by position and
+typography rather than by surrounding words. Second, documents are
+\emph{multimodal}: text, layout, and image jointly determine meaning. Third,
+document schemas are \emph{diverse and evolving}: a forms dataset and a receipts
+dataset share little vocabulary and almost no label space, so a system that
+learns them sequentially faces large distribution and output-space shifts.
+
+This thesis adopts the dominant framing of KIE as token-level sequence labelling
+with the BIO tagging scheme, where each OCR token is assigned a Begin/Inside/Outside
+tag for its entity type and the model is trained with token-level cross-entropy.
+This framing aligns with the mainstream visually-rich document understanding
+literature, yields a unified output format across datasets, and is directly
+compatible with the encoder-only backbones used here.
+
+\subsection{Multimodal Document Encoders}
+\label{sec:bg-multimodal-encoders}
+
+A multimodal document encoder ingests three streams---OCR tokens, their bounding
+boxes (2D position embeddings), and image patches---and fuses them through
+transformer self-attention. LayoutLMv3~\citep{huang2022layoutlmv3} unifies text
+and image masking with a word--patch alignment objective and is the
+field's reference encoder-only backbone. LiLT~\citep{wang2022lilt} decouples
+layout from text so that a language-agnostic layout transformer can be paired with
+different text encoders. BROS~\citep{hong2022bros} emphasises relative spatial
+encoding and an area-masking objective. DocFormer~\citep{appalaraju2021docformer}
+couples modalities through a shared spatial attention. A key structural feature
+shared by these models, and central to this thesis, is that they contain
+\emph{distinguishable components}---a text stream, a visual stream, layout
+embeddings, and cross-modal fusion---whose individual behaviour under continual
+learning has not previously been measured. Figure~\ref{fig:layoutlmv3-components}
+annotates these four components on the LayoutLMv3 architecture.
+
+\begin{figure}[t]
+  \centering
+  % TODO: add figure file (e.g. figures/layoutlmv3_components.pdf)
+  % \includegraphics[width=0.9\linewidth]{layoutlmv3_components.pdf}
+  \fbox{\parbox[c][4cm][c]{0.9\linewidth}{\centering\itshape
+  Placeholder --- LayoutLMv3 architecture annotated with the four diagnosed
+  components: text stream, visual/patch stream, layout (2D position) embeddings,
+  and cross-modal fusion layers.}}
+  \caption[LayoutLMv3 tri-modal architecture and its four components]{The
+  LayoutLMv3 tri-modal architecture. OCR tokens, 2D bounding-box position
+  embeddings, and image patches are projected into a shared sequence and fused by
+  transformer self-attention. The four components diagnosed in this thesis---text
+  stream, visual stream, layout embeddings, and cross-modal fusion---are
+  highlighted; their individual susceptibility to forgetting is the object of
+  Chapter~\ref{ch:methodology}.}
+  \label{fig:layoutlmv3-components}
+\end{figure}
+
+\section{Catastrophic Forgetting and Continual Learning}
+\label{sec:bg-cl}
+
+\subsection{The Stability--Plasticity Dilemma}
+\label{sec:bg-stability-plasticity}
+
+Continual learning is governed by the \emph{stability--plasticity dilemma}: a
+model must remain \emph{plastic} enough to acquire new tasks yet \emph{stable}
+enough to retain old ones. Pure fine-tuning maximises plasticity and suffers
+catastrophic forgetting; freezing the network maximises stability but prevents
+learning. Every continual-learning method is, in effect, a particular point on
+this trade-off, and a recurring theme of this thesis is that the right operating
+point may differ \emph{per component} of a multimodal encoder.
+
+\subsection{Continual-Learning Scenarios}
+\label{sec:bg-cl-scenarios}
+
+The literature distinguishes three canonical scenarios by what changes across the
+task sequence and what is known at test time. In \emph{task-incremental} learning
+(TIL) the task identity is available at inference, so a separate head can be
+selected. In \emph{domain-incremental} learning (DIL) the input distribution
+shifts but the label space is shared and task identity is unknown. In
+\emph{class-incremental} learning (CIL) new classes are introduced over time and
+the model must discriminate among all classes seen so far without task identity;
+CIL is generally the hardest because the output space itself grows. For document
+KIE, CIL additionally provokes the \emph{semantic shift of the ``O'' tag}: tokens
+that were background (O) in an earlier session may become a labelled entity in a
+later one, so the meaning of ``O'' is non-stationary. This thesis studies CIL,
+DIL, and a mixed scenario, and explicitly leaves TIL to future work.
+
+\subsection{The Five Method Families}
+\label{sec:bg-cl-families}
+
+Following the widely-used taxonomy of~\citet{wang2024survey}, continual-learning
+methods fall into five families summarised in Table~\ref{tab:cl-families}.
+\emph{Regularisation-based} methods (EWC~\citep{kirkpatrick2017ewc},
+SI, MAS) penalise changes to parameters deemed important for past tasks, typically
+weighted by a Fisher-information estimate. \emph{Replay-based} methods
+(GEM~\citep{lopezpaz2017gem}, ER~\citep{rolnick2019er},
+DER++~\citep{buzzega2020der}) store and re-present a memory of past exemplars.
+\emph{Optimisation-based} methods constrain or project gradients so that updates
+do not interfere with past tasks. \emph{Representation-based} methods freeze a
+large pre-trained backbone and learn small task-specific components---prompts
+(L2P~\citep{wang2022l2p}, DualPrompt~\citep{wang2022dualprompt},
+CODA-Prompt~\citep{smith2023coda}) or low-rank adapters
+(O-LoRA~\citep{wang2023olora}). \emph{Architecture-based} methods allocate
+separate parameters per task. The dominant paradigm in 2024--2026 is
+representation-based continual learning with pre-trained models: freeze the
+backbone and learn lightweight, often orthogonal, task components.
+
+\begin{table}[t]
+  \centering
+  \caption[The five continual-learning method families]{The five
+  continual-learning method families~\citep{wang2024survey}, their core
+  mechanism, and representative methods. The methods in bold are used as
+  baselines in this thesis (Chapter~\ref{ch:experimental-setup}).}
+  \label{tab:cl-families}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Family} & \textbf{Core mechanism} & \textbf{Representative methods} \\
+    \midrule
+    Regularisation   & Parameter-importance penalties & \textbf{EWC}, \textbf{LwF}, SI, MAS \\
+    Replay           & Store and replay past exemplars & \textbf{GEM}, \textbf{ER}, \textbf{DER++}, iCaRL \\
+    Optimisation     & Gradient projection/constraints & GPM, OGD, A-GEM \\
+    Representation    & Frozen PTM + prompts/adapters & \textbf{L2P}, \textbf{DualPrompt}, \textbf{CODA-Prompt}, \textbf{O-LoRA} \\
+    Architecture     & Separate parameters per task & PackNet, Progressive Nets \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Continual Learning for Information Extraction}
+\label{sec:bg-cl-ie}
+
+Continual learning for information extraction is real but nascent, fragmented, and
+almost entirely sentence-level. Table~\ref{tab:cl-ie-landscape} maps the landscape.
+
+\subsection{Continual NER and the O-Label Problem}
+\label{sec:bg-continual-ner}
+
+CPFD~\citep{zhang2023cpfd} addresses continual NER with pooled-feature
+distillation and pseudo-labelling of old entities, reporting a clear improvement
+over prior continual-NER methods but remaining class-incremental on a fixed
+schema. GenCNER reformulates NER \emph{generatively}, sidestepping the O-tag
+semantic-shift problem by generating entity spans rather than classifying every
+token; however, it uses a small text-only backbone and no document context. The
+shared limitation is that both operate at sentence level and ignore layout and
+vision---precisely the modalities that distinguish document IE.
+
+\subsection{Continual Relation Extraction}
+\label{sec:bg-continual-re}
+
+WAVE++ tackles continual relation extraction with task-specific prompt pools in a
+mixture-of-experts style under a task-incremental setting on TACRED/FewRel.
+FCRE-OIE extends to open-world relations through open information extraction and
+knowledge-graph completion in a few-shot regime. Both remain closed-world or
+sentence-level and do not address document-level, cross-sentence relations.
+
+\subsection{Document-Level Continual Learning}
+\label{sec:bg-doc-cl}
+
+Document-level continual learning is the least explored and most relevant to this
+thesis. GDI-Bench together with the LW-AFT method provides the first document
+intelligence continual-learning benchmark and shows that supervised fine-tuning of
+a large multimodal model (InternVL3-8B) causes measurable forgetting, especially
+on harder reasoning tasks; LW-AFT mitigates this by \emph{heuristically} freezing
+layers. Separately, continual table detection demonstrates continual learning for
+a document detection task using simple experience replay. The crucial gap is that
+these works either use a heuristic remedy or address detection rather than IE, and
+none diagnoses \emph{which component} of the backbone forgets---the question this
+thesis answers.
+
+\begin{table}[t]
+  \centering
+  \caption[The continual-learning-for-IE landscape]{The continual-learning-for-IE
+  landscape and the gap each line leaves open. Sentence-level, text-only, and
+  heuristic approaches dominate; no prior work provides a per-component forgetting
+  diagnosis for a tri-modal document encoder.}
+  \label{tab:cl-ie-landscape}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Setting} & \textbf{Method} & \textbf{Gap remaining} \\
+    \midrule
+    Continual NER     & CPFD              & Class-IL only; fixed schema; text-only \\
+    Continual NER     & GenCNER           & Small backbone; no document/layout context \\
+    Continual RE      & WAVE++            & Task-IL; closed-world; sentence-level \\
+    Continual RE      & FCRE-OIE          & Few-shot; no document-level relations \\
+    Document CL       & GDI-Bench + LW-AFT & Heuristic freezing; no IE tasks; no diagnosis \\
+    Document CL       & CL Table Detection & Detection only; simple replay; no IE \\
+    Multimodal CL     & CL-CrossVQA/CLiMB & VQA/VL only; no document IE \\
+    Multimodal CL     & SEFE              & Instruction tuning; not IE; no per-component view \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Multimodal and Component-Level Forgetting}
+\label{sec:bg-multimodal-forgetting}
+
+\subsection{Where Forgetting Lives: Text vs.\ Visual vs.\ Fusion}
+\label{sec:bg-where-forgetting}
+
+Evidence from multimodal continual-learning benchmarks suggests that forgetting is
+not uniform across modalities, but the picture is incomplete. CL-CrossVQA finds
+that dual-stream visual-question-answering models forget less than single-stream
+ones and that replay is the most robust remedy, hinting that architectural
+structure shapes forgetting. CLiMB observes that continual learning can prevent
+forgetting on vision-and-language tasks yet fails to enable positive transfer.
+These findings concern VQA rather than document IE and do not localise forgetting
+to specific \emph{components} of a single encoder. The methodological inspiration
+for this thesis comes instead from analyses of forgetting in unimodal networks:
+the ``anatomy of catastrophic forgetting''~\citep{ramasesh2021anatomy} shows that
+forgetting in deep networks concentrates in higher layers and can be probed
+layer-by-layer, and the study of forgetting in multimodal large language
+models~\citep{zhai2023investigating} adapts such diagnostics to multimodal
+settings. This thesis transfers that per-layer, per-component diagnostic stance to
+a tri-modal document encoder for the first time.
+
+\subsection{Superficial versus Essential Forgetting}
+\label{sec:bg-superficial-essential}
+
+SEFE introduces a distinction between \emph{superficial} forgetting---loss of the
+expected answer format---and \emph{essential} forgetting---loss of the underlying
+knowledge. This distinction matters for KIE, where a model may retain the ability
+to localise entities yet lose the correct label mapping (or vice versa). It
+motivates measuring forgetting with multiple, complementary instruments rather
+than a single accuracy number, a principle adopted in
+Chapter~\ref{ch:methodology}.
+
+\subsection{Measuring Representational Drift: CKA}
+\label{sec:bg-cka}
+
+To attribute forgetting to components, this thesis measures how internal
+representations change between checkpoints. Centered Kernel Alignment
+(CKA)~\citep{kornblith2019similarity} compares two activation matrices and returns
+a similarity in $[0,1]$ that is invariant to orthogonal transforms and isotropic
+scaling, properties that make it more reliable than naive cosine similarity
+between weights. A CKA of one indicates unchanged representations; a low CKA
+indicates reorganisation. Per-layer CKA between the model before and after a task
+thus localises the ``forgetting hotspots,'' and is one of the two primary
+diagnostic metrics used here, alongside per-group Fisher information.
+
+\section{Backbones for Continual Document IE}
+\label{sec:bg-backbones}
+
+The choice of backbone determines both the cost and the interpretability of the
+diagnosis. LayoutLMv3-base ($\approx$\,133M parameters, encoder-only) is the
+primary backbone: it is document-specific, small enough to run a full grid of
+methods $\times$ scenarios $\times$ seeds on a single GPU, and exposes
+clearly-separable text, visual, layout, and fusion components. Large multimodal
+LLMs such as InternVL3-8B are used in document continual-learning benchmarks
+(GDI-Bench) but their scale and decoder-only design make a controlled
+per-component study expensive and harder to interpret; they are noted as a
+comparison target rather than a primary subject. To test that the diagnosis
+generalises beyond a single architecture, LiLT-base and BROS-base are used as
+secondary backbones on a reduced method subset.
+
+\section{Research Gaps and Opportunities}
+\label{sec:bg-gaps}
+
+The survey above exposes the gaps the thesis addresses:
+
+\begin{enumerate}
+  \item \textbf{No per-component forgetting diagnosis for tri-modal document
+        encoders.} Prior work measures forgetting at the level of whole tasks or,
+        at most, layers of unimodal models. No study attributes forgetting to the
+        text, visual, layout, and fusion components of a document encoder.
+  \item \textbf{Document-level versus sentence-level continual IE.} CPFD, GenCNER,
+        and WAVE++ are sentence-level and text-only; document IE requires layout
+        and vision and exhibits the O-tag semantic shift at document scale.
+  \item \textbf{Heuristic versus principled continual learning for document
+        backbones.} The only document-level remedy, LW-AFT, freezes layers
+        heuristically. Whether a freezing/regularisation mechanism \emph{targeted
+        by measurement} outperforms uniform or heuristic treatment is open.
+  \item \textbf{Fragmented evaluation.} Existing results use different benchmarks
+        and protocols; there is no shared continual benchmark for document IE that
+        compares image-CL baselines and IE-specific methods on equal footing.
+\end{enumerate}
+
+\section{Positioning of the Current Research}
+\label{sec:bg-positioning}
+
+This thesis is a \emph{diagnostic-plus-remedy} study in the spirit
+of~\citet{ramasesh2021anatomy} and~\citet{zhai2023investigating}: it first
+characterises how forgetting distributes across the components of a tri-modal
+document encoder, then proposes a method whose mechanism is concentrated on the
+dominant-forgetting component. The measurement contribution stands on its own---it
+is informative even if forgetting turns out to be uniform---while the remedy is
+explicitly derived from, and validated against, the measurement. The work is
+deliberately scoped to encoder-only document KIE on three public datasets, with
+larger backbones, additional scenarios, and multilingual extensions left as future
+directions (Chapter~\ref{ch:conclusions}).
+
+\section{Chapter Summary}
+\label{sec:bg-summary}
+
+Document IE is a multimodal, spatially-structured, schema-diverse problem solved
+by tri-modal encoders such as LayoutLMv3. Continual learning of such tasks is
+obstructed by catastrophic forgetting, for which five method families offer
+remedies---but almost all treat the network uniformly and were validated on
+unimodal benchmarks. Continual learning for IE exists only in fragmented,
+sentence-level, mostly text-only form, and the one document-level remedy is
+heuristic. Crucially, no prior work measures \emph{which component} of a
+multimodal document encoder forgets. The next chapter develops a diagnostic to
+answer that question and a mechanism-targeted remedy derived from the answer.

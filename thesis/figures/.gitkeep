@@ -1,0 +1,3 @@
+# Place figure assets here (PDF/PNG). Referenced via \graphicspath{{figures/}}.
+# Pilot figures are produced under results/pilot/figures/ by the analysis scripts;
+# copy or symlink the final versions here for the thesis build.

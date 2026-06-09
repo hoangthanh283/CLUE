@@ -1,0 +1,181 @@
+% =====================================================================
+\chapter{Results and Discussion}
+\label{ch:results}
+% =====================================================================
+% SCAFFOLD ONLY. Subsection structure, figure/table shells, captions and labels
+% are in place. Quantitative bodies are filled from results/ once experiments
+% complete. Do NOT insert fabricated numbers. Every gap is marked TODO.
+% =====================================================================
+
+This chapter reports the empirical findings. The per-component diagnosis is the
+headline result (\S\ref{sec:results-diagnosis}); the mechanism-targeted remedy is
+then compared against the baselines (\S\ref{sec:results-remedy}), followed by
+ablations (\S\ref{sec:results-ablation}), a computational-cost analysis
+(\S\ref{sec:results-compute}), and a discussion of implications and threats to
+validity (\S\ref{sec:results-discussion}).
+
+\section{Where Forgetting Lives: The Per-Component Diagnosis}
+\label{sec:results-diagnosis}
+
+This section reports how forgetting distributes across the text, visual, layout,
+and fusion components under naive sequential fine-tuning, for the four diagnostic
+conditions C1--C4, and tests the hypotheses of
+\S\ref{sec:method-diag-hypotheses}.
+
+\subsection{Per-Component Forgetting Profile}
+\label{sec:results-profile}
+
+% TODO: interpret Fig 6.1 — which component(s) show the largest Fisher/accuracy
+% drop in C4 versus C1-C3; 1-2 paragraphs.
+
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{results/pilot/figures/fisher_bars.pdf}
+  \fbox{\parbox[c][4cm][c]{0.85\linewidth}{\centering\itshape
+  Placeholder --- per-component forgetting bars (per-group Fisher / accuracy drop)
+  for conditions C1--C4.}}
+  \caption[Per-component forgetting profile]{Per-component forgetting across the
+  task sequence for each diagnostic condition. Bars show the drop attributed to
+  the text, visual, layout, and fusion components. \textbf{TODO:} state the
+  dominant component once analysed.}
+  \label{fig:per-component-bars}
+\end{figure}
+
+\subsection{Per-Layer Breakdown}
+\label{sec:results-layer}
+
+% TODO: interpret Fig 6.2 — which layers are the CKA hotspots.
+
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{results/pilot/figures/cka_heatmap.pdf}
+  \fbox{\parbox[c][4cm][c]{0.85\linewidth}{\centering\itshape
+  Placeholder --- per-layer CKA heatmap (layer $\times$ task boundary), condition C4.}}
+  \caption[Per-layer CKA heatmap]{Per-layer representational drift (linear CKA)
+  between consecutive checkpoints. Darker cells indicate larger drift, localising
+  the forgetting hotspots. \textbf{TODO:} describe the pattern.}
+  \label{fig:cka-heatmap}
+\end{figure}
+
+\subsection{Stability of the Finding}
+\label{sec:results-stability}
+
+% TODO: report whether the dominant-component finding holds across the three seeds
+% and the alternate task order; report the Mann-Whitney U test result (p-value,
+% Bonferroni-corrected) for H0 vs H1.
+
+\section{Mechanism-Targeted Remedy versus Baselines}
+\label{sec:results-remedy}
+
+\subsection{Main Comparison}
+\label{sec:results-main-table}
+
+% TODO: interpret Table 6.1 — DocCL versus the ten baselines on AA across the
+% three scenarios; mean +/- std over 3 seeds.
+
+\begin{table}[t]
+  \centering
+  \caption[Main comparison: average accuracy across scenarios]{Average entity-F1
+  (AA, mean\,$\pm$\,std over three seeds) of each method on the three continual
+  scenarios. Best non-oracle result per column in bold. \textbf{TODO:} fill from
+  \texttt{results/}.}
+  \label{tab:main-comparison}
+  \begin{tabular}{lccc}
+    \toprule
+    \textbf{Method} & \textbf{CIL-CORD} & \textbf{DIL} & \textbf{Mixed} \\
+    \midrule
+    Naive (lower bound)   & TODO & TODO & TODO \\
+    EWC                   & TODO & TODO & TODO \\
+    LwF                   & TODO & TODO & TODO \\
+    ER                    & TODO & TODO & TODO \\
+    DER++                 & TODO & TODO & TODO \\
+    L2P                   & TODO & TODO & TODO \\
+    DualPrompt            & TODO & TODO & TODO \\
+    CODA-Prompt           & TODO & TODO & TODO \\
+    O-LoRA                & TODO & TODO & TODO \\
+    \textbf{DocCL (ours)} & TODO & TODO & TODO \\
+    \midrule
+    Joint (upper bound)   & TODO & TODO & TODO \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Forgetting and Plasticity Breakdown}
+\label{sec:results-bwt-fwt}
+
+% TODO: report BWT (forgetting) and FWT (plasticity) for the key methods;
+% reference Fig 6.3.
+
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{results/pilot/figures/forgetting_matrix.pdf}
+  \fbox{\parbox[c][4cm][c]{0.85\linewidth}{\centering\itshape
+  Placeholder --- per-task forgetting curves for the key methods.}}
+  \caption[Forgetting curves per method]{Per-task performance as the task sequence
+  progresses, for the key methods. \textbf{TODO:} interpret stability versus
+  plasticity.}
+  \label{fig:forgetting-curves}
+\end{figure}
+
+\subsection{Targeting versus Uniform Treatment}
+\label{sec:results-key-ablation}
+
+% TODO: the key ablation — does concentrating the mechanism on the dominant
+% component beat uniform treatment? Reference Table 6.2.
+
+\section{Ablation Studies}
+\label{sec:results-ablation}
+
+% TODO: turn the mechanism on for each component in isolation and confirm that the
+% diagnosis predicts the best target.
+
+\begin{table}[t]
+  \centering
+  \caption[Component-targeting ablation]{Effect of concentrating the DocCL
+  mechanism on each component in isolation. The diagnosis predicts which target is
+  best. \textbf{TODO:} fill from \texttt{results/}.}
+  \label{tab:ablation}
+  \begin{tabular}{lcc}
+    \toprule
+    \textbf{Targeted component} & \textbf{AA} & \textbf{BWT} \\
+    \midrule
+    Text only    & TODO & TODO \\
+    Visual only  & TODO & TODO \\
+    Layout only  & TODO & TODO \\
+    Fusion only  & TODO & TODO \\
+    Uniform (all) & TODO & TODO \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Computational Efficiency}
+\label{sec:results-compute}
+
+% TODO: overhead of instrumentation + the targeted mechanism versus generic CL
+% (training time, memory, added parameters). Reference Table 6.3.
+
+\begin{table}[t]
+  \centering
+  \caption[Computational overhead]{Training-time and parameter overhead of the
+  diagnostic instrumentation and the DocCL mechanism relative to naive
+  fine-tuning. \textbf{TODO:} fill from \texttt{results/}.}
+  \label{tab:compute}
+  \begin{tabular}{lccc}
+    \toprule
+    \textbf{Method} & \textbf{Time/task} & \textbf{Added params} & \textbf{Memory} \\
+    \midrule
+    Naive          & TODO & TODO & TODO \\
+    EWC            & TODO & TODO & TODO \\
+    \textbf{DocCL} & TODO & TODO & TODO \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Discussion}
+\label{sec:results-discussion}
+
+% TODO: what the diagnosis means for designing CL methods for multimodal
+% encoders; whether targeting beats uniform treatment and why; threats to
+% validity (single primary backbone, dataset scale, OCR noise, the C1 text-only
+% caveat from Section 3.2.2); whether the finding generalises to LiLT/BROS
+% (secondary-backbone check).
