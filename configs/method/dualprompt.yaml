@@ -1,0 +1,9 @@
+name: dualprompt
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+n_experts: 10
+g_prompt_length: 5
+e_prompt_length: 5
+lambda_key: 0.5

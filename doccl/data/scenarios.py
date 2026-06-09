@@ -300,29 +300,32 @@ def build_single(dataset_name: str) -> CLScenario:
     )
 
 
-def build_pilot() -> CLScenario:
+def build_pilot(order: list[int] | None = None) -> CLScenario:
     """Pilot study scenario: naive sequential FUNSD → CORD → SROIE.
 
     Used to characterize per-component forgetting in pilot study (Phase 2).
     Each task uses the FULL label set of its respective dataset.
-    """
-    train_dss = [
-        FUNSDDataset("train"),
-        CORDDataset("train", "fine"),
-        SROIEDataset("train"),
-    ]
-    eval_dss = [
-        FUNSDDataset("test"),
-        CORDDataset("test", "fine"),
-        SROIEDataset("test"),
-    ]
 
-    label_sets = [
+    Args:
+        order: optional permutation of [0,1,2] over (FUNSD, CORD, SROIE). Defaults
+            to [0,1,2]. Pass e.g. [2,1,0] for the alternate task order used in the
+            §6.1.3 stability check (does the dominant-component finding survive a
+            different ordering?).
+    """
+    order = order or [0, 1, 2]
+    train_all = [FUNSDDataset("train"), CORDDataset("train", "fine"), SROIEDataset("train")]
+    eval_all = [FUNSDDataset("test"), CORDDataset("test", "fine"), SROIEDataset("test")]
+    label_all = [
         FUNSDDataset.LABEL_NAMES,
         CORDDataset.LABEL_NAMES_FINE,
         SROIEDataset.LABEL_NAMES,
     ]
-    names = ["funsd", "cord", "sroie"]
+    names_all = ["funsd", "cord", "sroie"]
+
+    train_dss = [train_all[i] for i in order]
+    eval_dss = [eval_all[i] for i in order]
+    label_sets = [label_all[i] for i in order]
+    names = [names_all[i] for i in order]
 
     tasks = [
         TaskInfo(
@@ -330,9 +333,9 @@ def build_pilot() -> CLScenario:
             task_name=f"pilot_{names[i]}",
             label_set=label_sets[i],
             is_first=(i == 0),
-            is_last=(i == 2),
+            is_last=(i == len(order) - 1),
         )
-        for i in range(3)
+        for i in range(len(order))
     ]
     return CLScenario("pilot", ScenarioType.PILOT, tasks, train_dss, eval_dss)
 

@@ -3,7 +3,8 @@
 Extension points:
     - expand_classifier(new_labels): for CIL
     - get_layout_signature(boxes): for layout-aware methods (LAPP)
-    - forward_with_modality_mask(...): for pilot conditions C2/C3
+    - forward(..., modality_mask=...): for pilot conditions C2/C3
+    - forward_with_prompts(...): for prompt-based methods (L2P/DualPrompt/CODA/routed)
     - param_groups: dict of named parameter groups for Fisher analysis
 """
 from __future__ import annotations
@@ -169,6 +170,67 @@ class LayoutLMv3Wrapper(nn.Module):
 
         return new_input_ids, new_pixel_values, new_bbox
 
+    # ─── Prompt injection (L2P / DualPrompt / CODA-Prompt / routed prompts) ─────
+    def forward_with_prompts(
+        self,
+        input_ids: torch.Tensor,
+        bbox: torch.Tensor,
+        pixel_values: torch.Tensor,
+        prompt_embeds: torch.Tensor,
+        attention_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Forward with ``prompt_embeds`` prepended to the text token embeddings.
+
+        Shared injection path for all prompt-based methods. We embed ``input_ids``
+        via the word-embedding table, prepend the ``(B, P, D)`` prompt vectors,
+        prepend dummy bboxes (``[0,0,0,0]``) and attention-mask ones for the prompt
+        slots, run the frozen LayoutLMv3 (text stream first, then visual patches),
+        then **slice the prompt slots off** the text outputs before the token
+        classifier.
+
+        Because the datasets pad to ``max_length`` (512) and LayoutLMv3's absolute
+        position table caps usable length at ``max_position_embeddings - 2`` (512
+        for base), we truncate the text to ``max_total - P`` so ``P + L`` fits. The
+        dropped tail is almost always padding. Returns per-token logits over the
+        *used* text positions, shape ``(B, L_used, num_labels)`` — callers must
+        align labels to ``logits.shape[1]`` (the prompt base class does this).
+        """
+        B, L = input_ids.shape
+        P = prompt_embeds.shape[1]
+        lm = self.model.layoutlmv3
+
+        max_total = self.model.config.max_position_embeddings - 2  # RoBERTa pad offset
+        L_used = min(L, max_total - P)
+        if L_used < L:
+            input_ids = input_ids[:, :L_used]
+            bbox = bbox[:, :L_used]
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, :L_used]
+
+        word_embeds = lm.embeddings.word_embeddings(input_ids)  # (B, L_used, D)
+        inputs_embeds = torch.cat(
+            [prompt_embeds.to(word_embeds.dtype), word_embeds], dim=1
+        )  # (B, P + L_used, D)
+
+        dummy_bbox = torch.zeros(B, P, 4, dtype=bbox.dtype, device=bbox.device)
+        new_bbox = torch.cat([dummy_bbox, bbox], dim=1)
+
+        if attention_mask is None:
+            attention_mask = torch.ones(B, L_used, dtype=torch.long, device=input_ids.device)
+        prompt_mask = torch.ones(B, P, dtype=attention_mask.dtype, device=attention_mask.device)
+        new_mask = torch.cat([prompt_mask, attention_mask], dim=1)
+
+        outputs = lm(
+            inputs_embeds=inputs_embeds,
+            bbox=new_bbox,
+            pixel_values=pixel_values,
+            attention_mask=new_mask,
+        )
+        # Text tokens come first; drop the P prompt slots → (B, L_used, D)
+        text_out = outputs[0][:, P : P + L_used]
+        logits = self.model.classifier(self.model.dropout(text_out))
+        return logits
+
     # ─── Parameter groups for Fisher analysis (pilot study) ────────────────────
     @property
     def param_groups(self) -> dict[str, list[nn.Parameter]]:
@@ -221,6 +283,20 @@ class LayoutLMv3Wrapper(nn.Module):
     def unfreeze_backbone(self) -> None:
         for p in self.model.layoutlmv3.parameters():
             p.requires_grad = True
+
+    def enable_gradient_checkpointing(self) -> None:
+        """Trade compute for memory: recompute activations in the backward pass
+        instead of storing them. Essential for full fine-tuning on limited-VRAM
+        GPUs. Uses non-reentrant checkpointing so it also works when the backbone
+        is frozen (prompt methods). ``self.model`` may be a PeftModel (O-LoRA /
+        DocCL-A); both delegate this call to the base model.
+        """
+        try:
+            self.model.gradient_checkpointing_enable(
+                gradient_checkpointing_kwargs={"use_reentrant": False}
+            )
+        except TypeError:  # older transformers without the kwargs argument
+            self.model.gradient_checkpointing_enable()
 
     def trainable_param_count(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)

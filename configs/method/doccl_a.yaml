@@ -1,0 +1,13 @@
+# Candidate A — Hierarchical LoRA (component-banked orthogonal LoRA).
+# target_component selects the active bank for the Table 6.2 ablation:
+#   text | visual | fusion | uniform  ('layout' is not LoRA-addressable — use B).
+name: doccl_a
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.1
+lambda_ortho: 0.5
+target_component: uniform

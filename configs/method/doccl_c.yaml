@@ -1,0 +1,14 @@
+# Candidate C — Modality-Routed Prompts (text/visual/layout sub-pools + router).
+# target_component forces a single sub-pool for the Table 6.2 ablation:
+#   text | visual | layout  ('uniform' uses the learned router).
+name: doccl_c
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+n_prompts: 10
+prompt_length: 5
+top_k: 5
+lambda_key: 0.5
+layout_grid: 4
+target_component: uniform

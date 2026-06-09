@@ -22,8 +22,34 @@ def test_imports():
     from doccl.methods.er import ER  # noqa
     from doccl.methods.der import DERpp  # noqa
     from doccl.methods.o_lora import OLoRA  # noqa
+    from doccl.methods.prompt_base import PromptBasedMethod, PromptPool  # noqa
+    from doccl.methods.l2p import L2P  # noqa
+    from doccl.methods.dualprompt import DualPrompt  # noqa
+    from doccl.methods.coda_prompt import CODAPrompt  # noqa
+    from doccl.methods.doccl import DocCL_A, DocCL_B, DocCL_C  # noqa
     from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper  # noqa
     from doccl.types import ScenarioType, ModalityMask, TaskInfo  # noqa
+
+
+def test_method_registry_complete():
+    """All 10 baselines + 3 DocCL candidates (+ alias) are registered."""
+    import importlib.util
+    from pathlib import Path
+
+    pytest.importorskip("hydra")  # train.py is the Hydra entrypoint
+    pytest.importorskip("wandb")
+
+    spec = importlib.util.spec_from_file_location(
+        "doccl_train", Path(__file__).resolve().parent.parent / "scripts" / "train.py"
+    )
+    train = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(train)
+    for name in [
+        "naive", "joint", "ewc", "lwf", "er", "der_pp",
+        "l2p", "dualprompt", "coda_prompt", "o_lora",
+        "doccl_a", "doccl_b", "doccl_c", "doccl",
+    ]:
+        assert name in train.METHOD_REGISTRY, f"{name} missing from METHOD_REGISTRY"
 
 
 def test_metrics_tracker():
@@ -135,6 +161,139 @@ def test_scenario_registry():
     expected = {"single_funsd", "single_cord", "single_sroie",
                 "cil_funsd", "cil_cord", "dil", "mixed", "pilot"}
     assert expected.issubset(set(SCENARIO_REGISTRY.keys()))
+
+
+# ─── Prompt-module components (fast: pure tensors, no backbone download) ──────
+def test_prompt_pool_select_shapes():
+    """PromptPool.select returns (B, top_k, L_p, D) and a scalar key-pull loss."""
+    from doccl.methods.prompt_base import PromptPool
+
+    pool = PromptPool(n_prompts=10, prompt_length=5, hidden_dim=32)
+    sel, key_pull = pool.select(torch.randn(4, 32), top_k=3)
+    assert sel.shape == (4, 3, 5, 32)
+    assert key_pull.ndim == 0 and key_pull.item() >= 0.0
+
+
+def test_coda_module_shapes():
+    """CODA decomposed prompt is (B, L_p, D); orthogonality penalty is a scalar."""
+    from doccl.methods.coda_prompt import _CodaModule
+
+    coda = _CodaModule(n_components=8, prompt_length=5, hidden=32)
+    prompt = coda(torch.randn(4, 32))
+    assert prompt.shape == (4, 5, 32)
+    pen = coda.ortho_penalty()
+    assert pen.ndim == 0 and pen.item() >= 0.0
+
+
+def test_router_softmax():
+    """DocCL_C router emits per-pool weights that sum to one."""
+    from doccl.methods.doccl import _Router
+
+    weights = _Router(in_dim=48, n_pools=3)(torch.randn(4, 48))
+    assert weights.shape == (4, 3)
+    assert torch.allclose(weights.sum(-1), torch.ones(4), atol=1e-5)
+
+
+def test_dualprompt_modules_shapes():
+    """DualPrompt holds one shared G-prompt + per-expert E-prompts and keys."""
+    from doccl.methods.dualprompt import _DualPromptModules
+
+    dp = _DualPromptModules(n_experts=5, g_len=4, e_len=6, hidden=32)
+    assert dp.g_prompt.shape == (4, 32)
+    assert len(dp.e_prompts) == 5 and dp.e_prompts[0].shape == (6, 32)
+    assert dp.e_keys[0].shape == (32,)
+
+
+# ─── Real-model forward (slow: downloads LayoutLMv3-base) ─────────────────────
+@pytest.mark.slow
+def test_forward_with_prompts_shape():
+    """Prompt injection returns per-token logits over the (truncated) text length."""
+    from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
+
+    B, L, P = 2, 32, 5
+    w = LayoutLMv3Wrapper(num_labels=7)
+    w.eval()
+    with torch.no_grad():
+        logits = w.forward_with_prompts(
+            input_ids=torch.randint(1, 1000, (B, L)),
+            bbox=torch.randint(0, 1000, (B, L, 4)),
+            pixel_values=torch.randn(B, 3, 224, 224),
+            prompt_embeds=torch.randn(B, P, w.hidden_size),
+            attention_mask=torch.ones(B, L, dtype=torch.long),
+        )
+    assert logits.shape[0] == B and logits.shape[2] == 7
+    assert logits.shape[1] <= L  # prompt slots sliced off (text truncated to fit)
+
+
+@pytest.mark.slow
+def test_prompt_methods_train_eval():
+    """L2P/DualPrompt/CODA/DocCL_C run a train step + eval end-to-end."""
+    from doccl.methods.coda_prompt import CODAPrompt
+    from doccl.methods.doccl import DocCL_C
+    from doccl.methods.dualprompt import DualPrompt
+    from doccl.methods.l2p import L2P
+    from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
+    from doccl.types import TaskInfo
+
+    B, L = 2, 32
+
+    def make_batch():
+        return {
+            "input_ids": torch.randint(1, 1000, (B, L)),
+            "bbox": torch.randint(0, 1000, (B, L, 4)),
+            "pixel_values": torch.randn(B, 3, 224, 224),
+            "attention_mask": torch.ones(B, L, dtype=torch.long),
+            "labels": torch.randint(0, 7, (B, L)),
+        }
+
+    task = TaskInfo(task_id=0, task_name="t0", label_set=[str(i) for i in range(7)])
+    cfgs = {
+        L2P: {"epochs": 1, "n_prompts": 5, "prompt_length": 3, "top_k": 2},
+        DualPrompt: {"epochs": 1, "n_experts": 3, "g_prompt_length": 3, "e_prompt_length": 3},
+        CODAPrompt: {"epochs": 1, "n_components": 5, "prompt_length": 3},
+        DocCL_C: {"epochs": 1, "n_prompts": 5, "prompt_length": 3, "top_k": 2},
+    }
+    for cls, cfg in cfgs.items():
+        m = cls(LayoutLMv3Wrapper(num_labels=7), cfg)
+        m.model.id_to_label = {i: str(i) for i in range(7)}
+        m.before_task(task, [make_batch()])
+        tm = m.train_task(task, [make_batch()])
+        assert tm.n_steps == 1
+        assert 0 in m.evaluate({0: [make_batch()]})
+
+
+@pytest.mark.slow
+def test_doccl_ab_train_step():
+    """DocCL_A (H-LoRA) and DocCL_B (Layout-Protected EWC) construct and step."""
+    from doccl.methods.doccl import DocCL_A, DocCL_B
+    from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
+    from doccl.types import TaskInfo
+
+    B, L = 2, 32
+
+    def make_batch():
+        return {
+            "input_ids": torch.randint(1, 1000, (B, L)),
+            "bbox": torch.randint(0, 1000, (B, L, 4)),
+            "pixel_values": torch.randn(B, 3, 224, 224),
+            "attention_mask": torch.ones(B, L, dtype=torch.long),
+            "labels": torch.randint(0, 7, (B, L)),
+        }
+
+    task = TaskInfo(task_id=0, task_name="t0", label_set=[str(i) for i in range(7)])
+
+    a = DocCL_A(
+        LayoutLMv3Wrapper(num_labels=7),
+        {"epochs": 1, "target_component": "fusion", "lora_rank": 4},
+    )
+    assert a.train_task(task, [make_batch()]).n_steps == 1
+
+    b = DocCL_B(
+        LayoutLMv3Wrapper(num_labels=7),
+        {"epochs": 1, "target_component": "layout", "fisher_n_samples": 4},
+    )
+    assert b.train_task(task, [make_batch()]).n_steps == 1
+    b.after_task(task, [make_batch()])  # Fisher snapshot path
 
 
 @pytest.mark.slow

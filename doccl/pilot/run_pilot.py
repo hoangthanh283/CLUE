@@ -68,6 +68,8 @@ def run_pilot_condition(
     batch_size: int = 8,
     cka_n_samples: int = 500,
     fisher_n_samples: int = 200,
+    task_order: list[int] | None = None,
+    gradient_checkpointing: bool = False,
 ) -> dict:
     """Run one condition × seed of the pilot study.
 
@@ -75,6 +77,8 @@ def run_pilot_condition(
         condition: one of {"c1_bert", "c2_no_text", "c3_no_image", "c4_full"}
         seed: random seed
         output_dir: where to save results
+        task_order: optional permutation of [0,1,2] over (FUNSD, CORD, SROIE) for
+            the §6.1.3 stability check; default order if None.
 
     Returns:
         Summary dict of metrics (also saved to disk).
@@ -84,15 +88,18 @@ def run_pilot_condition(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     log.info("=" * 80)
-    log.info(f"Pilot condition: {condition}, seed={seed}, device={device}")
+    log.info(f"Pilot condition: {condition}, seed={seed}, order={task_order}, device={device}")
     log.info("=" * 80)
 
     # Build scenario
-    scenario = build_pilot()
+    scenario = build_pilot(order=task_order)
 
     # Build model based on condition
     model, modality_mask = _build_condition_model(condition, scenario)
     model = model.to(device)
+    if gradient_checkpointing:
+        model.enable_gradient_checkpointing()
+        log.info("Gradient checkpointing enabled (lower memory, slower).")
 
     # Reservoirs for analysis
     cka_records: list[dict] = []  # one per task boundary
@@ -181,16 +188,21 @@ def run_pilot_condition(
         })
 
     # ─── Save results ──────────────────────────────────────────────────────────
+    order = task_order or [0, 1, 2]
     summary = {
         "condition": condition,
         "seed": seed,
+        "task_order": order,
         "cka_records": cka_records,
         "fisher_records": fisher_records,
         "accuracy_records": accuracy_records,
         "cl_metrics": tracker.summary(),
         "matrix": tracker.matrix.tolist(),
     }
-    out_path = output_dir / f"{condition}_seed{seed}.json"
+    # Suffix non-default orders so the alternate-order stability runs do not collide
+    # with the default-order results (both are pooled by doccl.pilot.analyze).
+    order_suffix = "" if order == [0, 1, 2] else "_ord" + "".join(str(i) for i in order)
+    out_path = output_dir / f"{condition}_seed{seed}{order_suffix}.json"
     with open(out_path, "w") as f:
         json.dump(summary, f, indent=2)
     log.info(f"\nSaved pilot results to {out_path}")
@@ -315,6 +327,23 @@ def main():
     parser.add_argument("--output_dir", type=Path, default=Path("results/pilot"))
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument(
+        "--task_order", nargs="+", type=int, default=None,
+        help="Permutation of 0 1 2 over (FUNSD CORD SROIE); e.g. '2 1 0' for the "
+             "alternate-order stability check (§6.1.3). Default: 0 1 2.",
+    )
+    parser.add_argument(
+        "--cka_n_samples", type=int, default=500,
+        help="Probe-set size for CKA (lower to save memory on small GPUs).",
+    )
+    parser.add_argument(
+        "--fisher_n_samples", type=int, default=200,
+        help="Sample count for the Fisher estimate (lower to save memory).",
+    )
+    parser.add_argument(
+        "--gradient_checkpointing", action="store_true",
+        help="Recompute activations in backward to fit limited-VRAM GPUs.",
+    )
     args = parser.parse_args()
 
     for cond in args.conditions:
@@ -325,6 +354,10 @@ def main():
                 output_dir=args.output_dir,
                 epochs_per_task=args.epochs,
                 batch_size=args.batch_size,
+                cka_n_samples=args.cka_n_samples,
+                fisher_n_samples=args.fisher_n_samples,
+                task_order=args.task_order,
+                gradient_checkpointing=args.gradient_checkpointing,
             )
 
 

@@ -1,0 +1,8 @@
+name: coda_prompt
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+n_components: 10
+prompt_length: 5
+lambda_ortho: 0.1

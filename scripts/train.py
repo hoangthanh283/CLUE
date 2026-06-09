@@ -7,8 +7,10 @@ Usage:
 """
 from __future__ import annotations
 
+import json
 import logging
 import random
+import time
 from pathlib import Path
 
 import hydra
@@ -20,9 +22,13 @@ from torch.utils.data import ConcatDataset, DataLoader
 
 from doccl.data.scenarios import get_scenario
 from doccl.eval.metrics import CLMetricsTracker
+from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.der import DERpp
+from doccl.methods.doccl import DocCL_A, DocCL_B, DocCL_C
+from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.er import ER
 from doccl.methods.ewc import EWC
+from doccl.methods.l2p import L2P
 from doccl.methods.lwf import LwF
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
 from doccl.methods.o_lora import OLoRA
@@ -39,10 +45,19 @@ METHOD_REGISTRY = {
     "er": ER,
     "der_pp": DERpp,
     "o_lora": OLoRA,
-    # "l2p": L2P,         # Week 7
-    # "dualprompt": ...,  # Week 8
-    # "coda_prompt": ..., # Week 8
-    # "doccl": ...,       # Week 9-11 (selected post-pilot)
+    "l2p": L2P,
+    "dualprompt": DualPrompt,
+    "coda_prompt": CODAPrompt,
+    # Proposed-method candidates — pre-implemented; one is selected at the Week-4
+    # pilot decision gate (CLAUDE.md). Each accepts method.target_component for the
+    # component-targeting ablation (Table 6.2).
+    "doccl_a": DocCL_A,
+    "doccl_b": DocCL_B,
+    "doccl_c": DocCL_C,
+    # PLACEHOLDER alias for the proposed method. At the Week-4 gate, repoint this to
+    # the pilot-selected winner (doccl_a/b/c). Not a pre-lock: the Phase-5 grid for
+    # `doccl` is only run *after* the diagnosis selects the candidate.
+    "doccl": DocCL_A,
 }
 
 
@@ -55,15 +70,58 @@ def set_seed(seed: int) -> None:
     torch.backends.cudnn.benchmark = False
 
 
+def save_run_metrics(
+    out_dir: Path,
+    cfg: DictConfig,
+    tracker: CLMetricsTracker,
+    method,
+    task_times: list[float],
+) -> None:
+    """Persist a structured per-run ``metrics.json`` for offline ingestion.
+
+    Decouples ``scripts/analyze_results.py`` from W&B: on an offline Vast.ai box
+    the LaTeX result tables (6.1/6.3) and forgetting curves are built directly
+    from ``results/<run>/{matrix.npy,metrics.json}``. Records the CL metrics, the
+    accuracy matrix, per-task wall time, parameter counts, and peak GPU memory
+    (the raw signals behind the computational-overhead table).
+    """
+    peak_mem_mb = None
+    if torch.cuda.is_available():
+        peak_mem_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
+    metrics = {
+        "method": cfg.method.name,
+        "scenario": cfg.scenario.name,
+        "seed": int(cfg.seed),
+        "target_component": cfg.method.get("target_component"),
+        **tracker.to_dict(),
+        "wall_time_per_task_s": [float(t) for t in task_times],
+        "total_wall_time_s": float(sum(task_times)),
+        "mean_time_per_task_s": float(sum(task_times) / max(len(task_times), 1)),
+        "total_params": int(method.total_param_count()),
+        "trainable_params": int(method.trainable_param_count()),
+        "peak_gpu_mem_mb": peak_mem_mb,
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with open(out_dir / "metrics.json", "w") as f:
+        json.dump(metrics, f, indent=2)
+    log.info("Saved metrics to %s", out_dir / "metrics.json")
+
+
 @hydra.main(version_base=None, config_path="../configs", config_name="default")
 def main(cfg: DictConfig) -> None:
     log.info("Config:\n%s", OmegaConf.to_yaml(cfg))
     set_seed(cfg.seed)
 
     # ─── W&B init ──────────────────────────────────────────────────────────────
+    # Include target_component in the run name so component-targeting ablation runs
+    # (same method, different bank) get distinct result dirs and are identifiable.
+    run_name = f"{cfg.scenario.name}_{cfg.method.name}_seed{cfg.seed}"
+    target_component = cfg.method.get("target_component")
+    if target_component is not None:
+        run_name += f"_{target_component}"
     run = wandb.init(
         project=cfg.wandb.project,
-        name=f"{cfg.scenario.name}_{cfg.method.name}_seed{cfg.seed}",
+        name=run_name,
         config=OmegaConf.to_container(cfg, resolve=True),
         tags=[cfg.scenario.name, cfg.method.name, f"seed{cfg.seed}"],
         mode=cfg.wandb.get("mode", "online"),
@@ -97,9 +155,18 @@ def main(cfg: DictConfig) -> None:
     method_cls = METHOD_REGISTRY[cfg.method.name]
     method = method_cls(model, OmegaConf.to_container(cfg.method, resolve=True))
 
+    # Activation checkpointing (after any PEFT wrapping) — fits small-VRAM GPUs.
+    if cfg.training.get("gradient_checkpointing", False):
+        model.enable_gradient_checkpointing()
+        log.info("Gradient checkpointing enabled (lower memory, ~20-30%% slower).")
+
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
+
     # ─── CL loop ───────────────────────────────────────────────────────────────
     tracker = CLMetricsTracker(num_tasks=len(scenario.tasks))
     eval_loaders_seen: dict[int, DataLoader] = {}
+    out_dir = Path(cfg.output_dir) / run.name
 
     # Special path for Joint: concatenate all train datasets and treat as 1 task
     if cfg.method.name == "joint":
@@ -124,7 +191,9 @@ def main(cfg: DictConfig) -> None:
         )
         # Train once on joint data
         synthetic_task = scenario.tasks[0]
+        t0 = time.perf_counter()
         method.train_task(synthetic_task, joint_loader)
+        joint_time = time.perf_counter() - t0
 
         # Evaluate on each task's eval set
         for tid, eval_ds in enumerate(scenario.eval_datasets):
@@ -143,10 +212,16 @@ def main(cfg: DictConfig) -> None:
         wandb.log({f"final/eval/task_{tid}/f1": r.f1 for tid, r in results.items()})
         wandb.log({"final/AA": tracker.average_accuracy()})
         log.info("Joint final AA: %.2f", tracker.average_accuracy())
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        np.save(out_dir / "matrix.npy", tracker.matrix)
+        save_run_metrics(out_dir, cfg, tracker, method, [joint_time])
+
         wandb.finish()
         return
 
     # Standard CL loop
+    task_times: list[float] = []
     for task_idx, task in enumerate(scenario.tasks):
         log.info("=== Task %d/%d: %s ===", task_idx + 1, len(scenario.tasks), task.task_name)
 
@@ -175,7 +250,9 @@ def main(cfg: DictConfig) -> None:
 
         # Lifecycle
         method.before_task(task, train_loader)
+        t0 = time.perf_counter()
         train_metrics = method.train_task(task, train_loader)
+        task_times.append(time.perf_counter() - t0)
         method.after_task(task, train_loader)
 
         # Evaluate on all seen tasks
@@ -200,11 +277,11 @@ def main(cfg: DictConfig) -> None:
     log.info("Final: AA=%.2f BWT=%.2f AF=%.2f", summary["AA"], summary["BWT"], summary["AF"])
     wandb.log({"final/" + k: v for k, v in summary.items()})
 
-    # Save tracker matrix
-    out_dir = Path(cfg.output_dir) / run.name
+    # Save tracker matrix + structured metrics for offline ingestion
     out_dir.mkdir(parents=True, exist_ok=True)
     np.save(out_dir / "matrix.npy", tracker.matrix)
     log.info("Saved matrix to %s", out_dir)
+    save_run_metrics(out_dir, cfg, tracker, method, task_times)
 
     wandb.finish()
 

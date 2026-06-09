@@ -1,0 +1,9 @@
+name: l2p
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+n_prompts: 10
+prompt_length: 5
+top_k: 5
+lambda_key: 0.5

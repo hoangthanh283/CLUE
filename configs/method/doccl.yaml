@@ -1,0 +1,15 @@
+# Proposed-method alias used by the Phase-5 grid (`method=doccl`).
+# PLACEHOLDER: currently mirrors Candidate A. At the Week-4 pilot decision gate,
+# replace this body with the selected winner's hyperparameters (copy doccl_a/b/c.yaml)
+# AND repoint METHOD_REGISTRY["doccl"] in scripts/train.py to the same class.
+# Not a pre-lock — the `doccl` grid is only run after the diagnosis selects the candidate.
+name: doccl
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.1
+lambda_ortho: 0.5
+target_component: uniform

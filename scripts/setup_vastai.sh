@@ -35,11 +35,12 @@ else
     echo "WARNING: pyproject.toml not found in $(pwd) — install manually."
 fi
 
-# 3. W&B login (interactive — paste API key when prompted)
+# 3. W&B login (OPTIONAL — the grid runs OFFLINE by default)
 echo
-echo "→ W&B login (paste your API key from https://wandb.ai/authorize)"
-echo "  Skip with Ctrl-C if you'll set WANDB_API_KEY env var instead."
-wandb login || echo "  (Skipped — set WANDB_API_KEY env var to log results)"
+echo "→ W&B is OPTIONAL: scripts/run_grid.sh defaults to WANDB_MODE=offline and"
+echo "  scripts/analyze_results.py aggregates from local results/ (no W&B needed)."
+echo "  Log in only if you want live dashboards (then run with WANDB_MODE=online):"
+wandb login || echo "  (Skipped — running fully offline; results come from results/*/metrics.json)"
 
 # 4. HuggingFace datasets cache
 echo
@@ -50,8 +51,11 @@ print('Downloading FUNSD...')
 load_dataset('nielsr/funsd-layoutlmv3', trust_remote_code=True)
 print('Downloading CORD-v2...')
 load_dataset('naver-clova-ix/cord-v2', trust_remote_code=True)
-print('Done. SROIE must be prepared via scripts/prepare_sroie.py.')
+print('Done.')
 "
+echo "  SROIE: either prepare locally —"
+echo "      python scripts/prepare_sroie.py --raw_dir <SROIE_raw> --output_dir data/sroie"
+echo "  — or use the HF mirror (source='hf' in doccl/data/sroie.py; confirm its BIO scheme)."
 
 # 5. Smoke tests
 echo

@@ -1,0 +1,13 @@
+# Candidate B — Layout-Protected EWC (per-component-group penalty weighting).
+# target_component is the high-lambda protected group for the Table 6.2 ablation:
+#   layout | text | visual | fusion | ffn.
+name: doccl_b
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+fisher_n_samples: 200
+ewc_gamma: 1.0
+lambda_high: 5000.0
+lambda_low: 100.0
+target_component: layout

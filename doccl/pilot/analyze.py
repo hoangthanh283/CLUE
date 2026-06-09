@@ -182,6 +182,93 @@ def plot_forgetting_matrix(df: pd.DataFrame, output_path: Path) -> None:
     print(f"Saved {output_path}")
 
 
+def _mannwhitney(a: list[float], b: list[float]) -> float:
+    """Two-sided Mann-Whitney U p-value; NaN if scipy missing or degenerate."""
+    try:
+        from scipy.stats import mannwhitneyu
+    except ImportError:
+        return float("nan")
+    if len(a) < 1 or len(b) < 1 or (len(set(a)) == 1 and len(set(b)) == 1 and a[0] == b[0]):
+        return float("nan")
+    try:
+        _, p = mannwhitneyu(a, b, alternative="two-sided")
+        return float(p)
+    except ValueError:
+        return float("nan")
+
+
+def condition_bwt_test(results: list[dict], reference: str = "c4_full", alpha: float = 0.05) -> dict | None:
+    """H0/H1 across conditions: is the full-multimodal model's forgetting (|BWT|)
+    distinguishable from each unimodal/ablated condition?
+
+    Samples per condition = seeds (and alternate task orders, if those runs are
+    present — each pilot JSON is one sample). Bonferroni-corrected at
+    ``alpha / (#rival conditions)``.
+    """
+    by_cond: dict[str, list[float]] = {}
+    for r in results:
+        by_cond.setdefault(r["condition"], []).append(abs(r["cl_metrics"]["BWT"]))
+    if reference not in by_cond:
+        return None
+    rivals = sorted(c for c in by_cond if c != reference)
+    bonf = alpha / max(len(rivals), 1)
+    rows, reject_any = [], False
+    for c in rivals:
+        p = _mannwhitney(by_cond[reference], by_cond[c])
+        sig = (p == p) and p < bonf  # p==p screens NaN
+        reject_any = reject_any or sig
+        rows.append((c, float(np.mean(by_cond[c])), p, sig))
+    return {
+        "reference": reference,
+        "ref_mean": float(np.mean(by_cond[reference])),
+        "alpha": alpha,
+        "bonferroni": bonf,
+        "rivals": rows,
+        "reject_H0": reject_any,
+        "n_per_group": len(by_cond[reference]),
+    }
+
+
+def component_hypothesis_test(df: pd.DataFrame, condition: str = "c4_full", alpha: float = 0.05) -> dict | None:
+    """H0 (forgetting uniform across components) vs H1 (one component dominates),
+    within ``condition``, on the per-group Fisher signal at the final task.
+
+    Identifies the dominant (highest mean Fisher) group and Mann-Whitney-tests it
+    against each rival group, pooling across seeds (and alternate orders, if
+    present). Bonferroni-corrected at ``alpha / (#groups - 1)``.
+    """
+    fisher = df[(df["metric"] == "fisher") & (df["condition"] == condition)]
+    if fisher.empty:
+        return None
+    final_task = fisher["task_idx"].max()
+    sub = fisher[fisher["task_idx"] == final_task]
+    groups = sorted(sub["group"].unique())
+    samples = {g: sub[sub["group"] == g]["value"].tolist() for g in groups}
+    means = {g: float(np.mean(v)) for g, v in samples.items() if v}
+    if not means:
+        return None
+    dominant = max(means, key=means.get)
+    bonf = alpha / max(len(groups) - 1, 1)
+    rows, reject_any = [], False
+    for g in groups:
+        if g == dominant:
+            continue
+        p = _mannwhitney(samples[dominant], samples[g])
+        sig = (p == p) and p < bonf
+        reject_any = reject_any or sig
+        rows.append((g, means[g], p, sig))
+    return {
+        "condition": condition,
+        "dominant": dominant,
+        "dominant_mean": means[dominant],
+        "alpha": alpha,
+        "bonferroni": bonf,
+        "rivals": rows,
+        "reject_H0": reject_any,
+        "n_per_group": len(samples[dominant]),
+    }
+
+
 def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: Path) -> None:
     """Generate a markdown summary of pilot findings."""
     lines = [
@@ -207,14 +294,68 @@ def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: P
             + " |"
         )
 
-    lines.extend([
+    # ─── Hypothesis tests (Mann-Whitney U, Bonferroni-corrected) ──────────────
+    lines += ["", "## Hypothesis Tests (Mann-Whitney U, Bonferroni-corrected)", ""]
+
+    cond_test = condition_bwt_test(results, reference="c4_full")
+    lines += [
+        "### Cross-condition: does full-multimodal forgetting differ from C1-C3?",
         "",
-        "## Hypothesis Test (informal)",
+        "**H0:** |BWT| of C4 equals that of the ablated/unimodal conditions.  ",
+        "**H1:** C4 forgets differently from at least one of C1-C3.",
         "",
-        "**H0:** Forgetting (BWT magnitude) uniform across conditions.  ",
-        "**H1:** C4 (full multimodal) shows significantly different forgetting pattern than C1-C3.",
+    ]
+    if cond_test is None:
+        lines.append("_No `c4_full` runs found — cannot test._")
+    else:
+        lines += [
+            f"- Reference **{cond_test['reference']}** mean |BWT| = {cond_test['ref_mean']:.2f} "
+            f"(n={cond_test['n_per_group']} per group, α={cond_test['alpha']}, "
+            f"Bonferroni α'={cond_test['bonferroni']:.4f}).",
+            "",
+            "| Rival condition | mean \\|BWT\\| | p (vs C4) | significant |",
+            "|---|---|---|---|",
+        ]
+        for c, mean, p, sig in cond_test["rivals"]:
+            pstr = "n/a" if p != p else f"{p:.4f}"
+            lines.append(f"| {c} | {mean:.2f} | {pstr} | {'**yes**' if sig else 'no'} |")
+        verdict = "**reject H0**" if cond_test["reject_H0"] else "fail to reject H0"
+        lines += ["", f"Verdict: {verdict} at the Bonferroni-corrected level."]
+
+    comp_test = component_hypothesis_test(df, condition="c4_full")
+    lines += [
         "",
-        "_Run statistical tests separately (e.g., Mann-Whitney U on BWT)._",
+        "### Per-component (C4): is forgetting concentrated in one component?",
+        "",
+        "**H0:** per-group Fisher uniform across components.  ",
+        "**H1:** one component (the dominant) differs significantly.",
+        "",
+    ]
+    if comp_test is None:
+        lines.append("_No per-group Fisher data for `c4_full` — cannot test._")
+    else:
+        lines += [
+            f"- Dominant component: **{comp_test['dominant']}** "
+            f"(mean Fisher = {comp_test['dominant_mean']:.3e}, n={comp_test['n_per_group']}, "
+            f"Bonferroni α'={comp_test['bonferroni']:.4f}).",
+            "",
+            "| Rival group | mean Fisher | p (vs dominant) | significant |",
+            "|---|---|---|---|",
+        ]
+        for g, mean, p, sig in comp_test["rivals"]:
+            pstr = "n/a" if p != p else f"{p:.4f}"
+            lines.append(f"| {g} | {mean:.3e} | {pstr} | {'**yes**' if sig else 'no'} |")
+        verdict = "**reject H0**" if comp_test["reject_H0"] else "fail to reject H0"
+        lines += [
+            "",
+            f"Verdict: {verdict}. ",
+            "",
+            "_Decision rule (CLAUDE.md): fusion-dominant → Candidate A; layout-position "
+            "drift → Candidate B; scenario-dependent → Candidate C; no clear pattern "
+            "(fail to reject H0) → characterization-only fallback._",
+        ]
+
+    lines += [
         "",
         "## Key Layer/Group Drift (CKA / Fisher)",
         "",
@@ -222,8 +363,8 @@ def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: P
         "",
         "## Implications for Method Design",
         "",
-        "_To be filled in based on findings — see Week 4 advisor meeting decision._",
-    ])
+        "_To be confirmed at the Week-4 advisor meeting (GATE A)._",
+    ]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines))
