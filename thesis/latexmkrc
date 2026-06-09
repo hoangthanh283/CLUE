@@ -1,0 +1,15 @@
+# Force XeLaTeX. The hust-thesis class uses mathspec/fontspec (\RequireXeTeX),
+# so the document MUST be compiled with XeLaTeX, not pdfLaTeX.
+# Overleaf and local latexmk both honour this file.
+#   $pdf_mode = 5  ->  build PDF via xelatex
+$pdf_mode = 5;
+
+# Run the glossaries (makeglossaries) step so the List of Acronyms is populated.
+add_cus_dep('glo', 'gls', 0, 'run_makeglossaries');
+add_cus_dep('acn', 'acr', 0, 'run_makeglossaries');
+sub run_makeglossaries {
+    my ($base_name, $path) = fileparse($_[0]);
+    pushd($path) if $path;
+    system("makeglossaries", $base_name);
+    popd() if $path;
+}

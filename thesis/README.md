@@ -8,14 +8,17 @@ Built on the **official HUST thesis class** `hust-thesis` (Ngoc Bui, CC BY 4.0).
 
 ## Compiler
 
-**XeLaTeX** (the class uses `fontspec`/`mathspec` and bundled OTF fonts) + **BibTeX**.
-On Overleaf set *Menu → Compiler → XeLaTeX*. The build verified locally with:
+**XeLaTeX** (the class uses `fontspec`/`mathspec`, which require XeTeX, plus
+bundled OTF fonts) + **BibTeX**. A `latexmkrc` (`$pdf_mode = 5`) forces XeLaTeX, so
+the project builds correctly on Overleaf and locally without any manual setting.
 
 ```bash
-latexmk -xelatex -interaction=nonstopmode main.tex
+latexmk -interaction=nonstopmode main.tex   # latexmkrc selects xelatex
 ```
 
-→ 48-page PDF, 0 undefined references.
+> On Overleaf, if you still see an `\RequireXeTeX` / `mathspec` "Emergency stop",
+> the project is being built with pdfLaTeX — set *Menu → Compiler → XeLaTeX* and
+> recompile (the bundled `latexmkrc` should make this unnecessary).
 
 > Note on fonts: the class sets `\setmainfont{Times New Roman}` and loads Arno Pro
 > from `fonts/`. Overleaf and TeX Live resolve these; if a future Overleaf image
