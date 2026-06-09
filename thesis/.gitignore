@@ -28,6 +28,9 @@
 *.alg
 *.ist
 *.xdy
+*.nlg
+*.not
+*.ntn
 main.pdf
 
 # Editor
