@@ -70,7 +70,7 @@ output:
 # Weights & Biases (wandb) experiment tracking (optional)
 # To enable wandb tracking, set use_wandb to true and provide your credentials
 wandb:
-  use_wandb: false  # Set to true to enable wandb tracking
+  use_wandb: true  # Enabled by default for experiment tracking
   wandb_entity: null
   wandb_project: null
   #wandb_api_key: null  # Use WANDB_API_KEY env var

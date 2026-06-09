@@ -277,19 +277,7 @@ class TestWandbIntegration:
             }
         }
 
-        try:
-            run = init_wandb_run(config)
-        except Exception as e:
-            error_msg = str(e).lower()
-            # Skip if permission/entity issues
-            if any(x in error_msg for x in ["permission", "personal entities", "403"]):
-                pytest.skip(
-                    f"wandb API key lacks proper permissions. "
-                    f"Entity: {os.getenv('WANDB_ENTITY', 'N/A')}, "
-                    f"Project: {os.getenv('WANDB_PROJECT', 'cl4ie')}. "
-                    f"Error: {e}"
-                )
-            raise
+        run = init_wandb_run(config)
 
         try:
             assert run is not None, "wandb.init() failed to create run"
@@ -310,13 +298,7 @@ class TestWandbIntegration:
             }
         }
 
-        try:
-            run = init_wandb_run(config)
-        except Exception as e:
-            error_msg = str(e).lower()
-            if any(x in error_msg for x in ["permission", "personal entities", "403"]):
-                pytest.skip(f"wandb permissions issue: {e}")
-            raise
+        run = init_wandb_run(config)
 
         try:
             assert run is not None
@@ -350,13 +332,7 @@ class TestWandbIntegration:
             }
         }
 
-        try:
-            run = init_wandb_run(config)
-        except Exception as e:
-            error_msg = str(e).lower()
-            if any(x in error_msg for x in ["permission", "personal entities", "403"]):
-                pytest.skip(f"wandb permissions issue: {e}")
-            raise
+        run = init_wandb_run(config)
 
         try:
             assert run is not None
@@ -368,8 +344,7 @@ class TestWandbIntegration:
             # Verify run finished
             # (Note: wandb may need time to sync, so just check it's callable)
             assert run_id is not None
-        except Exception as e:
-            # If run not properly cleaned up, fail test
+        finally:
+            # Safety cleanup if exception occurs
             if run:
                 run.finish()
-            raise e

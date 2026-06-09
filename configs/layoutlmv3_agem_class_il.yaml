@@ -93,7 +93,7 @@ output:
   push_to_hub: false
 
 wandb:
-  use_wandb: false
+  use_wandb: true
   wandb_entity: null
   wandb_project: "cl4ie"
   #wandb_api_key: null  # Use WANDB_API_KEY env var

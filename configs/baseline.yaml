@@ -27,3 +27,10 @@ cl_strategy:
 evaluation:
   metrics: ["f1", "precision", "recall"]
   save_predictions: true
+
+# Weights & Biases (wandb) experiment tracking
+wandb:
+  use_wandb: true  # Enabled by default for experiment tracking
+  wandb_entity: null
+  wandb_project: null
+  tags: ["baseline", "no_cl", "bert"]
