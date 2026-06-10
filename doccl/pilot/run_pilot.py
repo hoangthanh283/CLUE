@@ -136,22 +136,26 @@ def run_pilot_condition(
         )
         eval_loaders[task_idx] = eval_loader
 
-        # ─── Capture pre-training activations & Fisher (before training task) ──
+        # ─── Capture pre-training activations for CKA (before training task) ───
+        # CKA needs both checkpoints probed on the SAME inputs: capture with the
+        # previous checkpoint here, and with the post-training checkpoint below,
+        # both on this task's eval set (eval sets differ in size across tasks,
+        # so carrying activations across tasks would also break N alignment).
         if task_idx > 0:
             log.info("Capturing pre-training activations for CKA...")
-            _ = _capture_activations(model, eval_loader, modality_mask, cka_n_samples, device)
+            prev_activations = _capture_activations(
+                model, eval_loader, modality_mask, cka_n_samples, device
+            )
 
         # ─── Train naively on this task ────────────────────────────────────────
         _train_naive(model, train_loader, modality_mask, epochs_per_task, device)
 
-        # ─── Capture post-training activations ─────────────────────────────────
-        log.info("Capturing post-training activations...")
-        cur_activations = _capture_activations(
-            model, eval_loader, modality_mask, cka_n_samples, device
-        )
-
-        # CKA: layer-wise similarity between consecutive checkpoints
+        # ─── Capture post-training activations + CKA vs pre-training capture ───
         if prev_activations is not None:
+            log.info("Capturing post-training activations...")
+            cur_activations = _capture_activations(
+                model, eval_loader, modality_mask, cka_n_samples, device
+            )
             cka = {
                 layer: linear_cka(prev_activations[layer], cur_activations[layer])
                 for layer in cur_activations.keys() & prev_activations.keys()
@@ -161,7 +165,7 @@ def run_pilot_condition(
                 "cka": cka,
             })
             log.info(f"CKA at boundary {task_idx-1}→{task_idx}: {cka}")
-        prev_activations = cur_activations
+            prev_activations = None  # next boundary captures its own pair
 
         # ─── Fisher per group ──────────────────────────────────────────────────
         log.info("Computing Fisher information...")

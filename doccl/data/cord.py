@@ -177,12 +177,16 @@ class CORDDataset(Dataset):
                 xs = [quad.get(f"x{i}", 0) for i in range(1, 5)]
                 ys = [quad.get(f"y{i}", 0) for i in range(1, 5)]
                 x0, y0, x1, y1 = min(xs), min(ys), max(xs), max(ys)
-                # Normalize to [0, 1000]
+                # Normalize to [0, 1000] and clamp: CORD quads occasionally carry
+                # slightly out-of-frame coords (negative or > W/H from annotation
+                # noise), which become negative / >1000 ids and trip LayoutLMv3's
+                # 2D position-embedding bounds (valid [0, 1023]) -> CUDA device-side
+                # assert. FUNSD/SROIE are pre-clamped upstream; CORD is not.
                 box = [
-                    int(1000 * x0 / W),
-                    int(1000 * y0 / H),
-                    int(1000 * x1 / W),
-                    int(1000 * y1 / H),
+                    min(1000, max(0, int(1000 * x0 / W))),
+                    min(1000, max(0, int(1000 * y0 / H))),
+                    min(1000, max(0, int(1000 * x1 / W))),
+                    min(1000, max(0, int(1000 * y1 / H))),
                 ]
                 # BIO tag
                 if label_class is None:

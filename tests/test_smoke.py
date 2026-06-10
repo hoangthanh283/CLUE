@@ -206,6 +206,30 @@ def test_dualprompt_modules_shapes():
     assert dp.e_keys[0].shape == (32,)
 
 
+# ─── Dataset bbox bounds (slow: reads cached datasets) ────────────────────────
+@pytest.mark.slow
+@pytest.mark.parametrize("name", ["funsd", "cord", "sroie"])
+def test_dataset_bbox_within_layoutlmv3_bounds(name):
+    """Every bbox coordinate must lie in LayoutLMv3's 2D position-embedding range
+    [0, 1023]; an out-of-range coord triggers a CUDA device-side assert at train
+    time. CORD raw quads carry out-of-frame coords, so normalization must clamp.
+    """
+    from doccl.data.cord import CORDDataset
+    from doccl.data.funsd import FUNSDDataset
+    from doccl.data.sroie import SROIEDataset
+
+    ds = {
+        "funsd": lambda: FUNSDDataset("test"),
+        "cord": lambda: CORDDataset("test", "fine"),
+        "sroie": lambda: SROIEDataset("test"),
+    }[name]()
+
+    for j in range(min(len(ds), 40)):
+        bbox = ds[j]["bbox"]
+        assert int(bbox.min()) >= 0, f"{name}[{j}] has negative bbox coord {int(bbox.min())}"
+        assert int(bbox.max()) <= 1023, f"{name}[{j}] has bbox coord {int(bbox.max())} > 1023"
+
+
 # ─── Real-model forward (slow: downloads LayoutLMv3-base) ─────────────────────
 @pytest.mark.slow
 def test_forward_with_prompts_shape():
