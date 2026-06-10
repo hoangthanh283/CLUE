@@ -11,7 +11,7 @@ across runs. Method-specific hyperparameters (e.g.\ the EWC penalty $\lambda$, t
 replay-buffer size, the prompt-pool size, the LoRA rank) are set per method and
 recorded in the corresponding configuration files.
 
-\begin{table}[h]
+\begin{table}[!htbp]
   \centering
   \caption[Default hyperparameters]{Shared training defaults (top) and the main
   method-specific hyperparameters with their sweep ranges (bottom). Scenario-specific
@@ -25,11 +25,12 @@ recorded in the corresponding configuration files.
     Backbone               & LayoutLMv3-base (12 layers, hidden 768) \\
     Optimiser              & AdamW (weight decay $0.01$) \\
     Learning rate          & $5\times10^{-5}$ \\
-    Warmup ratio           & $0.1$ \\
+    LR schedule            & constant (no warmup) \\
     Gradient clipping       & max-norm $1.0$ \\
     Batch size             & 8 \\
+    Gradient accumulation  & 1 \\
     Epochs per task        & 10 \\
-    Mixed precision        & fp16 \\
+    Precision              & fp32 (fp16 flag available, off by default) \\
     Image resolution       & $224\times224$ \\
     Box coordinate range   & $[0,1000]^4$ \\
     Seeds                  & 42, 123, 7 \\
@@ -37,11 +38,50 @@ recorded in the corresponding configuration files.
     \midrule
     \multicolumn{2}{l}{\emph{Method-specific (default; sweep)}} \\
     EWC penalty $\lambda$  & $1000$; $\{10^2,10^3,10^4\}$ \\
+    EWC online decay $\gamma$ & $1$ \\
+    Fisher estimation samples & $200$ \\
     LwF $\alpha$, temp.\ $T$ & $1.0$, $2.0$; $\alpha\in\{0.5,1,2\}$ \\
     Replay buffer          & $200$; $\{200,500\}$ \\
-    DER++ logit weight     & $0.5$; $\{0.1,0.5,1\}$ \\
+    ER replay batch size   & $8$ \\
+    DER++ $\alpha$, $\beta$ & $0.5$, $0.5$; logit weight $\in\{0.1,0.5,1\}$ \\
     L2P pool / length / top-$K$ & $10$ / $5$ / $5$ \\
+    L2P key-loss weight $\lambda_{\text{key}}$ & $0.5$ \\
     LoRA rank / $\alpha$ / dropout & $8$ / $16$ / $0.1$; rank $\in\{4,8,16\}$ \\
+    O-LoRA targets / $\lambda_{\text{ortho}}$ & Q, K, V / $0.5$ \\
+    CKA probe set          & 500 samples (mean-pooled) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{CIL-CORD Session Class Lists}
+\label{app:cil-classes}
+
+Table~\ref{tab:cil-classes} records the exact six CORD fine-grained classes
+introduced at each session of the CIL-CORD scenario
+(\S\ref{sec:exp-cil}, Table~\ref{tab:cil-split}). Class names follow CORD's
+native \texttt{category.field} naming; each class contributes a B- and an I-
+tag to the BIO label space.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[CIL-CORD per-session class lists]{The six CORD fine-grained classes
+  introduced at each CIL-CORD session. Shared prefixes are factored for
+  compactness.}
+  \label{tab:cil-classes}
+  \small
+  \begin{tabular}{cp{10.5cm}}
+    \toprule
+    \textbf{Session} & \textbf{Classes introduced} \\
+    \midrule
+    0 & \texttt{menu.\{cnt, discountprice, itemsubtotal, nm, num, price\}} \\
+    1 & \texttt{menu.\{unitprice, vatyn\}};
+        \texttt{menu.sub.\{cnt, nm, price, unitprice\}} \\
+    2 & \texttt{sub\_total.\{discount\_price, etc, othersvc\_price,
+        service\_price, subtotal\_price, tax\_price\}} \\
+    3 & \texttt{total.\{cashprice, changeprice, creditcardprice, emoneyprice,
+        menuqty\_cnt, menutype\_cnt\}} \\
+    4 & \texttt{total.\{total\_etc, total\_price\}};
+        \texttt{void\_menu.\{nm, price\}}; \texttt{sub.\{nm, cnt\}} \\
     \bottomrule
   \end{tabular}
 \end{table}

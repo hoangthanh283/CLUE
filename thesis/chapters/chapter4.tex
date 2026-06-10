@@ -6,30 +6,37 @@
 This chapter describes how the methodology of Chapter~\ref{ch:methodology} is
 realised as a research framework: the backbone and software stack
 (\S\ref{sec:impl-framework}), the document-IE data pipeline
-(\S\ref{sec:impl-pipeline}), and the system architecture, including the
+(\S\ref{sec:impl-pipeline}), the system architecture, including the
 per-component instrumentation and experiment tracking
-(\S\ref{sec:impl-architecture}).
+(\S\ref{sec:impl-architecture}), and the reproducibility provisions that make
+every reported number regenerable from logs
+(\S\ref{sec:impl-reproducibility}).
 
 \section{Framework Selection}
 \label{sec:impl-framework}
 
-\paragraph{Backbone.} The primary backbone is LayoutLMv3-base
+\subsection{Backbone Selection}
+\label{sec:impl-backbone}
+
+The primary backbone is LayoutLMv3-base
 (\texttt{microsoft/layoutlmv3-base}, $\approx$\,133M parameters, 12 layers, hidden
 size 768). It was chosen because it is document-specific, encoder-only, and small
 enough to run the full experimental grid---ten baselines and the selected method
 across three scenarios and three seeds---within the compute budget, while exposing
 the four separable components central to the diagnosis. LiLT-base and BROS-base
 serve as secondary backbones for a generalisation study on a reduced method
-subset. Table~\ref{tab:backbone-comparison} compares the candidates.
+subset. Table~\ref{tab:backbone-comparison} compares the candidates. This choice
+directly instantiates the backbone selection criteria laid out in
+\S\ref{sec:bg-backbones}.
 
-\begin{table}[t]
+\begin{table}[!htbp]
   \centering
   \caption[Backbone comparison]{Backbones considered for the study. LayoutLMv3-base
   is the primary subject; LiLT and BROS test generalisation of the diagnosis; large
   multimodal LLMs are noted as comparison targets but are out of scope for the
   controlled per-component study.}
   \label{tab:backbone-comparison}
-  \begin{tabular}{llll}
+  \begin{tabularx}{\textwidth}{l L c L}
     \toprule
     \textbf{Backbone} & \textbf{Type} & \textbf{Scale} & \textbf{Role} \\
     \midrule
@@ -38,27 +45,108 @@ subset. Table~\ref{tab:backbone-comparison} compares the candidates.
     BROS-base       & encoder-only, spatial & $\approx$\,110M & secondary \\
     InternVL3-8B    & multimodal LLM & 8B & comparison target (out of scope) \\
     \bottomrule
-  \end{tabular}
+  \end{tabularx}
 \end{table}
 
-\paragraph{Software stack.} The framework is implemented in Python with PyTorch
-and the HuggingFace Transformers library for the backbones, \texttt{seqeval} for
-BIO-aware entity-F1, and Hydra for composable configuration. Experiments are
-launched through a single entry point and configured by composition, e.g.
+\subsection{Software Stack: Selection Criteria and Justification}
+\label{sec:impl-stack}
+
+\paragraph{Selection criteria.} Five requirements drove the choice of software
+stack. \textbf{(i) Reference implementations:} the diagnosis must run on the
+canonical LayoutLMv3 weights and preprocessing, not a re-implementation whose
+deviations could masquerade as forgetting signal. \textbf{(ii) Composable
+configuration at grid scale:} the full grid of methods $\times$ scenarios
+$\times$ seeds must be launchable from a single entry point with no per-run code
+edits. \textbf{(iii) BIO-correct evaluation:} the metric must be entity-level,
+span-aware F1 rather than token accuracy. \textbf{(iv) Queryable experiment
+tracking:} the complete grid must be reconstructable from logged runs alone.
+\textbf{(v) Determinism support:} the CKA and Fisher patterns reported in
+Chapter~\ref{ch:results} must reflect signal, not run-to-run noise, so the
+framework must expose deterministic execution modes.
+
+\paragraph{Justification.} PyTorch ($\ge$2.3) satisfies (i) and (v): it is the
+framework in which the canonical LayoutLMv3 is released, it provides the
+forward-hook API on which the CKA activation probes are built, and it exposes
+the cuDNN determinism flags required for reproducible kernels. TensorFlow and
+JAX were rejected because neither has a maintained LayoutLMv3 reference
+implementation. HuggingFace Transformers ($\ge$4.41) supplies the canonical
+LayoutLMv3 model together with its \texttt{LayoutLMv3Processor}, and Datasets
+($\ge$4.0) loads the benchmark corpora from the HuggingFace Hub, jointly
+covering (i); re-implementing the backbone or hand-rolling loaders would
+forfeit the canonical-weights guarantee. PEFT ($\ge$0.11) provides audited LoRA
+injection for the LoRA-family baselines, avoiding hand-rolled adapter code.
+For (ii), Hydra ($\ge$1.3.2) with OmegaConf composes declarative configuration
+groups (method, scenario, model, training) into a fully specified run;
+\texttt{argparse} plus hand-rolled YAML was rejected because it cannot express
+the sweep grid declaratively. For (iv), Weights \& Biases ($\ge$0.17) records
+every run with structured, queryable tags; TensorBoard was rejected because it
+offers no structured cross-run querying. Finally, for (iii), \texttt{seqeval}
+($\ge$1.2.2) computes entity-level BIO-aware F1; plain token accuracy was
+rejected because it is inflated by the dominant O class and would mask
+entity-level forgetting. Experiments are launched through a single entry point
+and configured by composition, e.g.
 \begin{quote}\small
 \texttt{python scripts/train.py method=ewc scenario=cil\_cord seed=42
 method.lambda\_=1000}
 \end{quote}
 so that every run is fully specified by its config and reproducible.
+Table~\ref{tab:software-stack} summarises the stack.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Software stack]{Software stack with minimum versions, the role each
+  component plays in this study, and the alternatives considered and rejected
+  against criteria (i)--(v).}
+  \label{tab:software-stack}
+  \small
+  \begin{tabularx}{\textwidth}{l l L L}
+    \toprule
+    \textbf{Component} & \textbf{Package (min.\ version)} & \textbf{Role in this study} & \textbf{Alternative considered} \\
+    \midrule
+    Language      & Python $\ge$3.10        & runtime & --- \\
+    DL framework  & torch $\ge$2.3          & training; forward hooks (CKA); determinism flags & TensorFlow, JAX \\
+    Models        & transformers $\ge$4.41  & LayoutLMv3 backbone + processor & re-implementation \\
+    Data          & datasets $\ge$4.0       & HuggingFace Hub loading & bespoke loaders \\
+    Adapters      & peft $\ge$0.11          & LoRA injection & hand-rolled adapters \\
+    Configuration & hydra-core $\ge$1.3.2   & composable configs; sweep launch & argparse + YAML \\
+    Tracking      & wandb $\ge$0.17         & run logging; tag queries & TensorBoard, MLflow \\
+    Evaluation    & seqeval $\ge$1.2.2      & BIO-aware entity F1 & token accuracy \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
 
 \section{Document-IE Pipeline Integration}
 \label{sec:impl-pipeline}
 
-Each document is loaded as OCR tokens with normalised bounding boxes
-($[0,1000]^4$) and a $224\times224$ page image. Tokens are WordPiece-tokenised and
-aligned to their boxes; sub-tokens inherit their word's box and only the first
-sub-token carries the label, with the remainder masked to the ignore index. Image
-patches are extracted by the backbone's vision module. The same preprocessing is
+Every document passes through the same five-step preprocessing pipeline,
+regardless of dataset or continual scenario:
+
+\begin{enumerate}
+  \item \textbf{Load.} Dataset-provided OCR tokens, word boxes, and the page
+  image are loaded---no OCR engine is ever run.
+  \item \textbf{Tokenise.} The \texttt{LayoutLMv3Processor}
+  (\texttt{apply\_ocr=False}) WordPiece-tokenises the words, truncating and
+  padding to a maximum sequence length of 512.
+  \item \textbf{Normalise layout.} Word boxes are scaled to the integer range
+  $[0,1000]^4$ and degenerate or out-of-range boxes are clamped.
+  \item \textbf{Encode image.} The page image is resized to $224\times224$ and
+  consumed by the backbone as $16\times16$ patches.
+  \item \textbf{Align labels.} Each sub-token inherits its word's box, only the
+  first sub-token carries the BIO label, and trailing sub-tokens are set to the
+  ignore index $-100$.
+\end{enumerate}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=.95\textwidth]{doc_pipeline}
+  \caption{The five-step document preprocessing pipeline. Dataset-provided OCR
+  tokens, word boxes, and the page image are tokenised, normalised, and aligned
+  into the tri-modal inputs of the backbone; colour chips mark which input
+  stream each step feeds.}
+  \label{fig:doc-pipeline}
+\end{figure}
+
+Figure~\ref{fig:doc-pipeline} summarises the pipeline. The same preprocessing is
 shared across all datasets so that the only thing that changes between continual
 tasks is the data and label space, not the pipeline. For the diagnostic conditions
 (C1--C4) a modality mask is applied at the input layer---zeroing image pixels,
@@ -81,10 +169,13 @@ and boxes directly and never re-runs an OCR engine; this removes OCR quality as 
 confounder, so that any measured drift is attributable to continual training of the
 encoder rather than to changing recognition behaviour across tasks.
 
+Chapter~\ref{ch:experimental-setup} specifies the datasets this pipeline
+consumes.
+
 \section{System Architecture Overview}
 \label{sec:impl-architecture}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.95\linewidth]{system_architecture.pdf}
   \caption[System architecture]{System architecture. The continual-learning core
@@ -112,7 +203,36 @@ All methods implement a common \texttt{ContinualMethod} interface with four hook
 buffer, compute Fisher, freeze weights), and \texttt{evaluate} (evaluate on all
 tasks seen so far). This interface lets regularisation, replay, prompt-based, and
 LoRA-based methods share the same training and evaluation harness, which is
-essential for like-for-like comparison.
+essential for like-for-like comparison. Algorithm~\ref{alg:cl-loop} shows how the
+core drives these hooks per task.
+
+\begin{algorithm}[t]
+  \caption{The continual-learning core loop}
+  \label{alg:cl-loop}
+  \begin{algorithmic}[1]
+    \Require task sequence $\mathcal{T}_{1:T}$, method $m$, backbone $\theta^{(0)}$
+    \For{$t = 1$ \textbf{to} $T$}
+      \State $m.\texttt{before\_task}(\mathcal{T}_t)$
+        \Comment{expand head (Eq.~\ref{eq:head-expansion}); allocate prompts, adapters, penalties}
+      \State $m.\texttt{train\_task}(\mathcal{T}_t)$
+        \Comment{10 epochs of AdamW, constant LR; replay/distillation internal to $m$}
+      \State $m.\texttt{after\_task}(\mathcal{T}_t)$
+        \Comment{update buffers, estimate Fisher, freeze parameters as $m$ requires}
+      \ForAll{$j \le t$}
+        \State $R[t,j] \gets \textsc{EntityF1}(m.\texttt{evaluate}, \mathcal{T}_j)$
+      \EndFor
+      \State \textsc{Snapshot}(per-layer CKA, per-group Fisher)
+        \Comment{decoupled instrumentation hooks}
+    \EndFor
+    \State \Return $R$ and derived AA/BWT/AF/FWT
+  \end{algorithmic}
+\end{algorithm}
+
+\paragraph{Joint upper bound.} The Joint method bypasses the loop entirely: the
+classifier is expanded to the union label space upfront and a single training
+pass runs over the concatenation of all sessions' data. It is the only method
+that sees all data simultaneously and serves as the oracle reference of
+Chapter~\ref{ch:experimental-setup}.
 
 \subsection{Per-Component Instrumentation}
 \label{sec:impl-instrumentation}
@@ -144,7 +264,17 @@ mechanisms make up the layer:
   \item \textbf{Classifier-head expansion.} When a new task introduces new BIO
   labels, the classification head is grown to cover them while the rows
   corresponding to previously seen labels are preserved, so that old-label logits
-  are not reset by the arrival of new classes. Expansion is performed once by the
+  are not reset by the arrival of new classes. Formally,
+  \begin{equation}
+    \label{eq:head-expansion}
+    W^{(t)} = \begin{bmatrix} W^{(t-1)} \\ W_{\mathrm{new}} \end{bmatrix},
+    \qquad W_{\mathrm{new}} \sim \mathcal{N}(0,\,0.02^{2}),
+    \qquad b_{\mathrm{new}} = 0,
+  \end{equation}
+  where the rows of $W^{(t-1)}$---the previously seen BIO labels---are copied
+  unchanged so that old-label logits are exactly preserved, and
+  $W^{(t)} \in \mathbb{R}^{|\mathcal{Y}_t| \times 768}$ for the label set
+  $\mathcal{Y}_t$ after session $t$. Expansion is performed once by the
   training loop before each task, and the label$\leftrightarrow$index maps are
   updated in lockstep.
   \item \textbf{Modality ablation.} The pilot conditions are realised by zeroing
@@ -175,25 +305,94 @@ mixed) through a registry, so that a scenario is selected by name from the confi
 \subsection{Compute and Deployment}
 \label{sec:impl-compute}
 
-Experiments run on a single RTX 4090 (cloud), with a local RTX 2060 reserved for
-debugging only; paper-result experiments are never run on the debug machine.
-Determinism is enforced (fixed seeds, deterministic cuDNN) so that CKA and Fisher
-patterns reflect signal rather than run-to-run noise.
+\paragraph{Hardware tiers.} Experiments run on a single RTX 4090 (cloud), with a
+local RTX 2060 reserved for debugging only; paper-result experiments are never
+run on the debug machine. Determinism is enforced (fixed seeds, deterministic
+cuDNN) so that CKA and Fisher patterns reflect signal rather than run-to-run
+noise.
+
+\paragraph{Memory management.} Two documented low-VRAM knobs allow the debug
+tier to run the same code path: reducing the batch size from 8 to 2 and
+enabling gradient checkpointing. Production runs use full fp32 precision---an
+fp16 flag exists but is disabled by default---so no precision-related
+nondeterminism enters the measurements.
+
+\paragraph{Resource accounting.} Every run records wall-clock time per task,
+parameter counts, and peak GPU memory in its \texttt{metrics.json}
+(\S\ref{sec:impl-tracking}), enabling the computational-cost comparison of
+Chapter~\ref{ch:results}.
 
 \subsection{Experiment Tracking and Monitoring}
 \label{sec:impl-tracking}
 
-All runs report to Weights \& Biases under a single project, with a structured tag
-schema (\texttt{\{phase\}/\{scenario\}/\{method\}/seed\{seed\}}; pilot runs use
-\texttt{pilot/\{condition\}/seed\{seed\}}), so that the full grid is queryable and
+All runs report to Weights \& Biases under a single public project
+(\url{https://wandb.ai/thanh-workspace/CL4IE}), with a structured tag
+schema (\texttt{\{phase\}/\allowbreak\{scenario\}/\allowbreak\{method\}/\allowbreak seed\{seed\}}; pilot runs use
+\texttt{pilot/\allowbreak\{condition\}/\allowbreak seed\{seed\}}), so that the full grid is queryable and
 the result tables of Chapter~\ref{ch:results} can be regenerated from the tracked
-logs.
+logs. Each run is named \texttt{\{scenario\}\_\allowbreak\{method\}\_\allowbreak seed\{seed\}}, and its
+per-run \texttt{results/\allowbreak<run>/\allowbreak metrics.json} holds the final \gls{aa}, \gls{bwt},
+\gls{af}, and \gls{fwt}, the full performance matrix $R$, wall-time per task,
+parameter counts, and peak GPU memory, with the raw matrix additionally saved as
+\texttt{matrix.npy}. Downstream, \texttt{scripts/\allowbreak analyze\_results.py}
+aggregates the runs into the LaTeX result tables and
+\texttt{scripts/\allowbreak ingest\_to\_thesis.py}
+copies them into the thesis source, so every reported number is regenerable from
+logs. Table~\ref{tab:run-artifacts} lists the artefacts each run produces and
+who consumes them.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Per-run artefacts]{Artefacts produced by every run and their
+  consumers in the offline results pipeline.}
+  \label{tab:run-artifacts}
+  \small
+  \begin{tabularx}{\textwidth}{l L l}
+    \toprule
+    \textbf{Artefact} & \textbf{Contents} & \textbf{Consumer} \\
+    \midrule
+    \texttt{results/<run>/metrics.json} & final AA, BWT, AF, FWT; full matrix $R$; wall-time; parameter counts; peak GPU memory & \texttt{analyze\_results.py} \\
+    \texttt{results/<run>/matrix.npy}   & raw $R[i,j]$ & aggregation and plotting \\
+    W\&B run                            & per-step losses, config snapshot, tags & grid-level queries \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Reproducibility}
+\label{sec:impl-reproducibility}
+
+\paragraph{Repository and environment.} The complete implementation is available
+at \url{https://github.com/hoangthanh283/doccl} (branch \texttt{doccl}). The
+environment is Python $\ge$3.10 with the minimum versions of
+Table~\ref{tab:software-stack} pinned in \texttt{pyproject.toml}.
+
+\paragraph{Seeds and determinism.} All main results use three seeds (42, 123,
+7). cuDNN runs in deterministic mode with benchmarking disabled
+(\texttt{torch.backends.\allowbreak cudnn.\allowbreak deterministic=True},
+\texttt{benchmark=False}), and every run is fully specified by its Hydra
+configuration.
+
+\paragraph{One-command reproduction.} The diagnostic study---four conditions
+$\times$ three seeds over FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE---reproduces
+with \texttt{bash scripts/run\_pilot.sh}; the main grid with
+\texttt{bash scripts/run\_grid.sh}, where the \texttt{PHASE} variable selects
+the core, advanced, selected-method, or ablation slices; and a single run via
+the Hydra entry point of \S\ref{sec:impl-stack}. SROIE is prepared once by
+\texttt{python scripts/prepare\_sroie.py} from a public HuggingFace mirror
+(\texttt{mp-02/sroie}) or the ICDAR-2019 originals.
+
+\paragraph{Tracked artefacts.} The public Weights \& Biases project of
+\S\ref{sec:impl-tracking}, together with the per-run artefacts of
+Table~\ref{tab:run-artifacts}, allows the result tables to be regenerated
+end-to-end from logs.
 
 \section{Summary}
 \label{sec:impl-summary}
 
 The framework pairs a small, component-separable backbone with a uniform
 continual-method interface, a shared document pipeline, decoupled per-component
-instrumentation, and structured experiment tracking. This design makes the
-diagnosis attachable to any run and the baseline comparison strictly like-for-like,
-which the next chapter relies upon.
+instrumentation, and structured experiment tracking, and it is reproducible
+end-to-end through a public repository, a pinned environment, and result tables
+regenerated directly from tracked logs. This design makes the diagnosis
+attachable to any run and the baseline comparison strictly like-for-like, which
+the next chapter relies upon.

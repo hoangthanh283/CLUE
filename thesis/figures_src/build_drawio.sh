@@ -26,6 +26,12 @@ drawio_export() {  # $1 = absolute .drawio in, $2 = out pdf
 }
 
 shopt -s nullglob
+# Figures exported by the loop below (alphabetical):
+#   candidate_a_lapp_hlora   candidate_b_c          cl_taxonomy
+#   diagnostic_conditions    diagnostic_pipeline    doc_pipeline
+#   forgetting_matrix_schematic  layoutlmv3_components  method_selection_tree
+#   scenario_cil_cord        scenario_dil           scenario_mixed
+#   stability_plasticity     system_architecture
 n=0
 for f in "$SRC"/*.drawio; do
   name="$(basename "${f%.drawio}")"

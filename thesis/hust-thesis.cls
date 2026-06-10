@@ -94,7 +94,7 @@
 \RequirePackage{titling}
 \RequirePackage{setspace} 
 \RequirePackage{booktabs} % for much better looking tables
-\RequirePackage[figurewithin=section, tablewithin=section]{caption}
+\RequirePackage[figurewithin=chapter, tablewithin=chapter]{caption}
 
 % line alignment
 \onehalfspacing

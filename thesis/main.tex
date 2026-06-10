@@ -18,6 +18,24 @@
 \usepackage{algpseudocode}
 \usepackage{multirow}
 \usepackage{array}
+\usepackage{tabularx}   % width-constrained tables that wrap long cells to \textwidth
+% Left-aligned (ragged) flexible column for text-heavy table cells.
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+
+% ---- Float placement tuning (keep tables/figures near their reference) ----
+% Relax LaTeX's restrictive defaults so floats are placed at the top/bottom of
+% the page that mentions them instead of drifting to later float-only pages.
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.9}
+\renewcommand{\textfraction}{0.08}
+\renewcommand{\floatpagefraction}{0.7}
+
+% ---- Line-breaking robustness (absorb long \texttt paths / arrow chains in prose) ----
+\usepackage{microtype}          % character protrusion (XeLaTeX-safe); tidies right margin
+\emergencystretch=4em           % last-resort stretch so prose lines never overrun the margin
 
 \graphicspath{{figures/}}
 

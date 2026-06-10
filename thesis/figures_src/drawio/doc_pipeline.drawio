@@ -1,0 +1,148 @@
+<mxfile host="Electron" modified="2026-06-10T00:00:00.000Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.2 Chrome/114.0.5735.289 Electron/25.9.4 Safari/537.36" version="22.1.2" type="device">
+  <diagram name="doc_pipeline" id="docpipe">
+    <mxGraphModel dx="954" dy="669" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="760" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="Document Preprocessing Pipeline" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry x="60" y="12" width="980" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- ===== STEP 1: LOAD ===== -->
+        <mxCell id="s1_box" value="&lt;b&gt;1. Load&lt;/b&gt;&lt;br&gt;Dataset-provided OCR tokens, word boxes, page image" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=13;verticalAlign=middle;align=center;" parent="1" vertex="1">
+          <mxGeometry x="60" y="56" width="520" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_note" value="no OCR engine is re-run" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Courier New;fontSize=10;verticalAlign=middle;align=left;spacingLeft=8;" parent="1" vertex="1">
+          <mxGeometry x="604" y="66" width="248" height="26" as="geometry" />
+        </mxCell>
+        <!-- chips step 1: text + layout + visual stacked -->
+        <mxCell id="s1_chip_t" value="Text" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="870" y="56" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_chip_l" value="Layout" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="870" y="80" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_chip_v" value="Visual" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="870" y="104" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- arrow 1 -> 2 -->
+        <mxCell id="arr1" style="endArrow=block;html=1;strokeColor=#444444;strokeWidth=2;endFill=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="320" y="124" as="sourcePoint" />
+            <mxPoint x="320" y="154" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== STEP 2: TOKENISE ===== -->
+        <mxCell id="s2_box" value="&lt;b&gt;2. Tokenise&lt;/b&gt;&lt;br&gt;WordPiece sub-tokenisation of OCR words" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=13;verticalAlign=middle;align=center;" parent="1" vertex="1">
+          <mxGeometry x="60" y="154" width="520" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="s2_note" value="LayoutLMv3Processor (apply_ocr=False), max length 512" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Courier New;fontSize=10;verticalAlign=middle;align=left;spacingLeft=8;" parent="1" vertex="1">
+          <mxGeometry x="604" y="162" width="248" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="s2_chip_t" value="Text" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="870" y="174" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- arrow 2 -> 3 -->
+        <mxCell id="arr2" style="endArrow=block;html=1;strokeColor=#444444;strokeWidth=2;endFill=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="320" y="214" as="sourcePoint" />
+            <mxPoint x="320" y="244" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== STEP 3: NORMALISE LAYOUT ===== -->
+        <mxCell id="s3_box" value="&lt;b&gt;3. Normalise Layout&lt;/b&gt;&lt;br&gt;Scale word boxes; clamp degenerate boxes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=13;verticalAlign=middle;align=center;" parent="1" vertex="1">
+          <mxGeometry x="60" y="244" width="520" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_note" value="boxes &amp;rarr; [0, 1000]^4 (integer)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Courier New;fontSize=10;verticalAlign=middle;align=left;spacingLeft=8;" parent="1" vertex="1">
+          <mxGeometry x="604" y="252" width="248" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_chip_l" value="Layout" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="870" y="264" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- arrow 3 -> 4 -->
+        <mxCell id="arr3" style="endArrow=block;html=1;strokeColor=#444444;strokeWidth=2;endFill=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="320" y="304" as="sourcePoint" />
+            <mxPoint x="320" y="334" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== STEP 4: ENCODE IMAGE ===== -->
+        <mxCell id="s4_box" value="&lt;b&gt;4. Encode Image&lt;/b&gt;&lt;br&gt;Resize page image; split into patches" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=13;verticalAlign=middle;align=center;" parent="1" vertex="1">
+          <mxGeometry x="60" y="334" width="520" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="s4_note" value="224x224 &amp;rarr; 16x16 patches" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Courier New;fontSize=10;verticalAlign=middle;align=left;spacingLeft=8;" parent="1" vertex="1">
+          <mxGeometry x="604" y="342" width="248" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="s4_chip_v" value="Visual" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="870" y="354" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- arrow 4 -> 5 -->
+        <mxCell id="arr4" style="endArrow=block;html=1;strokeColor=#444444;strokeWidth=2;endFill=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="320" y="394" as="sourcePoint" />
+            <mxPoint x="320" y="424" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== STEP 5: ALIGN LABELS ===== -->
+        <mxCell id="s5_box" value="&lt;b&gt;5. Align Labels&lt;/b&gt;&lt;br&gt;First sub-token carries the BIO label" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=13;verticalAlign=middle;align=center;" parent="1" vertex="1">
+          <mxGeometry x="60" y="424" width="520" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="s5_note" value="trailing sub-tokens &amp;rarr; ignore index -100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Courier New;fontSize=10;verticalAlign=middle;align=left;spacingLeft=8;" parent="1" vertex="1">
+          <mxGeometry x="604" y="432" width="248" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="s5_chip_t" value="Text" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="870" y="444" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- arrow 5 -> output -->
+        <mxCell id="arr5" style="endArrow=block;html=1;strokeColor=#444444;strokeWidth=2;endFill=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="320" y="484" as="sourcePoint" />
+            <mxPoint x="320" y="518" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== OUTPUT BOX ===== -->
+        <mxCell id="out_box" value="&lt;b&gt;Tri-modal Model Inputs&lt;/b&gt;&lt;br&gt;input_ids &amp;nbsp;&amp;#183;&amp;nbsp; bbox &amp;nbsp;&amp;#183;&amp;nbsp; pixel_values &amp;nbsp;&amp;#183;&amp;nbsp; labels" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;strokeWidth=2;fontFamily=Times New Roman;fontSize=13;verticalAlign=middle;align=center;" parent="1" vertex="1">
+          <mxGeometry x="60" y="518" width="520" height="64" as="geometry" />
+        </mxCell>
+
+        <!-- ===== LEGEND ===== -->
+        <mxCell id="leg_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#CCCCCC;" parent="1" vertex="1">
+          <mxGeometry x="60" y="614" width="980" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="leg_label" value="Stream chips:" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" parent="1" vertex="1">
+          <mxGeometry x="72" y="624" width="100" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg_t" value="Text" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="180" y="624" width="60" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg_l" value="Layout" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="252" y="624" width="60" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg_v" value="Visual" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="324" y="624" width="60" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg_sep" value="|" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontColor=#AAAAAA;" parent="1" vertex="1">
+          <mxGeometry x="396" y="624" width="16" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg_ann" value="annotation notes appear in" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" parent="1" vertex="1">
+          <mxGeometry x="420" y="624" width="182" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg_note_chip" value="monospace note style" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Courier New;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="608" y="623" width="148" height="20" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

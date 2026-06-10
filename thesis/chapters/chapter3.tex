@@ -102,7 +102,7 @@ so it is the closest same-architecture text baseline rather than a true unimodal
 encoder; a dedicated text-only backbone is a possible follow-up if the results
 warrant it.
 
-\begin{table}[t]
+\begin{table}[!htbp]
   \centering
   \caption[The four diagnostic conditions]{The four apples-to-apples diagnostic
   conditions. The same LayoutLMv3 architecture is used throughout; only the active
@@ -123,7 +123,7 @@ warrant it.
 Figure~\ref{fig:diagnostic-conditions} depicts the four conditions as the same
 network with different input pathways switched on or off.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.95\linewidth]{diagnostic_conditions.pdf}
   \caption[The four diagnostic conditions as active and zeroed pathways]{The four
@@ -172,7 +172,7 @@ transfer and forgetting), and the upper triangle---unused here, as tasks arrive
 sequentially---would hold zero-shot forward transfer. This is the conventional,
 component-agnostic view that the per-component metrics refine.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.6\linewidth]{forgetting_matrix_schematic.pdf}
   \caption[Annotated structure of the forgetting matrix]{Schematic structure of the
@@ -223,7 +223,7 @@ Figure~\ref{fig:diagnostic-pipeline} shows it as a data-flow diagram.
   \end{algorithmic}
 \end{algorithm}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.95\linewidth]{diagnostic_pipeline.pdf}
   \caption[The per-component diagnostic pipeline]{Data flow of the per-component
@@ -264,14 +264,14 @@ Table~\ref{tab:subhypotheses} maps them to the candidate they trigger. If no gro
 separates---i.e.\ $H_0$ cannot be rejected for any $g$---the thesis falls back to a
 characterisation-only contribution (\S\ref{sec:method-fallback}).
 
-\begin{table}[t]
+\begin{table}[!htbp]
   \centering
   \caption[Diagnostic sub-hypotheses and the candidate each triggers]{Sub-hypotheses
   considered in the diagnosis and the remedy each one selects. The pilot does not
   pre-commit to any; the dominant pattern decides
   (\S\ref{sec:method-selection}).}
   \label{tab:subhypotheses}
-  \begin{tabular}{lll}
+  \begin{tabularx}{\textwidth}{l L l}
     \toprule
     \textbf{Pattern} & \textbf{Signature} & \textbf{Triggers} \\
     \midrule
@@ -280,7 +280,7 @@ characterisation-only contribution (\S\ref{sec:method-fallback}).
     $H_c$ scenario-dependent & Pattern differs across task transitions & Candidate~C (\S\ref{sec:method-cand-c}) \\
     $H_0$ no clear pattern & No group separates after correction & Characterisation-only (\S\ref{sec:method-fallback}) \\
     \bottomrule
-  \end{tabular}
+  \end{tabularx}
 \end{table}
 
 The mapping from diagnostic outcome to remedy is made explicit in
@@ -288,7 +288,7 @@ Figure~\ref{fig:selection-tree}: the decision is a function of the pilot, so no
 single candidate is committed to in advance, and the no-pattern branch leads to the
 characterisation-only fallback rather than to a method.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.85\linewidth]{method_selection_tree.pdf}
   \caption[Decision tree mapping diagnostic outcomes to candidates]{The Week-4
@@ -380,7 +380,7 @@ $\mathrm{cell}(i) = \big(\lfloor 4\,c_x^{(i)}\rfloor,\, \lfloor 4\,c_y^{(i)}\rfl
   \qquad \sum_{k=1}^{16}\phi(\text{boxes})_k = 1,
 \]
 so $\phi(\text{boxes})$ is the layout-only, text-invariant geometry of the page (the
-\texttt{get\_layout\_signature} descriptor of \S\ref{sec:impl-instrumentation});
+\texttt{get\_\allowbreak layout\_\allowbreak signature} descriptor of \S\ref{sec:impl-instrumentation});
 $W_{\text{layout}}\colon\mathbb{R}^{16}\!\to\!\mathbb{R}^{768}$ is trainable. Given a
 prompt pool $\{(k_i, P_i)\}_{i=1}^{M}$ of key--prompt pairs, the prepended prompts
 are those whose keys are most similar to the layout-aware query under cosine
@@ -420,7 +420,7 @@ which at $r{=}8$, $d{=}768$ is on the order of $10^5$ parameters per task agains
 $\sim$133M frozen backbone---roughly a tenth of a percent.
 Figure~\ref{fig:candidate-a} sketches the two components together.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.95\linewidth]{candidate_a_lapp_hlora.pdf}
   \caption[Candidate~A: layout-aware prompts with hierarchical LoRA]{Candidate~A
@@ -464,7 +464,7 @@ routing and naturally fits domain-incremental shifts (where S-Prompt-style
 per-domain prompts excel~\citep{wang2022sprompt}). Candidates~B and~C are contrasted
 in Figure~\ref{fig:candidate-bc}.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.95\linewidth]{candidate_b_c.pdf}
   \caption[Candidates~B and~C: layout-protected regularisation and modality-routed

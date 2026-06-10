@@ -18,31 +18,49 @@ used with their \emph{dataset-provided} \gls{ocr} and bounding boxes; we do not
 re-run \gls{ocr}, which removes a confound and keeps the pipeline fixed across the
 whole study.
 
-\begin{description}
-  \item[FUNSD] noisy scanned forms with three entity types (HEADER, QUESTION,
-        ANSWER) plus background, giving 7 \gls{bio} tags. Small, noisy, and
-        full-page---the clearest test of the KEY/VALUE relation.
-  \item[CORD] receipt understanding with 30 fine-grained classes grouped into five
-        super-classes (menu, sub\_total, total, void\_menu, sub), giving 61
-        \gls{bio} tags. Its fine-grained label space makes it the natural host for
-        the class-incremental scenario.
-  \item[SROIE] scanned receipts with four fields (company, address, date, total),
-        giving 9 \gls{bio} tags; the largest test split.
-\end{description}
+\paragraph{FUNSD.} Loaded from the HuggingFace release
+\texttt{nielsr/funsd-layoutlmv3}, FUNSD provides 149 training and 50 test
+documents and ships no validation split. Its three entity types (HEADER,
+QUESTION, ANSWER) plus background give 7 \gls{bio} tags. The documents are
+noisy, full-page scanned forms---small in number but the clearest test of the
+KEY/VALUE relation.
 
-\begin{table}[t]
+\paragraph{CORD.} Loaded from \texttt{naver-clova-ix/cord-v2}, CORD provides
+800 training, 100 validation, and 100 test receipts. Its 30 fine-grained
+classes, grouped into five super-classes (menu, sub\_total, total, void\_menu,
+sub), give 61 \gls{bio} tags at fine granularity and 11 at super-class
+granularity. The fine-grained label space makes CORD the natural host for the
+class-incremental scenario of \S\ref{sec:exp-cil}, while the super-class view
+is used in the domain-incremental remapping.
+
+\paragraph{SROIE.} Prepared once by \texttt{scripts/prepare\_sroie.py} from the
+HuggingFace mirror \texttt{mp-02/sroie} (or, equivalently, the ICDAR-2019
+originals), SROIE provides 626 training and 347 test scanned receipts and, like
+FUNSD, ships no validation split. Its four fields (company, address, date,
+total) give 9 \gls{bio} tags, and it contributes the largest test split.
+
+All three datasets are consumed by the shared five-step preprocessing pipeline
+of \S\ref{sec:impl-pipeline}; \gls{ocr} transcriptions and word-level bounding
+boxes are dataset-provided throughout, so no \gls{ocr} engine enters the
+experimental loop.
+
+\begin{table}[!htbp]
   \centering
   \caption[Dataset statistics]{Statistics of the three datasets. Tag counts are
   BIO-aware and include the background ``O'' tag; split sizes follow the
-  standard releases used here. OCR is dataset-provided throughout.}
+  standard releases used here. OCR is dataset-provided throughout. FUNSD and
+  SROIE ship no validation split; validation usage is specified in
+  \S\ref{sec:exp-checkpointing}.}
   \label{tab:dataset-stats}
-  \begin{tabular}{lccccl}
+  \small
+  \setlength{\tabcolsep}{5pt}
+  \begin{tabular}{lcccccl}
     \toprule
-    \textbf{Dataset} & \textbf{Train} & \textbf{Test} & \textbf{Types} & \textbf{BIO tags} & \textbf{Domain (avg.\ tokens)} \\
+    \textbf{Dataset} & \textbf{Train} & \textbf{Val} & \textbf{Test} & \textbf{Types} & \textbf{BIO tags} & \textbf{Domain (avg.\ tokens)} \\
     \midrule
-    FUNSD & 149 & 50  & 4  & 7  & scanned forms ($\sim$700) \\
-    CORD  & 800 & 100 & 30 & 61 & receipts, fine-grained ($\sim$80) \\
-    SROIE & 626 & 347 & 4  & 9  & scanned receipts ($\sim$150) \\
+    FUNSD & 149 & --  & 50  & 4  & 7  & scanned forms ($\sim$700) \\
+    CORD  & 800 & 100 & 100 & 30 & 61 & receipts, fine-grained ($\sim$80) \\
+    SROIE & 626 & --  & 347 & 4  & 9  & scanned receipts ($\sim$150) \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -79,7 +97,9 @@ protocol established in the \gls{cner} literature.
 
 The 30 classes are partitioned into the five sessions by a hand-curated
 easy-to-hard ordering rather than at random, so that the curriculum reflects the
-order in which fields are realistically added to a deployed parser. A direct
+order in which fields are realistically added to a deployed parser; the exact
+six classes introduced at each session are tabulated in
+Appendix~\ref{app:cil-classes}. A direct
 consequence is that class frequencies are markedly imbalanced across sessions---core
 menu fields dominate early sessions while void and auxiliary categories are sparse
 and arrive late. We deliberately leave this imbalance \emph{unmodified} (no
@@ -87,7 +107,7 @@ re-sampling or re-weighting) and treat it as a controlled factor of the benchmar
 since artificially re-balancing the sessions would misrepresent the long-tailed
 schema growth that motivates the scenario.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.95\linewidth]{scenario_cil_cord.pdf}
   \caption[The CIL-CORD class-incremental scenario]{The class-incremental
@@ -99,11 +119,12 @@ schema growth that motivates the scenario.
   \label{fig:scenario-cil}
 \end{figure}
 
-\begin{table}[t]
+\begin{table}[!htbp]
   \centering
   \caption[CIL-CORD session split]{The class-incremental split of CORD into five
-  sessions of six classes, ordered easy-to-hard. The exact class lists are
-  recorded with the benchmark.}
+  sessions of six classes, ordered easy-to-hard. Class names follow CORD's
+  native \texttt{category.field} naming; the full per-session class lists are
+  given in Appendix~\ref{app:cil-classes}.}
   \label{tab:cil-split}
   \begin{tabular}{cll}
     \toprule
@@ -139,7 +160,7 @@ no KEY at all (productive content maps to VALUE, void/sub to OTHER). The asymmet
 SROIE mapping is chosen so that every tag receives discriminative gradient signal;
 the resulting sparsity of KEY outside FUNSD is recorded as a known limitation.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.95\linewidth]{scenario_dil.pdf}
   \caption[The DIL domain-incremental scenario]{The domain-incremental DIL
@@ -151,13 +172,13 @@ the resulting sparsity of KEY outside FUNSD is recorded as a known limitation.
   \label{fig:scenario-dil}
 \end{figure}
 
-\begin{table}[t]
+\begin{table}[!htbp]
   \centering
   \caption[DIL unified-schema mapping]{Mapping of each dataset's native classes to
   the unified DIL schema (HEADER/KEY/VALUE/OTHER). The reverse order
   (CORD\,$\rightarrow$\,SROIE\,$\rightarrow$\,FUNSD) is used as a robustness check.}
   \label{tab:dil-map}
-  \begin{tabular}{ll}
+  \begin{tabularx}{\textwidth}{l L}
     \toprule
     \textbf{Dataset} & \textbf{Native $\rightarrow$ unified} \\
     \midrule
@@ -165,7 +186,7 @@ the resulting sparsity of KEY outside FUNSD is recorded as a known limitation.
     SROIE & COMPANY$\rightarrow$KEY; ADDRESS/DATE/TOTAL$\rightarrow$VALUE \\
     CORD  & menu/sub\_total/total$\rightarrow$VALUE; void\_menu/sub$\rightarrow$OTHER \\
     \bottomrule
-  \end{tabular}
+  \end{tabularx}
 \end{table}
 
 \subsection{Mixed (Compositional)}
@@ -184,7 +205,7 @@ transition (label growth at a fixed domain, as in \S\ref{sec:exp-cil}) or a
 the scenario stresses plasticity and stability simultaneously rather than in
 isolation.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.95\linewidth]{scenario_mixed.pdf}
   \caption[The Mixed compositional scenario]{The Mixed compositional scenario:
@@ -207,14 +228,91 @@ Chapter~\ref{ch:methodology} is likewise repeated under an alternate order.
 \section{Model Architecture and Training Configuration}
 \label{sec:exp-config}
 
-The backbone is LayoutLMv3-base (\S\ref{sec:impl-framework}) with a
-token-classification head expanded as new labels appear. Unless otherwise stated,
-training uses AdamW with the pilot defaults (learning rate $5\times10^{-5}$, batch
-size 8, ten epochs per task, warmup ratio $0.1$, gradient clipping at $1.0$, mixed
-precision). Hyperparameter sensitivity is treated as a separate ablation in the
-main grid rather than tuned per method, to keep the comparison fair. Determinism is
-enforced via fixed seeds and deterministic cuDNN. Full hyperparameters, including
-the per-method sweeps, are listed in Appendix~\ref{app:hyperparameters}.
+\subsection{Architecture Specification}
+\label{sec:exp-arch}
+
+The backbone is LayoutLMv3-base (\S\ref{sec:impl-framework}), used identically
+across every method, scenario, and seed. Table~\ref{tab:arch-spec} records the
+full specification so that the experimental conditions are reproducible from the
+thesis alone. The token-classification head is expanded as new labels appear,
+following the logit-preserving expansion of Equation~\eqref{eq:head-expansion}
+in Chapter~\ref{ch:implementation}: old-class rows are carried over unchanged and
+only the newly added rows are freshly initialised.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Architecture specification]{Architecture specification used for all
+  experiments on the primary backbone.}
+  \label{tab:arch-spec}
+  \begin{tabular}{lp{8.6cm}}
+    \toprule
+    \textbf{Item} & \textbf{Specification} \\
+    \midrule
+    Backbone & \texttt{microsoft/layoutlmv3-base} --- encoder-only, 12 layers,
+               hidden size 768, $\approx$133M parameters \\
+    Text input & WordPiece, maximum sequence length 512 \\
+    Layout input & word boxes normalised to $[0,1000]^4$ \\
+    Image input & $224\times224$ page image as $16\times16$ patches \\
+    Classification head & linear over the current BIO label set; expanded per
+               session (Eq.~\ref{eq:head-expansion}) \\
+    Label convention & first sub-token labelled; trailing sub-tokens ignored
+               ($-100$) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Training Objective}
+\label{sec:exp-objective}
+
+Training minimises the plain token-level cross-entropy
+\begin{equation}
+  \mathcal{L}_{\mathrm{CE}}(\theta)
+  = -\frac{1}{|\mathcal{I}_B|} \sum_{i \in \mathcal{I}_B}
+    \log p_\theta\!\left(y_i \mid x\right),
+  \qquad
+  \mathcal{I}_B = \{\, i : \tilde{y}_i \neq -100 \,\},
+  \label{eq:token-ce}
+\end{equation}
+where $\mathcal{I}_B$ indexes the first sub-token of each word; padding and
+trailing sub-tokens carry the ignore label $-100$, and no class weights are
+applied. The loss is deliberately unweighted---no re-weighting, focal terms, or
+re-sampling---so that the native long-tailed label distribution is preserved as
+a controlled benchmark factor, matching the treatment of session imbalance in
+\S\ref{sec:exp-cil}. The $-100$ masking also makes the loss and the entity-level
+F1 metric agree on one prediction per word (step~5 of the pipeline,
+\S\ref{sec:impl-pipeline}).
+
+\subsection{Optimisation Protocol}
+\label{sec:exp-optim}
+
+Unless otherwise stated, training uses AdamW with a learning rate of
+$5\times10^{-5}$ held constant throughout (no scheduler, no warmup), weight
+decay $0.01$, batch size 8 without gradient accumulation, gradient clipping at
+max-norm $1.0$, and exactly ten epochs per task, all in full fp32 precision (an
+fp16 flag exists in the framework but is disabled for all reported runs). A
+constant learning rate and a fixed epoch budget give every method and every
+session an identical optimisation budget, removing scheduler state and stopping
+time as confounds in the forgetting measurement. Hyperparameter sensitivity is
+treated as a separate ablation in the main grid rather than tuned per method, to
+keep the comparison fair. Determinism is enforced via fixed seeds and
+deterministic cuDNN. Full hyperparameters, including the per-method sweeps, are
+listed in Appendix~\ref{app:hyperparameters}.
+
+\subsection{Checkpointing and Model Selection}
+\label{sec:exp-checkpointing}
+
+The model carried into session $t{+}1$---and evaluated on all tasks seen so
+far---is the \emph{final-epoch} checkpoint of session $t$; there is no early
+stopping and no within-task checkpoint selection. This is a deliberate design
+choice: combined with the fixed optimisation budget of \S\ref{sec:exp-optim},
+it ensures that what is measured at each task boundary is the model the
+training procedure actually produces, not a model favoured by a selection
+heuristic that would itself interact with forgetting. Validation data---CORD's
+native validation split; FUNSD and SROIE provide none
+(Table~\ref{tab:dataset-stats})---is used only for the per-method
+hyperparameter sweeps, which fix one shared configuration per method, chosen
+once and held fixed across all three scenarios. Test splits are never used for
+selection or stopping.
 
 \section{Baselines and Continual-Learning Strategies}
 \label{sec:exp-baselines}
@@ -224,15 +322,19 @@ DocCL method, all under the shared interface of \S\ref{sec:impl-cl-core}
 (Table~\ref{tab:baselines}). Methods are reproduced and validated against their
 published behaviour before being extended (for example, \gls{er} is made to work
 before DER++). The selected DocCL method is added once the diagnosis fixes its
-design (\S\ref{sec:method-selected}).
+design (\S\ref{sec:method-selected}). Default settings---\gls{ewc}
+$\lambda{=}1000$ with the Fisher estimated over 200 samples, DER++
+$\alpha{=}\beta{=}0.5$, O-LoRA rank 8 on the query/key/value projections with
+orthogonality weight $0.5$, L2P pool of ten length-5 prompts with top-5
+retrieval---are tabulated in Appendix~\ref{app:hyperparameters}.
 
-\begin{table}[t]
+\begin{table}[!htbp]
   \centering
   \caption[Baseline suite]{The ten baselines (plus the post-pilot DocCL method)
   evaluated on the primary backbone, with the main hyperparameter swept for each.
   Naive and Joint are the lower and oracle-upper bounds.}
   \label{tab:baselines}
-  \begin{tabular}{lll}
+  \begin{tabularx}{\textwidth}{l l L}
     \toprule
     \textbf{Family} & \textbf{Method} & \textbf{Reference / swept hyperparameter} \\
     \midrule
@@ -248,7 +350,7 @@ design (\S\ref{sec:method-selected}).
     LoRA-based     & O-LoRA & \citet{wang2023olora}; rank $\in\{4,8,16\}$ \\
     Proposed       & DocCL & post-pilot (Chapter~\ref{ch:methodology}) \\
     \bottomrule
-  \end{tabular}
+  \end{tabularx}
 \end{table}
 
 \section{Evaluation Methodology}
@@ -258,17 +360,16 @@ design (\S\ref{sec:method-selected}).
 \label{sec:eval-protocol}
 
 After each task the model is evaluated on all tasks seen so far, populating the
-accuracy matrix \gls{not:R}. The primary task metric is entity-level F1 with
+performance matrix \gls{not:R}. The primary task metric is entity-level F1 with
 \gls{bio}-aware span matching (\texttt{seqeval}). Because the test splits are small
 (FUNSD has only 50 documents), we report mean\,$\pm$\,standard deviation rather than
 point estimates.
 
-We keep model selection and final reporting strictly separate. A held-out
-validation split is carved from each task's training data and is used only for
-in-task model selection---early stopping and checkpoint selection during that task's
-training---and for fixing a single \emph{shared} hyperparameter setting per method.
-That setting is chosen once and held fixed across all three scenarios, so no method
-is tuned per scenario and the comparison stays fair. All reported metrics are
+We keep model selection and final reporting strictly separate. The
+checkpointing and validation-usage policy---final-epoch checkpoints, no early
+stopping, validation data used only for the one-off per-method hyperparameter
+sweeps---is specified in \S\ref{sec:exp-checkpointing} and is not repeated
+here. All reported metrics are
 computed on the held-out \emph{test} splits, which are never used for selection or
 stopping. The per-method hyperparameter sweeps of Table~\ref{tab:baselines} and
 Appendix~\ref{app:hyperparameters} are a separate sensitivity analysis: they
@@ -278,7 +379,7 @@ constitute per-scenario tuning of the main results.
 \subsection{Metrics}
 \label{sec:eval-metrics}
 
-From the accuracy matrix $R[i,j]$ (F1 on task $j$ after training task $i$) we
+From the performance matrix $R[i,j]$ (F1 on task $j$ after training task $i$) we
 report the standard \gls{cl} metrics~\citep{lopezpaz2017gem}:
 
 \begin{align}
@@ -298,8 +399,14 @@ drift metrics of \S\ref{sec:method-diag-metrics} (per-layer \gls{cka} and per-gr
 
 Because FUNSD provides only 149 training documents, sample efficiency matters and
 variance is wide. We therefore (i) report accuracy at 1\%, 5\%, and 10\% of each
-task's training set in addition to the full-data result; (ii) use a small-buffer
-regime for replay (buffer set to 20--50\% of the past task's size); and (iii)
+task's training set in addition to the full-data result; (ii) hold the replay
+buffer fixed at 200 documents across scenarios---the framework default---which
+yields deliberately heterogeneous relative coverage: roughly 25\% of CORD's 800
+training documents and 32\% of SROIE's 626, but more than FUNSD's entire
+149-document training set, so for FUNSD replay approaches joint training on
+that task; the $\{200, 500\}$ sweep of Table~\ref{tab:baselines} characterises
+sensitivity to this choice, and the asymmetry is taken into account when
+interpreting per-dataset retention; and (iii)
 include the prompt-based baselines, which inject few parameters and are less prone
 to overfitting on small data. ProtoNER-style prototypical few-shot \gls{cil} on
 LayoutLM is the natural point of comparison from the literature.
@@ -322,5 +429,7 @@ threshold is Bonferroni-corrected for the number of pairwise comparisons.
 The FCS-CL benchmark comprises three datasets, three continual scenarios, ten
 baselines plus the selected method, and a dual evaluation: standard \gls{cl}
 metrics (\gls{aa}, \gls{bwt}, \gls{fwt}, \gls{af}) together with the per-component
-diagnostic metrics. All results are reported over three seeds and multiple task
+diagnostic metrics. All results are obtained under a fixed optimisation budget
+(constant learning rate, ten epochs per task, final-epoch checkpoints) and
+reported over three seeds and multiple task
 orders with statistical tests. The next chapter presents the findings.
