@@ -75,13 +75,15 @@ def test_linear_cka_self_similarity():
     from doccl.eval.cka import linear_cka
 
     torch.manual_seed(42)
-    X = torch.randn(100, 64)
+    X = torch.randn(2000, 64)
     assert abs(linear_cka(X, X) - 1.0) < 1e-5
 
-    # CKA between independent random matrices should be small (not 0 due to finite samples)
-    Y = torch.randn(100, 64)
+    # CKA between independent random matrices is ~d/(n+d) for finite samples
+    # (Kornblith et al. 2019); n must be >> d for it to be near 0. At n=100,
+    # d=64 it concentrates around 0.39, so use n=2000 (expected ~0.03).
+    Y = torch.randn(2000, 64)
     cka = linear_cka(X, Y)
-    assert 0.0 <= cka < 0.3, f"Expected low CKA between random, got {cka}"
+    assert 0.0 <= cka < 0.1, f"Expected low CKA between random, got {cka}"
 
 
 def test_linear_cka_invariance():
