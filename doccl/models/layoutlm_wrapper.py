@@ -9,6 +9,7 @@ Extension points:
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import torch
@@ -16,6 +17,8 @@ import torch.nn as nn
 from transformers import LayoutLMv3ForTokenClassification, LayoutLMv3Processor
 
 from doccl.types import ModalityMask
+
+logger = logging.getLogger(__name__)
 
 
 class LayoutLMv3Wrapper(nn.Module):
@@ -290,13 +293,39 @@ class LayoutLMv3Wrapper(nn.Module):
         GPUs. Uses non-reentrant checkpointing so it also works when the backbone
         is frozen (prompt methods). ``self.model`` may be a PeftModel (O-LoRA /
         DocCL-A); both delegate this call to the base model.
+
+        transformers >= 4.50 removed the checkpointing path from the LayoutLMv3
+        encoder (``supports_gradient_checkpointing`` is False and the layer loop
+        has no ``_gradient_checkpointing_func`` branch), so when the native call
+        is unavailable we wrap each encoder layer's ``forward`` with
+        ``torch.utils.checkpoint`` ourselves. Non-reentrant checkpointing accepts
+        kwargs (``rel_pos``/``rel_2d_pos``) and tolerates frozen inputs.
         """
-        try:
-            self.model.gradient_checkpointing_enable(
-                gradient_checkpointing_kwargs={"use_reentrant": False}
-            )
-        except TypeError:  # older transformers without the kwargs argument
-            self.model.gradient_checkpointing_enable()
+        if getattr(self.model, "supports_gradient_checkpointing", False):
+            try:
+                self.model.gradient_checkpointing_enable(
+                    gradient_checkpointing_kwargs={"use_reentrant": False}
+                )
+            except TypeError:  # older transformers without the kwargs argument
+                self.model.gradient_checkpointing_enable()
+            return
+
+        from torch.utils.checkpoint import checkpoint
+
+        encoder = self.model.layoutlmv3.encoder  # PeftModel delegates getattr
+        for layer in encoder.layer:
+            if getattr(layer, "_doccl_ckpt_wrapped", False):
+                continue
+            orig_forward = layer.forward
+
+            def wrapped_forward(*args, _fwd=orig_forward, _mod=layer, **kwargs):  # noqa: ANN002,ANN003,ANN202
+                if _mod.training and torch.is_grad_enabled():
+                    return checkpoint(_fwd, *args, use_reentrant=False, **kwargs)
+                return _fwd(*args, **kwargs)
+
+            layer.forward = wrapped_forward
+            layer._doccl_ckpt_wrapped = True
+        logger.info("Enabled per-layer gradient checkpointing on %d encoder layers", len(encoder.layer))
 
     def trainable_param_count(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
