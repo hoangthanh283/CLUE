@@ -1,0 +1,118 @@
+<mxfile host="Electron" modified="2026-06-10T00:46:34.085Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.2 Chrome/114.0.5735.289 Electron/25.9.4 Safari/537.36" version="22.1.2" etag="OzQL1DabPCIk7wiKF6Rt" type="device">
+  <diagram name="layoutlmv3_components" id="lmv3comp">
+    <mxGraphModel dx="867" dy="608" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="880" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="LayoutLMv3 Tri-modal Architecture" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry x="150" y="10" width="600" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="in_text" value="OCR tokens&lt;br&gt;w&lt;sub&gt;1&lt;/sub&gt;, &amp;#8230;, w&lt;sub&gt;N&lt;/sub&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="80" y="55" width="170" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="in_layout" value="Bounding boxes&lt;br&gt;b&lt;sub&gt;i&lt;/sub&gt; &amp;#8712; [0,1000]&lt;sup&gt;4&lt;/sup&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="360" y="55" width="180" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="in_visual" value="Page image&lt;br&gt;I &amp;#8712; &amp;#8477;&lt;sup&gt;3&amp;#215;224&amp;#215;224&lt;/sup&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="645" y="55" width="180" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="emb_text" value="Text embedding&lt;br&gt;(WordPiece + position)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="60" y="160" width="210" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="emb_layout" value="2-D position / layout embedding&lt;br&gt;(x&lt;sub&gt;0&lt;/sub&gt;, y&lt;sub&gt;0&lt;/sub&gt;, x&lt;sub&gt;1&lt;/sub&gt;, y&lt;sub&gt;1&lt;/sub&gt;, w, h &amp;#8594; learned embed)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="310" y="160" width="280" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="emb_visual" value="16&amp;#215;16 patch embedding&lt;br&gt;(linear projection of image patches)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="630" y="160" width="210" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e_int" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#2C6FB3;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="in_text" target="emb_text" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_inl" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#3A9D4E;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="in_layout" target="emb_layout" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_inv" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#D9772B;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="in_visual" target="emb_visual" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="seq" value="Shared token + patch sequence&lt;br&gt;(text &amp;#8853; layout &amp;#8853; image-patch tokens)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#222222;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="200" y="270" width="500" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e_et_seq" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#2C6FB3;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" parent="1" source="emb_text" target="seq" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_el_seq" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#3A9D4E;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="emb_layout" target="seq" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ev_seq" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#D9772B;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" parent="1" source="emb_visual" target="seq" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="transformer_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;dashed=0;" parent="1" vertex="1">
+          <mxGeometry x="160" y="375" width="580" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="transformer_title" value="Transformer self-attention &amp;#215; 12" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=14;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="160" y="383" width="580" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="transformer_note" value="cross-modal fusion via shared attention" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=12;fontStyle=2;fontColor=#5C3D8E;" parent="1" vertex="1">
+          <mxGeometry x="160" y="412" width="580" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="transformer_sublabel" value="hidden d = 768 &amp;nbsp;&amp;nbsp;|&amp;nbsp;&amp;nbsp; L = 12 layers" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=11;fontStyle=0;fontColor=#5C3D8E;" parent="1" vertex="1">
+          <mxGeometry x="160" y="436" width="580" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="e_seq_tf" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#222222;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="seq" target="transformer_bg" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h_repr" value="Token representations&lt;br&gt;h&lt;sub&gt;1&lt;/sub&gt;, &amp;#8230;, h&lt;sub&gt;N&lt;/sub&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#222222;fontFamily=Times New Roman;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="310" y="520" width="280" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="e_tf_hr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#222222;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="transformer_bg" target="h_repr" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="head" value="Task head (token classifier)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="335" y="594" width="230" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="e_hr_hd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#222222;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="h_repr" target="head" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="bio_out" value="BIO labels y&lt;sub&gt;1&lt;/sub&gt;, &amp;#8230;, y&lt;sub&gt;N&lt;/sub&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#222222;fontFamily=Times New Roman;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="335" y="686" width="230" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="e_hd_out" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#222222;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="head" target="bio_out" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="param_note" value="&amp;approx;133M params &amp;nbsp;&amp;#183;&amp;nbsp; hidden d=768 &amp;nbsp;&amp;#183;&amp;nbsp; L=12 layers &amp;nbsp;&amp;#183;&amp;nbsp; pre-trained with MLM + MIM + WPA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" parent="1" vertex="1">
+          <mxGeometry x="160" y="750" width="580" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_t" value="" style="rounded=0;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;" parent="1" vertex="1">
+          <mxGeometry x="60" y="800" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_tt" value="Text stream" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="86" y="798" width="110" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_v" value="" style="rounded=0;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;" parent="1" vertex="1">
+          <mxGeometry x="200" y="800" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_vt" value="Visual stream" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="226" y="798" width="110" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_l" value="" style="rounded=0;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="345" y="800" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_lt" value="Layout (2-D position)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="371" y="798" width="150" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_f" value="" style="rounded=0;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="530" y="800" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_ft" value="Cross-modal fusion" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="556" y="798" width="140" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_n" value="" style="rounded=0;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;" parent="1" vertex="1">
+          <mxGeometry x="705" y="800" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_nt" value="Task head" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="731" y="798" width="90" height="18" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

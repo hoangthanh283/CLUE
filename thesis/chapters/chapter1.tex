@@ -43,13 +43,33 @@ hand-tuned heuristics.
 For a \emph{tri-modal} document encoder this uniform treatment is unsatisfying,
 because the network is manifestly heterogeneous: it contains a text stream, a
 visual/patch stream, layout (2D position) embeddings, and cross-modal fusion
-layers that combine them. It is not known which of these components forgets most,
-nor whether the pattern is stable across continual scenarios. Answering that
-question is a prerequisite for designing a \gls{cl} method that spends its capacity
-where forgetting actually happens rather than spreading it thinly across the whole
-network. This thesis takes a \emph{measure-first, then-fix} stance: it first
-\emph{diagnoses} where forgetting lives in a multimodal document encoder, and only
-then proposes a remedy whose design is justified by the diagnosis.
+layers that combine them. These components are trained on different signals, carry
+different inductive biases, and---there is every reason to suspect---are unlikely
+to age at the same rate under a shifting task distribution. Yet the prevailing
+remedies are blind to this structure: elastic-weight
+penalties~\citep{kirkpatrick2017ewc} apply one importance-weighted quadratic term
+across all parameters, distillation~\citep{li2017lwf} matches whole-network
+outputs, and heuristic layer freezing draws an arbitrary depth-wise cut that
+ignores the modality a layer serves. Even the modern parameter-efficient and
+modular families---low-rank adapters~\citep{wang2023olora} and prompt
+pools~\citep{wang2022l2p,wang2022dualprompt,smith2023coda}---only sharpen the
+question rather than answer it: deciding \emph{which} weights to adapt or
+\emph{where} to inject a prompt implicitly presupposes that one already knows which
+part of the encoder is at risk. Evidence from unimodal vision transformers shows
+that forgetting is far from uniform across depth and is concentrated in identifiable
+layers~\citep{ramasesh2021anatomy}, and recent probes of multimodal models report
+modality-dependent degradation~\citep{zhai2023investigating}; but for a document
+encoder that jointly reasons over text, layout, and pixels, \emph{no prior work has
+measured which component actually forgets}. That measurement is the missing
+prerequisite this thesis supplies.
+
+Answering that question---which component forgets most, and whether the pattern is
+stable across continual scenarios---is therefore a prerequisite for designing a
+\gls{cl} method that spends its capacity where forgetting actually happens rather
+than spreading it thinly across the whole network. This thesis takes a
+\emph{measure-first, then-fix} stance: it first \emph{diagnoses} where forgetting
+lives in a multimodal document encoder, and only then proposes a remedy whose
+design is justified by the diagnosis.
 
 \section{Objectives}
 \label{sec:intro-objectives}
@@ -90,6 +110,23 @@ The thesis pursues the following concrete objectives:
 
 % Numeric claims marked TODO are filled once experiments complete (Chapter 6).
 
+\noindent\emph{Contributions at a glance.} The thesis makes three contributions:
+
+\begin{enumerate}
+  \item a \textbf{per-component forgetting diagnostic} for tri-modal document
+        encoders, realised through controlled modality ablation of a single
+        backbone and read out by representational drift, per-group \gls{fim}, and
+        standard forgetting metrics;
+  \item \textbf{DocCL}, a mechanism-targeted continual-learning remedy whose design
+        is \emph{derived from} the diagnosis rather than chosen \emph{a priori},
+        concentrating its mechanism on the dominant-forgetting component;
+  \item the \textbf{FCS-CL benchmark} together with reproducible per-component
+        tooling---unified scenarios, baselines, configurations, and
+        instrumentation---to support like-for-like comparison.
+\end{enumerate}
+
+\noindent The remainder of this section expands each contribution.
+
 \noindent\textbf{A per-component forgetting diagnosis for tri-modal document
 encoders.} We introduce, to our knowledge, the first protocol that decomposes
 \gls{cf} in a multimodal document encoder into its text, visual, layout, and fusion
@@ -128,7 +165,8 @@ instrumentation hooks and experiment tracking.
 task construction, the model and training configuration, the baselines, and the
 evaluation methodology.
 \textbf{Chapter~\ref{ch:results}} reports the diagnosis as the headline result,
-compares the remedy against baselines, presents ablations and a computational-cost
-analysis, and discusses implications and threats to validity.
+tests it for stability across seeds and task orders, compares the remedy against
+all baselines, presents ablations and a computational-cost analysis, and discusses
+implications and threats to validity.
 \textbf{Chapter~\ref{ch:conclusions}} states limitations, conclusions, and future
 work.

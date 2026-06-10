@@ -71,12 +71,7 @@ these four components on the LayoutLMv3 architecture.
 
 \begin{figure}[t]
   \centering
-  % TODO: add figure file (e.g. figures/layoutlmv3_components.pdf)
-  % \includegraphics[width=0.9\linewidth]{layoutlmv3_components.pdf}
-  \fbox{\parbox[c][4cm][c]{0.9\linewidth}{\centering\itshape
-  Placeholder --- LayoutLMv3 architecture annotated with the four diagnosed
-  components: text stream, visual/patch stream, layout (2D position) embeddings,
-  and cross-modal fusion layers.}}
+  \includegraphics[width=0.92\linewidth]{layoutlmv3_components.pdf}
   \caption[LayoutLMv3 tri-modal architecture and its four components]{The
   LayoutLMv3 tri-modal architecture. OCR tokens, 2D bounding-box position
   embeddings, and image patches are projected into a shared sequence and fused by
@@ -101,12 +96,26 @@ the \emph{stability--plasticity dilemma}: a model must remain \emph{plastic}
 enough to acquire new tasks yet \emph{stable} enough to retain old ones. Pure
 fine-tuning maximises plasticity and suffers \gls{cf}; freezing the network
 maximises stability but prevents learning. Every \gls{cl} method is, in effect, a
-particular operating point on this trade-off, and a recurring theme of this thesis
+particular operating point on this trade-off
+(Figure~\ref{fig:stability-plasticity}), and a recurring theme of this thesis
 is that the right operating point may differ \emph{per component} of a multimodal
 encoder. Forgetting also has more than one face: it can be \emph{superficial}
 (the output format drifts while knowledge is intact) or \emph{essential} (the
 underlying knowledge is lost), a distinction made precise in
 \S\ref{sec:bg-superficial-essential}.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\linewidth]{stability_plasticity.pdf}
+  \caption[The stability--plasticity trade-off]{Illustrative schematic of the
+  stability--plasticity trade-off (no measured data). Pure fine-tuning sits at the
+  high-plasticity, low-stability extreme and suffers catastrophic forgetting;
+  freezing the backbone sits at the opposite extreme and cannot acquire new tasks.
+  Continual-learning methods occupy intermediate operating points. A central
+  hypothesis of this thesis is that the optimal operating point is not a single
+  global setting but may differ across the components of a multimodal encoder.}
+  \label{fig:stability-plasticity}
+\end{figure}
 
 \subsection{Continual-Learning Scenarios}
 \label{sec:bg-cl-scenarios}
@@ -117,30 +126,65 @@ available at inference, so a separate head can be selected---the easiest case. I
 \gls{dil} the input distribution shifts but the label space is shared and task
 identity is unknown. In \gls{cil} new classes are introduced over time and the
 model must discriminate among all classes seen so far without task identity;
-\gls{cil} is generally the hardest because the output space itself grows. For
-document \gls{kie}, \gls{cil} additionally provokes the \emph{semantic shift of
-the ``O'' tag}: tokens that were background (O) in an earlier session may become a
-labelled entity in a later one, so the meaning of ``O'' is non-stationary and the
-supervision for old spans becomes inconsistent. This thesis studies \gls{cil},
+\gls{cil} is generally the hardest because the output space itself grows.
+
+For document \gls{kie} cast as \gls{bio} sequence labelling, \gls{cil} additionally
+provokes the \emph{semantic shift of the ``O'' tag}, a form of structural
+interference that has no counterpart in image-classification \gls{cl}. Let
+$\mathcal{L}_t$ denote the foreground (entity) label set introduced up to session
+$t$. Under class incremental learning these sets grow monotonically,
+\[
+  \mathcal{L}_1 \subset \mathcal{L}_2 \subset \dots \subset \mathcal{L}_T ,
+  \qquad
+  O_t = \mathcal{Y} \setminus \mathcal{L}_t ,
+\]
+where $\mathcal{Y}$ is the universe of foreground types and $O_t$ is the background
+(``O'') class, defined as the \emph{shrinking complement} of $\mathcal{L}_t$. Because
+$\mathcal{L}_s \subset \mathcal{L}_t$ for $s<t$, a token labelled O in session $s$
+may carry a genuine entity label in a later session $t>s$; the same surface token is
+therefore a negative example in one session and a positive example in another.
+Consequently the conditional $p(y=O \mid x)$ is \emph{non-stationary} across the
+session sequence, and the supervision the model received for old spans becomes
+inconsistent with what later sessions demand. This moving decision boundary, rather
+than mere distribution shift, is the structural difficulty unique to continual
+sequence labelling, and it is amplified in documents where a single entity type
+recurs across many tokens. This thesis studies \gls{cil},
 \gls{dil}, and a mixed scenario, and explicitly leaves \gls{til} to future work.
 
 \subsection{The Five Method Families}
 \label{sec:bg-cl-families}
 
 Following the widely-used taxonomy of~\citet{wang2024survey}, \gls{cl} methods
-fall into five families summarised in Table~\ref{tab:cl-families}.
+fall into five families summarised in Table~\ref{tab:cl-families} and
+Figure~\ref{fig:cl-taxonomy}.
 
 \paragraph{Regularisation-based.} These penalise changes to parameters deemed
 important for past tasks. \Gls{ewc}~\citep{kirkpatrick2017ewc} weights a quadratic
-penalty by the diagonal of the \gls{fim}; \gls{si}~\citep{zenke2017si} accumulates
-importance online from the path integral of parameter change; and
+penalty by the diagonal of the \gls{fim}, optimising
+\[
+  \mathcal{L} \;=\; \mathcal{L}_{\text{new}}
+  \;+\; \lambda \sum_i F_i \,\bigl(\theta_i - \theta_i^{\ast}\bigr)^2 ,
+\]
+where $\theta^{\ast}$ are the parameters at the end of the previous task, $F_i$ is
+the Fisher diagonal estimating the importance of parameter $\theta_i$, and $\lambda$
+sets the stability--plasticity balance. \Gls{si}~\citep{zenke2017si} accumulates
+importance online from the path integral of parameter change, and
 \gls{mas}~\citep{aljundi2018mas} estimates importance from output sensitivity
-without labels. A known failure mode is that the \gls{fim} accumulates across many
+without labels; both can be read as alternative estimators of the same per-parameter
+weights $F_i$. A known failure mode is that this importance accumulates across many
 tasks until the penalty effectively freezes the network~\citep{kirkpatrick2017ewc}.
+The per-parameter, per-group structure of $F_i$ is precisely what makes
+regularisation a natural vehicle for a \emph{component-targeted} remedy.
 
 \paragraph{Replay-based.} These store and re-present a memory of past exemplars.
-\Gls{gem}~\citep{lopezpaz2017gem} projects gradients so they do not increase loss
-on stored examples and introduced the now-standard transfer metrics;
+\Gls{gem}~\citep{lopezpaz2017gem} projects the new-task gradient $g$ so that it does
+not increase the loss on the stored memory, enforcing the inequality constraint
+\[
+  \langle g,\, g_{\text{ref}} \rangle \;\ge\; 0 ,
+\]
+where $g_{\text{ref}}$ is the gradient evaluated on the memory of a past task; an
+update that violates this is projected onto the nearest gradient that satisfies it.
+\Gls{gem} also introduced the now-standard backward- and forward-transfer metrics.
 \gls{agem}~\citep{chaudhry2019agem} relaxes this to a single averaged constraint;
 \gls{er}~\citep{rolnick2019er} simply interleaves replayed examples; DER++
 \citep{buzzega2020der} adds a logit-distillation term; and
@@ -159,15 +203,34 @@ are stable but the protected subspace grows until its capacity is exhausted.
 \gls{ptm} backbone and learns small task-specific modules.
 RanPAC~\citep{mcdonnell2023ranpac} lifts frozen features by a random projection
 and fits class prototypes in closed form; SAFE~\citep{zhou2024safe} couples a slow
-and a fast learner. Prompt-based methods learn a pool of soft prompts:
-\gls{l2p}~\citep{wang2022l2p} selects prompts by key--query matching;
-DualPrompt~\citep{wang2022dualprompt} separates task-shared from task-specific
-prompts; CODA-Prompt~\citep{smith2023coda} replaces hard selection with a
-decomposed attention weighting; and S-Prompt~\citep{wang2022sprompt} learns
-independent prompts per domain for \gls{dil}. \Gls{lora}-based methods learn
-low-rank weight updates: \gls{olora}~\citep{wang2023olora} keeps per-task
-subspaces orthogonal, and InfLoRA~\citep{liang2024inflora} constrains new adapters
-to be orthogonal to the input subspaces of old tasks.
+and a fast learner. Prompt-based methods learn a pool of soft prompts and a set of
+learnable keys $\{k_i\}$, retrieving for an input $x$ the subset of prompts whose
+keys are most similar to a query $q(x)$ extracted from the frozen backbone,
+\[
+  K_x \;=\; \operatorname*{top\text{-}K}_{i}\; \mathrm{sim}\bigl(q(x),\, k_i\bigr) ,
+\]
+so that knowledge is partitioned across the pool rather than overwritten
+\citep{wang2022l2p}. DualPrompt~\citep{wang2022dualprompt} separates task-shared
+from task-specific prompts; CODA-Prompt~\citep{smith2023coda} replaces this hard
+$\operatorname{top\text{-}K}$ selection with a differentiable decomposed attention
+weighting; and S-Prompt~\citep{wang2022sprompt} learns independent prompts per
+domain for \gls{dil}. \Gls{lora}-based methods instead inject a trainable low-rank
+update into frozen weight matrices,
+\[
+  W \;=\; W_0 + BA ,
+  \qquad B \in \mathbb{R}^{d\times r},\; A \in \mathbb{R}^{r\times d},\;
+  r \ll d ,
+\]
+so each task adds only $2dr$ parameters while $W_0$ stays fixed
+\citep{hu2022lora}. \gls{olora}~\citep{wang2023olora} keeps the per-task
+subspaces $BA$ orthogonal across tasks, and InfLoRA~\citep{liang2024inflora}
+constrains new adapters to be orthogonal to the input subspaces of old tasks.
+That such adapters can be allocated \emph{per layer} rather than uniformly is
+exploited by D-MoLE~\citep{ge2025dmole}, which dynamically routes a budget of
+low-rank experts to the layers where adaptation is most needed---direct evidence
+that the capacity a continual learner should spend is not distributed uniformly
+across a network, and a motivation for first measuring \emph{where} that capacity is
+required.
 
 \paragraph{Architecture-based.} These allocate separate parameters per task by
 masking (PackNet) or growth (Progressive Networks), trading parameter count for
@@ -193,6 +256,19 @@ isolation.
   \end{tabular}
 \end{table}
 
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{cl_taxonomy.pdf}
+  \caption[Taxonomy of continual-learning method families]{Taxonomy of the five
+  continual-learning method families and their representative methods. Methods
+  set in bold are used as baselines in this thesis. The families are not mutually
+  exclusive---several state-of-the-art methods combine mechanisms (for example,
+  DER++ pairs replay with logit distillation, and O-LoRA adds an orthogonality
+  constraint to low-rank adaptation)---but the grouping organises the design space
+  by the primary mechanism each method uses to resist forgetting.}
+  \label{fig:cl-taxonomy}
+\end{figure}
+
 \subsection{Measuring Forgetting Inside the Network}
 \label{sec:bg-measurement}
 
@@ -211,6 +287,32 @@ much} a model forgets but \emph{where}.
 
 \Gls{cl} for \gls{ie} is real but nascent, fragmented, and almost entirely
 sentence-level. Table~\ref{tab:cl-ie-landscape} maps the landscape.
+
+The dominance of the sentence-level setting is not incidental: it reflects what the
+surveyed \gls{cner} and \gls{cre} methods were designed for, and it is precisely why
+they transfer poorly to documents. Five structural reasons explain the failure when
+the unit of extraction grows from a sentence to a page:
+\begin{enumerate}
+  \item \textbf{Cross-sentence entity and coreference resolution.} A field and its
+        value, or repeated mentions of the same entity, routinely span several lines
+        or text blocks; a sentence-windowed model cannot link them.
+  \item \textbf{Multi-hop relations.} Document-level relations (the DocRED setting)
+        chain evidence across sentences, so the reasoning a continual learner must
+        preserve is not captured by any single local context.
+  \item \textbf{Layout and visual context loss.} Sentence-level methods discard
+        bounding boxes and image patches, yet in forms and receipts the role of a
+        token is signalled by position and typography rather than neighbouring words.
+  \item \textbf{O-tag shift amplified across many mentions.} The non-stationary
+        background class of \S\ref{sec:bg-cl-scenarios} is far more damaging at
+        document scale, where one entity type recurs across dozens of tokens, so a
+        single session's inconsistent supervision corrupts many spans at once.
+  \item \textbf{Unknown task identity at document scale.} A real document stream
+        does not announce which session or schema a page belongs to, ruling out the
+        \gls{til} assumption on which several sentence-level methods (for example,
+        the prompt-pool \gls{cre} approaches) implicitly rely.
+\end{enumerate}
+These five reasons motivate the document-level, multimodal framing adopted
+throughout this thesis.
 
 \subsection{Continual NER and the O-Label Problem}
 \label{sec:bg-continual-ner}
@@ -327,13 +429,24 @@ principle adopted in Chapter~\ref{ch:methodology}.
 
 To attribute forgetting to components, this thesis measures how internal
 representations change between checkpoints. \Gls{cka}~\citep{kornblith2019similarity}
-compares two activation matrices and returns a similarity in $[0,1]$ that is
-invariant to orthogonal transforms and isotropic scaling---properties that make it
-more reliable than naive cosine similarity between weights. A \gls{cka} of one
-indicates unchanged representations; a low value indicates reorganisation.
-Per-layer \gls{cka} between the model before and after a task thus localises the
-``forgetting hotspots,'' and is one of the two primary diagnostic metrics used
-here, alongside per-group \gls{fim}.
+compares two activation matrices $X$ and $Y$ (samples $\times$ neurons) and returns a
+similarity $\mathrm{CKA}(X,Y) \in [0,1]$, the precise estimator of which is given in
+Chapter~\ref{ch:methodology}. Two invariance properties make it the appropriate
+instrument here. First, linear \gls{cka} is invariant to \emph{orthogonal
+transformations} of the representation: for any orthogonal $Q$, $\mathrm{CKA}(XQ,Y)=
+\mathrm{CKA}(X,Y)$, so a mere rotation or permutation of neurons---which leaves the
+function computed by a layer unchanged---is correctly scored as no drift. Second, it
+is invariant to \emph{isotropic scaling}, $\mathrm{CKA}(\alpha X,Y)=\mathrm{CKA}(X,Y)$
+for $\alpha\neq 0$, so a uniform change in activation magnitude is likewise ignored.
+These are exactly the symmetries a representation-level measure should respect, and
+they are why \gls{cka} is preferable to a naive cosine similarity between weight
+vectors: cosine similarity in weight space is \emph{not} invariant to neuron
+permutation or rotation, so two functionally identical networks can register as
+maximally dissimilar simply because their hidden units are reordered. A \gls{cka} of
+one indicates unchanged representations; a low value indicates genuine
+reorganisation. Per-layer \gls{cka} between the model before and after a task thus
+localises the ``forgetting hotspots,'' and is one of the two primary diagnostic
+metrics used here, alongside per-group \gls{fim}.
 
 \section{Backbones for Continual Document IE}
 \label{sec:bg-backbones}

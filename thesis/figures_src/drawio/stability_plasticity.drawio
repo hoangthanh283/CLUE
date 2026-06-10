@@ -1,0 +1,128 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="stability_plasticity" id="stabplast">
+    <mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="640" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ===== TITLE ===== -->
+        <mxCell id="title" value="Stability–Plasticity Trade-off (Illustrative)" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" vertex="1" parent="1"><mxGeometry x="0" y="14" width="900" height="26" as="geometry"/></mxCell>
+
+        <!-- ===== AXES ===== -->
+        <!-- Y-axis arrow (Stability) -->
+        <mxCell id="yaxis" value="" style="endArrow=block;endFill=1;html=1;strokeColor=#222222;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="130" y="530" as="sourcePoint"/>
+            <mxPoint x="130" y="80" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <!-- X-axis arrow (Plasticity) -->
+        <mxCell id="xaxis" value="" style="endArrow=block;endFill=1;html=1;strokeColor=#222222;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="130" y="530" as="sourcePoint"/>
+            <mxPoint x="760" y="530" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Axis labels -->
+        <mxCell id="ylabel" value="Stability&lt;br&gt;(retention of old tasks) &amp;#8594;" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=12;fontStyle=1;rotation=-90;" vertex="1" parent="1"><mxGeometry x="20" y="230" width="220" height="40" as="geometry"/></mxCell>
+        <mxCell id="xlabel" value="Plasticity (capacity to learn new tasks) &amp;#8594;" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="200" y="544" width="440" height="28" as="geometry"/></mxCell>
+
+        <!-- ===== FRONTIER CURVE (convex, 5 segments approximating smooth arc) ===== -->
+        <!-- Points: A(160,120) upper-left, B(240,160), C(360,240), D(490,360), E(620,490) lower-right -->
+        <mxCell id="seg1" value="" style="curved=1;endArrow=none;html=1;strokeColor=#444444;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="162" y="120" as="sourcePoint"/>
+            <mxPoint x="252" y="160" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="200" y="128"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seg2" value="" style="curved=1;endArrow=none;html=1;strokeColor=#444444;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="252" y="160" as="sourcePoint"/>
+            <mxPoint x="372" y="248" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="310" y="196"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seg3" value="" style="curved=1;endArrow=none;html=1;strokeColor=#444444;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="372" y="248" as="sourcePoint"/>
+            <mxPoint x="498" y="368" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="432" y="300"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="seg4" value="" style="curved=1;endArrow=none;html=1;strokeColor=#444444;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="498" y="368" as="sourcePoint"/>
+            <mxPoint x="628" y="492" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="564" y="428"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Frontier label -->
+        <mxCell id="frontier_lbl" value="Stability–Plasticity frontier" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="308" y="154" width="210" height="18" as="geometry"/></mxCell>
+        <!-- small arrow from frontier label to curve -->
+        <mxCell id="e_fl" value="" style="endArrow=open;endSize=6;html=1;strokeColor=#888888;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="308" y="163" as="sourcePoint"/>
+            <mxPoint x="264" y="168" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== ENDPOINT DOTS ===== -->
+        <!-- Frozen backbone: upper-left near (162,120) -->
+        <mxCell id="dot_frozen" value="" style="ellipse;html=1;fillColor=#2C6FB3;strokeColor=#2C6FB3;" vertex="1" parent="1"><mxGeometry x="148" y="106" width="16" height="16" as="geometry"/></mxCell>
+        <mxCell id="lbl_frozen" value="Frozen backbone&lt;br&gt;(high stability, low plasticity)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontColor=#2C6FB3;" vertex="1" parent="1"><mxGeometry x="176" y="86" width="226" height="34" as="geometry"/></mxCell>
+
+        <!-- Naive fine-tuning: lower-right near (628,492) -->
+        <mxCell id="dot_naive" value="" style="ellipse;html=1;fillColor=#B3402F;strokeColor=#B3402F;" vertex="1" parent="1"><mxGeometry x="614" y="478" width="16" height="16" as="geometry"/></mxCell>
+        <mxCell id="lbl_naive" value="Naive fine-tuning&lt;br&gt;(high plasticity, low stability)" style="text;html=1;align=right;fontFamily=Times New Roman;fontSize=11;fontColor=#B3402F;" vertex="1" parent="1"><mxGeometry x="400" y="490" width="210" height="34" as="geometry"/></mxCell>
+
+        <!-- ===== CL METHODS REGION ===== -->
+        <!-- Shaded ellipse region in the middle of the frontier -->
+        <mxCell id="cl_region" value="" style="ellipse;html=1;fillColor=#F0ECF7;strokeColor=#8055B5;strokeWidth=1;dashed=1;opacity=60;" vertex="1" parent="1"><mxGeometry x="300" y="196" width="220" height="140" as="geometry"/></mxCell>
+        <mxCell id="lbl_cl" value="CL methods&lt;br&gt;operate here" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontStyle=1;fontColor=#8055B5;" vertex="1" parent="1"><mxGeometry x="318" y="268" width="184" height="40" as="geometry"/></mxCell>
+
+        <!-- ===== PER-COMPONENT MARKERS (near the frontier, in text/layout/fusion colours) ===== -->
+        <!-- Text-stream marker: near (310,215) on the curve -->
+        <mxCell id="dot_text" value="" style="ellipse;html=1;fillColor=#2C6FB3;strokeColor=#2C6FB3;" vertex="1" parent="1"><mxGeometry x="296" y="208" width="12" height="12" as="geometry"/></mxCell>
+        <!-- Layout-stream marker: near (460,340) -->
+        <mxCell id="dot_layout" value="" style="ellipse;html=1;fillColor=#3A9D4E;strokeColor=#3A9D4E;" vertex="1" parent="1"><mxGeometry x="456" y="334" width="12" height="12" as="geometry"/></mxCell>
+        <!-- Fusion-stream marker: moved left/up out of label area -->
+        <mxCell id="dot_fusion" value="" style="ellipse;html=1;fillColor=#8055B5;strokeColor=#8055B5;" vertex="1" parent="1"><mxGeometry x="354" y="248" width="12" height="12" as="geometry"/></mxCell>
+
+        <!-- Note callout box -->
+        <mxCell id="note_box" value="Per-component operating&lt;br&gt;points may differ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" vertex="1" parent="1"><mxGeometry x="574" y="186" width="188" height="44" as="geometry"/></mxCell>
+        <!-- Arrow from note to markers area -->
+        <mxCell id="e_note" value="" style="endArrow=open;endSize=6;html=1;strokeColor=#8895A6;curved=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="574" y="208" as="sourcePoint"/>
+            <mxPoint x="470" y="280" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="524" y="240"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== LEGEND ===== -->
+        <mxCell id="lg_bg" value="" style="rounded=1;html=1;fillColor=#FBFBFB;strokeColor=#CCCCCC;" vertex="1" parent="1"><mxGeometry x="100" y="584" width="700" height="34" as="geometry"/></mxCell>
+        <mxCell id="lg_dot1" value="" style="ellipse;html=1;fillColor=#2C6FB3;strokeColor=#2C6FB3;" vertex="1" parent="1"><mxGeometry x="116" y="594" width="12" height="12" as="geometry"/></mxCell>
+        <mxCell id="lg_t1" value="Text stream" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="132" y="592" width="100" height="16" as="geometry"/></mxCell>
+        <mxCell id="lg_dot2" value="" style="ellipse;html=1;fillColor=#3A9D4E;strokeColor=#3A9D4E;" vertex="1" parent="1"><mxGeometry x="256" y="594" width="12" height="12" as="geometry"/></mxCell>
+        <mxCell id="lg_t2" value="Layout stream" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="272" y="592" width="110" height="16" as="geometry"/></mxCell>
+        <mxCell id="lg_dot3" value="" style="ellipse;html=1;fillColor=#8055B5;strokeColor=#8055B5;" vertex="1" parent="1"><mxGeometry x="408" y="594" width="12" height="12" as="geometry"/></mxCell>
+        <mxCell id="lg_t3" value="Fusion stream" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="424" y="592" width="110" height="16" as="geometry"/></mxCell>
+        <mxCell id="lg_note" value="Schematic only — no numeric scale" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="556" y="592" width="232" height="16" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

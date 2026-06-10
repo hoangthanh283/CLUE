@@ -1,0 +1,163 @@
+<mxfile host="Electron" modified="2026-06-10T00:44:17.528Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.2 Chrome/114.0.5735.289 Electron/25.9.4 Safari/537.36" version="22.1.2" etag="-6PIZTU5vx1s7DLkg0sf" type="device">
+  <diagram name="cl_taxonomy" id="cltax">
+    <mxGraphModel dx="954" dy="669" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="819" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="A Taxonomy of Continual-Learning Methods" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry y="14" width="1400" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="root" value="Continual-Learning Methods" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#222222;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="528" y="56" width="280" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="reg" value="Regularisation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="40" y="168" width="200" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="rep" value="Replay" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="290" y="168" width="200" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="opt" value="Optimisation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="568" y="168" width="200" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="rpr" value="Representation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="848" y="168" width="200" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="arch" value="Architecture" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E9DE;strokeColor=#B3402F;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="1140" y="168" width="200" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="bus_drop" style="endArrow=none;html=1;strokeColor=#222222;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="668" y="100" as="sourcePoint" />
+            <mxPoint x="668" y="138" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bus_h" style="endArrow=none;html=1;strokeColor=#222222;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="140" y="138" as="sourcePoint" />
+            <mxPoint x="1240" y="138" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d_reg" style="endArrow=block;endFill=1;html=1;strokeColor=#222222;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="140" y="138" as="sourcePoint" />
+            <mxPoint x="140" y="168" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d_rep" style="endArrow=block;endFill=1;html=1;strokeColor=#222222;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="390" y="138" as="sourcePoint" />
+            <mxPoint x="390" y="168" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d_opt" style="endArrow=block;endFill=1;html=1;strokeColor=#222222;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="668" y="138" as="sourcePoint" />
+            <mxPoint x="668" y="168" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d_rpr" style="endArrow=block;endFill=1;html=1;strokeColor=#222222;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="948" y="138" as="sourcePoint" />
+            <mxPoint x="948" y="168" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d_arch" style="endArrow=block;endFill=1;html=1;strokeColor=#222222;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1240" y="138" as="sourcePoint" />
+            <mxPoint x="1240" y="168" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="reg_ewc" value="&lt;b&gt;EWC&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="40" y="274" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_lwf" value="&lt;b&gt;LwF&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="40" y="316" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_si" value="SI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="40" y="358" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_mas" value="MAS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="40" y="400" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="rep_er" value="&lt;b&gt;ER&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="290" y="274" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="rep_der" value="&lt;b&gt;DER++&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="290" y="316" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="rep_gem" value="GEM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="290" y="358" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="rep_agem" value="A-GEM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="290" y="400" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="rep_icarl" value="iCaRL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="290" y="442" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="opt_gpm" value="GPM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="568" y="274" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="opt_ogd" value="OGD" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="568" y="316" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="rpr_l2p" value="&lt;b&gt;L2P&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="848" y="274" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="rpr_dp" value="&lt;b&gt;DualPrompt&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="848" y="316" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="rpr_coda" value="&lt;b&gt;CODA-Prompt&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="848" y="358" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="rpr_olora" value="&lt;b&gt;O-LoRA&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="848" y="400" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="rpr_ranpac" value="RanPAC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="848" y="442" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="rpr_safe" value="SAFE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="848" y="484" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="arch_pack" value="PackNet" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B3402F;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="1140" y="274" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="arch_prog" value="Progressive Nets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B3402F;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="1140" y="316" width="200" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="e_reg_ewc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#2C6FB3;" parent="1" source="reg" target="reg_ewc" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_rep_er" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#3A9D4E;" parent="1" source="rep" target="rep_er" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_opt_gpm" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#D9772B;" parent="1" source="opt" target="opt_gpm" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_rpr_l2p" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#8055B5;" parent="1" source="rpr" target="rpr_l2p" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_arch_pack" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#B3402F;" parent="1" source="arch" target="arch_pack" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_bg" value="" style="rounded=1;html=1;fillColor=#FBFBFB;strokeColor=#CCCCCC;" parent="1" vertex="1">
+          <mxGeometry x="220" y="704" width="960" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_filled" value="" style="rounded=0;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;" parent="1" vertex="1">
+          <mxGeometry x="236" y="716" width="18" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_base" value="● Filled = baseline used in this thesis" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="260" y="713" width="280" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_wb" value="" style="rounded=0;html=1;fillColor=#FFFFFF;strokeColor=#6E6E6E;" parent="1" vertex="1">
+          <mxGeometry x="566" y="716" width="18" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_wlbl" value="White = non-baseline method (in family)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="590" y="713" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_clrlbl" value="Family node colours: Reg. / Replay / Optim. / Repr. / Arch." style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="900" y="713" width="270" height="20" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

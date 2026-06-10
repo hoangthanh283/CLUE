@@ -73,6 +73,15 @@ forward transfer, and average forgetting are defined in \S\ref{sec:eval-metrics}
 \section{Extended Per-Task Result Tables}
 \label{app:extended-results}
 
+Once the full experimental grid completes, this section will report the detailed
+tables underlying the aggregate numbers in the main text: the per-task accuracy
+matrix $R[i,j]$ (accuracy on task $j$ after training through task $i$) for each
+method, scenario, and seed, from which average accuracy, backward transfer, and
+average forgetting are derived; the per-condition layer-wise CKA and per-group
+Fisher values that support the diagnosis; and per-seed breakdowns with means and
+standard deviations. All values will be regenerated from the tracked logs so that
+they remain consistent with the figures and summary tables.
+
 % TODO: full per-task accuracy matrices R[i,j] for each method, scenario, and
 % seed; per-condition CKA and Fisher tables. Fill from results/ once experiments
 % complete.

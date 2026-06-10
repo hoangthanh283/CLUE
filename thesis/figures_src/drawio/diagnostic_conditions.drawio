@@ -1,0 +1,163 @@
+<mxfile host="Electron" modified="2026-06-10T00:45:16.689Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.2 Chrome/114.0.5735.289 Electron/25.9.4 Safari/537.36" version="22.1.2" etag="-vlJNJnozzQWLgeIMyWO" type="device">
+  <diagram name="diagnostic_conditions" id="diagCond">
+    <mxGraphModel dx="1272" dy="892" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="760" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="page_title" value="Pilot Study: Four Modality-Ablation Conditions" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry x="50" y="8" width="1000" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="c1_title" value="C1 — Text only" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=13;fontStyle=1;fontColor=#2C6FB3;" parent="1" vertex="1">
+          <mxGeometry x="80" y="42" width="200" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="c1_text" value="Text stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="105" y="72" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c1_vis" value="&lt;i&gt;Visual stream [zeroed]&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F0F0;strokeColor=#BFBFBF;fontFamily=Times New Roman;fontSize=12;fontColor=#999999;" parent="1" vertex="1">
+          <mxGeometry x="105" y="120" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c1_lay" value="&lt;i&gt;Layout stream [zeroed]&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F0F0;strokeColor=#BFBFBF;fontFamily=Times New Roman;fontSize=12;fontColor=#999999;" parent="1" vertex="1">
+          <mxGeometry x="105" y="168" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c1_tf" value="Transformer + head" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="105" y="222" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c1_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#2C6FB3;dashed=1;" parent="1" source="c1_text" target="c1_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c1_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#BFBFBF;dashed=1;" parent="1" source="c1_vis" target="c1_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c1_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#BFBFBF;dashed=1;" parent="1" source="c1_lay" target="c1_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c1_note" value="closest same-architecture text baseline" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="65" y="266" width="260" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="c2_title" value="C2 — Image + Layout" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=13;fontStyle=1;fontColor=#D9772B;" parent="1" vertex="1">
+          <mxGeometry x="615" y="42" width="210" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="c2_text" value="&lt;i&gt;Text stream [zeroed]&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F0F0;strokeColor=#BFBFBF;fontFamily=Times New Roman;fontSize=12;fontColor=#999999;" parent="1" vertex="1">
+          <mxGeometry x="640" y="72" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c2_vis" value="Visual stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="640" y="120" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c2_lay" value="Layout stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="640" y="168" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c2_tf" value="Transformer + head" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="640" y="222" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c2_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#BFBFBF;dashed=1;" parent="1" source="c2_text" target="c2_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c2_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#D9772B;dashed=1;" parent="1" source="c2_vis" target="c2_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c2_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#3A9D4E;" parent="1" source="c2_lay" target="c2_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c2_note" value="isolates visual + layout forgetting" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="600" y="266" width="240" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="hdiv" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#BFBFBF;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="294" as="sourcePoint" />
+            <mxPoint x="1060" y="294" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c3_title" value="C3 — Text + Layout" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=13;fontStyle=1;fontColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="80" y="308" width="210" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="c3_text" value="Text stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="105" y="338" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c3_vis" value="&lt;i&gt;Visual stream [zeroed]&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F0F0;strokeColor=#BFBFBF;fontFamily=Times New Roman;fontSize=12;fontColor=#999999;" parent="1" vertex="1">
+          <mxGeometry x="105" y="386" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c3_lay" value="Layout stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="105" y="434" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c3_tf" value="Transformer + head" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="105" y="488" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c3_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#2C6FB3;dashed=1;" parent="1" source="c3_text" target="c3_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c3_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#BFBFBF;dashed=1;" parent="1" source="c3_vis" target="c3_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c3_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#3A9D4E;" parent="1" source="c3_lay" target="c3_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c3_note" value="isolates text + layout forgetting" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="65" y="532" width="260" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="c4_title" value="C4 — Full tri-modal &amp;#9733;" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=13;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="615" y="308" width="220" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="c4_border" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#8055B5;strokeWidth=2.5;" parent="1" vertex="1">
+          <mxGeometry x="625" y="330" width="190" height="208" as="geometry" />
+        </mxCell>
+        <mxCell id="c4_text" value="Text stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="640" y="338" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c4_vis" value="Visual stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="640" y="386" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c4_lay" value="Layout stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="640" y="434" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c4_tf" value="Transformer + head" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="640" y="488" width="150" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="c4_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#2C6FB3;dashed=1;" parent="1" source="c4_text" target="c4_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c4_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#D9772B;dashed=1;" parent="1" source="c4_vis" target="c4_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c4_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#3A9D4E;" parent="1" source="c4_lay" target="c4_tf" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c4_note" value="main subject of analysis" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="600" y="532" width="240" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="vdiv" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#BFBFBF;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="545" y="36" as="sourcePoint" />
+            <mxPoint x="545" y="560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lg_hdr" value="Legend:" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="55" y="572" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_act" value="" style="rounded=0;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;" parent="1" vertex="1">
+          <mxGeometry x="130" y="574" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_act_t" value="Active pathway" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="155" y="572" width="130" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_zer" value="" style="rounded=0;html=1;fillColor=#F0F0F0;strokeColor=#BFBFBF;" parent="1" vertex="1">
+          <mxGeometry x="300" y="574" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_zer_t" value="Zeroed pathway" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;fontColor=#999999;" parent="1" vertex="1">
+          <mxGeometry x="325" y="572" width="130" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_tf" value="" style="rounded=0;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;" parent="1" vertex="1">
+          <mxGeometry x="470" y="574" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_tf_t" value="Transformer + head" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="495" y="572" width="160" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_fus" value="" style="rounded=0;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="665" y="574" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_fus_t" value="C4 full (fusion border)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="690" y="572" width="200" height="18" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

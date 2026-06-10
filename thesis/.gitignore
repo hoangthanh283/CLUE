@@ -36,3 +36,7 @@ main.pdf
 # Editor
 *.swp
 .DS_Store
+
+# draw.io desktop editor backup/temp files
+.$*.bkp
+.$*.dtmp

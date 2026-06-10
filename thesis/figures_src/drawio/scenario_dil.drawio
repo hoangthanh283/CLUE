@@ -1,0 +1,95 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="scenario_dil" id="scendil">
+    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="460" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ===== TITLE ===== -->
+        <mxCell id="title" value="Domain-Incremental Learning (DIL) &#8212; One Unified Schema, Shifting Domains" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" vertex="1" parent="1"><mxGeometry x="100" y="10" width="900" height="26" as="geometry"/></mxCell>
+
+        <!-- ===== SHARED-SCHEMA BANNER ===== -->
+        <mxCell id="banner" value="Shared label space&amp;nbsp; L = { &lt;b&gt;HEADER&lt;/b&gt;, &lt;b&gt;KEY&lt;/b&gt;, &lt;b&gt;VALUE&lt;/b&gt;, &lt;b&gt;OTHER&lt;/b&gt; } (+ O background) &amp;nbsp;&#8212;&amp;nbsp; fixed for all sessions; only the input domain changes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1"><mxGeometry x="60" y="46" width="980" height="34" as="geometry"/></mxCell>
+
+        <!-- ============================================================= -->
+        <!-- SESSION 1 - FUNSD (green)                                     -->
+        <!-- ============================================================= -->
+        <mxCell id="p1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="60" y="108" width="300" height="196" as="geometry"/></mxCell>
+        <mxCell id="p1t" value="Session 1 &#8212; FUNSD" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=13;fontStyle=1;fontColor=#1F6B33;" vertex="1" parent="1"><mxGeometry x="70" y="116" width="280" height="20" as="geometry"/></mxCell>
+        <mxCell id="p1s" value="scanned forms &#8212; canonical KEY/VALUE schema" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#1F6B33;" vertex="1" parent="1"><mxGeometry x="70" y="136" width="280" height="16" as="geometry"/></mxCell>
+
+        <mxCell id="p1n1" value="HEADER" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="76" y="162" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p1a1" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="196" y="164" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p1u1" value="&lt;b&gt;HEADER&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="220" y="162" width="124" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="p1n2" value="QUESTION" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="76" y="194" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p1a2" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="196" y="196" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p1u2" value="&lt;b&gt;KEY&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="220" y="194" width="124" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="p1n3" value="ANSWER" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="76" y="226" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p1a3" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="196" y="228" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p1u3" value="&lt;b&gt;VALUE&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="220" y="226" width="124" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="p1n4" value="OTHER" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="76" y="258" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p1a4" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="196" y="260" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p1u4" value="&lt;b&gt;O&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="220" y="258" width="124" height="26" as="geometry"/></mxCell>
+
+        <!-- ============================================================= -->
+        <!-- SESSION 2 - SROIE (orange)                                    -->
+        <!-- ============================================================= -->
+        <mxCell id="p2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="400" y="108" width="300" height="196" as="geometry"/></mxCell>
+        <mxCell id="p2t" value="Session 2 &#8212; SROIE" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=13;fontStyle=1;fontColor=#9C5212;" vertex="1" parent="1"><mxGeometry x="410" y="116" width="280" height="20" as="geometry"/></mxCell>
+        <mxCell id="p2s" value="printed receipts &#8212; no explicit key/value split" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#9C5212;" vertex="1" parent="1"><mxGeometry x="410" y="136" width="280" height="16" as="geometry"/></mxCell>
+
+        <mxCell id="p2n1" value="COMPANY" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="416" y="162" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p2a1" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="536" y="164" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p2u1" value="&lt;b&gt;KEY&lt;/b&gt;&amp;nbsp;(KEY-like)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="560" y="162" width="124" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="p2n2" value="ADDRESS" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="416" y="194" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p2a2" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="536" y="196" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p2u2" value="&lt;b&gt;VALUE&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="560" y="194" width="124" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="p2n3" value="DATE" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="416" y="226" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p2a3" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="536" y="228" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p2u3" value="&lt;b&gt;VALUE&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="560" y="226" width="124" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="p2n4" value="TOTAL" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="416" y="258" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p2a4" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="536" y="260" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p2u4" value="&lt;b&gt;VALUE&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="560" y="258" width="124" height="26" as="geometry"/></mxCell>
+
+        <!-- ============================================================= -->
+        <!-- SESSION 3 - CORD superclass (purple)                          -->
+        <!-- ============================================================= -->
+        <mxCell id="p3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="740" y="108" width="300" height="196" as="geometry"/></mxCell>
+        <mxCell id="p3t" value="Session 3 &#8212; CORD (superclass)" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=13;fontStyle=1;fontColor=#5B3A85;" vertex="1" parent="1"><mxGeometry x="750" y="116" width="280" height="20" as="geometry"/></mxCell>
+        <mxCell id="p3s" value="receipts &#8212; no KEY class at all" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#5B3A85;" vertex="1" parent="1"><mxGeometry x="750" y="136" width="280" height="16" as="geometry"/></mxCell>
+
+        <mxCell id="p3n1" value="menu.*" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="756" y="162" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p3a1" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="876" y="164" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p3u1" value="&lt;b&gt;VALUE&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="900" y="162" width="124" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="p3n2" value="sub_total.*" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="756" y="194" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p3a2" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="876" y="196" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p3u2" value="&lt;b&gt;VALUE&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="900" y="194" width="124" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="p3n3" value="total.*" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="756" y="226" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p3a3" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="876" y="228" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p3u3" value="&lt;b&gt;VALUE&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="900" y="226" width="124" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="p3n4" value="void_menu, sub.*" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=10;" vertex="1" parent="1"><mxGeometry x="756" y="258" width="118" height="26" as="geometry"/></mxCell>
+        <mxCell id="p3a4" value="&#8594;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontColor=#444444;" vertex="1" parent="1"><mxGeometry x="876" y="260" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="p3u4" value="&lt;b&gt;OTHER&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="900" y="258" width="124" height="26" as="geometry"/></mxCell>
+
+        <!-- ===== DOMAIN-SHIFT ARROWS BETWEEN PANELS ===== -->
+        <mxCell id="sh1" style="endArrow=block;endFill=1;html=1;strokeColor=#222222;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="362" y="206" as="sourcePoint"/><mxPoint x="398" y="206" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="sh2" style="endArrow=block;endFill=1;html=1;strokeColor=#222222;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="702" y="206" as="sourcePoint"/><mxPoint x="738" y="206" as="targetPoint"/></mxGeometry></mxCell>
+
+        <!-- ===== BOTTOM NOTES ===== -->
+        <mxCell id="seqnote" value="Training sequence FUNSD &#8594; SROIE &#8594; CORD orders the domains by increasing distance from the canonical form schema. The label space L is &lt;b&gt;fixed&lt;/b&gt;; only the input distribution P&lt;sub&gt;t&lt;/sub&gt;(X) shifts at each session boundary." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1"><mxGeometry x="60" y="328" width="980" height="40" as="geometry"/></mxCell>
+
+        <mxCell id="caveat" value="Caveat: KEY is sparse outside FUNSD &#8212; COMPANY is the only KEY-like field in SROIE, and CORD has no KEY at all (recorded as a known limitation)." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E9DE;strokeColor=#B3402F;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" vertex="1" parent="1"><mxGeometry x="60" y="380" width="980" height="32" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

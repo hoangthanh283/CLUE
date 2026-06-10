@@ -1,0 +1,165 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="candidate_b_c" id="candBC">
+    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="680" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ===================================================================== -->
+        <!-- LEFT PANEL (B): Layout-Protected EWC  x=30..530                      -->
+        <!-- ===================================================================== -->
+        <mxCell id="tB" value="(B)&amp;nbsp; Layout-Protected EWC (L-EWC)" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" vertex="1" parent="1">
+          <mxGeometry x="30" y="14" width="490" height="26" as="geometry"/>
+        </mxCell>
+
+        <!-- Sub-title: parameter groups row label -->
+        <mxCell id="bsub" value="Trainable parameter groups" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;fontStyle=2;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="30" y="48" width="490" height="18" as="geometry"/>
+        </mxCell>
+
+        <!-- 5 parameter group boxes in a row, y=72 -->
+        <mxCell id="b_text" value="Text" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#BFBFBF;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="72" width="76" height="36" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_vis" value="Visual" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#BFBFBF;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="130" y="72" width="76" height="36" as="geometry"/>
+        </mxCell>
+
+        <!-- Layout box: accent hotspot style (thick B3402F border) -->
+        <mxCell id="b_lay" value="Layout" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E9DE;strokeColor=#B3402F;strokeWidth=2;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="220" y="72" width="76" height="36" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="b_fus" value="Fusion" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#BFBFBF;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="310" y="72" width="76" height="36" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_ffn" value="FFN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#BFBFBF;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="400" y="72" width="76" height="36" as="geometry"/>
+        </mxCell>
+
+        <!-- Labels below groups -->
+        <mxCell id="b_lay_lbl" value="HIGH penalty" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=1;fontColor=#B3402F;" vertex="1" parent="1">
+          <mxGeometry x="205" y="112" width="106" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_oth_lbl" value="low penalty" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#888888;" vertex="1" parent="1">
+          <mxGeometry x="30" y="112" width="170" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="b_oth_lbl2" value="low penalty" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#888888;" vertex="1" parent="1">
+          <mxGeometry x="300" y="112" width="186" height="18" as="geometry"/>
+        </mxCell>
+
+        <!-- Loss formula box -->
+        <mxCell id="b_loss" value="&lt;b&gt;L&lt;/b&gt; = L&lt;sub&gt;CE&lt;/sub&gt; + &amp;#955;&lt;sub&gt;layout&lt;/sub&gt; F&lt;sub&gt;layout&lt;/sub&gt; (&amp;#952;&amp;minus;&amp;#952;*)&lt;sup&gt;2&lt;/sup&gt; + &amp;#955;&lt;sub&gt;other&lt;/sub&gt; F&lt;sub&gt;other&lt;/sub&gt; (&amp;#952;&amp;minus;&amp;#952;*)&lt;sup&gt;2&lt;/sup&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="148" width="436" height="44" as="geometry"/>
+        </mxCell>
+
+        <!-- Lambda note -->
+        <mxCell id="b_lambda" value="&amp;#955;&lt;sub&gt;layout&lt;/sub&gt; &amp;gt;&amp;gt; &amp;#955;&lt;sub&gt;other&lt;/sub&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E9DE;strokeColor=#B3402F;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="148" y="204" width="220" height="36" as="geometry"/>
+        </mxCell>
+
+        <!-- Optional note -->
+        <mxCell id="b_opt" value="Optional: layout-embedding distillation from previous-task model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7F8FA;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="256" width="436" height="34" as="geometry"/>
+        </mxCell>
+
+        <!-- Footnote B -->
+        <mxCell id="b_foot" value="Triggered if forgetting is uniform but 2-D position embeddings drift fastest; no inference-time parameters." style="text;html=1;align=left;whiteSpace=wrap;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="40" y="302" width="436" height="34" as="geometry"/>
+        </mxCell>
+
+        <!-- ===================================================================== -->
+        <!-- Vertical dashed divider  x=570                                        -->
+        <!-- ===================================================================== -->
+        <mxCell id="vdiv" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#BFBFBF;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="560" y="10" as="sourcePoint"/>
+            <mxPoint x="560" y="470" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===================================================================== -->
+        <!-- RIGHT PANEL (C): Modality-Routed Prompts  x=590..1140                -->
+        <!-- ===================================================================== -->
+        <mxCell id="tC" value="(C)&amp;nbsp; Modality-Routed Prompts" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" vertex="1" parent="1">
+          <mxGeometry x="590" y="14" width="490" height="26" as="geometry"/>
+        </mxCell>
+
+        <!-- Router box -->
+        <mxCell id="c_router" value="Router&lt;br&gt;r(x) = softmax(MLP([h&lt;sub&gt;CLS&lt;/sub&gt; ; &amp;#966;(boxes) ; v&#772;]))" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#222222;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="690" y="72" width="290" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Three sub-pool boxes (text, visual, layout colours), centred under router -->
+        <mxCell id="c_ptext" value="P&lt;sub&gt;text&lt;/sub&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="610" y="186" width="100" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="c_pvis" value="P&lt;sub&gt;visual&lt;/sub&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="785" y="186" width="100" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="c_play" value="P&lt;sub&gt;layout&lt;/sub&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="960" y="186" width="100" height="44" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges: router → each sub-pool -->
+        <mxCell id="c_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#2C6FB3;" edge="1" parent="1" source="c_router" target="c_ptext">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#D9772B;" edge="1" parent="1" source="c_router" target="c_pvis">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#3A9D4E;" edge="1" parent="1" source="c_router" target="c_play">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- "prepended to its stream" label boxes under each sub-pool -->
+        <mxCell id="c_prep1" value="prepended to&lt;br&gt;text stream" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#2C6FB3;" vertex="1" parent="1">
+          <mxGeometry x="590" y="238" width="140" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="c_prep2" value="prepended to&lt;br&gt;visual stream" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#D9772B;" vertex="1" parent="1">
+          <mxGeometry x="765" y="238" width="140" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="c_prep3" value="prepended to&lt;br&gt;layout stream" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#3A9D4E;" vertex="1" parent="1">
+          <mxGeometry x="940" y="238" width="140" height="28" as="geometry"/>
+        </mxCell>
+
+        <!-- Footnote C -->
+        <mxCell id="c_foot" value="Triggered if per-scenario or per-modality forgetting patterns are dominant; sub-pools are modality-specific and independently trained." style="text;html=1;align=left;whiteSpace=wrap;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#444444;" vertex="1" parent="1">
+          <mxGeometry x="595" y="285" width="465" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ===================================================================== -->
+        <!-- LEGEND                                                                -->
+        <!-- ===================================================================== -->
+        <mxCell id="lg_hdr" value="Legend:" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="358" width="70" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg_acc" value="" style="rounded=0;html=1;fillColor=#F3E9DE;strokeColor=#B3402F;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="115" y="360" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg_acc_t" value="HIGH penalty (layout)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="140" y="358" width="170" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg_t" value="" style="rounded=0;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;" vertex="1" parent="1">
+          <mxGeometry x="320" y="360" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg_t_t" value="Text sub-pool" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="345" y="358" width="120" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg_v" value="" style="rounded=0;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;" vertex="1" parent="1">
+          <mxGeometry x="475" y="360" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg_v_t" value="Visual sub-pool" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="500" y="358" width="130" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg_l" value="" style="rounded=0;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;" vertex="1" parent="1">
+          <mxGeometry x="640" y="360" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg_l_t" value="Layout sub-pool" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="665" y="358" width="130" height="18" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

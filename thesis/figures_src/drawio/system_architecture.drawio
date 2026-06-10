@@ -1,0 +1,142 @@
+<mxfile host="Electron" modified="2026-06-10T00:51:56.356Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.2 Chrome/114.0.5735.289 Electron/25.9.4 Safari/537.36" version="22.1.2" etag="iOA0bvdTx3qnH5JL2IO5" type="device">
+  <diagram name="system_architecture" id="sysarch">
+    <mxGraphModel dx="1122" dy="787" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="680" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="DocCL System Architecture" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry x="300" y="10" width="600" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="cl1_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F4FA;strokeColor=#8895A6;dashed=0;arcSize=5;" parent="1" vertex="1">
+          <mxGeometry x="30" y="50" width="300" height="510" as="geometry" />
+        </mxCell>
+        <mxCell id="cl1_lbl" value="Document Pipeline" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=13;fontStyle=1;fontColor=#2C6FB3;" parent="1" vertex="1">
+          <mxGeometry x="44" y="58" width="220" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ocr_tok" value="OCR tokens&lt;br&gt;w&lt;sub&gt;1&lt;/sub&gt;, &amp;#8230;, w&lt;sub&gt;N&lt;/sub&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="60" y="92" width="160" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="bbox" value="Bounding boxes&lt;br&gt;b&lt;sub&gt;i&lt;/sub&gt; &amp;#8712; [0,1000]&lt;sup&gt;4&lt;/sup&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="60" y="170" width="160" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="page_img" value="Page image&lt;br&gt;3 &amp;#215; 224 &amp;#215; 224 tensor" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="55" y="248" width="220" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="preproc" value="Preprocessing&lt;br&gt;&lt;i&gt;WordPiece tokenise · box align&lt;br&gt;16&amp;#215;16 patches&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#222222;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="60" y="354" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ocr_pp" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#2C6FB3;exitX=0.5;exitY=1;exitDx=0;exitDy=0;dashed=1;" parent="1" source="ocr_tok" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="140" y="354" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="140" y="354" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_bb_pp" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#3A9D4E;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;dashed=1;" parent="1" source="bbox" target="preproc" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="185" y="218" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_img_pp" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#D9772B;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;dashed=1;" parent="1" source="page_img" target="preproc" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hydra" value="Hydra config&lt;br&gt;(scenario / method / seed)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;dashed=1;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="60" y="452" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e_hydra_pp" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;strokeColor=#8895A6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=1;entryDx=0;entryDy=0;" parent="1" source="hydra" target="preproc" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cl2_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2EDF8;strokeColor=#8055B5;dashed=0;arcSize=5;" parent="1" vertex="1">
+          <mxGeometry x="400" y="50" width="340" height="510" as="geometry" />
+        </mxCell>
+        <mxCell id="cl2_lbl" value="Core Runtime" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=13;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="414" y="58" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="wrapper" value="LayoutLMv3Wrapper&lt;br&gt;&lt;b&gt;backbone, 133M params&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="420" y="92" width="300" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="wrapper_sub" value="extension point: modality_mask · expand_classifier&lt;br&gt;param_groups · get_layout_signature" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" parent="1" vertex="1">
+          <mxGeometry x="420" y="156" width="300" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="cl_core" value="ContinualMethod (ABC)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="420" y="248" width="300" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="hooks_box" value="lifecycle hooks:&lt;br&gt;before_task &amp;nbsp;/&amp;nbsp; train_task &amp;nbsp;/&amp;nbsp; after_task &amp;nbsp;/&amp;nbsp; evaluate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="420" y="294" width="300" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="registry_box" value="method registry:&lt;br&gt;Naive · EWC · LwF · ER · DER++ · L2P · O-LoRA · &amp;hellip;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="420" y="350" width="300" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="cl_loop" value="CL loop:&amp;nbsp; for t &amp;#8712; tasks &amp;nbsp;&amp;rarr;&amp;nbsp; before_task &amp;nbsp;&amp;rarr;&amp;nbsp; train_task &amp;nbsp;&amp;rarr;&amp;nbsp; after_task &amp;nbsp;&amp;rarr;&amp;nbsp; evaluate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" parent="1" vertex="1">
+          <mxGeometry x="420" y="428" width="300" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="e_pp_wr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#222222;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="preproc" target="wrapper" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_wr_cl" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#222222;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="wrapper_sub" target="cl_core" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cl3_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF7EF;strokeColor=#3A9D4E;dashed=0;arcSize=5;" parent="1" vertex="1">
+          <mxGeometry x="820" y="50" width="370" height="510" as="geometry" />
+        </mxCell>
+        <mxCell id="cl3_lbl" value="Observability" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=13;fontStyle=1;fontColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="834" y="58" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="instr" value="Per-component instrumentation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="836" y="98" width="340" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="instr_sub" value="linear-CKA hooks per layer&lt;br&gt;per-group Fisher F&lt;sub&gt;g&lt;/sub&gt;&lt;br&gt;forgetting matrix R[i,j] &amp;nbsp;(entity-F1 of task j after task i)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="836" y="142" width="340" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="tracking" value="Experiment tracking" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="836" y="264" width="340" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="tracking_sub" value="W&amp;amp;B project: doccl-aaai2027&lt;br&gt;tag schema: {phase}/{scenario}/{method}/seed{seed}&lt;br&gt;results/matrix.npy &amp;nbsp;(forgetting matrix on disk)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="836" y="314" width="340" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e_wr_ins" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#8055B5;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="wrapper" target="instr" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl_tap" value="tap" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="760" y="98" width="40" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="e_cl_tr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#222222;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="registry_box" target="tracking" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="leg_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#CCCCCC;" parent="1" vertex="1">
+          <mxGeometry x="30" y="590" width="746" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_d1" value="" style="endArrow=block;html=1;strokeColor=#222222;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="46" y="608" as="sourcePoint" />
+            <mxPoint x="86" y="608" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lg_d1t" value="data flow (solid)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="92" y="600" width="150" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_d2" value="" style="endArrow=block;html=1;dashed=1;strokeColor=#8895A6;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="310" y="608" as="sourcePoint" />
+            <mxPoint x="350" y="608" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lg_d2t" value="config (dashed)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="356" y="600" width="140" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_d3" value="" style="endArrow=block;html=1;strokeColor=#8055B5;strokeWidth=2;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="560" y="608" as="sourcePoint" />
+            <mxPoint x="600" y="608" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lg_d3t" value="instrumentation tap (coloured)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="606" y="600" width="220" height="18" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

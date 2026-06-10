@@ -57,13 +57,47 @@ Three scenarios are constructed over these datasets.
 
 CORD's 30 fine-grained classes are split into five sessions of six classes each,
 ordered as a curriculum from core menu fields to auxiliary void/sub categories
-(Table~\ref{tab:cil-split}). Fine-grained (not super-class) growth is deliberate:
+(Table~\ref{tab:cil-split}, Figure~\ref{fig:scenario-cil}). Formally, the per-session
+label spaces grow monotonically,
+\begin{equation}
+  \mathcal{L}_1 \subset \mathcal{L}_2 \subset \dots \subset \mathcal{L}_5,
+  \qquad |\mathcal{L}_{t}| - |\mathcal{L}_{t-1}| = 6,
+  \label{eq:cil-growth}
+\end{equation}
+with six fine-grained classes added at each session over a single shared input
+domain $P(X)$ (receipt images): only the label space changes from task to task.
+Because new classes are absent from earlier sessions, their tokens are folded into
+the background ``O'' tag until they are introduced, so the meaning of ``O'' shifts
+as the sequence advances. Fine-grained (not super-class) growth is deliberate:
 real \gls{kie} pipelines face exactly this---a receipt parser that begins with a
 handful of fields and accrues dozens over its deployment lifetime---whereas a
-five-super-class split would be trivially easy. Each session inherits the
-\gls{cil} \emph{semantic shift of the ``O'' tag} (\S\ref{sec:bg-cl-scenarios}),
-handled with the \gls{kd}/pseudo-label protocol established in the \gls{cner}
-literature.
+five-super-class split would be trivially easy. The monotone growth of
+Equation~\eqref{eq:cil-growth} is precisely what induces the \gls{cil}
+\emph{semantic shift of the ``O'' tag} (\S\ref{sec:bg-cl-scenarios}) noted above,
+which each session inherits and which we handle with the \gls{kd}/pseudo-label
+protocol established in the \gls{cner} literature.
+
+The 30 classes are partitioned into the five sessions by a hand-curated
+easy-to-hard ordering rather than at random, so that the curriculum reflects the
+order in which fields are realistically added to a deployed parser. A direct
+consequence is that class frequencies are markedly imbalanced across sessions---core
+menu fields dominate early sessions while void and auxiliary categories are sparse
+and arrive late. We deliberately leave this imbalance \emph{unmodified} (no
+re-sampling or re-weighting) and treat it as a controlled factor of the benchmark,
+since artificially re-balancing the sessions would misrepresent the long-tailed
+schema growth that motivates the scenario.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{scenario_cil_cord.pdf}
+  \caption[The CIL-CORD class-incremental scenario]{The class-incremental
+  CIL-CORD scenario. CORD's 30 fine-grained classes are introduced six at a time
+  across five sessions over a single fixed input domain, so the label space grows
+  monotonically while the receipt-image distribution is held constant. Tokens of
+  not-yet-introduced classes are absorbed into the background ``O'' tag, which
+  therefore changes meaning as the sequence advances.}
+  \label{fig:scenario-cil}
+\end{figure}
 
 \begin{table}[t]
   \centering
@@ -87,16 +121,35 @@ literature.
 \subsection{Domain-Incremental (DIL)}
 \label{sec:exp-dil}
 
-FUNSD, SROIE, and CORD are remapped onto a unified four-entity schema
-(HEADER, KEY, VALUE, OTHER; 9 \gls{bio} tags) and presented in order of increasing
-distance from that canonical schema:
-FUNSD\,$\rightarrow$\,SROIE\,$\rightarrow$\,CORD. The mapping
+FUNSD, SROIE, and CORD are remapped onto a unified four-entity schema and presented
+in order of increasing distance from that canonical schema:
+FUNSD\,$\rightarrow$\,SROIE\,$\rightarrow$\,CORD (Figure~\ref{fig:scenario-dil}).
+Formally, a single label space (9 \gls{bio} tags) is held fixed across the sequence,
+\begin{equation}
+  \mathcal{L} = \{\textsc{header},\,\textsc{key},\,\textsc{value},\,\textsc{other}\},
+  \label{eq:dil-schema}
+\end{equation}
+while the input distribution shifts from task to task, $P_t(X)\neq P_{t'}(X)$ for
+$t\neq t'$, with each step moving further from the canonical form schema (full-page
+forms $\to$ receipts $\to$ fine-grained receipts). The mapping
 (Table~\ref{tab:dil-map}) is the part of the benchmark most exposed to judgement:
 FUNSD aligns naturally (QUESTION/ANSWER $=$ KEY/VALUE), SROIE has no explicit
 key/value split (COMPANY is treated as KEY-like, the rest as VALUE), and CORD has
 no KEY at all (productive content maps to VALUE, void/sub to OTHER). The asymmetric
 SROIE mapping is chosen so that every tag receives discriminative gradient signal;
 the resulting sparsity of KEY outside FUNSD is recorded as a known limitation.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{scenario_dil.pdf}
+  \caption[The DIL domain-incremental scenario]{The domain-incremental DIL
+  scenario. A single unified four-entity schema (HEADER/KEY/VALUE/OTHER) is held
+  fixed while the input distribution shifts along the sequence
+  FUNSD~$\rightarrow$~SROIE~$\rightarrow$~CORD, each step moving further from the
+  canonical form schema. The label space is constant; only the document
+  distribution changes.}
+  \label{fig:scenario-dil}
+\end{figure}
 
 \begin{table}[t]
   \centering
@@ -121,8 +174,27 @@ the resulting sparsity of KEY outside FUNSD is recorded as a known limitation.
 A six-session scenario interleaves class-incremental growth within CORD with
 domain shifts across datasets, e.g.\ CORD-menu $\rightarrow$ FUNSD $\rightarrow$
 CORD-menu-extended $\rightarrow$ SROIE $\rightarrow$ CORD-sub\_total $\rightarrow$
-FUNSD-revisit, the final session serving as an explicit retention check. It
-stresses plasticity and stability simultaneously.
+FUNSD-revisit, the final session serving as an explicit retention check
+(Figure~\ref{fig:scenario-mixed}). Formally, the scenario is a length-six task
+sequence $(\mathcal{T}_1,\dots,\mathcal{T}_6)$ in which each boundary
+$\mathcal{T}_{t}\!\to\!\mathcal{T}_{t+1}$ is typed as either a \emph{new-class}
+transition (label growth at a fixed domain, as in \S\ref{sec:exp-cil}) or a
+\emph{new-domain} transition (a shift in $P_t(X)$ at a fixed schema, as in
+\S\ref{sec:exp-dil}). By alternating the two boundary types within one sequence,
+the scenario stresses plasticity and stability simultaneously rather than in
+isolation.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{scenario_mixed.pdf}
+  \caption[The Mixed compositional scenario]{The Mixed compositional scenario:
+  a length-six task sequence whose boundaries alternate between new-class
+  transitions (label growth within CORD at a fixed domain) and new-domain
+  transitions (a shift in input distribution at a fixed schema). The final
+  FUNSD-revisit session is an explicit retention check, so the sequence probes
+  plasticity and stability jointly.}
+  \label{fig:scenario-mixed}
+\end{figure}
 
 \subsection{Task Ordering}
 \label{sec:exp-ordering}
@@ -186,10 +258,22 @@ design (\S\ref{sec:method-selected}).
 \label{sec:eval-protocol}
 
 After each task the model is evaluated on all tasks seen so far, populating the
-accuracy matrix $R$. The primary task metric is entity-level F1 with \gls{bio}-aware
-span matching (\texttt{seqeval}). Because the test splits are small (FUNSD has only
-50 documents), we report mean\,$\pm$\,standard deviation rather than point
-estimates.
+accuracy matrix \gls{not:R}. The primary task metric is entity-level F1 with
+\gls{bio}-aware span matching (\texttt{seqeval}). Because the test splits are small
+(FUNSD has only 50 documents), we report mean\,$\pm$\,standard deviation rather than
+point estimates.
+
+We keep model selection and final reporting strictly separate. A held-out
+validation split is carved from each task's training data and is used only for
+in-task model selection---early stopping and checkpoint selection during that task's
+training---and for fixing a single \emph{shared} hyperparameter setting per method.
+That setting is chosen once and held fixed across all three scenarios, so no method
+is tuned per scenario and the comparison stays fair. All reported metrics are
+computed on the held-out \emph{test} splits, which are never used for selection or
+stopping. The per-method hyperparameter sweeps of Table~\ref{tab:baselines} and
+Appendix~\ref{app:hyperparameters} are a separate sensitivity analysis: they
+characterise each method's robustness to its main hyperparameter and do not
+constitute per-scenario tuning of the main results.
 
 \subsection{Metrics}
 \label{sec:eval-metrics}

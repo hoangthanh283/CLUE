@@ -120,6 +120,22 @@ warrant it.
   \end{tabular}
 \end{table}
 
+Figure~\ref{fig:diagnostic-conditions} depicts the four conditions as the same
+network with different input pathways switched on or off.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{diagnostic_conditions.pdf}
+  \caption[The four diagnostic conditions as active and zeroed pathways]{The four
+  diagnostic conditions C1--C4 realised on a single fixed architecture. Each panel
+  shows the same LayoutLMv3 with a different subset of input pathways active (text,
+  image, layout) and the remainder zeroed at the input: text only (C1), image and
+  layout (C2), text and layout (C3), and the full tri-modal input (C4). Because only
+  the inputs differ, any difference in forgetting is attributable to the modalities
+  in play rather than to the network.}
+  \label{fig:diagnostic-conditions}
+\end{figure}
+
 \subsection{Forgetting Decomposition Metrics}
 \label{sec:method-diag-metrics}
 
@@ -149,8 +165,25 @@ losing their task-relevant representations.
 \paragraph{Forgetting matrix.} We record the standard accuracy matrix
 $R[i,j]$, the entity-F1 on task $j$ after training task $i$, from which we derive
 average accuracy, backward transfer, and average forgetting
-(\S\ref{sec:eval-metrics}). This is the conventional, component-agnostic view that
-the per-component metrics refine.
+(\S\ref{sec:eval-metrics}). Its structure is annotated in
+Figure~\ref{fig:forgetting-matrix}: the diagonal holds just-learned accuracy, the
+lower triangle holds retained accuracy on earlier tasks (the source of backward
+transfer and forgetting), and the upper triangle---unused here, as tasks arrive
+sequentially---would hold zero-shot forward transfer. This is the conventional,
+component-agnostic view that the per-component metrics refine.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.6\linewidth]{forgetting_matrix_schematic.pdf}
+  \caption[Annotated structure of the forgetting matrix]{Schematic structure of the
+  accuracy matrix $R[i,j]$ (entity-F1 on task $j$ after training task $i$); symbolic
+  labels only, with no measured values. The diagonal $R[i,i]$ records just-learned
+  accuracy; the lower triangle $R[i,j]$ for $j<i$ records retained accuracy on
+  earlier tasks, from which average accuracy, backward transfer, and average
+  forgetting are derived; the upper triangle is unevaluated under sequential
+  arrival.}
+  \label{fig:forgetting-matrix}
+\end{figure}
 
 \subsection{Diagnostic Protocol}
 \label{sec:method-diag-protocol}
@@ -159,7 +192,8 @@ For each condition C1--C4 and each seed we train naively and sequentially on
 FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE with no continual-learning
 strategy, expanding the classifier head at each task. At every task boundary we
 capture per-layer CKA, per-group Fisher, and the forgetting matrix.
-Algorithm~\ref{alg:forgetting-decomposition} summarises the procedure.
+Algorithm~\ref{alg:forgetting-decomposition} summarises the procedure and
+Figure~\ref{fig:diagnostic-pipeline} shows it as a data-flow diagram.
 
 \begin{algorithm}[t]
   \caption{Per-component forgetting decomposition}
@@ -189,19 +223,46 @@ Algorithm~\ref{alg:forgetting-decomposition} summarises the procedure.
   \end{algorithmic}
 \end{algorithm}
 
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{diagnostic_pipeline.pdf}
+  \caption[The per-component diagnostic pipeline]{Data flow of the per-component
+  diagnostic. The model is fine-tuned sequentially on
+  FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE under a fixed modality mask, and
+  at each task boundary three instruments are captured: per-layer linear CKA between
+  the pre- and post-task checkpoints on a fixed probe set, per-group empirical
+  Fisher importance, and a row of the accuracy matrix $R[i,j]$ over all seen tasks.
+  The procedure is repeated for every condition C1--C4 and every seed.}
+  \label{fig:diagnostic-pipeline}
+\end{figure}
+
 \subsection{Hypotheses and Decision Rule}
 \label{sec:method-diag-hypotheses}
 
 We test a null hypothesis $H_0$ that forgetting is uniform across components
-against $H_1$ that it concentrates in specific ones. The test compares the
-per-component \gls{cka} drop (or per-group \gls{fim} drop) of a candidate group
-against the remaining groups with a Mann--Whitney U test; ``strongly supported''
-means $p < 0.05$ after Bonferroni correction across the eight parameter groups
-($\alpha = 0.05/8 \approx 0.0063$). Beyond the binary $H_0$/$H_1$, three
-sub-patterns are of particular interest because each implies a different remedy;
-Table~\ref{tab:subhypotheses} maps them to the candidate they trigger. If $H_0$
-cannot be rejected, the thesis falls back to a characterisation-only contribution
-(\S\ref{sec:method-fallback}).
+against $H_1$ that it concentrates in specific ones. The test is built from the
+per-component drop values produced by Algorithm~\ref{alg:forgetting-decomposition}.
+For each parameter group $g$ we form a sample of drop values, one per
+(seed, task-boundary) pair, where a drop is either the representational drop
+$1 - \mathrm{CKA}$ at the layer(s) associated with $g$ or the per-group Fisher drop;
+the two instruments are tested separately. To avoid pseudo-replication, the values
+are aggregated \emph{per seed first}---the per-seed statistic is the mean drop over
+that seed's task boundaries---and only these seed-level summaries enter the
+across-seed test, so the unit of analysis is the seed, not the individual boundary.
+For each group $g$ we then compare its seed-level drops against the pooled
+seed-level drops of the remaining seven groups with a one-sided
+Mann--Whitney U test (alternative: group $g$ drops are stochastically larger). We
+reject $H_0$ for group $g$ when
+\[
+  p_g < \alpha = \frac{0.05}{8} \approx 0.0063 ,
+\]
+a Bonferroni correction over the eight parameter groups; $H_1$ (non-uniform
+forgetting) is supported when at least one group's drop is significantly larger
+under this threshold. Beyond the binary $H_0$/$H_1$, three sub-patterns are of
+particular interest because each implies a different remedy;
+Table~\ref{tab:subhypotheses} maps them to the candidate they trigger. If no group
+separates---i.e.\ $H_0$ cannot be rejected for any $g$---the thesis falls back to a
+characterisation-only contribution (\S\ref{sec:method-fallback}).
 
 \begin{table}[t]
   \centering
@@ -221,6 +282,23 @@ cannot be rejected, the thesis falls back to a characterisation-only contributio
     \bottomrule
   \end{tabular}
 \end{table}
+
+The mapping from diagnostic outcome to remedy is made explicit in
+Figure~\ref{fig:selection-tree}: the decision is a function of the pilot, so no
+single candidate is committed to in advance, and the no-pattern branch leads to the
+characterisation-only fallback rather than to a method.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.85\linewidth]{method_selection_tree.pdf}
+  \caption[Decision tree mapping diagnostic outcomes to candidates]{The Week-4
+  decision rule as a tree. Each diagnostic outcome selects exactly one branch:
+  fusion-heavy ($H_a$) selects Candidate~A, position-drift ($H_b$) selects
+  Candidate~B, scenario- or modality-dependent ($H_c$) selects Candidate~C, and no
+  significant separation ($H_0$) selects the characterisation-only fallback. The
+  branch is determined by the diagnosis, not chosen in advance.}
+  \label{fig:selection-tree}
+\end{figure}
 
 \section{Mechanism-Targeted Continual Learning (DocCL)}
 \label{sec:method-remedy}
@@ -286,23 +364,75 @@ layout-sensitivity matters.} This candidate combines two components.
 \noindent\emph{LAPP (Layout-Aware Prompt Pool).} L2P's CLS-only query is replaced
 by a query that concatenates the CLS embedding with a projected layout signature,
 \[
-  q(x) = \big[\, h_{\mathrm{CLS}} \;;\; W_{\text{layout}}\,\phi(\text{boxes}) \,\big],
+  q(x) = \big[\, h_{\mathrm{CLS}} \;;\; W_{\text{layout}}\,\phi(\text{boxes}) \,\big].
 \]
-where $\phi(\text{boxes}) \in \mathbb{R}^{16}$ is the histogram of bounding-box
-centres over a $4\times4$ grid (the \texttt{get\_layout\_signature} descriptor of
-\S\ref{sec:impl-instrumentation}) and $W_{\text{layout}}\colon\mathbb{R}^{16}\!\to\!
-\mathbb{R}^{768}$ is trainable. Prompt-pool keys are enriched the same way, so that
-documents are routed to prompts by spatial layout, not text alone.
+The descriptor $\phi(\text{boxes})$ is made precise as a normalised spatial
+histogram. Each box $b_i$ contributes its centre
+$(c_x^{(i)}, c_y^{(i)}) = \big(\tfrac{b_{i,1}+b_{i,3}}{2},\, \tfrac{b_{i,2}+b_{i,4}}{2}\big)$,
+rescaled from $[0,1000]$ to $[0,1]^2$. The unit square is partitioned into a
+$4\times4$ grid of $16$ equal cells, and each centre is assigned to the single cell
+$\mathrm{cell}(i) = \big(\lfloor 4\,c_x^{(i)}\rfloor,\, \lfloor 4\,c_y^{(i)}\rfloor\big)$
+(clamped to the boundary). Counting centres per cell and $\ell_1$-normalising gives
+\[
+  \phi(\text{boxes})_k = \frac{1}{N}\sum_{i=1}^{N}
+    \mathbf{1}\!\big[\mathrm{cell}(i) = k\big]
+  \in \mathbb{R}^{16},
+  \qquad \sum_{k=1}^{16}\phi(\text{boxes})_k = 1,
+\]
+so $\phi(\text{boxes})$ is the layout-only, text-invariant geometry of the page (the
+\texttt{get\_layout\_signature} descriptor of \S\ref{sec:impl-instrumentation});
+$W_{\text{layout}}\colon\mathbb{R}^{16}\!\to\!\mathbb{R}^{768}$ is trainable. Given a
+prompt pool $\{(k_i, P_i)\}_{i=1}^{M}$ of key--prompt pairs, the prepended prompts
+are those whose keys are most similar to the layout-aware query under cosine
+similarity,
+\[
+  K_x = \operatorname*{top\text{-}K}_{i}\, \cos\!\big(q(x),\, k_i\big),
+\]
+and the pool keys $k_i$ are enriched the same way, so that documents are routed to
+prompts by spatial layout, not text alone.
 
-\noindent\emph{H-LoRA (Hierarchical LoRA).} Three rank-$8$ LoRA banks are
-allocated by component: Bank~1 on the text Q/K/V projections, Bank~2 on the
-patch projection and visual self-attention, and Bank~3 on the cross-modal fusion
-projection---the key bank when fusion dominates. Orthogonality is enforced
-\emph{per bank} (relaxing O-LoRA's global constraint and its rank-exhaustion), and
-a task may activate only a subset of banks, which is compatible with a
+\noindent\emph{H-LoRA (Hierarchical LoRA).} Three rank-$r$ LoRA banks
+($r{=}8$) are allocated by component
+$b\in\{\text{text},\text{visual},\text{fusion}\}$: Bank~1 on the text Q/K/V
+projections, Bank~2 on the patch projection and visual self-attention, and Bank~3 on
+the cross-modal fusion projection---the key bank when fusion dominates.
+Orthogonality is enforced \emph{per bank} rather than globally: writing the new-task
+down-projection of bank $b$ as $A_t^{(b)}$ and stacking the columns of all
+earlier-task factors of the same bank as $A_{<t}^{(b)}$, the new factor is
+constrained to lie orthogonally to them \emph{within that bank},
+\[
+  \big(A_t^{(b)}\big)^{\!\top} A_{<t}^{(b)} = 0
+  \qquad \text{for each } b\in\{\text{text},\text{visual},\text{fusion}\}.
+\]
+This is a deliberate relaxation of O-LoRA's single global orthogonality
+constraint~\citep{wang2023olora}: confining orthogonality to each component's own
+bank delays the rank exhaustion that a global constraint suffers once enough tasks
+accumulate, while still suppressing cross-task interference where it matters most. A
+task may activate only a subset of banks, compatible with a
 D-MoLE-style~\citep{ge2025dmole} layer-wise allocation. The per-task parameter cost
-is small: at rank $8$, hidden $768$, and $12$ layers, the adapters add on the order
-of $10^5$ parameters per task against the $\sim$133M frozen backbone.
+is small. A rank-$r$ adapter on a layer of width $d$ adds $2rd$ parameters (a
+$d\times r$ down-projection and an $r\times d$ up-projection), so across $L_b$
+adapted layers in bank $b$ the per-task cost is
+\[
+  \#\text{params}_{\text{H-LoRA}} \approx \sum_{b}\, 2\,r\,d\,L_b ,
+\]
+which at $r{=}8$, $d{=}768$ is on the order of $10^5$ parameters per task against the
+$\sim$133M frozen backbone---roughly a tenth of a percent.
+Figure~\ref{fig:candidate-a} sketches the two components together.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{candidate_a_lapp_hlora.pdf}
+  \caption[Candidate~A: layout-aware prompts with hierarchical LoRA]{Candidate~A
+  (LAPP + H-LoRA). \emph{Left}: the layout-aware query concatenates the CLS
+  embedding with a projected $4\times4$ grid histogram of bounding-box centres and
+  selects prompts from the pool by cosine top-$K$, so routing depends on page
+  geometry rather than text alone. \emph{Right}: three component-wise low-rank banks
+  (text, visual, fusion) with orthogonality enforced within each bank rather than
+  globally; the fusion bank is the key one when fusion forgets most. The schematic is
+  illustrative and does not assert that this candidate is selected.}
+  \label{fig:candidate-a}
+\end{figure}
 
 \subsubsection{Candidate B: Layout-Protected Regularisation (L-EWC)}
 \label{sec:method-cand-b}
@@ -331,7 +461,23 @@ maintained, and a router activates one or more from input features,
 where $\bar{v}$ is a pooled visual feature; the selected sub-pool is prepended to
 its corresponding stream. This combines L2P's pool concept with explicit modality
 routing and naturally fits domain-incremental shifts (where S-Prompt-style
-per-domain prompts excel~\citep{wang2022sprompt}).
+per-domain prompts excel~\citep{wang2022sprompt}). Candidates~B and~C are contrasted
+in Figure~\ref{fig:candidate-bc}.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{candidate_b_c.pdf}
+  \caption[Candidates~B and~C: layout-protected regularisation and modality-routed
+  prompts]{The two alternative candidates. \emph{Left} (Candidate~B, L-EWC): a
+  selective elastic-weight penalty places a large importance weight on the 2D
+  position (layout) embeddings and a small weight elsewhere, concentrating stability
+  on the fastest-drifting parameters with no inference-time cost. \emph{Right}
+  (Candidate~C, modality-routed prompts): a router maps input features to one or more
+  of three per-modality prompt sub-pools, each prepended to its own stream. Both are
+  shown as alternatives; the diagnosis, not this figure, decides which (if any) is
+  selected.}
+  \label{fig:candidate-bc}
+\end{figure}
 
 \subsection{Testable Component Hypotheses}
 \label{sec:method-component-hypotheses}

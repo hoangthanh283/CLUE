@@ -63,25 +63,45 @@ shared across all datasets so that the only thing that changes between continual
 tasks is the data and label space, not the pipeline. For the diagnostic conditions
 (C1--C4) a modality mask is applied at the input layer---zeroing image pixels,
 replacing text with padding tokens, or zeroing layout positions---through the
-backbone wrapper's \texttt{forward\_with\_modality\_mask} extension point.
+backbone wrapper's \texttt{modality\_mask} forward argument rather than a separate
+ablated model, so the four conditions differ only in which input pathways are
+active.
+
+\paragraph{Data integrity and validation.} Three preprocessing invariants are
+enforced and checked so that the forgetting signal is not confounded by data
+artefacts. First, WordPiece token--box alignment is validated at load time: every
+sub-token is tied to exactly one word box, the first sub-token of a word carries
+that word's BIO label, and the trailing sub-tokens are set to the $-100$ ignore
+index so that the loss and the entity-F1 metric see one prediction per word.
+Second, bounding boxes are normalised to the $[0,1000]^4$ integer range expected by
+the backbone's 2D position embeddings, with clamping to guard against
+out-of-range or degenerate (zero-area) boxes. Third, and most importantly for a
+controlled diagnosis, the pipeline consumes the dataset-provided OCR transcriptions
+and boxes directly and never re-runs an OCR engine; this removes OCR quality as a
+confounder, so that any measured drift is attributable to continual training of the
+encoder rather than to changing recognition behaviour across tasks.
 
 \section{System Architecture Overview}
 \label{sec:impl-architecture}
 
 \begin{figure}[t]
   \centering
-  % TODO: add figure file (e.g. figures/system_architecture.pdf)
-  \fbox{\parbox[c][4.5cm][c]{0.9\linewidth}{\centering\itshape
-  Placeholder --- system architecture: continual-learning core (method interface),
-  backbone wrapper with extension points, document pipeline, per-component
-  instrumentation hooks, and experiment tracking.}}
+  \includegraphics[width=0.95\linewidth]{system_architecture.pdf}
   \caption[System architecture]{System architecture. The continual-learning core
   exposes a uniform method interface; the backbone wrapper exposes extension points
   for classifier expansion, prompts, and LoRA banks; the instrumentation layer
   records per-layer CKA and per-group Fisher; all runs report to the experiment
-  tracker.}
+  tracker. Data flows from the shared document pipeline through the wrapped backbone
+  to the method-specific heads, while the instrumentation layer taps the backbone at
+  task boundaries without altering the training path.}
   \label{fig:system-architecture}
 \end{figure}
+
+Figure~\ref{fig:system-architecture} gives the overall picture: a thin
+continual-learning core orchestrates the per-task loop, the backbone wrapper hides
+architecture-specific details behind a stable set of extension points, the document
+pipeline feeds both, and a decoupled instrumentation layer observes the backbone
+without perturbing it. The remainder of this section describes each block in turn.
 
 \subsection{Continual-Learning Core}
 \label{sec:impl-cl-core}
@@ -102,7 +122,48 @@ that, at each task boundary, capture activations at the tracked layers (for CKA)
 and accumulate squared gradients per parameter group (for Fisher), writing
 per-run JSON dumps that are later aggregated into a long-format dataframe for
 analysis and plotting. The instrumentation is decoupled from the methods so that
-it can be attached to any run, including the naive-sequential pilot runs.
+it can be attached to any run, including the naive-sequential pilot runs. Four
+mechanisms make up the layer:
+
+\begin{itemize}
+  \item \textbf{Representational drift (CKA).} Forward hooks capture per-layer
+  activations on a \emph{fixed} probe set---the same held-out documents are used at
+  every task boundary so that representations are compared on identical inputs.
+  Linear CKA between the activations of two checkpoints scores how much each layer's
+  representation has changed; because it is invariant to orthogonal transforms and
+  isotropic scaling, a drop signals genuine representational reorganisation rather
+  than a trivial rotation. The probe activations are gathered through a hook helper
+  and scored layer by layer.
+  \item \textbf{Parameter importance (per-group Fisher).} Over a task's data the
+  diagonal empirical Fisher accumulates squared gradients of the log-likelihood with
+  respect to each parameter, summed within the eight named parameter groups
+  (text word embeddings, 2D layout-position embeddings, image patch embedding,
+  text attention, visual attention, cross-modal fusion, feed-forward, and
+  classifier). Comparing the per-group Fisher before and after a task gives a
+  per-component importance-drop profile that complements the CKA view.
+  \item \textbf{Classifier-head expansion.} When a new task introduces new BIO
+  labels, the classification head is grown to cover them while the rows
+  corresponding to previously seen labels are preserved, so that old-label logits
+  are not reset by the arrival of new classes. Expansion is performed once by the
+  training loop before each task, and the label$\leftrightarrow$index maps are
+  updated in lockstep.
+  \item \textbf{Modality ablation.} The pilot conditions are realised by zeroing
+  input pathways \emph{in place} rather than by instantiating separate models: the
+  text, visual, and layout streams are masked individually through a single forward
+  argument, so C1--C4 share identical weights and differ only in which modalities
+  reach the encoder. This is what makes the per-condition comparison
+  apples-to-apples.
+\end{itemize}
+
+\paragraph{Code pointers.} For reproducibility, the components above map directly
+onto the source: linear CKA and the activation hooks live in
+\texttt{doccl/eval/cka.py}; the diagonal and per-group Fisher in
+\texttt{doccl/eval/fisher.py}; classifier expansion, the eight-group
+\texttt{param\_groups} mapping, and the \texttt{modality\_mask} forward argument in
+\texttt{doccl/models/layoutlm\_wrapper.py}; and the method lifecycle hooks in
+\texttt{doccl/methods/base.py}. The single Hydra entry point
+\texttt{scripts/train.py} wires these together and resolves each method from its
+registry.
 
 \subsection{Datasets and Scenario Builders}
 \label{sec:impl-datasets}

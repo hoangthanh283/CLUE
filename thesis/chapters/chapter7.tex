@@ -17,9 +17,16 @@ genre. Third, the text-only diagnostic condition (C1) is a same-architecture
 LayoutLMv3 with its non-text pathways zeroed rather than a true unimodal encoder,
 so it is the closest apples-to-apples text baseline rather than an independent
 one. Fourth, the work targets token-level key-information extraction and does not
-address entity linking, relation extraction, or generative document IE. Finally,
-results rest on three seeds; more seeds would tighten the confidence intervals
-around the smaller effects.
+address entity linking, relation extraction, or generative document IE. Fifth, all
+results use the OCR transcriptions and bounding boxes supplied with the benchmark
+datasets and never re-run a recogniser; this is a deliberate choice that removes OCR
+quality as a confounder for the diagnosis, but it also means the findings are
+established under clean, dataset-provided text and layout. A deployed pipeline would
+introduce its own OCR engine, whose recognition and layout-detection errors differ
+across document genres and could interact with the per-component forgetting picture;
+quantifying that interaction is left to future work. Finally, results rest on three
+seeds; more seeds would tighten the confidence intervals around the smaller
+effects.
 
 \section{Conclusions}
 \label{sec:concl-conclusions}
@@ -45,17 +52,45 @@ multimodal document encoders, which the prior, fragmented literature lacked.
 \section{Future Work}
 \label{sec:concl-future}
 
-Several extensions follow naturally and are reserved for post-thesis work.
-\emph{Scaling the diagnosis} to larger and decoder-based backbones
-(LayoutLMv3-large, LayoutXLM, and document MLLMs such as InternVL3) would test
-whether the per-component picture holds at scale. \emph{Additional scenarios},
-including task-incremental learning and combined class-and-domain shifts, would
-broaden the evaluation beyond the three studied here. \emph{Cross-lingual
-continual document IE} (for example via XFUND) would introduce language shift on
-top of domain shift. \emph{Richer remedies}, such as a document-aware structural
-replay that exploits layout structure, could be combined with the
-mechanism-targeted approach. \emph{Multi-task continual IE}---learning NER and
-relation extraction jointly in a shared continual framework---remains an open and
-high-value direction. These extensions are intentionally outside the present
-scope, which prioritises a rigorous diagnosis and a single, well-justified remedy
-over breadth.
+Several extensions follow naturally and are reserved for post-thesis work; each is
+a future direction rather than part of the present AAAI-phase scope.
+
+\emph{Scaling and broadening the diagnosis.} The controlled diagnosis is
+established for an encoder-only, base-scale backbone. A natural next step is to
+re-run the same per-component protocol on larger and architecturally different
+backbones---LayoutLMv3-large, the multilingual LayoutXLM, and decoder-based or
+instruction-tuned document MLLMs such as InternVL3---to test whether the
+dominant-forgetting component is a property of the LayoutLMv3-base design or a more
+general feature of tri-modal document encoders. Decoder-based encoders are
+especially interesting because their generative objective and tokenisation differ
+markedly from the sequence-labelling setup used here.
+
+\emph{Additional continual scenarios.} The three studied scenarios cover
+class-incremental and domain-incremental shifts. Future work could add
+task-incremental learning, where a task identifier is available at inference, and
+combined class-and-domain shifts that vary the label space and the document genre
+simultaneously; both would stress the components differently and test whether a
+single mechanism-targeted remedy transfers across regimes.
+
+\emph{Cross-lingual continual document IE.} Extending the benchmark with a
+multilingual corpus such as XFUND would layer language shift on top of domain
+shift, asking whether forgetting concentrates in the text pathway when the script
+and vocabulary change while layout statistics stay comparatively stable---a setting
+the current English-only benchmark cannot probe.
+
+\emph{Richer, layout-aware remedies.} The diagnosis points to a specific component;
+a complementary direction is to enrich the remedy on the data side with a
+document-aware structural replay that rehearses not raw tokens but layout-structured
+exemplars (for example region- or block-level representations), exploiting the very
+spatial structure that distinguishes document IE from plain-text IE. Such a replay
+could be combined with the mechanism-targeted approach rather than replacing it.
+
+\emph{Joint multi-task continual IE.} Finally, learning token-level extraction
+together with relation extraction (and, eventually, entity linking) in one
+continual framework is an open and high-value direction: it would move the
+benchmark from single-task sequence labelling towards the joint document
+understanding that downstream applications ultimately require.
+
+These extensions are intentionally outside the present scope, which prioritises a
+rigorous diagnosis and a single, well-justified remedy over breadth; they sketch
+the trajectory for a fuller follow-up study.

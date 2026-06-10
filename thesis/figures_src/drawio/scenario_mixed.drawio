@@ -1,0 +1,292 @@
+<mxfile host="Electron" modified="2026-06-10T00:49:54.298Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.2 Chrome/114.0.5735.289 Electron/25.9.4 Safari/537.36" version="22.1.2" etag="WLnkl2WzHJZuD4TtC3Ob" type="device">
+  <diagram name="scenario_mixed" id="mixed">
+    <mxGraphModel dx="1363" dy="956" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="680" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Mixed Scenario &amp;#8212; Interleaved Class-IL and Domain Shifts (6 Sessions)" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry x="80" y="16" width="1100" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="sub" value="Stresses plasticity and stability jointly; &amp;#8805;3 random orders + 1 curriculum order evaluated" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=12;fontStyle=2;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="80" y="46" width="1100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EBF3E8;strokeColor=#3A9D4E;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="60" y="72" width="160" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_ds" value="DOMAIN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3A9D4E;strokeColor=#1E6A2E;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="66" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_type" value="NEW" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3A9D4E;strokeColor=#1E6A2E;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="142" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_num" value="S1" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=18;fontStyle=1;fontColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="60" y="110" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_name" value="FUNSD" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=14;fontStyle=1;fontColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="60" y="144" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_detail" value="HEADER / QUESTION&lt;br&gt;ANSWER / OTHER" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="60" y="170" width="160" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_sep" value="" style="endArrow=none;html=1;strokeColor=#3A9D4E;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="66" y="216" as="sourcePoint" />
+            <mxPoint x="212" y="216" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1_schema" value="Unified schema:&lt;br&gt;HEADER / KEY&lt;br&gt;VALUE / OTHER" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="60" y="222" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_task" value="Tasks seen: 1" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#6E6E6E;" parent="1" vertex="1">
+          <mxGeometry x="60" y="340" width="160" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_classes" value="4 classes" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=1;fontColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="60" y="360" width="160" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="s2_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE8F5;strokeColor=#8055B5;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="240" y="72" width="160" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="s2_ds" value="CLASS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8055B5;strokeColor=#5A3D80;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="246" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s2_type" value="NEW" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8055B5;strokeColor=#5A3D80;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="322" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s2_num" value="S2" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=18;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="240" y="110" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s2_name" value="CORD-menu" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=14;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="240" y="144" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="s2_detail" value="menu.nm, menu.price&lt;br&gt;menu.cnt, menu.unitprice&lt;br&gt;menu.discountprice&lt;br&gt;menu.sub_nm" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="240" y="170" width="160" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="s2_sep" value="" style="endArrow=none;html=1;strokeColor=#8055B5;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="246" y="236" as="sourcePoint" />
+            <mxPoint x="392" y="236" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s2_schema" value="+6 fine-grained&lt;br&gt;menu classes" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="240" y="242" width="160" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="s2_task" value="Tasks seen: 2" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#6E6E6E;" parent="1" vertex="1">
+          <mxGeometry x="240" y="340" width="160" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s2_classes" value="10 classes" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="240" y="360" width="160" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3E8;strokeColor=#D9772B;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="420" y="70" width="160" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_ds" value="DOMAIN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D9772B;strokeColor=#A0591F;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="426" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_type" value="SHIFT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D9772B;strokeColor=#A0591F;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="502" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_num" value="S3" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=18;fontStyle=1;fontColor=#D9772B;" parent="1" vertex="1">
+          <mxGeometry x="420" y="110" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_name" value="SROIE" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=14;fontStyle=1;fontColor=#D9772B;" parent="1" vertex="1">
+          <mxGeometry x="420" y="144" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_detail" value="COMPANY / ADDRESS&lt;br&gt;DATE / TOTAL&lt;br&gt;&amp;#8594; KEY / VALUE" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontColor=#D9772B;" parent="1" vertex="1">
+          <mxGeometry x="420" y="170" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_sep" value="" style="endArrow=none;html=1;strokeColor=#D9772B;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="426" y="230" as="sourcePoint" />
+            <mxPoint x="572" y="230" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s3_schema" value="Unified schema:&lt;br&gt;HEADER / KEY&lt;br&gt;VALUE / OTHER" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="420" y="236" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_task" value="Tasks seen: 3" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#6E6E6E;" parent="1" vertex="1">
+          <mxGeometry x="420" y="340" width="160" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_classes" value="4 + 6 classes" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=1;fontColor=#D9772B;" parent="1" vertex="1">
+          <mxGeometry x="420" y="360" width="160" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="s4_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE8F5;strokeColor=#8055B5;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="600" y="72" width="160" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="s4_ds" value="CLASS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8055B5;strokeColor=#5A3D80;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="606" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s4_type" value="NEW" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8055B5;strokeColor=#5A3D80;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="682" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s4_num" value="S4" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=18;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="600" y="110" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s4_name" value="CORD-total" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=14;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="600" y="144" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="s4_detail" value="total.total_price&lt;br&gt;total.cashprice&lt;br&gt;total.changeprice&lt;br&gt;total.creditcardprice&lt;br&gt;total.tax_price&lt;br&gt;total.service_price" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="600" y="170" width="160" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="s4_sep" value="" style="endArrow=none;html=1;strokeColor=#8055B5;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="606" y="252" as="sourcePoint" />
+            <mxPoint x="752" y="252" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s4_schema" value="+6 fine-grained&lt;br&gt;total classes" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="600" y="258" width="160" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="s4_task" value="Tasks seen: 4" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#6E6E6E;" parent="1" vertex="1">
+          <mxGeometry x="600" y="340" width="160" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s4_classes" value="16 classes" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="600" y="360" width="160" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="s5_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EBF3E8;strokeColor=#3A9D4E;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="780" y="70" width="160" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="s5_ds" value="DOMAIN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3A9D4E;strokeColor=#1E6A2E;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="786" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s5_type" value="SHIFT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3A9D4E;strokeColor=#1E6A2E;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="862" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s5_num" value="S5" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=18;fontStyle=1;fontColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="780" y="110" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s5_name" value="FUNSD-b" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=14;fontStyle=1;fontColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="780" y="144" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="s5_detail" value="New FUNSD split&lt;br&gt;HEADER / QUESTION&lt;br&gt;ANSWER / OTHER" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="780" y="170" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="s5_sep" value="" style="endArrow=none;html=1;strokeColor=#3A9D4E;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="786" y="230" as="sourcePoint" />
+            <mxPoint x="932" y="230" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s5_schema" value="Unified schema:&lt;br&gt;HEADER / KEY&lt;br&gt;VALUE / OTHER" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="780" y="236" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="s5_task" value="Tasks seen: 5" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#6E6E6E;" parent="1" vertex="1">
+          <mxGeometry x="780" y="340" width="160" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s5_classes" value="4 + 16 classes" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=1;fontColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="780" y="360" width="160" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="s6_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE8F5;strokeColor=#8055B5;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="960" y="70" width="160" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="s6_ds" value="CLASS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8055B5;strokeColor=#5A3D80;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="966" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s6_type" value="NEW" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8055B5;strokeColor=#5A3D80;fontFamily=Times New Roman;fontSize=10;fontColor=#FFFFFF;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="1042" y="84" width="70" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s6_num" value="S6" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=18;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="960" y="110" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s6_name" value="CORD-tax" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=14;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="960" y="144" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="s6_detail" value="sub_total.tax_price&lt;br&gt;sub_total.discount_price&lt;br&gt;void_menu.nm&lt;br&gt;void_menu.price&lt;br&gt;total.vatyn&lt;br&gt;total.etc_price" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="960" y="170" width="160" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="s6_sep" value="" style="endArrow=none;html=1;strokeColor=#8055B5;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="966" y="252" as="sourcePoint" />
+            <mxPoint x="1112" y="252" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s6_schema" value="+6 fine-grained&lt;br&gt;sub_total/void classes" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="960" y="258" width="160" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="s6_task" value="Tasks seen: 6" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#6E6E6E;" parent="1" vertex="1">
+          <mxGeometry x="960" y="340" width="160" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="s6_classes" value="22 classes" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=1;fontColor=#8055B5;" parent="1" vertex="1">
+          <mxGeometry x="960" y="360" width="160" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="arr12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#8055B5;strokeWidth=2;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="220" y="240" as="sourcePoint" />
+            <mxPoint x="240" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr23" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#D9772B;strokeWidth=2;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="400" y="240" as="sourcePoint" />
+            <mxPoint x="420" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr34" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#8055B5;strokeWidth=2;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="580" y="240" as="sourcePoint" />
+            <mxPoint x="600" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr45" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#3A9D4E;strokeWidth=2;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="760" y="240" as="sourcePoint" />
+            <mxPoint x="780" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr56" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#8055B5;strokeWidth=2;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="940" y="240" as="sourcePoint" />
+            <mxPoint x="960" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lg_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F9F9F9;strokeColor=#BFBFBF;" parent="1" vertex="1">
+          <mxGeometry x="60" y="432" width="1060" height="97" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_ttl" value="Legend" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry x="72" y="438" width="100" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_arr_dom" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#3A9D4E;strokeWidth=2;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="72" y="468" as="sourcePoint" />
+            <mxPoint x="122" y="468" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lg_dom_lbl" value="New domain (FUNSD / SROIE)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="128" y="460" width="220" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_arr_cls" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#8055B5;strokeWidth=2;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="72" y="490" as="sourcePoint" />
+            <mxPoint x="122" y="490" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lg_cls_lbl" value="New classes added (CORD-menu / CORD-total / CORD-tax)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="128" y="482" width="370" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_sw_f" value="" style="rounded=1;html=1;fillColor=#EBF3E8;strokeColor=#3A9D4E;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="570" y="456" width="24" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_lbl_f" value="FUNSD sessions" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="598" y="454" width="130" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_sw_c" value="" style="rounded=1;html=1;fillColor=#EDE8F5;strokeColor=#8055B5;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="570" y="478" width="24" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_lbl_c" value="CORD sessions (class-IL)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="598" y="476" width="160" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_sw_s" value="" style="rounded=1;html=1;fillColor=#FEF3E8;strokeColor=#D9772B;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="570" y="500" width="24" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_lbl_s" value="SROIE session" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="598" y="498" width="130" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="stress_note" value="Stresses &lt;b&gt;plasticity&lt;/b&gt; (new class labels) and &lt;b&gt;stability&lt;/b&gt; (domain shifts) jointly" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E9DE;strokeColor=#B3402F;strokeWidth=2;fontFamily=Times New Roman;fontSize=12;fontColor=#B3402F;" parent="1" vertex="1">
+          <mxGeometry x="840" y="462" width="270" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="eval_note" value="Evaluated on: &amp;#8805;3 random orders + 1 curriculum order" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="840" y="496" width="270" height="18" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

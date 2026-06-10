@@ -1,0 +1,67 @@
+<mxfile host="Electron" modified="2026-06-10T00:46:58.113Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.2 Chrome/114.0.5735.289 Electron/25.9.4 Safari/537.36" version="22.1.2" etag="HRS9kO1VJXbUieTd0ZLQ" type="device">
+  <diagram name="method_selection_tree" id="methTree">
+    <mxGraphModel dx="867" dy="608" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="580" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="pg_title" value="Pilot-Driven Method Selection (Data Decides)" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry x="50" y="10" width="1100" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="root" value="Pilot diagnosis:&lt;br&gt;per-component forgetting profile" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#222222;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="435" y="52" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="jA" value="" style="rounded=0;html=1;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="119" y="140" width="2" height="2" as="geometry" />
+        </mxCell>
+        <mxCell id="jB" value="" style="rounded=0;html=1;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="399" y="140" width="2" height="2" as="geometry" />
+        </mxCell>
+        <mxCell id="jC" value="" style="rounded=0;html=1;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="679" y="140" width="2" height="2" as="geometry" />
+        </mxCell>
+        <mxCell id="jD" value="" style="rounded=0;html=1;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="959" y="140" width="2" height="2" as="geometry" />
+        </mxCell>
+        <mxCell id="leaf_a" value="Candidate A&lt;br&gt;LAPP + H-LoRA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="20" y="310" width="200" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="leaf_b" value="Candidate B&lt;br&gt;Layout-Protected EWC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="295" y="310" width="210" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="leaf_c" value="Candidate C&lt;br&gt;Modality-Routed Prompts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="570" y="310" width="220" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="leaf_h0" value="Characterisation-only&lt;br&gt;(fallback)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="860" y="310" width="200" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a" style="rounded=0;html=1;endArrow=block;strokeColor=#8055B5;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" parent="1" source="root" target="leaf_a" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_b" style="rounded=0;html=1;endArrow=block;strokeColor=#3A9D4E;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" parent="1" source="root" target="leaf_b" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_c" style="rounded=0;html=1;endArrow=block;strokeColor=#D9772B;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" parent="1" source="root" target="leaf_c" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_h0" style="rounded=0;html=1;endArrow=block;strokeColor=#6E6E6E;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" parent="1" source="root" target="leaf_h0" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl_a" value="H&lt;sub&gt;a&lt;/sub&gt;: fusion forgets most" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#8055B5;background=#FFFFFF;" parent="1" vertex="1">
+          <mxGeometry x="20" y="202" width="200" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl_b" value="H&lt;sub&gt;b&lt;/sub&gt;: uniform, 2-D position drifts fastest" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#3A9D4E;background=#FFFFFF;" parent="1" vertex="1">
+          <mxGeometry x="279" y="220" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl_c" value="H&lt;sub&gt;c&lt;/sub&gt;: scenario / modality-dependent" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#D9772B;background=#FFFFFF;" parent="1" vertex="1">
+          <mxGeometry x="587" y="242" width="240" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl_h0" value="H&lt;sub&gt;0&lt;/sub&gt;: no group separates after Bonferroni" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#6E6E6E;background=#FFFFFF;" parent="1" vertex="1">
+          <mxGeometry x="835" y="202" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="bot_note" value="The remedy is selected from the diagnosis, not pre-committed — method choice emerges from pilot findings at Week 4." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=12;fontStyle=2;" parent="1" vertex="1">
+          <mxGeometry x="150" y="408" width="760" height="36" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

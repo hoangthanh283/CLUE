@@ -1,0 +1,124 @@
+<mxfile host="Electron" modified="2026-06-10T00:45:33.775Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.2 Chrome/114.0.5735.289 Electron/25.9.4 Safari/537.36" version="22.1.2" etag="67RsGdK7wB050wrB39dK" type="device">
+  <diagram name="diagnostic_pipeline" id="diagpipe">
+    <mxGraphModel dx="954" dy="669" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="640" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Per-Component Diagnostic Pipeline (Algorithm 3.1)" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry x="200" y="10" width="700" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="mask_banner" value="Modality mask &amp;nbsp; c &amp;#8712; { C1: text-only &amp;nbsp;|&amp;nbsp; C2: image+layout &amp;nbsp;|&amp;nbsp; C3: text+layout &amp;nbsp;|&amp;nbsp; C4: full tri-modal }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9DDF3;strokeColor=#8055B5;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="60" y="50" width="940" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" value="Task 1&lt;br&gt;&lt;b&gt;FUNSD&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBE8F7;strokeColor=#2C6FB3;fontFamily=Times New Roman;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="120" y="146" width="140" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" value="Task 2&lt;br&gt;&lt;b&gt;CORD&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="430" y="146" width="140" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="t3" value="Task 3&lt;br&gt;&lt;b&gt;SROIE&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7E7D6;strokeColor=#D9772B;fontFamily=Times New Roman;fontSize=13;" parent="1" vertex="1">
+          <mxGeometry x="740" y="146" width="140" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="e_t1_t2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#222222;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="t1" target="t2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_t2_t3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#222222;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="t2" target="t3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sub_note" value="naive sequential fine-tuning &amp;nbsp;&amp;#183;&amp;nbsp; classifier head expanded per task" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#444444;" parent="1" vertex="1">
+          <mxGeometry x="103" y="236" width="760" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="bnd1" value="capture" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F3E9DE;strokeColor=#B3402F;strokeWidth=2;fontFamily=Times New Roman;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="298" y="161" width="60" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="bnd2" value="capture" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F3E9DE;strokeColor=#B3402F;strokeWidth=2;fontFamily=Times New Roman;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="608" y="161" width="60" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="m1" value="Per-layer linear CKA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="60" y="318" width="280" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="m1_sub" value="CKA(&amp;#952;&lt;sup&gt;(t&amp;minus;1)&lt;/sup&gt;, &amp;#952;&lt;sup&gt;(t)&lt;/sup&gt;) per layer&lt;br&gt;measures representational similarity shift" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="60" y="366" width="280" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" value="Per-group Fisher Information" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="390" y="318" width="280" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="m2_sub" value="F&lt;sub&gt;g&lt;/sub&gt; = diag. Fisher per param group&lt;br&gt;groups: text / layout / visual / fusion / ffn / head" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="390" y="366" width="280" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="m3" value="Forgetting matrix R[i, j]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="720" y="318" width="280" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="m3_sub" value="entity-F1 of task j evaluated after task i&lt;br&gt;AA / BWT / AF derived from R[i,j]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6E6E6E;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="720" y="366" width="280" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="cap_bus" style="endArrow=none;html=1;strokeColor=#B3402F;strokeWidth=2;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="200" y="278" as="sourcePoint" />
+            <mxPoint x="860" y="278" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="cap1_drop" style="endArrow=none;html=1;strokeColor=#B3402F;strokeWidth=2;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="328" y="187" as="sourcePoint" />
+            <mxPoint x="328" y="278" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="cap2_drop" style="endArrow=none;html=1;strokeColor=#B3402F;strokeWidth=2;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="638" y="187" as="sourcePoint" />
+            <mxPoint x="638" y="278" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m1_drop" style="endArrow=block;html=1;strokeColor=#B3402F;strokeWidth=2;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="200" y="278" as="sourcePoint" />
+            <mxPoint x="200" y="318" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m2_drop" style="endArrow=block;html=1;strokeColor=#B3402F;strokeWidth=2;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="530" y="278" as="sourcePoint" />
+            <mxPoint x="530" y="318" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m3_drop" style="endArrow=block;html=1;strokeColor=#B3402F;strokeWidth=2;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="860" y="278" as="sourcePoint" />
+            <mxPoint x="860" y="318" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hyp_note" value="Hypothesis: H&lt;sub&gt;1&lt;/sub&gt; — forgetting concentrates in specific components; H&lt;sub&gt;0&lt;/sub&gt; (null) — uniform across all. &amp;nbsp;Decision at Week 4 selects CL method." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" parent="1" vertex="1">
+          <mxGeometry x="60" y="448" width="940" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="leg_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#CCCCCC;" parent="1" vertex="1">
+          <mxGeometry x="60" y="502" width="940" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_e1" value="" style="endArrow=block;html=1;strokeColor=#222222;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="76" y="520" as="sourcePoint" />
+            <mxPoint x="116" y="520" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lg_e1t" value="sequential task progression" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="122" y="512" width="200" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_e2" value="" style="endArrow=block;html=1;strokeColor=#B3402F;strokeWidth=2;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="366" y="520" as="sourcePoint" />
+            <mxPoint x="406" y="520" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lg_e2t" value="capture / fan-out to metrics" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="412" y="512" width="210" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_c" value="" style="rounded=0;html=1;fillColor=#F3E9DE;strokeColor=#B3402F;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="680" y="513" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_ct" value="task-boundary capture marker" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="706" y="512" width="220" height="18" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
