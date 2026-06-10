@@ -94,7 +94,7 @@
         <mxCell id="tracking" value="Experiment tracking" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEFE1;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
           <mxGeometry x="836" y="264" width="340" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="tracking_sub" value="W&amp;amp;B project: doccl-aaai2027&lt;br&gt;tag schema: {phase}/{scenario}/{method}/seed{seed}&lt;br&gt;results/matrix.npy &amp;nbsp;(forgetting matrix on disk)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+        <mxCell id="tracking_sub" value="W&amp;amp;B project: wandb.ai/thanh-workspace/CL4IE&lt;br&gt;tag schema: {phase}/{scenario}/{method}/seed{seed}&lt;br&gt;results/matrix.npy &amp;nbsp;(forgetting matrix on disk)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
           <mxGeometry x="836" y="314" width="340" height="70" as="geometry" />
         </mxCell>
         <mxCell id="e_wr_ins" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#8055B5;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="wrapper" target="instr" edge="1">

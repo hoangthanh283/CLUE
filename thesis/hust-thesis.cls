@@ -263,7 +263,8 @@
     \begin{enumerate}
     \item \isenglish{Student's information}{Thông tin sinh viên}:\\
     \isenglish{Name}{Họ và tên}: \@author. \\
-    \isenglish{Phone}{Điện thoại}: \@authorphone \quad  Email: \@authoremail\\
+    \isenglish{Phone}{Điện thoại}: \@authorphone \\
+    Email: \@authoremail\\
     \isenglish{Class}{Lớp}: \@authorclass \\
     \isenglish{Affiliation}{Trường}: \@university.\\
     \isenglish{Duration}{Thời gian thực hiện}: \@duration.
