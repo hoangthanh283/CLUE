@@ -74,6 +74,10 @@ class LayoutLMv3Wrapper(nn.Module):
 
         self.model.classifier = new_clf
         self.model.config.num_labels = new_n
+        # HF caches config.num_labels as an attribute at __init__ and uses the
+        # cached copy in the loss reshape — update it too or loss crashes after
+        # the first expansion (shape '[-1, old_n]' is invalid ...).
+        self.model.num_labels = new_n
         self.id_to_label = {i: l for i, l in enumerate(all_labels)}
         self.label_to_id = {l: i for i, l in enumerate(all_labels)}
 
