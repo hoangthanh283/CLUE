@@ -17,11 +17,37 @@ from dataclasses import dataclass
 
 from torch.utils.data import Dataset
 
+from doccl.data.cil_remapping import CIL_LabelRemapper
 from doccl.data.cord import CORDDataset
 from doccl.data.dil_remapping import DIL_LabelRemapper, DIL_UNIFIED_LABELS
 from doccl.data.funsd import FUNSDDataset
 from doccl.data.sroie import SROIEDataset
 from doccl.types import ScenarioType, TaskInfo
+
+
+def _cil_head_snapshots(
+    session_label_sets: list[list[str]],
+) -> tuple[list[dict[str, int]], list[list[str]]]:
+    """Compute the cumulative model-head label map seen at each CIL session.
+
+    Returns ``(snapshots, label_sets_with_O)`` where:
+      - ``snapshots[i]`` is the head ``label -> index`` map in effect when session ``i``
+        is trained: ``O`` at 0 followed by every label introduced in sessions ``0..i``
+        (deduplicated, append order). This matches the head grown by
+        ``expand_classifier`` once ``O`` is in the task-0 label set.
+      - ``label_sets_with_O[i]`` is session ``i``'s own label set prefixed with ``O``
+        (what ``TaskInfo.label_set`` should carry so the head is sized correctly).
+    """
+    cumulative: dict[str, int] = {"O": 0}
+    snapshots: list[dict[str, int]] = []
+    label_sets_with_O: list[list[str]] = []
+    for labels in session_label_sets:
+        for label in labels:
+            if label not in cumulative:
+                cumulative[label] = len(cumulative)
+        snapshots.append(dict(cumulative))  # snapshot AFTER adding this session's labels
+        label_sets_with_O.append(["O"] + list(labels))
+    return snapshots, label_sets_with_O
 
 
 @dataclass
@@ -48,14 +74,23 @@ def build_cil_funsd() -> CLScenario:
         ["B-HEADER", "I-HEADER", "B-QUESTION", "I-QUESTION"],
         ["B-ANSWER", "I-ANSWER"],
     ]
-    train_dss = [FUNSDDataset(split="train", label_filter=lbls) for lbls in splits]
-    eval_dss = [FUNSDDataset(split="test", label_filter=lbls) for lbls in splits]
+    snapshots, label_sets = _cil_head_snapshots(splits)
+
+    def _wrap(split: str) -> list[Dataset]:
+        wrapped = []
+        for i, lbls in enumerate(splits):
+            base = FUNSDDataset(split=split, label_filter=lbls)
+            wrapped.append(CIL_LabelRemapper(base, base.id_to_label, snapshots[i]))
+        return wrapped
+
+    train_dss = _wrap("train")
+    eval_dss = _wrap("test")
 
     tasks = [
         TaskInfo(
             task_id=i,
             task_name=f"funsd_cil_t{i}",
-            label_set=splits[i],
+            label_set=label_sets[i],
             is_first=(i == 0),
             is_last=(i == len(splits) - 1),
         )
@@ -93,20 +128,26 @@ def build_cil_cord(num_sessions: int = 5) -> CLScenario:
 
     bio_splits = [[f"B-{c}" for c in s] + [f"I-{c}" for c in s] for s in cls_per_session]
 
-    train_dss = [
-        CORDDataset(split="train", granularity="fine", label_filter=lbls)
-        for lbls in bio_splits
-    ]
-    eval_dss = [
-        CORDDataset(split="test", granularity="fine", label_filter=lbls)
-        for lbls in bio_splits
-    ]
+    # Cumulative head label maps per session + each session's label_set prefixed with O.
+    # The underlying datasets emit native CORD ids; CIL_LabelRemapper translates those
+    # into the head-index space so targets line up with the (growing) classifier head.
+    snapshots, label_sets = _cil_head_snapshots(bio_splits)
+
+    def _wrap(split: str) -> list[Dataset]:
+        wrapped = []
+        for i, lbls in enumerate(bio_splits):
+            base = CORDDataset(split=split, granularity="fine", label_filter=lbls)
+            wrapped.append(CIL_LabelRemapper(base, base.id_to_label, snapshots[i]))
+        return wrapped
+
+    train_dss = _wrap("train")
+    eval_dss = _wrap("test")
 
     tasks = [
         TaskInfo(
             task_id=i,
             task_name=f"cord_cil_t{i}",
-            label_set=bio_splits[i],
+            label_set=label_sets[i],
             is_first=(i == 0),
             is_last=(i == len(bio_splits) - 1),
             metadata={"super_class": ["menu", "menu", "sub_total", "total", "mixed"][i]},
@@ -193,9 +234,11 @@ def build_mixed() -> CLScenario:
         4: CORD super total+void+sub    (class-IL within receipts)
         5: FUNSD revisit (full)         (domain return — tests cross-session retention)
 
-    Uses native label spaces per session (no remapping). The classifier expands
-    monotonically as new labels arrive, so all label spaces accumulate in the
-    output head.
+    Each session's underlying dataset emits its own native label ids; a
+    CIL_LabelRemapper translates them into the cumulative head-index space so the
+    classifier head (grown monotonically by expand_classifier) and the targets stay
+    aligned. The FUNSD revisit (session 5) reuses labels already added in sessions
+    0-1, so the cumulative map does not re-expand for it.
     """
     sessions = []
 
@@ -255,13 +298,22 @@ def build_mixed() -> CLScenario:
         "metadata": {"phase": "domain-return"},
     })
 
-    train_dss = [s["train"] for s in sessions]
-    eval_dss = [s["test"] for s in sessions]
+    # Cumulative head snapshots over the per-session label sets, then wrap each
+    # session's native dataset so its ids land in the head-index space for that session.
+    snapshots, label_sets = _cil_head_snapshots([s["labels"] for s in sessions])
+    train_dss = [
+        CIL_LabelRemapper(s["train"], s["train"].id_to_label, snapshots[i])
+        for i, s in enumerate(sessions)
+    ]
+    eval_dss = [
+        CIL_LabelRemapper(s["test"], s["test"].id_to_label, snapshots[i])
+        for i, s in enumerate(sessions)
+    ]
     tasks = [
         TaskInfo(
             task_id=i,
             task_name=s["name"],
-            label_set=s["labels"],
+            label_set=label_sets[i],
             is_first=(i == 0),
             is_last=(i == len(sessions) - 1),
             metadata=s["metadata"],
