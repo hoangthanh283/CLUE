@@ -57,22 +57,38 @@ class LayoutLMv3Wrapper(nn.Module):
 
     # ─── Class-incremental: expand classifier ──────────────────────────────────
     def expand_classifier(self, new_labels: list[str]) -> None:
-        """Extend classification head to add new labels. Old logits preserved."""
+        """Extend the classification head to add new labels. Old logits preserved.
+
+        LayoutLMv3 chooses its head type by label count (``modeling_layoutlmv3``):
+        ``num_labels < 10`` → a plain ``nn.Linear``; ``num_labels >= 10`` →
+        ``LayoutLMv3ClassificationHead`` (an MLP whose final projection is
+        ``out_proj``). We grow only the FINAL output Linear in place — for the MLP
+        head that is ``classifier.out_proj`` (the dense/intermediate layers are kept
+        untouched), for the plain head it is ``classifier`` itself — so this works for
+        either head type and across the 10-label boundary (the head stays whichever
+        type it was initialised as; a wider Linear head is valid).
+        """
         old_labels = list(self.id_to_label.values())
         all_labels = old_labels + [l for l in new_labels if l not in self.label_to_id]
         new_n = len(all_labels)
 
-        old_clf = self.model.classifier
-        new_clf = nn.Linear(self.hidden_size, new_n).to(old_clf.weight.device)
+        # Locate the final output Linear regardless of head type.
+        head = self.model.classifier
+        out_linear = head.out_proj if hasattr(head, "out_proj") else head
 
+        new_linear = nn.Linear(out_linear.in_features, new_n).to(out_linear.weight.device)
         with torch.no_grad():
             if len(old_labels) > 0:
-                new_clf.weight[: len(old_labels)] = old_clf.weight
-                new_clf.bias[: len(old_labels)] = old_clf.bias
-            nn.init.normal_(new_clf.weight[len(old_labels):], std=0.02)
-            nn.init.zeros_(new_clf.bias[len(old_labels):])
+                new_linear.weight[: len(old_labels)] = out_linear.weight
+                new_linear.bias[: len(old_labels)] = out_linear.bias
+            nn.init.normal_(new_linear.weight[len(old_labels):], std=0.02)
+            nn.init.zeros_(new_linear.bias[len(old_labels):])
 
-        self.model.classifier = new_clf
+        if hasattr(head, "out_proj"):
+            head.out_proj = new_linear
+        else:
+            self.model.classifier = new_linear
+
         self.model.config.num_labels = new_n
         # HF caches config.num_labels as an attribute at __init__ and uses the
         # cached copy in the loss reshape — update it too or loss crashes after
