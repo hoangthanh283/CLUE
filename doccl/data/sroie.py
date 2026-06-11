@@ -205,15 +205,25 @@ class SROIEDataset(Dataset):
         return out
 
     def _filter_by_labels(self, data: list, label_filter: list[str]) -> list:
-        keep_ids = {self.label_to_id[l] for l in label_filter if l in self.label_to_id}
-        keep_ids.add(self.label_to_id["O"])
-        target_entity_ids = keep_ids - {self.label_to_id["O"]}
+        """Class-incremental split: keep any example with >=1 in-session entity, and
+        mask out-of-session entity tokens to 'O'.
+
+        SROIE receipts carry company/date/address/total fields together, so a
+        strict-subset filter keeps almost no documents. Standard CIL token-classification
+        practice is to retain documents with at least one target-class entity and relabel
+        every out-of-session entity token as background ('O') for this session.
+        """
+        o_id = self.label_to_id["O"]
+        target_entity_ids = {
+            self.label_to_id[l] for l in label_filter if l in self.label_to_id
+        } - {o_id}
 
         filtered = []
         for ex in data:
-            tag_set = set(ex["ner_tags"])
-            if tag_set.issubset(keep_ids) and tag_set & target_entity_ids:
-                filtered.append(ex)
+            if not (set(ex["ner_tags"]) & target_entity_ids):
+                continue
+            masked_tags = [t if t in target_entity_ids else o_id for t in ex["ner_tags"]]
+            filtered.append({**ex, "ner_tags": masked_tags})
         return filtered
 
     def __len__(self) -> int:
