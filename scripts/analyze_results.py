@@ -10,10 +10,21 @@ Produces (into ``--output_dir``, default ``results/``):
     - table_ablation.tex        : Table 6.2 — component-targeting ablation (AA, BWT)
     - table_compute.tex         : Table 6.3 — time / trainable params / peak memory
     - figure_forgetting_curves.pdf : Fig 6.3 — avg seen-task accuracy over the sequence
+    - table_single_task_baselines.{tex,csv} : single-task naive b_i per dataset (the FWT
+                                  baseline reference; see the FWT note below)
     - all_runs.csv, pivot_<metric>.csv
 
 ``scripts/ingest_to_thesis.py`` then copies these into ``thesis/generated/`` and
 ``thesis/figures/`` (committed, CI-safe) and wires them into chapter 6.
+
+Forward transfer (FWT) — IMPORTANT:
+    True FWT = mean_{i>0} (R[i-1, i] - b_i) needs the multi-task model's ZERO-SHOT F1
+    on each task *before* it is trained (R[i-1, i]). The live CL loop only evaluates
+    SEEN tasks, so R[i-1, i] is never measured and the stored matrices are strictly
+    lower-triangular. True FWT is therefore NOT recoverable post-hoc and is reported as
+    unavailable ("--") here rather than a misleading 0. We do emit the single-task
+    baseline table (b_i) so the thesis has the honest upper-reference. See
+    docs/FWT_NOTE.md for the exact train.py change that would enable true FWT later.
 
 Usage:
     python scripts/analyze_results.py                       # local results/ (default)
@@ -55,6 +66,24 @@ COMPONENT_DISPLAY = {
     "text": "Text only", "visual": "Visual only", "layout": "Layout only",
     "fusion": "Fusion only", "uniform": "Uniform (all)",
 }
+
+# ─── FWT baseline mapping (see docs/FWT_NOTE.md) ────────────────────────────────
+# Per-task underlying *dataset* for each multi-task scenario, in task order. The
+# single-task naive baseline b_i for task i is the from-scratch F1 on this dataset,
+# read from the corresponding ``single_<dataset>`` run. Derived from the scenario
+# builders in ``doccl/data/scenarios.py``:
+#   - dil       = build_dil():    funsd → sroie → cord   (TaskInfo.metadata native_dataset)
+#   - cil_cord  = build_cil_cord(): 5 CORD sessions       (all share the CORD baseline)
+#   - mixed     = build_mixed():  funsd, funsd, sroie, cord, cord, funsd
+# Within-dataset sessions (cil_cord, mixed) reuse a single dataset's single-task
+# baseline — there is no per-session single-task run.
+SCENARIO_TASK_DATASETS: dict[str, list[str]] = {
+    "dil": ["funsd", "sroie", "cord"],
+    "cil_cord": ["cord", "cord", "cord", "cord", "cord"],
+    "mixed": ["funsd", "funsd", "sroie", "cord", "cord", "funsd"],
+}
+# Single-task baseline run scenario name for each dataset (build_single → SCENARIO_REGISTRY).
+SINGLE_SCENARIO = {"funsd": "single_funsd", "cord": "single_cord", "sroie": "single_sroie"}
 
 
 # ─── Sources ────────────────────────────────────────────────────────────────────
@@ -311,6 +340,117 @@ def plot_forgetting_curves(
     print(f"Wrote {output}")
 
 
+# ─── Single-task baselines & forward transfer (FWT) ─────────────────────────────
+#
+# Why this is a *baseline table* and NOT a FWT column
+# ---------------------------------------------------
+# True forward transfer is  FWT = mean_{i>0} (R[i-1, i] - b_i)  where R[i-1, i] is
+# the multi-task model's ZERO-SHOT F1 on task i *before* it is trained (one step
+# earlier in the sequence) and b_i is the single-task from-scratch baseline on task
+# i's dataset (doccl/eval/metrics.py).
+#
+# The live CL loop (scripts/train.py, "Standard CL loop") only evaluates
+# ``eval_loaders_seen`` — tasks 0..current — after each task. The future-task entry
+# R[i-1, i] is therefore NEVER measured and the stored accuracy matrix is strictly
+# lower-triangular (R[i-1, i] = NaN). The per-run tracker is also constructed without
+# ``baseline_perf``, so ``forward_transfer()`` short-circuits to 0.0. As a result
+# TRUE zero-shot FWT is **not recoverable post-hoc** from the saved matrices, and we
+# refuse to fabricate it: FWT is reported as unavailable ("--") in the aggregates.
+#
+# What we CAN compute honestly is the single-task baseline table b_i (mean ± std over
+# seeds) from the ``single_*`` runs — a "single-task upper-reference" the thesis can
+# cite directly and which is exactly the b_i term true FWT would later subtract. See
+# docs/FWT_NOTE.md for precisely what train.py change would unlock true FWT.
+def compute_single_task_baselines(df: pd.DataFrame) -> dict[str, dict[str, float]]:
+    """b_i per dataset = mean ± std of single-task naive F1 over seeds.
+
+    Reads ``single_<dataset>`` runs (scenario == 'single_<dataset>'); each stores its
+    from-scratch single-task F1 as ``AA`` (matrix = [[f1]]). Returns
+    ``{dataset: {"mean": ..., "std": ..., "count": ...}}`` for whichever datasets have
+    runs. Missing datasets are simply absent (degrade gracefully — never raises).
+    """
+    out: dict[str, dict[str, float]] = {}
+    sub = df[df["state"] == "finished"]
+    for dataset, scenario in SINGLE_SCENARIO.items():
+        runs = sub[(sub["scenario"] == scenario)].dropna(subset=["AA"])
+        if runs.empty:
+            continue
+        vals = runs["AA"].astype(float)
+        out[dataset] = {
+            "mean": float(vals.mean()),
+            "std": float(vals.std(ddof=0)) if len(vals) > 1 else 0.0,
+            "count": int(len(vals)),
+        }
+    return out
+
+
+def write_baseline_table(df: pd.DataFrame, output: Path) -> dict[str, dict[str, float]]:
+    """Emit the single-task baseline table (b_i per dataset) as CSV + LaTeX.
+
+    This is the FWT baseline reference (not FWT itself — see the module note above and
+    docs/FWT_NOTE.md). Robust to missing single-task runs: writes an explicit
+    placeholder row rather than crashing. Returns the computed baselines so callers can
+    reuse them. Writes ``<output>`` (.tex) and a sibling ``.csv``.
+    """
+    baselines = compute_single_task_baselines(df)
+    datasets = [d for d in ("funsd", "cord", "sroie") if d in baselines]
+
+    # CSV (machine-readable, for thesis/generated/ ingestion).
+    csv_path = output.with_suffix(".csv")
+    csv_rows = [
+        {"dataset": d, "single_task_f1_mean": baselines[d]["mean"],
+         "single_task_f1_std": baselines[d]["std"], "n_seeds": baselines[d]["count"]}
+        for d in datasets
+    ]
+    output.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(csv_rows, columns=["dataset", "single_task_f1_mean", "single_task_f1_std", "n_seeds"]).to_csv(
+        csv_path, index=False
+    )
+
+    # LaTeX (single-task upper-reference the thesis can cite).
+    lines = [
+        "% Auto-generated by scripts/analyze_results.py (do not edit by hand).",
+        "% Single-task naive baseline b_i (from-scratch entity-F1, mean $\\pm$ std over seeds).",
+        "% This is the FWT baseline reference; true FWT is unavailable (see docs/FWT_NOTE.md).",
+        "\\begin{tabular}{lc}",
+        "\\toprule",
+        "\\textbf{Dataset} & \\textbf{Single-task F1} \\\\",
+        "\\midrule",
+    ]
+    if not datasets:
+        lines.append("\\multicolumn{2}{c}{\\itshape no single-task baseline runs found} \\\\")
+    else:
+        for d in datasets:
+            b = baselines[d]
+            lines.append(f"{d.upper()} & {_cell(b['mean'], b['std'])} \\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    output.write_text("\n".join(lines))
+    print(f"Wrote {output} and {csv_path}")
+    return baselines
+
+
+def report_fwt_status(df: pd.DataFrame, baselines: dict[str, dict[str, float]]) -> None:
+    """Print an explicit, honest FWT-unavailability notice (never a misleading 0).
+
+    True zero-shot FWT cannot be computed from the stored lower-triangular matrices.
+    We surface this loudly at aggregate time so the thesis never mistakes a 0/"--"
+    placeholder for a measured 0, and show which single-task baselines b_i are ready
+    to plug in once true FWT is enabled (see docs/FWT_NOTE.md).
+    """
+    print("\n=== FWT (Forward Transfer) ===")
+    print(
+        "FWT is UNAVAILABLE ('--'): the CL loop only evaluates seen tasks, so the\n"
+        "future-task zero-shot term R[i-1, i] is never measured (matrices are lower-\n"
+        "triangular). True FWT is NOT recoverable post-hoc and is NOT fabricated.\n"
+        "See docs/FWT_NOTE.md for the train.py change that would enable it."
+    )
+    if baselines:
+        ready = ", ".join(f"{d}={b['mean']:.2f}" for d, b in sorted(baselines.items()))
+        print(f"Single-task baselines b_i ready for future FWT: {ready}")
+    else:
+        print("No single-task (single_*) baseline runs found yet.")
+
+
 def write_pivot_csv(df: pd.DataFrame, output: Path, metric: str = "AA") -> None:
     df = _finished(df, metric)
     pivot = df.pivot_table(values=metric, index=["method", "scenario"], columns="seed")
@@ -345,6 +485,10 @@ def main():
     df.drop(columns=["matrix"], errors="ignore").to_csv(args.output_dir / "all_runs.csv", index=False)
 
     for metric in args.metrics:
+        # FWT cannot be measured post-hoc (lower-triangular matrices); never aggregate
+        # it as if it were a real number. Report its unavailability explicitly instead.
+        if metric == "FWT":
+            continue
         agg = aggregate(df, metric=metric)
         print(f"\n=== {metric} ===\n{agg.to_string(index=False)}")
         write_pivot_csv(df, args.output_dir / f"pivot_{metric}.csv", metric=metric)
@@ -353,6 +497,11 @@ def main():
     write_ablation_table(df, args.output_dir / "table_ablation.tex", proposed=args.proposed)
     write_compute_table(df, args.output_dir / "table_compute.tex")
     plot_forgetting_curves(df, args.output_dir / "figure_forgetting_curves.pdf")
+
+    # Single-task baseline reference (the b_i term of FWT) + honest FWT status. True
+    # zero-shot FWT is unavailable from stored matrices — see docs/FWT_NOTE.md.
+    baselines = write_baseline_table(df, args.output_dir / "table_single_task_baselines.tex")
+    report_fwt_status(df, baselines)
 
 
 if __name__ == "__main__":
