@@ -22,11 +22,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from transformers import LayoutLMv3Processor
+
+# Process-wide cache keyed by (hf_name, split) so the SROIE split reused across scenarios
+# (dil + mixed) shares one HF Arrow handle instead of each materialising its own copy.
+_RAW_DS_CACHE: dict[tuple[str, str], Any] = {}
 
 
 class SROIEDataset(Dataset):
@@ -124,7 +129,11 @@ class SROIEDataset(Dataset):
         hf_split = split
         if split == "test" and "test" not in available and "val" in available:
             hf_split = "val"
-        ds = load_dataset(hf_name, split=hf_split)
+        if (hf_name, hf_split) not in _RAW_DS_CACHE:
+            _RAW_DS_CACHE[(hf_name, hf_split)] = load_dataset(hf_name, split=hf_split)
+        ds = _RAW_DS_CACHE[(hf_name, hf_split)]
+        self._hf_ds = ds  # kept for lazy per-item image decode (not cached per example)
+        self._image_key = "image"
 
         # Some mirrors (e.g. ``mp-02/sroie``) encode ner_tags as int ids into a
         # flat ``S-<FIELD>`` / ``O`` ClassLabel rather than BIO. Detect that and
@@ -171,8 +180,15 @@ class SROIEDataset(Dataset):
             s = t.strip().upper().replace("_", "-")
             return s if s in self.label_to_id else t
 
+        # Detect the image field once so we can re-fetch it lazily by row in __getitem__.
+        if ds.column_names:
+            for cand in ("image", "img"):
+                if cand in ds.column_names:
+                    self._image_key = cand
+                    break
+
         out: list[dict] = []
-        for ex in ds:
+        for row, ex in enumerate(ds):
             tags = pick(ex, "ner_tags", "labels", "tags")
             if s_scheme_names is not None:  # int ids into an S-<FIELD> ClassLabel
                 tags = s_ids_to_bio(tags)
@@ -196,7 +212,10 @@ class SROIEDataset(Dataset):
             bboxes = [[min(1000, max(0, int(c))) for c in box] for box in bboxes]
             out.append(
                 {
-                    "image": pick(ex, "image", "img"),
+                    # Store the HF row index, NOT the decoded PIL image — the image is
+                    # re-fetched on demand in __getitem__ so building the dataset does
+                    # not hold every receipt image resident.
+                    "row": row,
                     "tokens": pick(ex, "tokens", "words"),
                     "bboxes": bboxes,
                     "ner_tags": tags,
@@ -231,8 +250,8 @@ class SROIEDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         ex = self.data[idx]
-        if "image" in ex:  # HF source: PIL image already in-memory
-            image = ex["image"].convert("RGB")
+        if "row" in ex:  # HF source: decode the image on demand (not cached per example)
+            image = self._hf_ds[ex["row"]][self._image_key].convert("RGB")
         else:  # local source: open from disk
             image = Image.open(self._image_root / ex["image_filename"]).convert("RGB")
         encoding = self.processor(

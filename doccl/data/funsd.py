@@ -10,10 +10,17 @@ Reference:
 """
 from __future__ import annotations
 
+from typing import Any
+
 import torch
 from datasets import load_dataset
 from torch.utils.data import Dataset
 from transformers import LayoutLMv3Processor
+
+# Process-wide cache keyed by ``split`` so the FUNSD splits reused across scenarios
+# (dil + mixed build FUNSD up to 3× via the CIL sessions and the revisit task) share one
+# underlying HF Arrow handle instead of each materialising its own copy of every form image.
+_RAW_DS_CACHE: dict[str, Any] = {}
 
 
 class FUNSDDataset(Dataset):
@@ -58,11 +65,31 @@ class FUNSDDataset(Dataset):
             "microsoft/layoutlmv3-base", apply_ocr=False
         )
 
-        ds = load_dataset("nielsr/funsd-layoutlmv3", split=split, trust_remote_code=True)
-        self.data = list(ds)
+        if split not in _RAW_DS_CACHE:
+            _RAW_DS_CACHE[split] = load_dataset(
+                "nielsr/funsd-layoutlmv3", split=split, trust_remote_code=True
+            )
+        self._ds = _RAW_DS_CACHE[split]
 
         self.label_to_id = {l: i for i, l in enumerate(self.LABEL_NAMES)}
         self.id_to_label = {i: l for l, i in self.label_to_id.items()}
+
+        # Keep only the HF row index + token/box/label arrays — never the decoded image
+        # (decoded on demand in __getitem__). Read the text columns from an image-free
+        # projection so building self.data does not decode every form image; ``ner_tags``
+        # is copied so filtering/masking never mutates the shared raw dataset.
+        text_cols = self._ds.remove_columns(
+            [c for c in self._ds.column_names if c not in ("tokens", "bboxes", "ner_tags")]
+        )
+        self.data = [
+            {
+                "row": row,
+                "tokens": ex["tokens"],
+                "bboxes": ex["bboxes"],
+                "ner_tags": list(ex["ner_tags"]),
+            }
+            for row, ex in enumerate(text_cols)
+        ]
 
         if label_filter is not None:
             self.data = self._filter_by_labels(self.data, label_filter)
@@ -94,8 +121,9 @@ class FUNSDDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         ex = self.data[idx]
+        image = self._ds[ex["row"]]["image"]  # decode on demand (not cached in self.data)
         encoding = self.processor(
-            ex["image"],
+            image,
             ex["tokens"],
             boxes=ex["bboxes"],
             word_labels=ex["ner_tags"],

@@ -24,6 +24,13 @@ from PIL import Image
 from torch.utils.data import Dataset
 from transformers import LayoutLMv3Processor
 
+# Process-wide caches keyed by ``split`` so that the N class-incremental sessions of a
+# scenario (e.g. cil_cord builds 10 CORDDataset instances) share ONE underlying HF Arrow
+# handle and ONE parsed-base list instead of each holding its own ~2 GB copy. This keeps
+# RAM bounded — caching 10 independent copies OOM-crashed the 15 GiB box.
+_RAW_DS_CACHE: dict[str, Any] = {}
+_PARSED_BASE_CACHE: dict[tuple[str, str], list[dict]] = {}
+
 
 # 30 fine-grained class names — derived from CORD-v2 schema
 CORD_FINE_LABELS = [
@@ -120,30 +127,58 @@ class CORDDataset(Dataset):
         self.label_to_id = {l: i for i, l in enumerate(self.label_names)}
         self.id_to_label = {i: l for l, i in self.label_to_id.items()}
 
-        # Load raw CORD-v2 (contains image + JSON ground truth)
-        ds = load_dataset("naver-clova-ix/cord-v2", split=split, trust_remote_code=True)
-        self.data = self._parse_examples(list(ds))
+        # Load raw CORD-v2 (Arrow-backed; images decode lazily on row access) and the
+        # parsed base examples ONCE per split, sharing both across every session of a
+        # scenario. We store only the HF row index + lightweight token/box/label arrays
+        # — never the decoded PIL image — so memory stays bounded; the image is decoded
+        # on demand in ``__getitem__`` via ``self._ds[row]["image"]``.
+        if split not in _RAW_DS_CACHE:
+            _RAW_DS_CACHE[split] = load_dataset(
+                "naver-clova-ix/cord-v2", split=split, trust_remote_code=True
+            )
+        self._ds = _RAW_DS_CACHE[split]
+
+        base_key = (split, granularity)
+        if base_key not in _PARSED_BASE_CACHE:
+            _PARSED_BASE_CACHE[base_key] = self._parse_examples(self._ds)
+        base = _PARSED_BASE_CACHE[base_key]
 
         if label_filter is not None:
-            self.data = self._filter_by_labels(self.data, label_filter)
+            self.data = self._filter_by_labels(base, label_filter)
+        else:
+            self.data = base
 
-    def _parse_examples(self, raw: list[dict]) -> list[dict]:
+    def _parse_examples(self, ds) -> list[dict]:
         """Parse CORD-v2 raw format into flat (tokens, boxes, labels) per example.
 
-        CORD-v2 ground truth is JSON-structured; we need to flatten to BIO sequence.
-        Each example has:
-            - "image": PIL Image
-            - "ground_truth": JSON string with "valid_line" list of regions
+        CORD-v2 ground truth is JSON-structured; we flatten it to a BIO sequence.
+        We store only the lightweight token/box/label arrays plus the HF ``row``
+        index — NOT the decoded PIL image — so memory stays bounded. The image is
+        re-decoded on demand in ``__getitem__`` via ``self._ds[row]["image"]``.
+
+        Bbox normalisation needs the image dimensions. We read those from the raw
+        image bytes (a non-decoding view of the column) instead of decoding the full
+        image, so the parse pass does not materialise ~2 GB of decoded receipts.
+        ``ground_truth`` is fetched on its own so the image column is never decoded.
         """
+        import io
+
+        from datasets import Image as HFImage
+
+        nodecode = ds.cast_column("image", HFImage(decode=False))
         parsed = []
-        for ex in raw:
-            image = ex["image"]
-            gt = json.loads(ex["ground_truth"])
-            tokens, boxes, labels = self._flatten_gt(gt, image.size)
+        for row in range(len(ds)):
+            rec = nodecode[row]["image"]  # {"bytes": ..., "path": ...}, no decode
+            src = io.BytesIO(rec["bytes"]) if rec.get("bytes") else rec["path"]
+            with Image.open(src) as im:
+                size = im.size
+            gt = json.loads(ds[row]["ground_truth"])
+            tokens, boxes, labels = self._flatten_gt(gt, size)
             if not tokens:
                 continue
             parsed.append({
-                "image": image,
+                "row": row,
+                "image_size": size,
                 "tokens": tokens,
                 "bboxes": boxes,
                 "ner_tags": labels,
@@ -247,8 +282,9 @@ class CORDDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         ex = self.data[idx]
+        image = self._ds[ex["row"]]["image"]  # decode on demand (not cached in self.data)
         encoding = self.processor(
-            ex["image"],
+            image,
             ex["tokens"],
             boxes=ex["bboxes"],
             word_labels=ex["ner_tags"],
