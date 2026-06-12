@@ -64,7 +64,21 @@ class ReservoirBuffer:
         keys = sampled[0].keys()
         out = {}
         for k in keys:
-            out[k] = torch.stack([ex[k] for ex in sampled], dim=0)
+            tensors = [ex[k] for ex in sampled]
+            # DER++ caches per-example "_logits" of shape (L, C). The classifier head
+            # grows across class-incremental tasks, so the buffer can hold logits of
+            # different widths C (e.g. 13 from task 0, 25 from task 1). Right-pad each
+            # to the max C with zeros before stacking so they form one tensor; the
+            # DER++ MSE later truncates to the shared width (der.py), and zero columns
+            # for never-seen classes are neutral.
+            if k == "_logits" and len({t.shape[-1] for t in tensors}) > 1:
+                max_c = max(t.shape[-1] for t in tensors)
+                tensors = [
+                    t if t.shape[-1] == max_c
+                    else torch.nn.functional.pad(t, (0, max_c - t.shape[-1]))
+                    for t in tensors
+                ]
+            out[k] = torch.stack(tensors, dim=0)
         return out
 
     def state_dict(self) -> dict:

@@ -41,6 +41,15 @@ class EWC(NaiveFineTune):
                 continue
             p = params[name]
             theta_star = self.state.custom["theta_star"][name]
+            # The class-incremental classifier head grows across tasks (e.g. weight
+            # [13,768] -> [25,768]); theta_star/fisher were snapshotted at the old
+            # size. Penalise only the rows that existed when the snapshot was taken
+            # (the old classes) — newly added class rows have no prior to anchor to.
+            # Slicing keeps the EWC penalty well-defined instead of crashing on the
+            # shape-mismatched subtraction.
+            if p.shape != theta_star.shape:
+                idx = tuple(slice(0, s) for s in theta_star.shape)
+                p = p[idx]
             penalty = penalty + (fisher_val * (p - theta_star) ** 2).sum()
         return penalty
 
