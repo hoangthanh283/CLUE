@@ -181,7 +181,12 @@ def main(cfg: DictConfig) -> None:
             model.expand_classifier(all_labels)
             model = model.to(device)
 
-        joint_train = ConcatDataset(scenario.train_datasets)
+        # Use the full-label joint pool when the scenario provides one (CIL scenarios mask
+        # out-of-session entities per task, so concatenating train_datasets would feed the
+        # same document with conflicting labels and collapse training). Falls back to the
+        # per-task datasets for scenarios whose tasks are disjoint documents (e.g. DIL).
+        joint_sources = scenario.joint_train_datasets or scenario.train_datasets
+        joint_train = ConcatDataset(joint_sources)
         joint_loader = DataLoader(
             joint_train,
             batch_size=cfg.training.batch_size,

@@ -59,6 +59,14 @@ class CLScenario:
     tasks: list[TaskInfo]
     train_datasets: list[Dataset]
     eval_datasets: list[Dataset]
+    # Full-label training pool for the Joint upper bound. The per-task ``train_datasets``
+    # above are CIL-masked (out-of-session entities relabelled to O), so concatenating them
+    # feeds the same document multiple times with CONFLICTING labels — which collapses Joint
+    # training. ``joint_train_datasets`` instead holds each underlying document ONCE with ALL
+    # its labels, in the same head-index space as ``tasks``' cumulative label set. When None,
+    # the Joint path falls back to ``train_datasets`` (correct for scenarios whose tasks are
+    # disjoint documents, e.g. DIL).
+    joint_train_datasets: list[Dataset] | None = None
 
 
 # ─── CIL scenarios ─────────────────────────────────────────────────────────────
@@ -143,6 +151,13 @@ def build_cil_cord(num_sessions: int = 5) -> CLScenario:
     train_dss = _wrap("train")
     eval_dss = _wrap("test")
 
+    # Joint upper-bound pool: ONE full-label CORD dataset (every receipt once with ALL its
+    # entities) remapped into the cumulative 61-tag head space (snapshots[-1]). This avoids
+    # the per-session masking conflict that collapses Joint when train_datasets are concatenated.
+    full_head = snapshots[-1]
+    full_train = CORDDataset(split="train", granularity="fine")
+    joint_train = [CIL_LabelRemapper(full_train, full_train.id_to_label, full_head)]
+
     tasks = [
         TaskInfo(
             task_id=i,
@@ -154,7 +169,10 @@ def build_cil_cord(num_sessions: int = 5) -> CLScenario:
         )
         for i in range(len(bio_splits))
     ]
-    return CLScenario("cil_cord", ScenarioType.CIL, tasks, train_dss, eval_dss)
+    return CLScenario(
+        "cil_cord", ScenarioType.CIL, tasks, train_dss, eval_dss,
+        joint_train_datasets=joint_train,
+    )
 
 
 # ─── DIL scenario ──────────────────────────────────────────────────────────────
@@ -305,6 +323,20 @@ def build_mixed() -> CLScenario:
         CIL_LabelRemapper(s["train"], s["train"].id_to_label, snapshots[i])
         for i, s in enumerate(sessions)
     ]
+
+    # Joint upper-bound pool: each DISTINCT underlying dataset once with ALL its labels,
+    # remapped into the full cumulative head (snapshots[-1]). FUNSD (sessions 0/1/revisit)
+    # and CORD-super (sessions 3/4) each appear masked multiple times in train_dss, which
+    # would conflict if concatenated; here each is included exactly once, full-label.
+    full_head = snapshots[-1]
+    funsd_full = FUNSDDataset("train")
+    sroie_full = SROIEDataset("train")
+    cord_full = CORDDataset("train", "super")
+    joint_train = [
+        CIL_LabelRemapper(funsd_full, funsd_full.id_to_label, full_head),
+        CIL_LabelRemapper(sroie_full, sroie_full.id_to_label, full_head),
+        CIL_LabelRemapper(cord_full, cord_full.id_to_label, full_head),
+    ]
     eval_dss = [
         CIL_LabelRemapper(s["test"], s["test"].id_to_label, snapshots[i])
         for i, s in enumerate(sessions)
@@ -320,7 +352,10 @@ def build_mixed() -> CLScenario:
         )
         for i, s in enumerate(sessions)
     ]
-    return CLScenario("mixed", ScenarioType.MIXED, tasks, train_dss, eval_dss)
+    return CLScenario(
+        "mixed", ScenarioType.MIXED, tasks, train_dss, eval_dss,
+        joint_train_datasets=joint_train,
+    )
 
 
 # ─── Utility scenarios ─────────────────────────────────────────────────────────
