@@ -24,7 +24,7 @@ mkdir -p results/logs
 say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
 # 3-epoch deadline budget + memory-safe DataLoader + limited-VRAM recipe.
-EXTRA="training.batch_size=1 training.gradient_checkpointing=true training.num_workers=0 method.epochs=3 wandb.project=CL4IE"
+EXTRA="training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 method.epochs=3 wandb.project=CL4IE"
 export WANDB_MODE=online
 
 # HARD per-run memory cap: each train.py runs in a cgroup capped at MEM_CAP with swap
