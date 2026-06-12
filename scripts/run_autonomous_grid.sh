@@ -24,7 +24,11 @@ mkdir -p results/logs
 say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
 # 3-epoch deadline budget + memory-safe DataLoader + limited-VRAM recipe.
-EXTRA="training.batch_size=2 training.gradient_checkpointing=false training.num_workers=0 method.epochs=3 wandb.project=CL4IE"
+# Gradient checkpointing ON: the regularization/replay methods (EWC stores Fisher+theta_star
+# for all params; LwF holds a frozen teacher; ER/DER hold replay batches) need more VRAM than
+# naive/joint, and without checkpointing EWC OOM'd the 6 GB GPU at ~5.6 GB. Checkpointing keeps
+# every method under ~2.6 GB VRAM (proven across the naive/joint runs). bs=2 retained.
+EXTRA="training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 method.epochs=3 wandb.project=CL4IE"
 export WANDB_MODE=online
 
 # HARD per-run memory cap: each train.py runs in a cgroup capped at MEM_CAP with swap
