@@ -44,6 +44,17 @@ class LayoutLMv3Wrapper(nn.Module):
         self.hidden_size = self.model.config.hidden_size  # 768 for base
         self.num_layers = self.model.config.num_hidden_layers  # 12 for base
 
+        # LayoutLMv3 swaps in a 2-layer MLP head (dense -> tanh -> out_proj) once
+        # num_labels >= 10. In class-incremental learning that head collapses to
+        # predicting all-O after the first expand_classifier: the task-0-trained
+        # ``dense`` saturates the tanh, so gradients to freshly-added class rows
+        # vanish and the new classes are never learned (verified: a freshly-built
+        # 25-way MLP head trains to F1~37, but the SAME head grown 13->25 collapses
+        # to F1=0, predicting only O). Force a single Linear head — the architecture
+        # the working <10-label runs already used — so CIL expansion just widens a
+        # plain Linear with no saturating nonlinearity.
+        self._force_linear_head()
+
         # Label maps (mutated by expand_classifier during CIL)
         self.label_to_id: dict[str, int] = {}
         self.id_to_label: dict[int, str] = {}
@@ -54,6 +65,25 @@ class LayoutLMv3Wrapper(nn.Module):
 
         if freeze_backbone:
             self.freeze_backbone()
+
+    def _force_linear_head(self) -> None:
+        """Replace LayoutLMv3's classifier with a single ``nn.Linear`` head.
+
+        Ensures a non-saturating head for class-incremental expansion regardless of
+        the initial label count (HF would otherwise use a 2-layer MLP head for
+        ``num_labels >= 10``). Reuses the existing final projection's weights when the
+        current head already is/contains a Linear of the right shape, else inits fresh.
+        """
+        head = self.model.classifier
+        if isinstance(head, nn.Linear):
+            return  # already a plain Linear head
+        out = getattr(head, "out_proj", None)
+        n = out.out_features if out is not None else self.model.config.num_labels
+        device = out.weight.device if out is not None else next(self.model.parameters()).device
+        linear = nn.Linear(self.hidden_size, n).to(device)
+        nn.init.normal_(linear.weight, std=0.02)
+        nn.init.zeros_(linear.bias)
+        self.model.classifier = linear
 
     # ─── Class-incremental: expand classifier ──────────────────────────────────
     def expand_classifier(self, new_labels: list[str]) -> None:
