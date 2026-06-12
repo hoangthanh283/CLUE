@@ -1,13 +1,10 @@
 # STATE
 
 ## Active Work
-Autonomous baseline-grid execution (user out, full permission granted 2026-06-12 ~06:30).
-Running PHASE 3 (54 core-baseline runs) at **3 epochs** (deadline budget, user-approved) on
-the single 6 GB RTX 2060. Then chains: single-task FWT baselines → PHASE 4 (36 prompt/LoRA) →
-PHASE 5 (9 doccl, DocCL_A placeholder) → aggregate → ingest → thesis prose.
-
-Launcher: `/tmp/launch_phase3.sh` (PATH=venv, num_workers=0, bs=1+grad_ckpt, epochs=3,
-WANDB online CL4IE). Resume-safe via `results/<run>/.done`. Log: `results/logs/grid_phase3.log`.
+Autonomous baseline grid running (bs=2, 3 epochs, full scope per user 2026-06-12). 3/54 done
+(cil_cord_naive x3 seeds, all valid: AA~18, BWT~-90, own-task F1 80-94, seed-consistent). On
+dil_naive now. OOM-proof: each run in 9GB cgroup cap, watchdog 11GB+drain-before-restart. Real
+pace ~39min/run -> ~2.6 days total. No aborts since OOM-proofing relaunch (10:12).
 
 ## Last Decision
 - **3 epochs** not 10 (10 = ~6.7 days, infeasible). Model hit F1=88 after 1 epoch, so 3 is
