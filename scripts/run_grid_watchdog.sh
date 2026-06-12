@@ -10,10 +10,11 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-RAM_LIMIT_MB=${RAM_LIMIT_MB:-13500}
+RAM_LIMIT_MB=${RAM_LIMIT_MB:-11000}     # abort well before the 15 GB box OOMs (margin for spikes)
+RAM_SAFE_MB=${RAM_SAFE_MB:-6000}        # only (re)start the driver once RAM has drained below this
 VRAM_LIMIT_MB=${VRAM_LIMIT_MB:-5000}
 STALL_SAMPLES=${STALL_SAMPLES:-30}     # ~10 min of no progress + idle GPU => stall
-MAX_RESTARTS=${MAX_RESTARTS:-20}
+MAX_RESTARTS=${MAX_RESTARTS:-50}
 DRIVER="scripts/run_autonomous_grid.sh"
 
 WLOG=results/logs/watchdog.log
@@ -29,10 +30,25 @@ kill_all() {
   pkill -9 -f "$DRIVER" 2>/dev/null || true
   pkill -9 -f 'scripts/run_grid.sh' 2>/dev/null || true
   pkill -9 -f 'scripts/train.py' 2>/dev/null || true
+  # tear down any leftover systemd run scopes from capped train.py launches
+  systemctl --user stop 'run-*.scope' 2>/dev/null || true
+}
+# Block until system RAM drains below RAM_SAFE_MB (memory + swap reclaim after a kill),
+# so we never restart the driver on top of un-reclaimed memory — the cause of the
+# earlier restart->rebuild->OOM->restart thrash loop. Times out after ~3 min.
+wait_for_ram() {
+  for _ in $(seq 1 36); do
+    local u; u=$(free -m | awk '/Mem:/{print $3}')
+    [ "${u:-99999}" -lt "$RAM_SAFE_MB" ] && return 0
+    sleep 5
+  done
+  wsay "WARN: RAM did not drain below ${RAM_SAFE_MB}MB after 3 min (now $(free -m|awk '/Mem:/{print $3}')MB)"
+  return 0
 }
 start_driver() {
+  wait_for_ram
   nohup bash "$DRIVER" >> results/logs/autonomous.log 2>&1 &
-  wsay "driver started (pid $!)"
+  wsay "driver started (pid $!) at RAM=$(free -m|awk '/Mem:/{print $3}')MB"
 }
 
 wsay "=== WATCHDOG START (RAM<${RAM_LIMIT_MB}MB VRAM<${VRAM_LIMIT_MB}MB) ==="

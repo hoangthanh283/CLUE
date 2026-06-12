@@ -27,6 +27,22 @@ say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 EXTRA="training.batch_size=1 training.gradient_checkpointing=true training.num_workers=0 method.epochs=3 wandb.project=CL4IE"
 export WANDB_MODE=online
 
+# HARD per-run memory cap: each train.py runs in a cgroup capped at MEM_CAP with swap
+# disabled, so the kernel OOM-kills only that run (never the machine) if it spikes. The
+# real peak for the heaviest scenario (mixed, 6 sessions) + model is ~3.2 GB, so 9G is
+# generous headroom while staying far under the 15 GB box.
+export MEM_CAP="${MEM_CAP:-9G}"
+
+# Helper: run a single capped train.py (used by the FWT single-task loop below).
+run_capped() {
+    if command -v systemd-run >/dev/null 2>&1; then
+        systemd-run --user --scope -q -p "MemoryMax=$MEM_CAP" -p "MemorySwapMax=0" \
+            python scripts/train.py "$@"
+    else
+        python scripts/train.py "$@"
+    fi
+}
+
 say "=== AUTONOMOUS GRID START (3 epochs) ==="
 
 # ── PHASE 3: core baselines (54) ───────────────────────────────────────────────
@@ -42,7 +58,7 @@ for sc in single_funsd single_cord single_sroie; do
     if [ -f "results/${run}/.done" ]; then say "  [skip] $run"; continue; fi
     say "  [run] $run"
     # shellcheck disable=SC2086
-    if python scripts/train.py method=naive scenario=$sc seed=$s wandb.mode=online $EXTRA >> "$LOG" 2>&1; then
+    if run_capped method=naive scenario=$sc seed=$s wandb.mode=online $EXTRA >> "$LOG" 2>&1; then
       mkdir -p "results/${run}"; touch "results/${run}/.done"
     else
       say "  [FAIL] $run (continuing)"

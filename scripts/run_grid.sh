@@ -48,8 +48,18 @@ run_one() {
         return
     fi
     echo "  [run]  $run_name"
+    # Optional hard memory cap (MEM_CAP, e.g. "9G"): run train.py inside a transient
+    # systemd cgroup scope so the kernel OOM-kills ONLY this process group if it ever
+    # exceeds the cap — the machine itself can never be driven OOM. Falls back to a
+    # plain run if systemd-run is unavailable.
+    local launcher=(python scripts/train.py)
+    if [ -n "${MEM_CAP:-}" ] && command -v systemd-run >/dev/null 2>&1; then
+        launcher=(systemd-run --user --scope -q
+                  -p "MemoryMax=${MEM_CAP}" -p "MemorySwapMax=0"
+                  python scripts/train.py)
+    fi
     # shellcheck disable=SC2086
-    if python scripts/train.py "$@" "wandb.mode=$WANDB_MODE" $EXTRA; then
+    if "${launcher[@]}" "$@" "wandb.mode=$WANDB_MODE" $EXTRA; then
         mkdir -p "results/${run_name}"
         touch "$done_marker"
     else
