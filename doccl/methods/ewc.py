@@ -41,16 +41,18 @@ class EWC(NaiveFineTune):
                 continue
             p = params[name]
             theta_star = self.state.custom["theta_star"][name]
-            # The class-incremental classifier head grows across tasks (e.g. weight
-            # [13,768] -> [25,768]); theta_star/fisher were snapshotted at the old
-            # size. Penalise only the rows that existed when the snapshot was taken
-            # (the old classes) — newly added class rows have no prior to anchor to.
-            # Slicing keeps the EWC penalty well-defined instead of crashing on the
-            # shape-mismatched subtraction.
-            if p.shape != theta_star.shape:
-                idx = tuple(slice(0, s) for s in theta_star.shape)
-                p = p[idx]
-            penalty = penalty + (fisher_val * (p - theta_star) ** 2).sum()
+            # The class-incremental classifier head grows across tasks, so the current
+            # param, the snapshotted theta_star, and the accumulated Fisher can each have
+            # a different leading (class) dimension (e.g. 25 vs 13 vs 25). Penalise only
+            # the rows present in ALL THREE — the old classes that have a prior — by
+            # slicing each to their common minimum shape. New class rows carry no EWC
+            # anchor, which is correct. This keeps the penalty well-defined regardless of
+            # which snapshot each tensor came from.
+            min_shape = tuple(
+                min(a, b, c) for a, b, c in zip(p.shape, theta_star.shape, fisher_val.shape)
+            )
+            idx = tuple(slice(0, s) for s in min_shape)
+            penalty = penalty + (fisher_val[idx] * (p[idx] - theta_star[idx]) ** 2).sum()
         return penalty
 
     def train_task(self, task: TaskInfo, train_loader: DataLoader) -> TrainMetrics:
@@ -102,10 +104,20 @@ class EWC(NaiveFineTune):
             self.model, train_loader, n_samples=self.fisher_n_samples, device=self.device
         )
 
-        # Online EWC: accumulate Fisher across tasks (weighted sum)
+        # Online EWC: accumulate Fisher across tasks (weighted sum). The class-incremental
+        # classifier head grows between tasks, so the previous Fisher can be smaller than the
+        # new one (e.g. [13,768] vs [25,768]). Pad the old accumulator up to the new shape with
+        # zeros (new class rows carry no prior importance) before summing, so accumulation never
+        # crashes on the shape mismatch.
         gamma = self.config.get("ewc_gamma", 1.0)  # 1.0 = simple sum
         for name, f in new_fisher.items():
-            if name in self.state.custom["fisher"]:
-                self.state.custom["fisher"][name] = gamma * self.state.custom["fisher"][name] + f
-            else:
+            old = self.state.custom["fisher"].get(name)
+            if old is None:
                 self.state.custom["fisher"][name] = f
+            elif old.shape == f.shape:
+                self.state.custom["fisher"][name] = gamma * old + f
+            else:
+                padded = torch.zeros_like(f)
+                idx = tuple(slice(0, s) for s in old.shape)
+                padded[idx] = old
+                self.state.custom["fisher"][name] = gamma * padded + f
