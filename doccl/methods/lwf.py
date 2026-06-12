@@ -53,6 +53,13 @@ class LwF(NaiveFineTune):
     def train_task(self, task: TaskInfo, train_loader: DataLoader) -> TrainMetrics:
         self.model.train()
         teacher = self.state.custom.get("teacher")
+        if teacher is not None:
+            # Ensure the whole teacher (params AND buffers, e.g. LayoutLMv3 position_ids)
+            # sits on the student's device, so its no-grad forward matches the GPU batch.
+            # A frozen eval teacher adds little activation memory, so it fits alongside the
+            # gradient-checkpointed student on the 6 GB card.
+            teacher.to(self.device)
+            teacher.eval()
         optimizer = torch.optim.AdamW(
             self.trainable_parameters(),
             lr=self.config.get("lr", 5e-5),
@@ -74,17 +81,12 @@ class LwF(NaiveFineTune):
                 kd_loss = torch.zeros((), device=self.device)
 
                 if teacher is not None:
-                    # The teacher is a full frozen copy of LayoutLMv3. Keeping it on the GPU
-                    # alongside the student OOMs the 6 GB card (two backbones at once), so the
-                    # teacher lives on CPU: run its (no-grad) forward on CPU and move only the
-                    # logits back to the student's device for the KD loss.
                     with torch.no_grad():
-                        cpu_batch = {
-                            k: v.cpu() for k, v in batch.items() if k != "labels"
-                        }
-                        teacher_logits = teacher(**cpu_batch).logits.to(self.device)
+                        teacher_out = teacher(
+                            **{k: v for k, v in batch.items() if k != "labels"}
+                        )
                     mask = batch["labels"] != -100
-                    kd_loss = self._kd_loss(outputs.logits, teacher_logits, mask)
+                    kd_loss = self._kd_loss(outputs.logits, teacher_out.logits, mask)
 
                 loss = ce_loss + self.alpha * kd_loss
                 loss.backward()
@@ -107,5 +109,8 @@ class LwF(NaiveFineTune):
         for p in teacher.parameters():
             p.requires_grad = False
         teacher.eval()
-        teacher.to("cpu")  # keep the frozen teacher off the GPU (avoids two-backbone OOM)
+        # The teacher only runs no-grad inference; checkpointing adds nothing and its hooks can
+        # misbehave, so disable it. train_task moves the teacher onto the student's device.
+        if hasattr(teacher.model, "gradient_checkpointing_disable"):
+            teacher.model.gradient_checkpointing_disable()
         self.state.custom["teacher"] = teacher
