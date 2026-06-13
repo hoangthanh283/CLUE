@@ -105,7 +105,11 @@ menu fields dominate early sessions while void and auxiliary categories are spar
 and arrive late. We deliberately leave this imbalance \emph{unmodified} (no
 re-sampling or re-weighting) and treat it as a controlled factor of the benchmark,
 since artificially re-balancing the sessions would misrepresent the long-tailed
-schema growth that motivates the scenario.
+schema growth that motivates the scenario. Concretely, applying the split to
+CORD's 800 training receipts---keeping every document that contains at least one
+in-session entity and relabelling out-of-session tokens to ``O''---yields
+per-session training pools of $800$, $382$, $549$, $723$, and $780$ documents for
+sessions~0--4 respectively, reflecting how many receipts carry each session's fields.
 
 \begin{figure}[!htbp]
   \centering

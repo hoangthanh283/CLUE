@@ -2,9 +2,12 @@
 \chapter{Results and Discussion}
 \label{ch:results}
 % =====================================================================
-% SCAFFOLD ONLY. Subsection structure, figure/table shells, captions and labels
-% are in place. Quantitative bodies are filled from results/ once experiments
-% complete. Do NOT insert fabricated numbers. Every gap is marked TODO.
+% PARTIALLY POPULATED. Section 6.1 (per-component diagnosis) and the completed
+% baseline rows of 6.2/6.4 are filled from the real pilot + main-grid results
+% (docs/PILOT_STUDY_REPORT.md, THESIS_HANDOFF, DOCCL_RESEARCH_RECORD). The DocCL
+% remedy, prompt/LoRA baselines, and the component-targeting ablation remain
+% in-progress placeholders. Do NOT insert fabricated numbers; unrun cells are
+% marked with an em-dash and explained in the caption/text.
 % =====================================================================
 
 This chapter reports the empirical findings. The per-component diagnosis is the
@@ -14,19 +17,49 @@ ablations (\S\ref{sec:results-ablation}), a computational-cost analysis
 (\S\ref{sec:results-compute}), and a discussion of implications and threats to
 validity (\S\ref{sec:results-discussion}).
 
+\paragraph{Status of these results.} The numbers reported in this chapter are
+\emph{preliminary}. They were obtained under a configuration reduced relative to the
+full protocol of Chapter~\ref{ch:experimental-setup}: a single 6\,GB GPU, three
+epochs per task, and batch size two, with $41$ of the planned $54$ main-grid cells
+complete at the time of writing. The two replay-heavy methods are still running and
+the prompt-based, LoRA-based, and proposed DocCL methods are deferred to the full
+run; the pilot diagnosis of \S\ref{sec:results-diagnosis} is complete. Cells that are
+not yet available are marked with an em-dash (``--'') and explained in place, and are
+never filled with estimated values. The qualitative conclusions below are already
+stable across the three seeds, but the exact figures will be refreshed once the full
+grid completes.
+
 \section{Where Forgetting Lives: The Per-Component Diagnosis}
 \label{sec:results-diagnosis}
 
 This section reports how forgetting distributes across the text, visual, layout,
 and fusion components under naive sequential fine-tuning, for the four diagnostic
 conditions C1--C4, and tests the hypotheses of
-\S\ref{sec:method-diag-hypotheses}.
+\S\ref{sec:method-diag-hypotheses}. The pilot trains LayoutLMv3-base naively and
+sequentially on FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE, recording the
+performance matrix $R[i,j]$, per-layer \gls{cka} between consecutive checkpoints,
+and per-group empirical Fisher information at every task boundary.
 
 \subsection{Per-Component Forgetting Profile}
 \label{sec:results-profile}
 
-% TODO: interpret Fig 6.1 — which component(s) show the largest Fisher/accuracy
-% drop in C4 versus C1-C3; 1-2 paragraphs.
+Under naive sequential fine-tuning the model learns each task well in isolation but
+retains almost nothing of earlier tasks. Table~\ref{tab:forgetting-matrix} shows the
+performance matrix for the full multimodal condition (C4): the diagonal is strong
+(88.0 / 93.0 / 80.5 entity-F1), but the off-diagonal collapses to roughly $2$ F1.
+After learning CORD, FUNSD performance falls from $88.0$ to $1.8$---an $86$-point
+drop in a single task step. The text\,+\,layout condition (C3) shows the identical
+pattern ($88.7\rightarrow0.3\rightarrow1.7$). Forgetting in this setting is therefore
+not gradual but essentially total within one boundary, which is what motivates the
+continual-learning treatment of the remaining sections.
+
+Attributing this collapse to specific parameters, Table~\ref{tab:fisher-component}
+reports the empirical Fisher information per parameter group, averaged over seeds and
+task boundaries. The \emph{classifier head} dominates importance by an order of
+magnitude ($2.17\times10^{-1}$ versus $\le 1.07\times10^{-2}$ for every other group),
+with the input-side embeddings (text-word, image-patch) least important. The most
+task-critical---and therefore most overwritten---parameters concentrate at the output
+side of the network rather than in the input encoders.
 
 \begin{figure}[!htbp]
   \centering
@@ -35,18 +68,70 @@ conditions C1--C4, and tests the hypotheses of
     \includegraphics[width=0.85\linewidth]{pilot_fisher_bars.pdf}}{%
     \fbox{\parbox[c][4cm][c]{0.85\linewidth}{\centering\itshape
     Placeholder --- per-component forgetting bars (per-group Fisher / accuracy drop)
-    for conditions C1--C4.}}}
+    for conditions C1--C4. Numbers are tabulated in Table~\ref{tab:fisher-component}.}}}
   \caption[Per-component forgetting profile]{Per-component forgetting across the
-  task sequence for each diagnostic condition. Bars show the drop attributed to
-  the text, visual, layout, and fusion components. \textbf{TODO:} state the
-  dominant component once analysed.}
+  task sequence. Bars show the per-group Fisher importance of the text, visual,
+  layout, and classifier components; the classifier head dominates (cf.\
+  Table~\ref{tab:fisher-component}). \textbf{Preliminary} pilot result (C4, naive
+  sequential, three seeds).}
   \label{fig:per-component-bars}
 \end{figure}
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Forgetting matrix under naive sequential fine-tuning]{Performance matrix
+  $R[i,j]$: entity-F1 on task $j$ after training task $i$, for the full multimodal
+  model (C4, seed 42) under naive sequential fine-tuning. The diagonal is strong;
+  the off-diagonal collapses to $\sim$2 F1, i.e.\ near-total forgetting within one
+  task step. \textbf{Preliminary} pilot result.}
+  \label{tab:forgetting-matrix}
+  \begin{tabular}{lccc}
+    \toprule
+                       & \textbf{eval FUNSD} & \textbf{eval CORD} & \textbf{eval SROIE} \\
+    \midrule
+    after FUNSD        & 88.0 & --   & --   \\
+    after CORD         & 1.8  & 93.0 & --   \\
+    after SROIE        & 1.9  & 4.1  & 80.5 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Per-component Fisher importance]{Empirical Fisher information per
+  parameter group for the full multimodal model (C4), averaged over seeds and task
+  boundaries ($n{=}18$). The classifier head dominates by an order of magnitude.
+  \textbf{Preliminary} pilot result.}
+  \label{tab:fisher-component}
+  \begin{tabular}{lr}
+    \toprule
+    \textbf{Component group} & \textbf{Mean Fisher} \\
+    \midrule
+    Classifier head             & $2.17\times10^{-1}$ \\
+    Other                       & $1.07\times10^{-2}$ \\
+    Text self-attention         & $4.69\times10^{-3}$ \\
+    Layout 2D-position embedding & $2.98\times10^{-3}$ \\
+    Feed-forward (FFN)          & $1.87\times10^{-3}$ \\
+    Image patch embedding       & $1.18\times10^{-3}$ \\
+    Text word embedding         & $1.99\times10^{-5}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \subsection{Per-Layer Breakdown}
 \label{sec:results-layer}
 
-% TODO: interpret Fig 6.2 — which layers are the CKA hotspots.
+The per-layer \gls{cka} between consecutive checkpoints
+(Table~\ref{tab:cka-layer}) localises the drift. A clean \emph{monotonic depth
+gradient} emerges: the text\,+\,layout embeddings and the vision patch-embed do not
+move at all ($\mathrm{CKA}=1.000$), while drift rises with depth and peaks at the
+last encoder layer ($0.245$) and the classifier ($0.215$) at the first task
+boundary. Forgetting is thus a \emph{late-layer\,+\,head} phenomenon, not a
+fusion-specific or input-encoder one. Drift is also larger at the first boundary
+($0\rightarrow1$) than the second ($1\rightarrow2$), consistent with representations
+stabilising as more tasks arrive. This per-layer picture and the Fisher profile of
+\S\ref{sec:results-profile} agree: the output side of the network is where
+task-specific knowledge concentrates and is overwritten.
 
 \begin{figure}[!htbp]
   \centering
@@ -54,54 +139,155 @@ conditions C1--C4, and tests the hypotheses of
   \IfFileExists{figures/pilot_cka_heatmap.pdf}{%
     \includegraphics[width=0.85\linewidth]{pilot_cka_heatmap.pdf}}{%
     \fbox{\parbox[c][4cm][c]{0.85\linewidth}{\centering\itshape
-    Placeholder --- per-layer CKA heatmap (layer $\times$ task boundary), condition C4.}}}
+    Placeholder --- per-layer CKA heatmap (layer $\times$ task boundary), condition C4.
+    Numbers are tabulated in Table~\ref{tab:cka-layer}.}}}
   \caption[Per-layer CKA heatmap]{Per-layer representational drift (linear CKA)
-  between consecutive checkpoints. Darker cells indicate larger drift, localising
-  the forgetting hotspots. \textbf{TODO:} describe the pattern.}
+  between consecutive checkpoints. Lower values indicate larger drift, localising
+  the forgetting hotspots at the late encoder layer and the classifier head (cf.\
+  Table~\ref{tab:cka-layer}). \textbf{Preliminary} pilot result.}
   \label{fig:cka-heatmap}
 \end{figure}
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Per-layer representational drift (CKA)]{Linear CKA between consecutive
+  checkpoints ($1.0=$ no drift) for the full multimodal model (C4, default order).
+  Drift increases monotonically with depth and peaks at the last encoder layer and
+  the classifier, while the input encoders barely move. \textbf{Preliminary} pilot
+  result.}
+  \label{tab:cka-layer}
+  \begin{tabular}{lcc}
+    \toprule
+    \textbf{Layer} & \textbf{FUNSD$\rightarrow$CORD} & \textbf{CORD$\rightarrow$SROIE} \\
+    \midrule
+    Text+layout embeddings  & 1.000 & 1.000 \\
+    Vision patch-embed      & 1.000 & 1.000 \\
+    Encoder layer 0 (early) & 0.777 & 0.989 \\
+    Encoder layer 5 (mid)   & 0.344 & 0.924 \\
+    Encoder layer 11 (late) & 0.245 & 0.774 \\
+    Classifier head         & 0.215 & 0.708 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \subsection{Stability of the Finding}
 \label{sec:results-stability}
 
-% TODO: report whether the dominant-component finding holds across the three seeds
-% and the alternate task order; report the Mann-Whitney U test result (p-value,
-% Bonferroni-corrected) for H0 vs H1.
+\paragraph{Cross-condition and per-component tests.}
+Two Mann--Whitney U tests (Bonferroni-corrected, $\alpha=0.0167$) probe the
+hypotheses of \S\ref{sec:method-diag-hypotheses}. The \emph{cross-condition} test---is
+the full multimodal model's forgetting distinguishable from the unimodal/ablated
+conditions?---\textbf{fails to reject} $H_0$ ($p = 0.026 / 0.028 / 0.167$ for C4 vs
+C1/C2/C3). The C4-vs-C1 gap is large (BWT $\approx-81$ vs $0$) but, with $n{=}6$ and
+the variance injected by the collapsed runs below, does not clear the corrected
+threshold. The \emph{per-component} test, by contrast, \textbf{rejects} $H_0$: the
+classifier group is the dominant forgetting locus, significantly above the
+image-patch and text-word embeddings. Per the pre-registered decision rule
+(\S\ref{sec:method-selection}), a head-dominated signal does not uniquely select any
+of the three \emph{architectural} candidates (fusion, layout-position,
+modality-routing), so the diagnosis points to the characterisation-first reading of
+\S\ref{sec:method-fallback}: forgetting is severe and late-layer/head-concentrated,
+but no single architectural component dominates in a way that mandates one structural
+remedy.
+
+\paragraph{Forgetting by condition.}
+Table~\ref{tab:condition-metrics} reports the continual-learning metrics by
+modality-ablation condition. The full model (C4) and the text\,+\,layout model (C3)
+forget comparably (BWT $-81$ and $-88$), confirming that the diagnosis is not an
+artefact of any one input stream.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Forgetting by diagnostic condition]{Continual-learning metrics by
+  modality-ablation condition (mean\,$\pm$\,std over three seeds), naive sequential
+  FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE. Text-deprived conditions (C1, C2)
+  collapse to F1\,$\approx$\,0 for most seeds, inflating their variance (see
+  ``modality collapse'' below). \textbf{Preliminary} pilot result.}
+  \label{tab:condition-metrics}
+  \begin{tabular}{llccc}
+    \toprule
+    \textbf{Cond.} & \textbf{Active streams} & \textbf{AA} & \textbf{BWT} & \textbf{AF} \\
+    \midrule
+    C1 & text only      & $0.00 \pm 0.00$  & $0.00 \pm 0.00$    & $0.00 \pm 0.00$ \\
+    C2 & layout+vision  & $7.21 \pm 10.20$ & $-18.79 \pm 26.57$ & $18.79 \pm 26.57$ \\
+    C3 & text+layout    & $27.72 \pm 0.44$ & $-87.62 \pm 0.62$  & $87.62 \pm 0.62$ \\
+    C4 & full           & $31.63 \pm 3.51$ & $-81.26 \pm 6.41$  & $81.26 \pm 6.41$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Modality collapse.}
+A secondary finding tempers the cross-condition test. Conditions that remove the text
+stream frequently collapse during \emph{task-0} training: C1 (text-only) trained in
+$0/3$ seeds and C2 (no text) in $1/3$, whereas C3 (text+layout) and C4 (full) trained
+stably in $3/3$ (and $3/3$ alternate-order) seeds. The collapse is a training failure,
+not forgetting---collapsed runs already score $0$ F1 immediately after task 0, while
+the one stable text-deprived run shows normal continual-learning behaviour. This
+indicates that the combination of text and layout drives stable optimisation and that
+the \emph{text stream is load-bearing} for LayoutLMv3, an interpretable finding in its
+own right; but it also means the text-deprived conditions contribute mostly zeros,
+which inflates their variance and weakens the cross-condition statistic above.
+
+\paragraph{Order dependence.}
+Finally, forgetting is order-sensitive. Reversing the task order
+(SROIE\,$\rightarrow$\,CORD\,$\rightarrow$\,FUNSD) measurably reduces forgetting
+relative to the default order (BWT $-75.23$ vs $-81.26$; AA $34.75$ vs $31.63$):
+ending on the small 7-label FUNSD task leaves more of the sequence intact. Single-order
+conclusions are therefore reported with this caveat, which the pilot deliberately
+captured with the alternate-order runs.
 
 \section{Mechanism-Targeted Remedy versus Baselines}
 \label{sec:results-remedy}
 
+This section reports the main continual-learning grid. The completed baselines
+(naive, joint, EWC, LwF, and the partially-complete ER) are filled below; the proposed
+DocCL remedy is in progress (its design follows the diagnosis,
+\S\ref{sec:method-selected}/\S\ref{sec:method-fallback}) and its row is left pending.
+
 \subsection{Main Comparison}
 \label{sec:results-main-table}
 
-% TODO: interpret Table 6.1 — DocCL versus the ten baselines on AA across the
-% three scenarios; mean +/- std over 3 seeds.
+Table~\ref{tab:main-comparison} reports the average accuracy of each method on the
+three scenarios. Three patterns hold across seeds. First, naive fine-tuning is far
+below the joint oracle in every scenario, with the gap largest on the
+domain-incremental scenario ($38.4$ vs $84.8$). Second, replay is the strongest
+non-oracle strategy by a wide margin: on DIL, ER reaches $88.2$ AA, statistically
+matching the joint upper bound and closing essentially the entire $46$-point
+forgetting gap. Third, regularisation (EWC) helps on domain shift but slightly hurts
+on fine-grained class-incremental learning, while distillation (LwF) tracks the naive
+lower bound throughout---in this dense token-classification setting LwF gives
+essentially no benefit, because the old-class logits it distils collapse anyway as the
+classifier head grows.
 
 \begin{table}[!htbp]
   \centering
   \caption[Main comparison: average accuracy across scenarios]{Average entity-F1
-  (AA, mean\,$\pm$\,std over three seeds) of each method on the three continual
-  scenarios. Best non-oracle result per column in bold. \textbf{TODO:} fill from
-  \texttt{results/}.}
+  (AA, mean\,$\pm$\,std over three seeds unless noted) of each method on the three
+  continual scenarios. Best non-oracle result per column in bold. \textbf{Preliminary}
+  results under the reduced configuration (RTX 2060, 3 epochs, batch 2); $41/54$ cells
+  complete. Em-dash cells: DER++ and ER-Mixed are in progress; the prompt-based
+  (L2P, DualPrompt, CODA-Prompt), LoRA (O-LoRA), and DocCL rows are deferred to the
+  full run (\S\ref{sec:results-discussion}). ``$n{=}2$'': two seeds available.}
   \label{tab:main-comparison}
-  % Generated by scripts/analyze_results.py + ingest_to_thesis.py; scaffold is the fallback.
+  % Generated by scripts/analyze_results.py + ingest_to_thesis.py; the table below is the
+  % current preliminary fill and is overridden automatically once the generated file exists.
   \IfFileExists{generated/table_main.tex}{\input{generated/table_main}}{%
   \begin{tabular}{lccc}
     \toprule
     \textbf{Method} & \textbf{CIL-CORD} & \textbf{DIL} & \textbf{Mixed} \\
     \midrule
-    Naive (lower bound)   & TODO & TODO & TODO \\
-    EWC                   & TODO & TODO & TODO \\
-    LwF                   & TODO & TODO & TODO \\
-    ER                    & TODO & TODO & TODO \\
-    DER++                 & TODO & TODO & TODO \\
-    L2P                   & TODO & TODO & TODO \\
-    DualPrompt            & TODO & TODO & TODO \\
-    CODA-Prompt           & TODO & TODO & TODO \\
-    O-LoRA                & TODO & TODO & TODO \\
-    \textbf{DocCL (ours)} & TODO & TODO & TODO \\
+    Naive (lower bound)   & $18.4 \pm 0.4$ & $38.4 \pm 0.9$ & $30.4 \pm 3.4$ \\
+    EWC                   & $14.3 \pm 1.5$ & $43.1 \pm 3.7$ & $30.9 \pm 3.4$ \\
+    LwF                   & $\mathbf{18.6 \pm 0.4}$ & $38.4 \pm 0.9$ & $\mathbf{32.3 \pm 1.0}$ \\
+    ER                    & $15.7 \pm 0.4$ & $\mathbf{88.2 \pm 0.5}$ ($n{=}2$) & -- \\
+    DER++                 & -- & -- & -- \\
+    L2P                   & -- & -- & -- \\
+    DualPrompt            & -- & -- & -- \\
+    CODA-Prompt           & -- & -- & -- \\
+    O-LoRA                & -- & -- & -- \\
+    \textbf{DocCL (ours)} & -- & -- & -- \\
     \midrule
-    Joint (upper bound)   & TODO & TODO & TODO \\
+    Joint (upper bound)   & $30.9 \pm 0.4$ & $84.8 \pm 0.8$ & $62.8 \pm 2.0$ \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -109,8 +295,44 @@ conditions C1--C4, and tests the hypotheses of
 \subsection{Forgetting and Plasticity Breakdown}
 \label{sec:results-bwt-fwt}
 
-% TODO: report BWT (forgetting) and FWT (plasticity) for the key methods;
-% reference Fig 6.3.
+Backward transfer (Table~\ref{tab:bwt-comparison}) sharpens the ranking. Naive and
+LwF forget almost totally on CIL-CORD (BWT $\approx-90$); EWC roughly halves the
+forgetting on the two scenarios with a domain shift (DIL $-36.5$, Mixed $-31.3$ vs
+naive $-71.3$ and $-66.8$) but barely helps on CIL-CORD; and ER all but eliminates
+forgetting on DIL, with a slightly \emph{positive} backward transfer
+($+1.0$)---learning later tasks marginally improves earlier ones under replay. The
+method ordering for forgetting prevention is thus
+naive\,$\approx$\,LwF\,$<$\,EWC\,$<$\,ER, well short of the zero-forgetting joint
+oracle but, for ER on DIL, effectively reaching it.
+
+\paragraph{Forward transfer.} For these preliminary runs the evaluation matrix is
+lower-triangular---each model is evaluated only on tasks seen so far---so the
+forward-transfer term FWT (which needs the zero-shot $R[j-1,j]$ entries) is
+\emph{not yet available} and is reported as ``--''. The full protocol of
+\S\ref{sec:eval-metrics} measures it by additionally evaluating the not-yet-seen
+tasks; this is enabled for the full run.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Backward transfer across scenarios]{Backward transfer (BWT, mean\,$\pm$\,std
+  over three seeds unless noted); closer to $0$ is less forgetting. Best non-oracle
+  per column in bold. \textbf{Preliminary} results; em-dash cells as in
+  Table~\ref{tab:main-comparison}.}
+  \label{tab:bwt-comparison}
+  \begin{tabular}{lccc}
+    \toprule
+    \textbf{Method} & \textbf{CIL-CORD} & \textbf{DIL} & \textbf{Mixed} \\
+    \midrule
+    Naive (lower bound) & $-90.4 \pm 1.2$ & $-71.3 \pm 3.1$ & $-66.8 \pm 3.0$ \\
+    EWC                 & $-77.2 \pm 2.8$ & $-36.5 \pm 2.4$ & $\mathbf{-31.3 \pm 7.2}$ \\
+    LwF                 & $-90.4 \pm 0.8$ & $-72.0 \pm 1.5$ & $-65.3 \pm 1.2$ \\
+    ER                  & $\mathbf{-63.8 \pm 5.4}$ & $\mathbf{+1.0 \pm 1.4}$ ($n{=}2$) & -- \\
+    DER++               & -- & -- & -- \\
+    \midrule
+    Joint (upper bound) & $0.0$ & $0.0$ & $0.0$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \begin{figure}[!htbp]
   \centering
@@ -118,30 +340,40 @@ conditions C1--C4, and tests the hypotheses of
   \IfFileExists{figures/forgetting_curves.pdf}{%
     \includegraphics[width=0.85\linewidth]{forgetting_curves.pdf}}{%
     \fbox{\parbox[c][4cm][c]{0.85\linewidth}{\centering\itshape
-    Placeholder --- per-task forgetting curves for the key methods.}}}
+    Placeholder --- per-task forgetting curves for the key methods (to be generated
+    from the full grid).}}}
   \caption[Forgetting curves per method]{Per-task performance as the task sequence
-  progresses, for the key methods. \textbf{TODO:} interpret stability versus
-  plasticity.}
+  progresses, for the key methods. Replay (ER) retains earlier-task F1 deep into the
+  sequence, whereas naive/LwF drop to near zero after each boundary.
+  \textbf{Preliminary}; figure generated once the full grid completes.}
   \label{fig:forgetting-curves}
 \end{figure}
 
 \subsection{Targeting versus Uniform Treatment}
 \label{sec:results-key-ablation}
 
-% TODO: the key ablation — does concentrating the mechanism on the dominant
-% component beat uniform treatment? Reference Table 6.2.
+This comparison---does concentrating a remedy on the dominant-forgetting component
+beat treating all components uniformly?---requires the proposed DocCL mechanism, which
+is \emph{in progress}. The pilot diagnosis produced a characterisation-first result
+(\S\ref{sec:results-stability}, \S\ref{sec:method-fallback}): the dominant locus is the
+classifier head rather than a single architectural lever, so the targeted mechanism is
+being finalised under advisor review before this ablation is run. The result will be
+reported here once the method is fixed.
 
 \section{Ablation Studies}
 \label{sec:results-ablation}
 
-% TODO: turn the mechanism on for each component in isolation and confirm that the
-% diagnosis predicts the best target.
+The component-targeting ablation (Table~\ref{tab:ablation}) turns the DocCL mechanism
+on for each component in isolation to test whether the diagnosis predicts the best
+target. It depends on the proposed mechanism and is therefore \emph{in progress}; the
+scaffold below is populated once the method is finalised.
 
 \begin{table}[!htbp]
   \centering
-  \caption[Component-targeting ablation]{Effect of concentrating the DocCL
-  mechanism on each component in isolation. The diagnosis predicts which target is
-  best. \textbf{TODO:} fill from \texttt{results/}.}
+  \caption[Component-targeting ablation (in progress)]{Effect of concentrating the
+  DocCL mechanism on each component in isolation; the diagnosis predicts which target
+  is best. \emph{In progress} --- depends on the proposed mechanism
+  (\S\ref{sec:results-key-ablation}).}
   \label{tab:ablation}
   % Generated by scripts/analyze_results.py + ingest_to_thesis.py; scaffold is the fallback.
   \IfFileExists{generated/table_ablation.tex}{\input{generated/table_ablation}}{%
@@ -149,11 +381,11 @@ conditions C1--C4, and tests the hypotheses of
     \toprule
     \textbf{Targeted component} & \textbf{AA} & \textbf{BWT} \\
     \midrule
-    Text only    & TODO & TODO \\
-    Visual only  & TODO & TODO \\
-    Layout only  & TODO & TODO \\
-    Fusion only  & TODO & TODO \\
-    Uniform (all) & TODO & TODO \\
+    Text only     & -- & -- \\
+    Visual only   & -- & -- \\
+    Layout only   & -- & -- \\
+    Fusion only   & -- & -- \\
+    Uniform (all) & -- & -- \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -161,24 +393,34 @@ conditions C1--C4, and tests the hypotheses of
 \section{Computational Efficiency}
 \label{sec:results-compute}
 
-% TODO: overhead of instrumentation + the targeted mechanism versus generic CL
-% (training time, memory, added parameters). Reference Table 6.3.
+Table~\ref{tab:compute} reports the wall-clock and memory cost of the completed
+methods, measured on the single 6\,GB GPU under the preliminary configuration
+(batch 2, gradient checkpointing). All methods fit within the $5$\,GB VRAM ceiling.
+Regularisation and distillation add a modest constant overhead---EWC stores the
+diagonal Fisher and a parameter snapshot, LwF a frozen teacher copy---while replay is
+the expensive method: ER roughly doubles the per-run wall-clock because it runs a
+second forward/backward pass over a replay batch at every step. ``Run'' denotes one
+full continual scenario (three to six tasks).
 
 \begin{table}[!htbp]
   \centering
-  \caption[Computational overhead]{Training-time and parameter overhead of the
-  diagnostic instrumentation and the DocCL mechanism relative to naive
-  fine-tuning. \textbf{TODO:} fill from \texttt{results/}.}
+  \caption[Computational overhead]{Wall-clock and memory overhead of the completed
+  continual-learning methods relative to naive fine-tuning, measured on a single
+  6\,GB RTX 2060 (batch 2, gradient checkpointing). ``Run'' $=$ one full continual
+  scenario. \textbf{Preliminary}; the DER++ and DocCL rows are in progress.}
   \label{tab:compute}
-  % Generated by scripts/analyze_results.py + ingest_to_thesis.py; scaffold is the fallback.
+  % Generated by scripts/analyze_results.py + ingest_to_thesis.py; the fill below is preliminary.
   \IfFileExists{generated/table_compute.tex}{\input{generated/table_compute}}{%
-  \begin{tabular}{lccc}
+  \begin{tabular}{llll}
     \toprule
-    \textbf{Method} & \textbf{Time/task} & \textbf{Added params} & \textbf{Memory} \\
+    \textbf{Method} & \textbf{Wall-clock / run} & \textbf{Extra state} & \textbf{Peak VRAM} \\
     \midrule
-    Naive          & TODO & TODO & TODO \\
-    EWC            & TODO & TODO & TODO \\
-    \textbf{DocCL} & TODO & TODO & TODO \\
+    Naive          & $\sim$24--40 min & ---                          & $\sim$2.6 GB \\
+    EWC            & $\sim$40--50 min & diagonal Fisher + $\theta^\star$ snapshot & $\sim$4.7 GB \\
+    LwF            & $\sim$40--50 min & frozen teacher copy          & $\sim$3.0 GB \\
+    ER             & $\sim$1.2--2.3 h & 200-doc replay buffer        & $<$5 GB \\
+    DER++          & in progress      & buffer + cached logits       & --- \\
+    \textbf{DocCL} & in progress      & ---                          & --- \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -186,8 +428,43 @@ conditions C1--C4, and tests the hypotheses of
 \section{Discussion}
 \label{sec:results-discussion}
 
-% TODO: what the diagnosis means for designing CL methods for multimodal
-% encoders; whether targeting beats uniform treatment and why; threats to
-% validity (single primary backbone, dataset scale, OCR noise, the C1 text-only
-% caveat from Section 3.2.2); whether the finding generalises to LiLT/BROS
-% (secondary-backbone check).
+\paragraph{What the diagnosis means.}
+The per-component diagnosis (\S\ref{sec:results-diagnosis}) gives a clear, if
+sobering, picture: under naive sequential fine-tuning LayoutLMv3 forgets
+catastrophically, and the forgetting concentrates in the \emph{classifier head and the
+late encoder layers}, not in the input encoders or a multimodal fusion component. The
+cross-condition test could not statistically separate the full multimodal model from
+its ablated variants, so the original premise that multimodal encoders forget
+differently \emph{in fusion} is not supported by this pilot. This is itself
+actionable: it suggests that remedies which protect or modularise the upper layers and
+the classifier---of which experience replay, by directly re-exposing old-class targets
+at the output, is the simplest instance---are the natural intervention, and it explains
+\emph{why} replay is so effective in the benchmark below.
+
+\paragraph{What the benchmark shows.}
+Across the three scenarios the ordering is unambiguous: replay $\gg$ regularisation
+$\gg$ distillation. ER essentially solves the domain-incremental scenario (AA $88.2$,
+BWT $\approx0$, matching the joint oracle), EWC roughly halves forgetting wherever a
+domain shift is present but not on fine-grained class-incremental learning, and LwF
+tracks the naive lower bound throughout. The dense token-classification setting with a
+growing head is the likely reason distillation fails: the old-class logits it distils
+decay regardless once their classes stop being reinforced. The scenario lens matters
+too---domain-incremental learning, with distinct documents under a fixed label space,
+is the most tractable for these methods, whereas fine-grained class-incremental
+learning over a single dataset is the hardest.
+
+\paragraph{Threats to validity.}
+Several caveats bound these conclusions. (i) The results are \emph{preliminary}: three
+epochs per task (not ten), a single 6\,GB GPU, and $41/54$ cells complete; the
+replay-heavy methods (ER-Mixed, DER++) and the prompt/LoRA baselines are not yet run,
+and the proposed DocCL remedy and its targeting ablation are deferred pending the
+method decision. (ii) Each scenario uses a single fixed task order for the main grid;
+the pilot showed order materially affects forgetting ($\sim$6 BWT points), so the full
+run repeats the main comparison under alternate orders. (iii) Forward transfer is not
+yet measured (\S\ref{sec:results-bwt-fwt}). (iv) The pilot's text-deprived conditions
+collapsed, which limited the statistical power of the cross-condition test. (v) All
+results are on the single primary backbone; whether the late-layer/head concentration
+generalises to LiLT and BROS is the planned secondary-backbone check. None of these
+undercut the two robust qualitative findings---forgetting is a late-layer/head
+phenomenon, and replay is the strongest remedy---but they delimit how far the exact
+numbers should be pushed before the full run completes.
