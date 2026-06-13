@@ -1,0 +1,53 @@
+<mxfile host="Electron" modified="2026-06-13T10:30:00.000Z" agent="claude-code" version="22.1.2" etag="diagfc01" type="device">
+  <diagram name="diag_forgetting_curves" id="diagfc">
+    <mxGraphModel dx="954" dy="669" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="820" pageHeight="470" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Naive sequential fine-tuning: per-task F1 across the sequence (pilot, C4, seed 42)" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry x="10" y="12" width="800" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="gy100" value="" style="endArrow=none;html=1;strokeColor=#ECECEC;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="120" y="80" as="sourcePoint" /><mxPoint x="740" y="80" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="gy80" value="" style="endArrow=none;html=1;strokeColor=#ECECEC;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="120" y="136" as="sourcePoint" /><mxPoint x="740" y="136" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="gy60" value="" style="endArrow=none;html=1;strokeColor=#ECECEC;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="120" y="192" as="sourcePoint" /><mxPoint x="740" y="192" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="gy40" value="" style="endArrow=none;html=1;strokeColor=#ECECEC;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="120" y="248" as="sourcePoint" /><mxPoint x="740" y="248" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="gy20" value="" style="endArrow=none;html=1;strokeColor=#ECECEC;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="120" y="304" as="sourcePoint" /><mxPoint x="740" y="304" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="yaxis" value="" style="endArrow=none;html=1;strokeColor=#6E6E6E;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="120" y="76" as="sourcePoint" /><mxPoint x="120" y="360" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="xaxis" value="" style="endArrow=none;html=1;strokeColor=#6E6E6E;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="120" y="360" as="sourcePoint" /><mxPoint x="740" y="360" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="yl100" value="100" style="text;html=1;align=right;fontFamily=Times New Roman;fontSize=10;fontColor=#777777;" parent="1" vertex="1"><mxGeometry x="84" y="72" width="28" height="16" as="geometry" /></mxCell>
+        <mxCell id="yl80" value="80" style="text;html=1;align=right;fontFamily=Times New Roman;fontSize=10;fontColor=#777777;" parent="1" vertex="1"><mxGeometry x="84" y="128" width="28" height="16" as="geometry" /></mxCell>
+        <mxCell id="yl60" value="60" style="text;html=1;align=right;fontFamily=Times New Roman;fontSize=10;fontColor=#777777;" parent="1" vertex="1"><mxGeometry x="84" y="184" width="28" height="16" as="geometry" /></mxCell>
+        <mxCell id="yl40" value="40" style="text;html=1;align=right;fontFamily=Times New Roman;fontSize=10;fontColor=#777777;" parent="1" vertex="1"><mxGeometry x="84" y="240" width="28" height="16" as="geometry" /></mxCell>
+        <mxCell id="yl20" value="20" style="text;html=1;align=right;fontFamily=Times New Roman;fontSize=10;fontColor=#777777;" parent="1" vertex="1"><mxGeometry x="84" y="296" width="28" height="16" as="geometry" /></mxCell>
+        <mxCell id="yl0" value="0" style="text;html=1;align=right;fontFamily=Times New Roman;fontSize=10;fontColor=#777777;" parent="1" vertex="1"><mxGeometry x="84" y="352" width="28" height="16" as="geometry" /></mxCell>
+        <mxCell id="ytitle" value="entity-F1 on task" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#555555;rotation=-90;" parent="1" vertex="1"><mxGeometry x="14" y="190" width="110" height="16" as="geometry" /></mxCell>
+        <mxCell id="fu1" value="" style="endArrow=none;html=1;strokeColor=#2C6FB3;strokeWidth=2;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="200" y="114" as="sourcePoint" /><mxPoint x="440" y="355" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="fu2" value="" style="endArrow=none;html=1;strokeColor=#2C6FB3;strokeWidth=2;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="440" y="355" as="sourcePoint" /><mxPoint x="680" y="355" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="co1" value="" style="endArrow=none;html=1;strokeColor=#D9772B;strokeWidth=2;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="440" y="100" as="sourcePoint" /><mxPoint x="680" y="349" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="mfu1" value="" style="ellipse;html=1;fillColor=#2C6FB3;strokeColor=#1A4E80;strokeWidth=2;" parent="1" vertex="1"><mxGeometry x="194" y="108" width="12" height="12" as="geometry" /></mxCell>
+        <mxCell id="mfu2" value="" style="ellipse;html=1;fillColor=#2C6FB3;strokeColor=#2C6FB3;" parent="1" vertex="1"><mxGeometry x="435" y="350" width="10" height="10" as="geometry" /></mxCell>
+        <mxCell id="mfu3" value="" style="ellipse;html=1;fillColor=#2C6FB3;strokeColor=#2C6FB3;" parent="1" vertex="1"><mxGeometry x="675" y="350" width="10" height="10" as="geometry" /></mxCell>
+        <mxCell id="mco2" value="" style="ellipse;html=1;fillColor=#D9772B;strokeColor=#A8530F;strokeWidth=2;" parent="1" vertex="1"><mxGeometry x="434" y="94" width="12" height="12" as="geometry" /></mxCell>
+        <mxCell id="mco3" value="" style="ellipse;html=1;fillColor=#D9772B;strokeColor=#D9772B;" parent="1" vertex="1"><mxGeometry x="675" y="344" width="10" height="10" as="geometry" /></mxCell>
+        <mxCell id="msr3" value="" style="ellipse;html=1;fillColor=#3A9D4E;strokeColor=#1E5A2E;strokeWidth=2;" parent="1" vertex="1"><mxGeometry x="674" y="129" width="12" height="12" as="geometry" /></mxCell>
+        <mxCell id="lfu1" value="88.0" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=1;fontColor=#2C6FB3;" parent="1" vertex="1"><mxGeometry x="172" y="90" width="56" height="16" as="geometry" /></mxCell>
+        <mxCell id="lfu2" value="1.8" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#2C6FB3;" parent="1" vertex="1"><mxGeometry x="412" y="358" width="40" height="14" as="geometry" /></mxCell>
+        <mxCell id="lfu3" value="1.9" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#2C6FB3;" parent="1" vertex="1"><mxGeometry x="690" y="360" width="40" height="14" as="geometry" /></mxCell>
+        <mxCell id="lco2" value="93.0" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=1;fontColor=#D9772B;" parent="1" vertex="1"><mxGeometry x="448" y="86" width="56" height="16" as="geometry" /></mxCell>
+        <mxCell id="lco3" value="4.1" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#D9772B;" parent="1" vertex="1"><mxGeometry x="640" y="340" width="40" height="14" as="geometry" /></mxCell>
+        <mxCell id="lsr3" value="80.5" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=1;fontColor=#3A9D4E;" parent="1" vertex="1"><mxGeometry x="690" y="126" width="56" height="16" as="geometry" /></mxCell>
+        <mxCell id="xs1" value="after T1&#10;(FUNSD)" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;whiteSpace=wrap;" parent="1" vertex="1"><mxGeometry x="150" y="364" width="100" height="30" as="geometry" /></mxCell>
+        <mxCell id="xs2" value="after T2&#10;(CORD)" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;whiteSpace=wrap;" parent="1" vertex="1"><mxGeometry x="390" y="364" width="100" height="30" as="geometry" /></mxCell>
+        <mxCell id="xs3" value="after T3&#10;(SROIE)" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;whiteSpace=wrap;" parent="1" vertex="1"><mxGeometry x="630" y="364" width="100" height="30" as="geometry" /></mxCell>
+        <mxCell id="learned_note" value="bold marker = task just learned" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=10;fontStyle=2;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="250" y="150" width="220" height="16" as="geometry" /></mxCell>
+        <mxCell id="lg_fu" value="" style="endArrow=none;html=1;strokeColor=#2C6FB3;strokeWidth=2;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="150" y="416" as="sourcePoint" /><mxPoint x="186" y="416" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="lg_fu_t" value="FUNSD" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1"><mxGeometry x="192" y="408" width="80" height="16" as="geometry" /></mxCell>
+        <mxCell id="lg_co" value="" style="endArrow=none;html=1;strokeColor=#D9772B;strokeWidth=2;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="290" y="416" as="sourcePoint" /><mxPoint x="326" y="416" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="lg_co_t" value="CORD" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1"><mxGeometry x="332" y="408" width="80" height="16" as="geometry" /></mxCell>
+        <mxCell id="lg_sr" value="" style="ellipse;html=1;fillColor=#3A9D4E;strokeColor=#1E5A2E;" parent="1" vertex="1"><mxGeometry x="430" y="411" width="12" height="12" as="geometry" /></mxCell>
+        <mxCell id="lg_sr_t" value="SROIE (just learned at end)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1"><mxGeometry x="448" y="408" width="220" height="16" as="geometry" /></mxCell>
+        <mxCell id="finding" value="Finding: each task is learned to a strong F1 (bold markers: 88 / 93 / 80.5) and then collapses to ~2&#8211;4 F1 once the next task is trained. These curves are the rows of the matrix in Fig.~6.1 read left-to-right." style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;fontStyle=2;fontColor=#333333;whiteSpace=wrap;" parent="1" vertex="1"><mxGeometry x="40" y="432" width="740" height="32" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

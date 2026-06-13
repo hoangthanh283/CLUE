@@ -1,0 +1,109 @@
+<mxfile host="Electron" modified="2026-06-13T10:00:00.000Z" agent="claude-code" version="22.1.2" etag="diagfm01" type="device">
+  <diagram name="diag_forgetting_matrix" id="diagfm">
+    <mxGraphModel dx="954" dy="669" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="780" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Performance matrix R[i,j] under naive sequential fine-tuning (C4, seed 42)" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry x="20" y="14" width="740" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="col_hdr" value="Evaluated on task j &#8594;" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="200" y="64" width="330" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="row_hdr" value="After&#10;training&#10;task i &#8595;" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=12;fontStyle=1;whiteSpace=wrap;" parent="1" vertex="1">
+          <mxGeometry x="70" y="150" width="96" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ch1" value="FUNSD" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="200" y="88" width="110" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ch2" value="CORD" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="320" y="88" width="110" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ch3" value="SROIE" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="440" y="88" width="110" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="rh1" value="FUNSD" style="text;html=1;align=right;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="118" y="142" width="74" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="rh2" value="CORD" style="text;html=1;align=right;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="118" y="214" width="74" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="rh3" value="SROIE" style="text;html=1;align=right;fontFamily=Times New Roman;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="118" y="286" width="74" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="m11" value="88.0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#9FD3AC;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=16;fontStyle=1;fontColor=#1E5A2E;" parent="1" vertex="1">
+          <mxGeometry x="200" y="142" width="110" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="m12" value="&#8212;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4F4F4;strokeColor=#CCCCCC;fontFamily=Times New Roman;fontSize=14;fontColor=#AAAAAA;" parent="1" vertex="1">
+          <mxGeometry x="320" y="142" width="110" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="m13" value="&#8212;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4F4F4;strokeColor=#CCCCCC;fontFamily=Times New Roman;fontSize=14;fontColor=#AAAAAA;" parent="1" vertex="1">
+          <mxGeometry x="440" y="142" width="110" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="m21" value="1.8" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E7A79C;strokeColor=#B3402F;fontFamily=Times New Roman;fontSize=16;fontStyle=1;fontColor=#7A2418;" parent="1" vertex="1">
+          <mxGeometry x="200" y="214" width="110" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="m22" value="93.0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#9FD3AC;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=16;fontStyle=1;fontColor=#1E5A2E;" parent="1" vertex="1">
+          <mxGeometry x="320" y="214" width="110" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="m23" value="&#8212;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4F4F4;strokeColor=#CCCCCC;fontFamily=Times New Roman;fontSize=14;fontColor=#AAAAAA;" parent="1" vertex="1">
+          <mxGeometry x="440" y="214" width="110" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="m31" value="1.9" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E7A79C;strokeColor=#B3402F;fontFamily=Times New Roman;fontSize=16;fontStyle=1;fontColor=#7A2418;" parent="1" vertex="1">
+          <mxGeometry x="200" y="286" width="110" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="m32" value="4.1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E7A79C;strokeColor=#B3402F;fontFamily=Times New Roman;fontSize=16;fontStyle=1;fontColor=#7A2418;" parent="1" vertex="1">
+          <mxGeometry x="320" y="286" width="110" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="m33" value="80.5" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#9FD3AC;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=16;fontStyle=1;fontColor=#1E5A2E;" parent="1" vertex="1">
+          <mxGeometry x="440" y="286" width="110" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="diag_note" value="diagonal:&#10;just-learned&#10;(plasticity)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#3A9D4E;whiteSpace=wrap;" parent="1" vertex="1">
+          <mxGeometry x="566" y="286" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e_diag" value="" style="endArrow=open;endSize=6;html=1;strokeColor=#3A9D4E;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="562" y="308" as="sourcePoint" />
+            <mxPoint x="552" y="308" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="forget_note" value="sub-diagonal: retention of an&#10;earlier task after later training&#10;&#8212; collapses to ~2&#8211;4 F1" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#B3402F;whiteSpace=wrap;" parent="1" vertex="1">
+          <mxGeometry x="566" y="214" width="180" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="e_forget" value="" style="endArrow=open;endSize=6;html=1;strokeColor=#B3402F;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="562" y="240" as="sourcePoint" />
+            <mxPoint x="312" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="callout_bg" value="" style="rounded=1;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;" parent="1" vertex="1">
+          <mxGeometry x="70" y="380" width="640" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="callout_title" value="Finding: forgetting is near-total within one task step" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=13;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+          <mxGeometry x="86" y="388" width="500" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="callout_body" value="Each task is learned well in isolation (diagonal 80&#8211;93 F1), but after one further task the&#10;earlier task collapses: FUNSD falls 88.0 &#8594; 1.8 (&#8722;86 F1) once CORD is learned. The&#10;text+layout condition C3 shows the identical pattern (88.7 &#8594; 0.3 &#8594; 1.7)." style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;fontColor=#333333;whiteSpace=wrap;" parent="1" vertex="1">
+          <mxGeometry x="86" y="410" width="610" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_g" value="" style="rounded=0;html=1;fillColor=#9FD3AC;strokeColor=#3A9D4E;" parent="1" vertex="1">
+          <mxGeometry x="200" y="500" width="18" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_glbl" value="retained / just-learned" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="222" y="498" width="150" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_r" value="" style="rounded=0;html=1;fillColor=#E7A79C;strokeColor=#B3402F;" parent="1" vertex="1">
+          <mxGeometry x="372" y="500" width="18" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_rlbl" value="forgotten" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="394" y="498" width="90" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_x" value="" style="rounded=0;html=1;fillColor=#F4F4F4;strokeColor=#CCCCCC;" parent="1" vertex="1">
+          <mxGeometry x="476" y="500" width="18" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_xlbl" value="not yet trained" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="498" y="498" width="130" height="18" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
