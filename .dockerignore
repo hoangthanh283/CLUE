@@ -1,0 +1,19 @@
+# Keep the Docker build context small + reproducible.
+.venv/
+.git/
+results/
+results_3ep_archive/
+wandb/
+data/sroie/          # 111M — regenerated from HF inside the container (prepare_sroie.py)
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.ipynb_checkpoints/
+thesis/             # the LaTeX thesis is not needed to run the grid
+papers/
+CL4IE/              # the wiki is not needed to run the grid
+docs/
+*.log
+.env                # secrets injected at runtime via -e, never baked into the image

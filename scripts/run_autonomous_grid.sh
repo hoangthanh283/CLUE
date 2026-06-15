@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Autonomous baseline-grid driver (train-to-convergence: val-F1 early stopping).
 #
-# Runs the full pipeline sequentially, resume-safe, within hard resource limits:
-#   PHASE 3 (54 core) -> single-task FWT baselines (9) -> PHASE 4 (36 prompt/LoRA)
-#   -> PHASE 5 (9 doccl) -> aggregate -> ingest.
+# Runs the pipeline sequentially, resume-safe, within hard resource limits:
+#   single-task FWT baselines (9) -> PHASE 5 (9 doccl) -> [PHASE 3 core (54) +
+#   PHASE 4 prompt/LoRA (36) unless SKIP_CORE=1] -> aggregate -> ingest.
+# DocCL runs right after the baselines so the proposed method lands early; Core and
+# Prompt/LoRA are a local fallback meant for a more powerful machine (docker/).
 #
 # Training protocol: each task trains until its held-out val-F1 stops improving for
 # `early_stop_patience` consecutive epochs (then best-val weights are restored), with
@@ -84,20 +86,29 @@ done
 say "Building single-task baseline CSV (b_i) for per-run FWT ..."
 python scripts/analyze_results.py >> "$LOG" 2>&1 || say "baseline-CSV build returned nonzero (continuing)"
 
-# ── PHASE 3: core baselines (54) ───────────────────────────────────────────────
-say "PHASE 3 core baselines (naive joint ewc lwf er der_pp x cil_cord dil mixed x 3 seeds)"
-PHASE=3 EXTRA="$EXTRA" bash scripts/run_grid.sh >> "$LOG" 2>&1 || say "phase3 returned nonzero (continuing)"
-say "PHASE 3 done markers: $(ls results/*_{naive,joint,ewc,lwf,er,der_pp}_seed*/.done 2>/dev/null | wc -l)"
-
-# ── PHASE 4: prompt/LoRA baselines (36) ────────────────────────────────────────
-say "PHASE 4 prompt/LoRA (l2p dualprompt coda_prompt o_lora x cil_cord dil mixed x 3 seeds)"
-PHASE=4 EXTRA="$EXTRA" bash scripts/run_grid.sh >> "$LOG" 2>&1 || say "phase4 returned nonzero (continuing)"
-say "PHASE 4 done markers: $(ls results/*_{l2p,dualprompt,coda_prompt,o_lora}_seed*/.done 2>/dev/null | wc -l)"
-
-# ── PHASE 5: doccl (9, DocCL_A placeholder) ────────────────────────────────────
-say "PHASE 5 doccl (DocCL_A placeholder) x cil_cord dil mixed x 3 seeds"
+# ── PHASE 5: doccl (9, DocCL_A placeholder) — RUN RIGHT AFTER BASELINES ─────────
+# The proposed method lands first so its results are available early. PHASE 3/4 (Core
+# + Prompt/LoRA) follow as a local fallback but are intended to run on a more powerful
+# machine (see docker/ + scripts/run_grid_remote.sh). Set SKIP_CORE=1 to skip them
+# locally once the remote machine has them.
+say "PHASE 5 doccl (DocCL_A placeholder) x cil_cord dil mixed x 3 seeds — AFTER baselines"
 PHASE=5 EXTRA="$EXTRA" bash scripts/run_grid.sh >> "$LOG" 2>&1 || say "phase5 returned nonzero (continuing)"
 say "PHASE 5 done markers: $(ls results/*_doccl_seed*/.done 2>/dev/null | wc -l)"
+
+if [ "${SKIP_CORE:-0}" = "1" ]; then
+  say "SKIP_CORE=1 set — skipping PHASE 3 (core) and PHASE 4 (prompt/LoRA) on this machine "\
+"(run them on the powerful machine via scripts/run_grid_remote.sh / docker)."
+else
+  # ── PHASE 3: core baselines (54) — local fallback ────────────────────────────
+  say "PHASE 3 core baselines (naive joint ewc lwf er der_pp x cil_cord dil mixed x 3 seeds)"
+  PHASE=3 EXTRA="$EXTRA" bash scripts/run_grid.sh >> "$LOG" 2>&1 || say "phase3 returned nonzero (continuing)"
+  say "PHASE 3 done markers: $(ls results/*_{naive,joint,ewc,lwf,er,der_pp}_seed*/.done 2>/dev/null | wc -l)"
+
+  # ── PHASE 4: prompt/LoRA baselines (36) — local fallback ─────────────────────
+  say "PHASE 4 prompt/LoRA (l2p dualprompt coda_prompt o_lora x cil_cord dil mixed x 3 seeds)"
+  PHASE=4 EXTRA="$EXTRA" bash scripts/run_grid.sh >> "$LOG" 2>&1 || say "phase4 returned nonzero (continuing)"
+  say "PHASE 4 done markers: $(ls results/*_{l2p,dualprompt,coda_prompt,o_lora}_seed*/.done 2>/dev/null | wc -l)"
+fi
 
 # ── Aggregate + ingest ─────────────────────────────────────────────────────────
 say "Aggregate (analyze_results.py)"
