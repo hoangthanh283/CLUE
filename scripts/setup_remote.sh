@@ -77,12 +77,18 @@ if [ -n "$TORCH_IMPORTABLE" ]; then
     warn "Continuing anyway; the grid will error on the first GPU call if this is real."
     warn "If it fails, pick a pytorch image whose CUDA version matches the host driver."
   fi
-  # Fast-path: if project package already importable (re-entering same container), skip pip.
-  if "$PY" -c 'import doccl' 2>/dev/null; then
-    ok "project deps already installed — skipping pip install"
+  # Fast-path: skip pip ONLY if the project AND its real runtime deps all import.
+  # `import doccl` alone is NOT sufficient — doccl is importable just from the source
+  # tree on PATH, even when hydra/transformers/etc. were never installed (that exact
+  # gap made every grid job die at `import hydra`). Probe the deps train.py actually needs.
+  if "$PY" -c 'import doccl, hydra, transformers, seqeval, wandb, datasets' 2>/dev/null; then
+    ok "project + runtime deps already installed — skipping pip install"
   else
     info "Installing project deps (pip install -e ., torch already satisfied) ..."
     "$PY" -m pip install -q -e . 2>&1 | tail -3 || die "pip install -e . failed"
+    # Verify the deps that previously slipped through are now importable.
+    "$PY" -c 'import doccl, hydra, transformers, seqeval, wandb, datasets' 2>/dev/null \
+      || die "deps still missing after pip install -e . — check the error above"
   fi
 else
   warn "torch not found in base image — installing full locked stack via uv"
