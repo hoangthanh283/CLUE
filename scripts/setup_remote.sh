@@ -150,7 +150,11 @@ fi
 prompt_plain GPUS         "GPU ids"      "$(seq -s' ' 0 $((NGPU-1)))"
 prompt_plain JOBS_PER_GPU "Jobs per GPU" "2"
 prompt_plain BATCH_SIZE   "Batch size"   "8"
-export GPUS JOBS_PER_GPU BATCH_SIZE
+# DataLoader workers PER JOB. Total = NUM_WORKERS x JOBS_PER_GPU x NGPU, each forking the
+# dataset working set. Heavy multilingual sets (XFUND, WildReceipt) can OOM HOST RAM at x4
+# across all slots (SIGKILL -> rc=137). Default 2 here is the RAM-safe value for this grid.
+prompt_plain NUM_WORKERS  "DataLoader workers/job" "2"
+export GPUS JOBS_PER_GPU BATCH_SIZE NUM_WORKERS
 
 # This is the POWERFUL-machine path: run absolutely everything, thoroughly.
 #   - core (6) + prompt/LoRA (4) + DocCL + single-task baselines, all 5 scenarios x 3 seeds

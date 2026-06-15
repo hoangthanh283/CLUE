@@ -41,6 +41,11 @@ GPUS="${GPUS:-0 1}"; GPUS="${GPUS//,/ }"
 JOBS_PER_GPU="${JOBS_PER_GPU:-2}"
 BATCH_SIZE="${BATCH_SIZE:-16}"
 EPOCHS_CAP="${EPOCHS_CAP:-100}"
+# DataLoader workers PER JOB. Total worker procs = NUM_WORKERS x JOBS_PER_GPU x NGPU,
+# and each worker forks a copy of the dataset working set. Heavy datasets (XFUND's 7
+# languages, WildReceipt) can exhaust HOST RAM at the default x4 across all slots and
+# trip the OOM killer (SIGKILL -> rc=137). Lower to 2 on RAM-constrained boxes.
+NUM_WORKERS="${NUM_WORKERS:-4}"
 SEEDS="${SEEDS:-42 123 7}"
 SCENARIOS="${SCENARIOS:-cil_cord dil mixed dil_xlingual cil_wildreceipt}"
 CORE_METHODS="${CORE_METHODS:-naive joint ewc lwf er der_pp}"
@@ -75,7 +80,7 @@ SYNC_INCLUDES=(--include "*/.done" --include "*/metrics.json" --include "*/matri
                --include "table_single_task_baselines.csv")
 
 EXTRA="training.batch_size=${BATCH_SIZE} training.gradient_checkpointing=false \
-training.num_workers=4 method.epochs=${EPOCHS_CAP} wandb.project=${WANDB_PROJECT:-CL4IE}"
+training.num_workers=${NUM_WORKERS} method.epochs=${EPOCHS_CAP} wandb.project=${WANDB_PROJECT:-CL4IE}"
 
 # ── Durable-resume sync (rclone; pure no-op unless sync is configured) ───────────
 # SECURITY: credentials are NEVER written to disk. When R2_* env vars are present we
