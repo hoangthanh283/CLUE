@@ -1,10 +1,11 @@
 # STATE
 
 ## Active Work
-Autonomous baseline grid running (bs=2, 3 epochs, full scope per user 2026-06-12). 3/54 done
-(cil_cord_naive x3 seeds, all valid: AA~18, BWT~-90, own-task F1 80-94, seed-consistent). On
-dil_naive now. OOM-proof: each run in 9GB cgroup cap, watchdog 11GB+drain-before-restart. Real
-pace ~39min/run -> ~2.6 days total. No aborts since OOM-proofing relaunch (10:12).
+GRID COMPLETE — 54/54 baseline runs done (6 methods x 3 scenarios x 3 seeds), zero failures across
+~53h. Aggregated (analyze_results.py -> all_runs.csv, pivot_*.csv, table_main/ablation/compute.tex)
+and ingested into thesis/. Results: replay methods (ER, DER++) win — both ~match joint upper bound on
+dil (AA 88/87.5, BWT~0). EWC moderate (halves dil/mixed forgetting). LwF ~= naive (no benefit, dense
+token CIL). naive = catastrophic lower bound. FWT reported unavailable (honest, see docs/FWT_NOTE.md).
 
 ## Last Decision
 - **3 epochs** not 10 (10 = ~6.7 days, infeasible). Model hit F1=88 after 1 epoch, so 3 is
