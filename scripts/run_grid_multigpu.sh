@@ -80,7 +80,25 @@ sync_setup() {
     echo "$RCLONE_CONFIG_B64" | base64 -d > "$HOME/.config/rclone/rclone.conf" 2>/dev/null \
       && say "[sync] injected rclone.conf" || say "[sync] WARN: could not decode RCLONE_CONFIG_B64"
   fi
-  say "[sync] durable resume ON -> ${SYNC_REMOTE}"
+  # Fail-fast preflight: prove we can write+list+delete on the remote BEFORE running 189
+  # ungated jobs. A creds/bucket/endpoint mistake aborts in seconds, not after hours.
+  local tmp; tmp=$(mktemp -d)
+  echo "ok $(date +%s)" > "$tmp/.synccheck"
+  if rclone copy "$tmp" "$SYNC_REMOTE" --include ".synccheck" >> "$LOG" 2>&1 \
+     && rclone lsf "$SYNC_REMOTE" 2>/dev/null | grep -q ".synccheck"; then
+    rclone delete "$SYNC_REMOTE/.synccheck" >> "$LOG" 2>&1 || true
+    rm -rf "$tmp"
+    say "[sync] preflight OK — durable resume ON -> ${SYNC_REMOTE}"
+  else
+    rm -rf "$tmp"
+    say "[sync] PREFLIGHT FAILED on ${SYNC_REMOTE} — check bucket/token/endpoint."
+    if [ "${SYNC_STRICT:-1}" = "1" ]; then
+      say "[sync] SYNC_STRICT=1 (default): aborting so you don't run un-persisted. Set SYNC_STRICT=0 to run anyway."
+      exit 3
+    fi
+    say "[sync] SYNC_STRICT=0 — continuing WITHOUT durable sync (results live on the ephemeral disk only)."
+    SYNC_REMOTE=""
+  fi
 }
 sync_pull() {
   [ -n "$SYNC_REMOTE" ] || return 0

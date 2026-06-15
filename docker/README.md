@@ -104,7 +104,13 @@ docker run ... -v /mnt/persistent/results:/workspace/results ... doccl-grid ...
 ### Option B — object-storage sync via rclone (RECOMMENDED, works on any provider)
 The scheduler pulls prior resume state at startup, pushes it every `SYNC_SECS` (default 300s) and
 on exit (incl. provider SIGTERM teardown). Off by default; enabled by setting `SYNC_REMOTE`.
-`rclone` is baked into the image.
+`rclone` is baked into the image. On startup it runs a **fail-fast preflight** (write+list+delete
+a `.synccheck` on the remote): if creds/bucket/endpoint are wrong it aborts in seconds rather than
+running 189 un-persisted jobs (override with `SYNC_STRICT=0` to continue without sync).
+
+**Fastest setup — run the helper** (`scripts/setup_r2.sh`): it prompts for your R2/S3
+Access Key ID + Secret + Endpoint, writes `~/.config/rclone/rclone.conf`, round-trip-tests the
+bucket, and prints your exact `docker run` command. Then skip to step 3 below.
 
 **Easiest backend: a private Hugging Face dataset repo** (you already have an HF token):
 ```bash
