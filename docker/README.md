@@ -9,8 +9,30 @@ cap 100, best-val weights restored) and **per-run FWT** (records the zero-shot
 future-task term + seeds the metrics tracker with the single-task baselines `b_i`).
 
 ## Prerequisites
-- A CUDA-13-capable NVIDIA driver + the NVIDIA Container Toolkit (`--gpus all` works).
+- A CUDA-13-capable NVIDIA driver.
+- The **NVIDIA Container Toolkit** so `--gpus all` works. Verify with:
+  ```bash
+  docker run --rm --gpus all nvidia/cuda:13.0.0-runtime-ubuntu24.04 nvidia-smi
+  ```
+  If this errors with `could not select device driver "" with capabilities: [[gpu]]`,
+  install the toolkit (Ubuntu):
+  ```bash
+  curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor \
+    -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+  sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+  sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+  ```
 - A Weights & Biases API key (or run offline).
+
+> Build validated on 2026-06-15: image `doccl-grid` (14.8 GB) builds cleanly
+> (`import doccl, torch` → torch 2.12.0+cu130; all 12 scenarios incl. the new
+> `dil_xlingual`/`cil_wildreceipt` register inside the container). GPU-in-container
+> training was NOT smoke-tested on the build machine because it lacked the NVIDIA
+> Container Toolkit — verify `--gpus all` on the target box with the command above
+> before launching the grid.
 
 ## 1. Build the image
 From the **repo root** (build context = repo, see `.dockerignore`):
