@@ -101,13 +101,34 @@ else
 fi
 
 # ── 5. Grid sizing + launch ──────────────────────────────────────────────────────
+# Safe defaults that fit a 24 GB card with headroom: per-job ~7-8 GB at bs=8 in bf16
+# (our 6 GB laptop hit ~4.4 GB at bs=2 no-checkpointing, so bs=16 activations are heavy).
+# 2 jobs/GPU x bs8 = effective batch 16/GPU with 2-way overlap. After launch, check the
+# heartbeat + `nvidia-smi`: if VRAM has lots of free room, re-run with BATCH_SIZE=16 or
+# JOBS_PER_GPU=3 (resume-safe — finished runs are skipped).
 prompt_plain GPUS         "GPU ids"      "$(seq -s' ' 0 $((NGPU-1)))"
 prompt_plain JOBS_PER_GPU "Jobs per GPU" "2"
-prompt_plain BATCH_SIZE   "Batch size"   "16"
+prompt_plain BATCH_SIZE   "Batch size"   "8"
 export GPUS JOBS_PER_GPU BATCH_SIZE
 
+# This is the POWERFUL-machine path: run absolutely everything, thoroughly.
+#   - core (6) + prompt/LoRA (4) + DocCL + single-task baselines, all 5 scenarios x 3 seeds
+#   - DocCL depth-ablation across ALL 5 scenarios (not just cil_cord) -> the fullest study
+# All defaults below stay overridable from the environment (e.g. ABLATION_SCENARIOS=cil_cord
+# for the lighter ablation, or RUN_ABLATION=0 to skip it).
+export CORE_METHODS="${CORE_METHODS:-naive joint ewc lwf er der_pp}"
+export PROMPT_METHODS="${PROMPT_METHODS:-l2p dualprompt coda_prompt o_lora}"
+export RUN_DOCCL="${RUN_DOCCL:-1}"
+export RUN_ABLATION="${RUN_ABLATION:-1}"
+export ABLATION_SCENARIOS="${ABLATION_SCENARIOS:-cil_cord dil mixed dil_xlingual cil_wildreceipt}"
+export AMP="${AMP:-1}"   # bf16 on (RTX 4090); set AMP=0 for exact fp32
+
+# Count the planned jobs so you see the full scope before it starts.
+NJOBS=$(DRY_RUN=1 bash scripts/run_grid_multigpu.sh 2>/dev/null | grep -cE "  ->  " || echo "?")
+
 echo
-info "Launching grid: GPUS='${GPUS}' JOBS_PER_GPU=${JOBS_PER_GPU} BATCH_SIZE=${BATCH_SIZE} W&B=${WANDB_MODE} sync=$([ -n "${R2_ACCESS_KEY_ID:-}" ] && echo ON || echo OFF)"
+info "Launching FULL grid: ${NJOBS} runs (core + prompt/LoRA + DocCL + full ablation, all 5 scenarios x 3 seeds)"
+info "  GPUS='${GPUS}' JOBS_PER_GPU=${JOBS_PER_GPU} BATCH_SIZE=${BATCH_SIZE} bf16=$([ "${AMP}" = "1" ] && echo ON || echo OFF) W&B=${WANDB_MODE} sync=$([ -n "${R2_ACCESS_KEY_ID:-}" ] && echo ON || echo OFF)"
 echo "  ${c_dim}heartbeat + filtered training lines stream below; re-run this script to resume.${c_off}"
 echo
 exec bash scripts/run_grid_multigpu.sh
