@@ -51,6 +51,10 @@ ABLATION_SCENARIOS="${ABLATION_SCENARIOS:-cil_cord}"
 DEPTH_TARGETS="${DEPTH_TARGETS:-head_only late_only uniform}"
 WANDB_MODE="${WANDB_MODE:-online}"
 DRY_RUN="${DRY_RUN:-0}"
+# bf16 autocast: ON by default on this (big-GPU) path for ~1.5-2x speedup. Set AMP=0 for
+# exact fp32. Exported as DOCCL_AMP so each train.py child enables it (CUDA-only; no-op on CPU).
+AMP="${AMP:-1}"
+export DOCCL_AMP="$AMP"
 
 # Progress visibility
 HEARTBEAT_SECS="${HEARTBEAT_SECS:-45}"              # 0 = disable the heartbeat block
