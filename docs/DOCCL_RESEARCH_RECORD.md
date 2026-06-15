@@ -1,6 +1,6 @@
 # DocCL: Continual Learning for Document Information Extraction — Complete Research Record
 
-> Self-contained transfer document. Captures every finding, bug, decision, table, and result produced during the experiment run, for use when writing the thesis report. Snapshot taken at **41/54 grid runs complete** (naive 9/9, joint 9/9, EWC 9/9, LwF 9/9, ER 5/9, DER++ 0/9). The remaining ER and DER++ runs follow the same code paths and are expected to extend the tables below without changing the conclusions.
+> Self-contained transfer document. Captures every finding, bug, decision, table, and result produced during the experiment run, for use when writing the thesis report. **GRID COMPLETE — all 54/54 baseline runs finished** (naive 9/9, joint 9/9, EWC 9/9, LwF 9/9, ER 9/9, DER++ 9/9; 6 methods × 3 scenarios × 3 seeds), zero failures (0 OOM / crash / abort) across ~53 h on a single 6 GB RTX 2060. §5 reports the full final results (every run's AA/BWT/own-task-F1 + mean±std + the consolidated comparison). Results aggregated by `scripts/analyze_results.py` (→ `results/all_runs.csv`, `pivot_*.csv`, `table_main.tex`) and ingested into `thesis/`.
 
 ---
 
@@ -185,9 +185,31 @@ A speed experiment disabled gradient checkpointing (bs=2) to use VRAM headroom (
 
 ---
 
-## 5. Complete Results (snapshot at 41/54)
+## 5. Complete Results — FINAL (54/54 grid complete)
 
-All runs: LayoutLMv3-base, bs=2, grad-checkpointing on, 3 epochs/task, seeds {42,123,7}, seqeval entity F1.
+All 54 runs complete: LayoutLMv3-base, bs=2, gradient-checkpointing on, 3 epochs/task, seeds {42,123,7},
+seqeval entity-level F1. 6 methods × 3 scenarios × 3 seeds. **Zero failures** (0 OOM / crash / abort) across
+the ~53 h run. Aggregated by `scripts/analyze_results.py` → `results/all_runs.csv`, `results/pivot_{AA,BWT,AF}.csv`,
+`results/table_main.tex`. AA = average accuracy on all seen tasks at end; BWT = backward transfer (negative =
+forgetting); own-task F1 = matrix diagonal R[i][i] (F1 on task i right after training it). FWT reported
+**unavailable** (not fabricated) — see §2.3 / `docs/FWT_NOTE.md`.
+
+### 5.0 Headline table — AA and BWT, mean ± std over 3 seeds
+
+| Method | cil_cord AA | cil_cord BWT | dil AA | dil BWT | mixed AA | mixed BWT |
+|--------|------------:|------------:|------:|-------:|--------:|---------:|
+| naive (lower bound) | 18.38 ± 0.32 | −90.44 ± 0.98 | 38.43 ± 0.77 | −71.32 ± 2.53 | 30.42 ± 2.76 | −66.76 ± 2.45 |
+| LwF | 18.62 ± 0.31 | −90.41 ± 0.69 | 38.41 ± 0.75 | −71.95 ± 1.26 | 32.27 ± 0.84 | −65.31 ± 1.01 |
+| EWC | 14.30 ± 1.24 | −77.24 ± 2.29 | 43.07 ± 3.06 | −36.48 ± 1.98 | 30.94 ± 2.81 | −31.28 ± 5.85 |
+| **ER** | 15.74 ± 0.35 | **−63.85 ± 4.44** | **87.98 ± 0.44** | **+1.86 ± 1.46** | 60.71 ± 0.65 | **−16.97 ± 4.31** |
+| **DER++** | 17.62 ± 0.17 | −82.80 ± 1.72 | **87.55 ± 0.41** | **−2.10 ± 0.81** | **61.79 ± 0.18** | −32.64 ± 0.10 |
+| joint (upper bound) | 30.86 ± 0.32 | 0.00 | 84.83 ± 0.65 | 0.00 | 62.81 ± 1.61 | 0.00 |
+
+**Method hierarchy (forgetting prevention): naive ≈ LwF < EWC < DER++ < ER ≈ joint.**
+- **Replay wins decisively.** ER and DER++ both **match the joint upper bound on dil** (AA ≈ 88/87.5 vs joint 84.8; BWT ≈ 0). ER's positive dil BWT (+1.9) means later tasks slightly *helped* earlier ones. On mixed, ER (AA 60.7) and DER++ (AA 61.8) reach ≈ the joint ceiling (62.8). Replay closes essentially the entire forgetting gap on domain-incremental and mixed learning — **the headline result.**
+- **EWC helps moderately**, especially on domain shifts: dil BWT −36.5 vs naive −71.3 (≈ halved), mixed −31.3 vs −66.8. On cil_cord the Fisher penalty constrains plasticity, so AA dips below naive while BWT still improves (−77 vs −90).
+- **LwF ≈ naive** on every scenario — little anti-forgetting benefit in this dense token-classification setting (documented limitation, not a bug; see §5.4).
+- **cil_cord is the hard ceiling for everyone** — even joint AA is only 30.9 (60 fine CORD classes packed into one growing head). Replay still helps on BWT (ER −63.9, vs naive −90.4) but absolute AA stays low.
 
 ### 5.1 Naive — lower bound (9/9)
 | Run | AA | BWT | Own-task F1 (diagonal) |
@@ -195,14 +217,14 @@ All runs: LayoutLMv3-base, bs=2, grad-checkpointing on, 3 epochs/task, seeds {42
 | cil_cord_naive_seed42 | 18.80 | −89.10 | [92.2, 93.9, 89.0, 81.4, 94.0] |
 | cil_cord_naive_seed123 | 18.01 | −91.42 | [94.0, 92.8, 92.4, 86.5, 90.1] |
 | cil_cord_naive_seed7 | 18.34 | −90.80 | [94.1, 86.9, 94.2, 88.0, 91.7] |
-| dil_naive_seed42 | 38.28 | −74.43 | — |
-| dil_naive_seed123 | 39.45 | −71.31 | — |
-| dil_naive_seed7 | 37.57 | −68.22 | — |
-| mixed_naive_seed42 | 33.29 | −63.61 | — |
-| mixed_naive_seed123 | 26.70 | −69.59 | — |
+| dil_naive_seed42 | 38.28 | −74.43 | [85.8, 82.0, 95.9] |
+| dil_naive_seed123 | 39.45 | −71.31 | [83.6, 80.9, 96.4] |
+| dil_naive_seed7 | 37.57 | −68.22 | [76.7, 76.9, 95.5] |
+| mixed_naive_seed42 | 33.29 | −63.61 | [80.5, 80.6, 80.3, 94.6, 96.1, 85.8] |
+| mixed_naive_seed123 | 26.70 | −69.59 | [86.0, 87.5, 80.6, 94.0, 90.1, 70.0] |
 | mixed_naive_seed7 | 31.26 | −67.09 | [84.0, 88.4, 81.4, 94.9, 93.3, 81.1] |
 
-Textbook catastrophic forgetting: own-task F1 81–94 (learns each task), AA low, BWT severely negative (earlier tasks forgotten). cil_cord (hardest, 5 sessions) forgets most (BWT≈−90); dil least (≈−71); mixed intermediate (≈−66). Single-task reference: `single_funsd_naive_seed42` AA=87.99.
+Textbook catastrophic forgetting: own-task F1 77–96 (learns each task well), AA low, BWT severely negative (earlier tasks forgotten). cil_cord (hardest, 5 sessions) forgets most (BWT≈−90); dil least (≈−71); mixed intermediate (≈−67). Single-task reference: `single_funsd_naive_seed42` AA=87.99; the analyzer's single-task baseline table reports funsd b_i=85.39.
 
 ### 5.2 Joint — upper bound (9/9)
 | Run | AA | BWT |
@@ -217,64 +239,70 @@ Textbook catastrophic forgetting: own-task F1 81–94 (learns each task), AA low
 | mixed_joint_seed123 | 63.47 | 0.00 |
 | mixed_joint_seed7 | 64.37 | 0.00 |
 
-BWT=0 (no forgetting, all tasks pooled). cil_cord joint last_row e.g. seed42 [67.2,25.4,24.1,24.5,13.4]. cil_cord joint AA modest (~31) because all 60 fine classes share one head — a genuine ceiling. dil ~85, mixed ~61–64 strong upper bounds.
+BWT=0 (no forgetting — all tasks pooled into one training run; only the last matrix row is populated, so the diagonal is NaN except the final cell). cil_cord joint AA modest (~31) because all 60 fine classes share one head — a genuine ceiling. dil ~85, mixed ~61–64 are strong upper bounds. **(Note: joint was a fixed bug — §3 Bug #6 — it originally trained on CIL-masked conflicting copies and learned only task 0; the fix trains it on a full-label dedup pool.)**
 
 ### 5.3 EWC (9/9)
-| Run | AA | BWT |
-|-----|-----|------|
-| cil_cord_ewc_seed42 | 13.07 | −75.70 |
-| cil_cord_ewc_seed123 | 13.83 | −75.56 |
-| cil_cord_ewc_seed7 | 16.00 | −80.48 |
-| dil_ewc_seed42 | 39.02 | −39.12 |
-| dil_ewc_seed123 | 46.40 | −35.99 |
-| dil_ewc_seed7 | 43.80 | −34.34 |
-| mixed_ewc_seed42 | 28.15 | −31.48 |
-| mixed_ewc_seed123 | 34.79 | −24.02 |
-| mixed_ewc_seed7 | 29.87 | −38.35 |
+| Run | AA | BWT | Own-task F1 |
+|-----|-----|------|-------------|
+| cil_cord_ewc_seed42 | 13.07 | −75.70 | [92.9, 88.6, 62.7, 58.7, 65.3] |
+| cil_cord_ewc_seed123 | 13.83 | −75.56 | [94.0, 87.4, 70.1, 50.8, 69.1] |
+| cil_cord_ewc_seed7 | 16.00 | −80.48 | [94.1, 88.5, 70.6, 68.7, 80.0] |
+| dil_ewc_seed42 | 39.02 | −39.12 | [85.8, 28.8, 80.7] |
+| dil_ewc_seed123 | 46.40 | −35.99 | [83.6, 42.5, 85.0] |
+| dil_ewc_seed7 | 43.80 | −34.34 | [76.7, 47.3, 76.1] |
+| mixed_ewc_seed42 | 28.15 | −31.48 | [80.5, 82.9, 3.4, 59.3, 43.2, 57.1] |
+| mixed_ewc_seed123 | 34.79 | −24.02 | [86.0, 78.5, 3.5, 51.2, 30.8, 78.7] |
+| mixed_ewc_seed7 | 29.87 | −38.35 | [84.0, 82.3, 30.8, 56.2, 59.1, 58.6] |
 
-cil_cord_ewc_seed42 own-task F1 [92.9, 88.6, 62.7, 58.7, 65.3]. EWC consistently reduces forgetting vs naive: cil_cord −76 to −80 (vs −90); **dil −34 to −39 (≈half of naive's −71, AA up to 39–46)**; mixed −24 to −38 (vs −66). The Fisher penalty constrains plasticity, so cil_cord AA dips slightly below naive while BWT improves.
+EWC consistently reduces forgetting vs naive: cil_cord −77 (vs −90); **dil −36.5 (≈half of naive's −71, AA up to 39–46)**; mixed −31 (vs −67). The Fisher penalty constrains plasticity, so cil_cord AA dips slightly below naive while BWT improves. (EWC was the hardest method to get running — three distinct crash modes fixed; see §3 Bugs #8/#10/#11.)
 
 ### 5.4 LwF (9/9)
 | Run | AA | BWT | Own-task F1 |
 |-----|-----|------|-------------|
 | cil_cord_lwf_seed42 | 18.80 | −91.39 | [92.9, 91.5, 91.5, 89.7, 94.0] |
-| cil_cord_lwf_seed123 | 18.88 | −89.93 | — |
-| cil_cord_lwf_seed7 | 18.18 | −89.92 | — |
-| dil_lwf_seed42 | 38.44 | −73.64 | — |
-| dil_lwf_seed123 | 39.32 | −71.58 | — |
-| dil_lwf_seed7 | 37.47 | −70.64 | — |
+| cil_cord_lwf_seed123 | 18.88 | −89.93 | [94.0, 87.2, 93.4, 85.1, 94.4] |
+| cil_cord_lwf_seed7 | 18.18 | −89.92 | [94.1, 90.2, 88.1, 87.2, 90.9] |
+| dil_lwf_seed42 | 38.44 | −73.64 | [85.8, 80.8, 96.1] |
+| dil_lwf_seed123 | 39.32 | −71.58 | [83.6, 81.2, 96.3] |
+| dil_lwf_seed7 | 37.47 | −70.64 | [76.7, 80.9, 96.1] |
 | mixed_lwf_seed42 | 33.42 | −63.89 | [80.5, 85.8, 77.2, 95.8, 94.3, 86.4] |
 | mixed_lwf_seed123 | 31.95 | −66.17 | [86.0, 85.2, 78.6, 95.5, 94.9, 82.4] |
-| mixed_lwf_seed7 | 31.44 | −65.86 | — |
+| mixed_lwf_seed7 | 31.44 | −65.86 | [84.0, 85.2, 79.7, 93.9, 94.7, 80.5] |
 
-**Key honest finding:** LwF ≈ naive across all scenarios (cil_cord −90/−91; dil −71/−74; mixed −64/−66). LwF provides **little anti-forgetting benefit** in this dense token-classification setting — a documented limitation, not a bug: its distillation only constrains old-class logits, which collapse anyway in class-IL when the growing head never reinforces them; and distillation is known to be weaker for token tasks than image classification. Seed-consistent → robust. (Validated end-to-end: KD active, GPU teacher ~3 GB.)
+**Key honest finding:** LwF ≈ naive across all scenarios (cil_cord −90; dil −72; mixed −65). LwF provides **little anti-forgetting benefit** in this dense token-classification setting — a documented limitation, not a bug: its distillation only constrains old-class logits, which collapse anyway in class-IL when the growing head never reinforces them; and distillation is known to be weaker for token tasks than image classification. Seed-consistent → robust. (Validated end-to-end: KD loss active, GPU teacher ~3 GB; teacher-device bug fixed — §3 Bug #12.)
 
-### 5.5 ER — Experience Replay (5/9; cell in progress)
-| Run | AA | BWT |
-|-----|-----|------|
-| cil_cord_er_seed42 | 15.88 | −64.58 |
-| cil_cord_er_seed123 | 15.26 | −68.88 |
-| cil_cord_er_seed7 | 16.07 | −58.08 |
-| dil_er_seed42 | 87.87 | 0.00 |
-| dil_er_seed123 | 88.56 | +2.00 |
-| dil_er_seed7 | (running) | — |
-| mixed_er ×3 | pending | — |
+### 5.5 ER — Experience Replay (9/9)
+| Run | AA | BWT | Own-task F1 |
+|-----|-----|------|-------------|
+| cil_cord_er_seed42 | 15.88 | −64.58 | [92.9, 79.2, 36.0, 68.3, 61.4] |
+| cil_cord_er_seed123 | 15.26 | −68.88 | [94.0, 78.9, 50.4, 69.7, 58.8] |
+| cil_cord_er_seed7 | 16.07 | −58.08 | [94.1, 44.8, 46.6, 58.4, 68.7] |
+| dil_er_seed42 | 87.87 | 0.00 | [85.8, 82.7, 95.1] |
+| dil_er_seed123 | 88.56 | +2.00 | [83.6, 80.8, 97.3] |
+| dil_er_seed7 | 87.50 | +3.59 | [76.7, 81.8, 96.8] |
+| mixed_er_seed42 | 60.60 | −12.75 | [80.5, 1.6, 77.5, 95.9, 86.2, 85.5] |
+| mixed_er_seed123 | 61.56 | −22.88 | [86.0, 59.2, 80.3, 96.6, 76.9, 84.9] |
+| mixed_er_seed7 | 59.98 | −15.28 | [84.0, 7.1, 80.8, 95.6, 82.9, 86.0] |
 
-Retention signal (cil_cord_er_seed42): `After task1: {0:56.04, 1:79.15}; After task2: {0:48.08, 1:10.45, 2:35.96}` — **task 0 retains F1≈48–56 deep into the sequence** (vs ~0 for naive/EWC/LwF). **ER is the strongest method.** On cil_cord (hardest), BWT −58 to −69 (best of all). On dil, **AA≈88, BWT≈0 — matching/exceeding the joint upper bound (85), positive BWT means later tasks even slightly *helped* earlier ones.** Replay closes the entire forgetting gap on domain-incremental learning — the headline result. Config: `ReservoirBuffer(capacity=buffer_size default 200, store_logits=False)`, mixes a replay batch each step (double forward → ~2× compute).
+**ER is the strongest method overall.** Retention signal (cil_cord_er_seed42): `After task1: {0:56.04, 1:79.15}; After task2: {0:48.08, 1:10.45, 2:35.96}` — task 0 retains F1≈48–56 deep into the sequence (vs ~0 for naive/EWC/LwF). On cil_cord (hardest), BWT −58 to −69 (best of all methods). **On dil: AA≈88, BWT≈0 to +3.6 — matching/exceeding the joint upper bound (84.8); positive BWT means later tasks even slightly helped earlier ones.** On mixed: AA≈60.7, BWT −17 (vs naive −67), near the joint ceiling (62.8). Config: `ReservoirBuffer(capacity=buffer_size default 200, store_logits=False)`, mixes a replay batch each step (double forward → ~2× compute; ~1.5–2.5 h/run, the slow tail).
 
-### 5.6 DER++ (0/9, not yet run)
-`ReservoirBuffer(store_logits=True)`, alpha=0.5 (MSE), beta=0.5 (CE); samples two replay batches per the DER++ paper; `n_shared = min(...)` truncation for the logit MSE. Buffer pad fix (`cc5fc7c`) in place but **not yet verified in production** — its first task-1 run (head growth) is the last fix to confirm.
+### 5.6 DER++ — Dark Experience Replay++ (9/9)
+| Run | AA | BWT | Own-task F1 |
+|-----|-----|------|-------------|
+| cil_cord_der_pp_seed42 | 17.76 | −84.88 | [96.3, 92.3, 77.1, 79.8, 82.9] |
+| cil_cord_der_pp_seed123 | 17.72 | −80.68 | [95.1, 88.8, 74.9, 67.9, 84.6] |
+| cil_cord_der_pp_seed7 | 17.38 | −82.84 | [94.8, 85.8, 73.1, 81.6, 82.9] |
+| dil_der_pp_seed42 | 87.26 | −3.20 | [89.2, 82.1, 96.9] |
+| dil_der_pp_seed123 | 88.13 | −1.83 | [87.9, 83.1, 97.1] |
+| dil_der_pp_seed7 | 87.25 | −1.26 | [87.4, 80.0, 96.9] |
+| mixed_der_pp_seed42 | 61.54 | −32.54 | [86.7, 87.3, 82.3, 96.6, 94.2, 84.9] |
+| mixed_der_pp_seed123 | 61.92 | −32.77 | [87.2, 88.7, 82.6, 96.7, 94.0, 86.3] |
+| mixed_der_pp_seed7 | 61.91 | −32.60 | [87.0, 89.7, 81.3, 97.4, 93.1, 86.0] |
 
-### 5.7 Consolidated method comparison
-| Method | cil_cord BWT | cil_cord AA | dil BWT | dil AA | mixed BWT | mixed AA |
-|--------|-------------|-------------|---------|--------|-----------|----------|
-| naive (lower) | −89 to −91 | ~18 | −68 to −74 | ~38 | −64 to −70 | ~27–33 |
-| LwF | −90 to −91 | ~18 | −71 to −74 | ~38–39 | −64 to −66 | ~31–33 |
-| EWC | −76 to −80 | ~13–16 | −34 to −39 | ~39–46 | −24 to −38 | ~28–35 |
-| **ER** | **−58 to −69** | ~15–16 | **~0 to +2** | **~88** | (pending) | (pending) |
-| joint (upper, AA) | — | ~31 | — | ~84–86 | — | ~61–64 |
+DER++ (replay + logit-distillation MSE + replay CE) is the **second-strongest method**, and the most seed-stable (tiny std). On **dil it matches the joint upper bound** (AA 87.5, BWT≈−2, like ER). On mixed it reaches AA 61.8 ≈ joint (62.8). On cil_cord its BWT (−83) is between EWC and ER — the logit-distillation term helps less than pure replay on the hardest class-IL scenario. Config: `ReservoirBuffer(store_logits=True)`, alpha=0.5 (MSE), beta=0.5 (replay CE), two replay batches/step per the DER++ paper; the buffer pad fix for mixed-width cached logits (§3 Bug #9) was **verified in production** at the task-0→1 head expansion.
 
-**Method hierarchy (forgetting prevention):** naive ≈ LwF < EWC < ER < joint (ceiling). Replay (ER) decisively best; on dil it matches the upper bound. Regularization (EWC) helps moderately, especially on domain shifts. Distillation (LwF) does not help here.
+### 5.7 Single-task FWT baselines
+`single_funsd_naive_seed42` (pre-existing, AA=87.99) plus the analyzer's single-task baseline table (`results/table_single_task_baselines.{tex,csv}`) provide b_i for forward-transfer. The dedicated single-task FWT runs were not separately executed in the final grid (the driver focused on the 54 core runs); FWT remains reported as unavailable per §2.3 because the CL loop never measures the zero-shot future-task term. Single-task reference value available: funsd b_i=85.39.
 
 ---
 
@@ -324,12 +352,19 @@ Projection (replay methods are the bottleneck; all remaining runs are ER/DER++):
 ---
 
 ## 9. Outstanding / Next Steps
-1. Finish ER cell (4 runs: dil seed7 + mixed ×3) — ER mixed expected strong.
-2. Run DER++ cell (9) — verify buffer pad fix (`cc5fc7c`) holds at first task-1 head growth (watch `stack expects equal size`).
-3. Aggregate: `python scripts/analyze_results.py` → `all_runs.csv`, `pivot_*.csv`, `table_main.tex`, `table_ablation.tex`, `table_compute.tex`, `figure_forgetting_curves.pdf`, `table_single_task_baselines.{tex,csv}`.
-4. Ingest: `python scripts/ingest_to_thesis.py`.
-5. Optional PHASE 4 (prompt/LoRA, 36 runs) and PHASE 5 doccl — deferred.
-6. Prose (Ch6/§3.3.6/abstract) against real `results/`, no fabricated numbers.
+
+**DONE (grid complete):**
+- ✅ All 54 baseline runs (6 methods × 3 scenarios × 3 seeds), zero failures.
+- ✅ DER++ buffer pad fix (`cc5fc7c`) verified in production at the task-0→1 head growth.
+- ✅ Aggregated: `scripts/analyze_results.py` → `results/all_runs.csv`, `pivot_{AA,BWT,AF}.csv`, `table_main.tex`, `table_ablation.tex`, `table_compute.tex`, `figure_forgetting_curves.pdf`, `table_single_task_baselines.{tex,csv}` (all committed).
+- ✅ Ingested into thesis: `scripts/ingest_to_thesis.py` → `thesis/generated/table_{main,ablation,compute}.tex`, `thesis/figures/{forgetting_curves,pilot_cka_heatmap,pilot_fisher_bars}.pdf` (committed).
+
+**Remaining (thesis writing & optional extensions):**
+1. **Write the prose** (Ch6 results / §3.3.6 / abstract / conclusion) against the real numbers in §5 — no fabricated values. The narrative below is what the data supports.
+2. **Rebuild the thesis** (`latexmk` in `thesis/`) to render the new tables/figures (`chapter6.tex` uses `\IfFileExists`, so it now shows the real tables).
+3. **FWT** (optional): true forward-transfer needs a `train.py` change (evaluate unseen tasks + seed the tracker with `baseline_perf`) — see `docs/FWT_NOTE.md`. Currently reported as unavailable, not fabricated.
+4. **Optional PHASE 4** (prompt/LoRA methods: l2p/dualprompt/coda_prompt/o_lora, 36 runs) and **PHASE 5 doccl** (DocCL_A placeholder, gated on GATE A) — deferred; the 6 core methods are the essential comparison.
+5. **GATE A revisit** (optional): pilot was inconclusive (characterization-only fallback). A cleaner pilot with modality-collapse stability fixes (lower LR / warmup / early-stop on eval-F1) might enable a proposed architectural method — see §2.2 and `docs/PILOT_STUDY_REPORT.md` §8.
 
 **Thesis narrative the data supports:** Sequential fine-tuning of LayoutLMv3 on document IE suffers catastrophic forgetting (BWT to −90 on class-IL). Among CL strategies, **replay (ER) is decisively most effective** — matching the joint upper bound on domain-incremental learning (AA 88 vs 85, BWT≈0) and best on class-IL; **regularization (EWC) helps moderately** (halving forgetting on domain shifts); **distillation (LwF) provides little benefit** in this dense token setting. The pilot additionally found **text is the load-bearing modality** (text-deprived → F1=0) and forgetting is **order-dependent**.
 
