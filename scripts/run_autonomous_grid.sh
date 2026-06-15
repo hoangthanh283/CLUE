@@ -45,11 +45,13 @@ export WANDB_MODE=online
 
 # HARD per-run memory cap: each train.py runs in a cgroup capped at MEM_CAP with swap
 # disabled, so the kernel OOM-kills only that run (never the machine) if it spikes.
-# DocCL is the heaviest method (Fisher estimation over fisher_n_samples + replay buffer
-# + frozen teacher) and was seen to peak ~12.5 GB system RAM, so 9G was too tight and
-# caused cgroup OOM-kill -> crash loop. 12G gives the train process headroom while the
-# watchdog still aborts the *system* at 13.5 GB (under the user's 14 GB ceiling).
-export MEM_CAP="${MEM_CAP:-12G}"
+# DocCL is the heaviest method (Fisher estimation + replay buffer + a deep-copied frozen
+# teacher held in host RAM) and pushed the SYSTEM to ~14.3 GB, tripping a global OOM.
+# Cap the train process at 11G: that hard-bounds the single run well below the user's
+# 14 GB system ceiling, leaving ~3 GB for the OS, page cache, and other services so the
+# machine can never be driven OOM. If DocCL's deep-copy teacher needs more, the next
+# lever is teacher-to-CPU-on-demand rather than raising this. See clue-doccl-vram-heavy.
+export MEM_CAP="${MEM_CAP:-11G}"
 
 # Helper: run a single capped train.py (used by the FWT single-task loop below).
 run_capped() {
