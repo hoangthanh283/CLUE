@@ -1,0 +1,24 @@
+{
+  "method": "naive",
+  "scenario": "single_sroie",
+  "seed": 123,
+  "target_component": null,
+  "matrix": [
+    [
+      81.0885291078195
+    ]
+  ],
+  "num_tasks": 1,
+  "AA": 81.0885291078195,
+  "BWT": 0.0,
+  "AF": -0.0,
+  "FWT": 0.0,
+  "wall_time_per_task_s": [
+    420.53637464600615
+  ],
+  "total_wall_time_s": 420.53637464600615,
+  "mean_time_per_task_s": 420.53637464600615,
+  "total_params": 125333897,
+  "trainable_params": 125333897,
+  "peak_gpu_mem_mb": 2408.02685546875
+}
