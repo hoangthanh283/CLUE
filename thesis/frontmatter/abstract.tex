@@ -20,25 +20,30 @@ LayoutLMv3 architecture---isolating each component's contribution without the
 confound of comparing different models---and reads forgetting out through
 representational drift (linear CKA), per-group Fisher information, and standard
 forgetting metrics across the FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE task
-sequence.
-% TODO (after pilot, Week 4): 1--2 sentences stating the dominant-forgetting
-% component, e.g. "We find forgetting concentrates in the cross-modal fusion
-% layers, while the text stream remains comparatively stable."
+sequence. The diagnosis returns a clear, somewhat counter-intuitive result: forgetting
+is \emph{not} fusion-specific but \emph{output-side}---it concentrates in the
+classifier head and the late encoder layers (the head dominates Fisher importance by
+roughly an order of magnitude and CKA drift rises monotonically with depth, from
+$1.00$ at the input encoders to $0.22$ at the head), while the input encoders remain
+comparatively stable; a controlled cross-condition test cannot distinguish the full
+multimodal model's forgetting from its unimodal ablations.
 
-Guided directly by this measurement rather than by a predetermined design, we
-propose \textbf{DocCL}, a mechanism-targeted continual-learning method that
-concentrates its regularisation and adaptation on the dominant-forgetting component
-identified by the diagnosis. Across three continual scenarios (class-incremental,
-domain-incremental, and mixed) and ten baselines spanning the regularisation,
-replay, prompt-based, and LoRA-based families (EWC, LwF, ER, DER++, L2P,
-DualPrompt, CODA-Prompt, O-LoRA, plus naive and joint bounds), all evaluated over
-three seeds with statistical testing, the targeted method
-% TODO (after main grid): "reduces forgetting (BWT) by X points / improves
-% average entity-F1 by Y" over component-agnostic continual learning while
-% adding negligible overhead.
-improves continual performance over component-agnostic baselines on the FCS-CL
-benchmark, which we release with full per-component tooling. These results
-establish the per-component diagnostic protocol as a practical instrument for
+We then benchmark six continual-learning strategies---naive and joint bounds,
+regularisation (EWC), distillation (LwF), and replay (ER, DER++)---across three
+scenarios (class-, domain-, and mixed-incremental) over three seeds. The empirical
+ordering follows directly from the diagnosis: because forgetting is at the head,
+\emph{replay}---which re-exposes old-class targets at the output---is the strongest
+remedy, with both ER and DER++ reaching the joint upper bound on domain-incremental
+learning (average entity-F1 $\approx 88$ versus the oracle's $85$, with backward
+transfer near zero) and closing essentially the entire forgetting gap; regularisation
+(EWC) roughly halves forgetting where a domain shift is present, and distillation (LwF)
+gives little benefit in this dense token-classification setting. Guided by the same
+measurement we design \textbf{DocCL}, a mechanism-targeted method that would
+concentrate continual-learning effort on the dominant-forgetting head and late layers;
+as the diagnosis did not single out one architectural lever, its full empirical
+evaluation is identified as the immediate next step rather than claimed here. These
+results establish the per-component diagnostic protocol, together with a controlled
+benchmark and per-component tooling that we release, as a practical instrument for
 designing continual-learning methods for multimodal document
 encoders.\footnote{Source code: \url{https://github.com/hoangthanh283/doccl}
 (\texttt{doccl} branch); experiments tracked on Weights \& Biases at

@@ -31,23 +31,47 @@ effects.
 \section{Conclusions}
 \label{sec:concl-conclusions}
 
-% TODO: restate the headline diagnosis finding and the remedy outcome with their
-% effect sizes once Chapter 6 is complete.
 This thesis set out to answer \emph{where} a tri-modal document encoder forgets,
 and to use that answer to design a continual-learning remedy. Its first
 contribution is a per-component forgetting diagnostic that attributes catastrophic
 forgetting to the text, visual, layout, and fusion components of LayoutLMv3 under
 a controlled modality-ablation protocol, using complementary representational
 (CKA) and importance-based (Fisher) metrics together with standard forgetting
-measures. Its second contribution is DocCL, a mechanism-targeted method that
-concentrates its continual-learning mechanism on the dominant-forgetting component
-identified by the diagnosis, evaluated on the FCS-CL benchmark against ten
-baselines spanning the major method families.
-\textbf{[TODO: one paragraph stating what was found and whether the targeted
-remedy outperformed component-agnostic baselines, once results are in.]}
-Whatever the remedy's margin, the diagnostic contribution stands on its own: it
-provides a reusable tool and a shared benchmark for studying forgetting in
-multimodal document encoders, which the prior, fragmented literature lacked.
+measures.
+
+The diagnosis returns a clear and somewhat counter-intuitive finding: under naive
+sequential fine-tuning LayoutLMv3 forgets almost totally---an earlier task that
+scores $88$ entity-F1 collapses to $\sim$2 F1 after a single subsequent task---and
+this forgetting is \emph{output-side}, not fusion-specific. It concentrates in the
+classifier head and the late encoder layers: the head dominates per-group Fisher
+importance by roughly an order of magnitude, and per-layer CKA drift rises
+monotonically with depth (from $1.00$ at the input encoders to $0.22$ at the head),
+while the input encoders are essentially unchanged. The cross-condition test could
+not statistically distinguish the full multimodal model's forgetting from its
+unimodal ablations, so the original premise that multimodal encoders forget
+differently \emph{in fusion} is not supported; the locus is the output head.
+
+The benchmark of continual-learning strategies confirms what this diagnosis predicts.
+Across the three scenarios the ordering is unambiguous---replay $\gg$ regularisation
+$\gg$ distillation---and it follows directly from \emph{where} forgetting lives:
+because the damage is at the head, \emph{replay}, which re-exposes old-class targets at
+the output, is the most effective remedy. On domain-incremental learning both replay
+methods (ER, DER++) reach the joint upper bound (AA $\approx 88$ vs the oracle's $85$,
+backward transfer $\approx 0$), closing essentially the entire $\sim$47-point forgetting
+gap; EWC roughly halves forgetting wherever a domain shift is present (DIL/Mixed BWT
+$-37$/$-31$ vs naive $-71$/$-67$); and LwF tracks the naive lower bound throughout, as
+its distilled old-class logits decay once the growing head stops reinforcing them.
+
+The proposed method, DocCL---a mechanism that would concentrate continual-learning
+effort on the dominant-forgetting head and late layers---was designed from the
+diagnosis but \emph{not} empirically evaluated in this work: the diagnosis was
+inconclusive as to which single architectural lever dominates, so per a pre-registered
+fallback the diagnosis and benchmark are reported as the primary contribution and the
+full DocCL evaluation is left as the immediate next step (\S\ref{sec:concl-future}).
+The diagnostic contribution stands on its own: it provides a reusable tool and a shared
+benchmark for studying forgetting in multimodal document encoders---together with a
+strong-baseline context (replay reaching the oracle) that any future targeted method
+must beat---which the prior, fragmented literature lacked.
 
 \section{Future Work}
 \label{sec:concl-future}

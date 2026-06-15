@@ -132,18 +132,42 @@ encoders.} We introduce, to our knowledge, the first protocol that decomposes
 \gls{cf} in a multimodal document encoder into its text, visual, layout, and fusion
 contributions. By masking input modalities of a \emph{single} LayoutLMv3
 architecture we isolate each modality's contribution without the confound of
-comparing different architectures.
-% TODO: state headline finding + effect size once pilot is analysed.
+comparing different architectures. The diagnosis returns a clear, somewhat
+counter-intuitive answer: forgetting is \emph{not} a fusion-specific effect but an
+\emph{output-side} one, concentrating in the classifier head and the late encoder
+layers. Per-group Fisher importance is dominated by the head by roughly an order of
+magnitude ($2.2\times10^{-1}$ versus $\le 1.1\times10^{-2}$ for every other group),
+and per-layer representational drift (CKA) rises monotonically with depth---from
+$1.00$ at the input encoders to $0.22$ at the head---while the input encoders barely
+move. A secondary finding is that the text stream is load-bearing: removing it
+destabilises training entirely.
 
-\noindent\textbf{A mechanism-targeted continual-learning method (DocCL).} Guided by
-the diagnosis, we design a method that concentrates its \gls{cl} mechanism on the
-dominant-forgetting component rather than treating the network uniformly.
-% TODO: state the improvement over the best component-agnostic baseline
-% (e.g. "+X entity-F1, -Y BWT on 2/3 scenarios") once the main grid is complete.
+\noindent\textbf{A controlled benchmark of continual-learning strategies for document
+IE.} We evaluate six core continual-learning strategies---naive and joint bounds,
+regularisation (EWC), distillation (LwF), and replay (ER, DER++)---across three
+scenarios (class-, domain-, and mixed-incremental) over three seeds under one fixed
+configuration. The ordering is unambiguous and consistent with the diagnosis:
+replay\,$\gg$\,regularisation\,$\gg$\,distillation. Because forgetting is output-side,
+\emph{replay}---which directly re-exposes old-class targets at the head---is the most
+effective remedy: on domain-incremental learning both ER and DER++ reach the joint
+upper bound (AA $\approx 88$ vs $85$, backward transfer $\approx 0$), closing the
+entire $\sim$47-point forgetting gap; EWC roughly halves forgetting where a domain
+shift is present; and LwF gives essentially no benefit in this dense
+token-classification setting.
+
+\noindent\textbf{A mechanism-targeted continual-learning method (DocCL), designed from
+the diagnosis.} Guided by the diagnosis, we design a method that would concentrate its
+\gls{cl} mechanism on the dominant-forgetting component (the head and late layers)
+rather than treating the network uniformly. Because the diagnosis was inconclusive as
+to which \emph{architectural} lever dominates---the signal points at the head, not at
+fusion, layout-position, or modality-routing specifically---we follow a pre-registered
+fallback and report the diagnosis and benchmark as the primary contribution, leaving
+the full empirical evaluation of DocCL as the immediate next step
+(Chapter~\ref{ch:conclusions}).
 
 \noindent\textbf{The FCS-CL benchmark and reproducible tooling.} We provide a
 unified \gls{cl} benchmark over three public document datasets with three
-scenarios, ten baselines, and per-component instrumentation, all under a single
+scenarios, a baseline suite, and per-component instrumentation, all under a single
 configuration system and tracked experiment log, enabling like-for-like comparison
 that the fragmented prior literature has lacked.
 

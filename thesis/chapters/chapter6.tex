@@ -2,12 +2,14 @@
 \chapter{Results and Discussion}
 \label{ch:results}
 % =====================================================================
-% PARTIALLY POPULATED. Section 6.1 (per-component diagnosis) and the completed
-% baseline rows of 6.2/6.4 are filled from the real pilot + main-grid results
-% (docs/PILOT_STUDY_REPORT.md, THESIS_HANDOFF, DOCCL_RESEARCH_RECORD). The DocCL
-% remedy, prompt/LoRA baselines, and the component-targeting ablation remain
-% in-progress placeholders. Do NOT insert fabricated numbers; unrun cells are
-% marked with an em-dash and explained in the caption/text.
+% POPULATED FROM THE COMPLETED GRID. Section 6.1 (per-component diagnosis) is
+% filled from the pilot; sections 6.2/6.3/6.4 are filled from the COMPLETE
+% main grid (54/54 runs: naive, joint, EWC, LwF, ER, DER++ x 3 scenarios x 3
+% seeds) aggregated by scripts/analyze_results.py -> generated/table_*.tex.
+% The prompt/LoRA baselines (L2P, DualPrompt, CODA-Prompt, O-LoRA), the proposed
+% DocCL remedy, and the component-targeting ablation are deferred (GATE A was
+% inconclusive -> characterisation-only fallback) and remain explicit em-dash
+% placeholders. Do NOT insert fabricated numbers for the deferred cells.
 % =====================================================================
 
 This chapter reports the empirical findings. The per-component diagnosis is the
@@ -17,17 +19,21 @@ ablations (\S\ref{sec:results-ablation}), a computational-cost analysis
 (\S\ref{sec:results-compute}), and a discussion of implications and threats to
 validity (\S\ref{sec:results-discussion}).
 
-\paragraph{Status of these results.} The numbers reported in this chapter are
-\emph{preliminary}. They were obtained under a configuration reduced relative to the
-full protocol of Chapter~\ref{ch:experimental-setup}: a single 6\,GB GPU, three
-epochs per task, and batch size two, with $41$ of the planned $54$ main-grid cells
-complete at the time of writing. The two replay-heavy methods are still running and
-the prompt-based, LoRA-based, and proposed DocCL methods are deferred to the full
-run; the pilot diagnosis of \S\ref{sec:results-diagnosis} is complete. Cells that are
-not yet available are marked with an em-dash (``--'') and explained in place, and are
-never filled with estimated values. The qualitative conclusions below are already
-stable across the three seeds, but the exact figures will be refreshed once the full
-grid completes.
+\paragraph{Status of these results.} The six core continual-learning methods are
+\emph{complete}: the full main grid of $54$ runs (six methods $\times$ three scenarios
+$\times$ three seeds) finished without a single failed run. They were obtained under a
+configuration adapted to a single 6\,GB GPU---three epochs per task and batch size
+two---which is lighter than the ten-epoch full protocol of
+Chapter~\ref{ch:experimental-setup} but was held fixed across every method, so the
+\emph{comparisons} are apples-to-apples; the conclusions are stable across the three
+seeds (small standard deviations throughout). What remains deferred is the
+\emph{additional} method family rather than the core comparison: the prompt-based
+(L2P, DualPrompt, CODA-Prompt) and LoRA-based (O-LoRA) baselines, and the proposed
+DocCL remedy with its component-targeting ablation, were not run because the Week-4
+diagnosis (\S\ref{sec:results-stability}) was inconclusive and triggered the
+characterisation-only fallback (\S\ref{sec:method-fallback}). Cells for these deferred
+methods are marked with an em-dash (``--'') and explained in place, and are never
+filled with estimated values.
 
 \section{Where Forgetting Lives: The Per-Component Diagnosis}
 \label{sec:results-diagnosis}
@@ -263,55 +269,64 @@ targets the head and late layers specifically is the proposed-method extension
 \section{Mechanism-Targeted Remedy versus Baselines}
 \label{sec:results-remedy}
 
-This section reports the main continual-learning grid. The completed baselines
-(naive, joint, EWC, LwF, and the partially-complete ER) are filled below; the proposed
-DocCL remedy is in progress (its design follows the diagnosis,
-\S\ref{sec:method-selected}/\S\ref{sec:method-fallback}) and its row is left pending.
+This section reports the main continual-learning grid. All six core methods are
+complete and filled below: the lower bound (naive), the upper bound (joint), the two
+regularisation/distillation methods (EWC, LwF), and the two replay methods (ER,
+DER++). The prompt/LoRA baselines and the proposed DocCL remedy were deferred (the
+diagnosis triggered the characterisation-only fallback,
+\S\ref{sec:method-fallback}); their rows are left as explicit em-dash placeholders.
 
 \subsection{Main Comparison}
 \label{sec:results-main-table}
 
 Table~\ref{tab:main-comparison} and Figure~\ref{fig:aa-bars} report the average accuracy
-of each method on the three scenarios. Three patterns hold across seeds. First, naive fine-tuning is far
-below the joint oracle in every scenario, with the gap largest on the
-domain-incremental scenario ($38.4$ vs $84.8$). Second, replay is the strongest
-non-oracle strategy by a wide margin: on DIL, ER reaches $88.2$ AA, statistically
-matching the joint upper bound and closing essentially the entire $46$-point
-forgetting gap. Third, regularisation (EWC) helps on domain shift but slightly hurts
-on fine-grained class-incremental learning, while distillation (LwF) tracks the naive
-lower bound throughout---in this dense token-classification setting LwF gives
-essentially no benefit, because the old-class logits it distils collapse anyway as the
-classifier head grows.
+of each method on the three scenarios. Four patterns hold across seeds. First, naive
+fine-tuning is far below the joint oracle in every scenario, with the gap largest on the
+domain-incremental scenario ($38.4$ vs $84.8$). Second, the two \emph{replay} methods are
+the strongest non-oracle strategies by a wide margin and behave almost identically: on
+DIL both ER ($88.0$) and DER++ ($87.6$) statistically match---indeed marginally
+exceed---the joint upper bound ($84.8$), closing essentially the entire $46$-point
+forgetting gap; on the Mixed scenario both reach the joint ceiling as well (ER $60.7$,
+DER++ $61.8$ vs joint $62.8$). Third, regularisation (EWC) helps clearly on the two
+scenarios with a domain shift (DIL $43.1$, the best non-replay result there) but slightly
+\emph{hurts} average accuracy on fine-grained class-incremental learning (CIL-CORD
+$14.3$ vs naive $18.4$), because its Fisher penalty trades plasticity for stability.
+Fourth, distillation (LwF) tracks the naive lower bound throughout---in this dense
+token-classification setting LwF gives essentially no benefit, because the old-class
+logits it distils collapse anyway as the classifier head grows. The hardest scenario for
+every method is CIL-CORD, where even the joint oracle reaches only $30.9$ AA: packing all
+$60$ fine-grained CORD classes into one growing head is an intrinsically difficult
+multi-class problem, independent of forgetting.
 
 \begin{table}[!htbp]
   \centering
   \caption[Main comparison: average accuracy across scenarios]{Average entity-F1
-  (AA, mean\,$\pm$\,std over three seeds unless noted) of each method on the three
-  continual scenarios. Best non-oracle result per column in bold. \textbf{Preliminary}
-  results under the reduced configuration (RTX 2060, 3 epochs, batch 2); $41/54$ cells
-  complete. Em-dash cells: DER++ and ER-Mixed are in progress; the prompt-based
-  (L2P, DualPrompt, CODA-Prompt), LoRA (O-LoRA), and DocCL rows are deferred to the
-  full run (\S\ref{sec:results-discussion}). ``$n{=}2$'': two seeds available.}
+  (AA, mean\,$\pm$\,std over three seeds) of each method on the three continual
+  scenarios. Best non-oracle result per column in bold. Six core methods complete
+  ($54/54$ runs) under the single-GPU configuration (RTX 2060, 3 epochs, batch 2),
+  held fixed across methods. Em-dash cells: the prompt-based (L2P, DualPrompt,
+  CODA-Prompt), LoRA (O-LoRA), and proposed DocCL rows are deferred
+  (\S\ref{sec:results-discussion}).}
   \label{tab:main-comparison}
-  % Generated by scripts/analyze_results.py + ingest_to_thesis.py; the table below is the
-  % current preliminary fill and is overridden automatically once the generated file exists.
+  % Auto-loaded from generated/table_main.tex (scripts/analyze_results.py + ingest_to_thesis.py);
+  % the inline table below is a hand-kept mirror of the final numbers as a fallback.
   \IfFileExists{generated/table_main.tex}{\input{generated/table_main}}{%
   \begin{tabular}{lccc}
     \toprule
     \textbf{Method} & \textbf{CIL-CORD} & \textbf{DIL} & \textbf{Mixed} \\
     \midrule
-    Naive (lower bound)   & $18.4 \pm 0.4$ & $38.4 \pm 0.9$ & $30.4 \pm 3.4$ \\
-    EWC                   & $14.3 \pm 1.5$ & $43.1 \pm 3.7$ & $30.9 \pm 3.4$ \\
-    LwF                   & $\mathbf{18.6 \pm 0.4}$ & $38.4 \pm 0.9$ & $\mathbf{32.3 \pm 1.0}$ \\
-    ER                    & $15.7 \pm 0.4$ & $\mathbf{88.2 \pm 0.5}$ ($n{=}2$) & -- \\
-    DER++                 & -- & -- & -- \\
+    Naive (lower bound)   & $18.4 \pm 0.3$ & $38.4 \pm 0.8$ & $30.4 \pm 2.8$ \\
+    EWC                   & $14.3 \pm 1.2$ & $43.1 \pm 3.1$ & $30.9 \pm 2.8$ \\
+    LwF                   & $\mathbf{18.6 \pm 0.3}$ & $38.4 \pm 0.8$ & $32.3 \pm 0.8$ \\
+    ER                    & $15.7 \pm 0.4$ & $\mathbf{88.0 \pm 0.4}$ & $60.7 \pm 0.7$ \\
+    DER++                 & $17.6 \pm 0.2$ & $87.6 \pm 0.4$ & $\mathbf{61.8 \pm 0.2}$ \\
     L2P                   & -- & -- & -- \\
     DualPrompt            & -- & -- & -- \\
     CODA-Prompt           & -- & -- & -- \\
     O-LoRA                & -- & -- & -- \\
     \textbf{DocCL (ours)} & -- & -- & -- \\
     \midrule
-    Joint (upper bound)   & $30.9 \pm 0.4$ & $84.8 \pm 0.8$ & $62.8 \pm 2.0$ \\
+    Joint (upper bound)   & $30.9 \pm 0.3$ & $84.8 \pm 0.7$ & $62.8 \pm 1.6$ \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -321,9 +336,8 @@ classifier head grows.
   \includegraphics[width=0.95\linewidth]{bench_aa_bars.pdf}
   \caption[Average accuracy by method and scenario]{Average accuracy (AA) of each method
   on the three scenarios, grouped by scenario, with the naive lower bound and the joint
-  upper bound for reference. Replay (ER) reaches the joint ceiling on DIL; ER-Mixed and the
-  prompt/LoRA/DocCL methods are not yet run (Table~\ref{tab:main-comparison}).
-  \textbf{Preliminary} results.}
+  upper bound for reference. Both replay methods (ER, DER++) reach the joint ceiling on
+  DIL and Mixed; the prompt/LoRA/DocCL methods are deferred (Table~\ref{tab:main-comparison}).}
   \label{fig:aa-bars}
 \end{figure}
 
@@ -331,39 +345,47 @@ classifier head grows.
 \label{sec:results-bwt-fwt}
 
 Backward transfer (Table~\ref{tab:bwt-comparison}, Figure~\ref{fig:bwt-bars}) sharpens
-the ranking. Naive and
-LwF forget almost totally on CIL-CORD (BWT $\approx-90$); EWC roughly halves the
-forgetting on the two scenarios with a domain shift (DIL $-36.5$, Mixed $-31.3$ vs
-naive $-71.3$ and $-66.8$) but barely helps on CIL-CORD; and ER all but eliminates
-forgetting on DIL, with a slightly \emph{positive} backward transfer
-($+1.0$)---learning later tasks marginally improves earlier ones under replay. The
-method ordering for forgetting prevention is thus
-naive\,$\approx$\,LwF\,$<$\,EWC\,$<$\,ER, well short of the zero-forgetting joint
-oracle but, for ER on DIL, effectively reaching it.
+the ranking. Naive and LwF forget almost totally on CIL-CORD (BWT $\approx-90$); EWC
+roughly halves the forgetting on the two scenarios with a domain shift (DIL $-36.5$,
+Mixed $-31.3$ vs naive $-71.3$ and $-66.8$) but barely helps on CIL-CORD; and the two
+replay methods all but eliminate forgetting on DIL---ER reaches a slightly
+\emph{positive} backward transfer ($+1.9$) and DER++ a near-zero $-2.1$, meaning later
+tasks no longer overwrite earlier ones under replay. On the Mixed scenario replay again
+leads (ER $-17.0$, DER++ $-32.6$ vs naive $-66.8$), and on the hardest scenario,
+CIL-CORD, ER gives the single best backward transfer of any method ($-63.8$ vs naive
+$-90.4$). The two replay variants differ in character: ER (pure rehearsal) is the
+stronger forgetting-reducer on CIL-CORD and Mixed, whereas DER++ (rehearsal plus
+logit distillation) is the more \emph{seed-stable} (standard deviations near $0.2$) and
+ties ER on DIL. The method ordering for forgetting prevention is thus
+naive\,$\approx$\,LwF\,$<$\,EWC\,$<$\,DER++\,$\lesssim$\,ER, with both replay methods
+reaching the zero-forgetting joint oracle on the domain-incremental scenario.
 
-\paragraph{Forward transfer.} For these preliminary runs the evaluation matrix is
-lower-triangular---each model is evaluated only on tasks seen so far---so the
+\paragraph{Forward transfer.} The continual-learning loop evaluates each model only
+on tasks seen so far, so the performance matrix is lower-triangular and the
 forward-transfer term FWT (which needs the zero-shot $R[j-1,j]$ entries) is
-\emph{not yet available} and is reported as ``--''. The full protocol of
-\S\ref{sec:eval-metrics} measures it by additionally evaluating the not-yet-seen
-tasks; this is enabled for the full run.
+\emph{not measured} and is reported as ``--''. This is a deliberate, honest gap rather
+than a missing number: recovering FWT requires additionally evaluating each model on the
+not-yet-seen tasks at every boundary and seeding the metric tracker with single-task
+baseline performance; the change needed to enable it is documented but out of scope for
+this run. The single-task baselines that FWT would subtract are nonetheless available
+(e.g.\ FUNSD $b_i\approx85$), tabulated by the analysis script for future use.
 
 \begin{table}[!htbp]
   \centering
   \caption[Backward transfer across scenarios]{Backward transfer (BWT, mean\,$\pm$\,std
-  over three seeds unless noted); closer to $0$ is less forgetting. Best non-oracle
-  per column in bold. \textbf{Preliminary} results; em-dash cells as in
+  over three seeds); closer to $0$ is less forgetting. Best non-oracle per column in
+  bold. Six core methods complete; em-dash cells (prompt/LoRA/DocCL) as in
   Table~\ref{tab:main-comparison}.}
   \label{tab:bwt-comparison}
   \begin{tabular}{lccc}
     \toprule
     \textbf{Method} & \textbf{CIL-CORD} & \textbf{DIL} & \textbf{Mixed} \\
     \midrule
-    Naive (lower bound) & $-90.4 \pm 1.2$ & $-71.3 \pm 3.1$ & $-66.8 \pm 3.0$ \\
-    EWC                 & $-77.2 \pm 2.8$ & $-36.5 \pm 2.4$ & $\mathbf{-31.3 \pm 7.2}$ \\
-    LwF                 & $-90.4 \pm 0.8$ & $-72.0 \pm 1.5$ & $-65.3 \pm 1.2$ \\
-    ER                  & $\mathbf{-63.8 \pm 5.4}$ & $\mathbf{+1.0 \pm 1.4}$ ($n{=}2$) & -- \\
-    DER++               & -- & -- & -- \\
+    Naive (lower bound) & $-90.4 \pm 1.0$ & $-71.3 \pm 2.5$ & $-66.8 \pm 2.5$ \\
+    EWC                 & $-77.2 \pm 2.3$ & $-36.5 \pm 2.0$ & $\mathbf{-31.3 \pm 5.9}$ \\
+    LwF                 & $-90.4 \pm 0.7$ & $-72.0 \pm 1.3$ & $-65.3 \pm 1.0$ \\
+    ER                  & $\mathbf{-63.8 \pm 4.4}$ & $\mathbf{+1.9 \pm 1.5}$ & $-17.0 \pm 4.3$ \\
+    DER++               & $-82.8 \pm 1.7$ & $-2.1 \pm 0.8$ & $-32.6 \pm 0.1$ \\
     \midrule
     Joint (upper bound) & $0.0$ & $0.0$ & $0.0$ \\
     \bottomrule
@@ -375,8 +397,8 @@ tasks; this is enabled for the full run.
   \includegraphics[width=0.95\linewidth]{bench_bwt_bars.pdf}
   \caption[Backward transfer by method and scenario]{Backward transfer (BWT) of each method,
   grouped by scenario; bars hang below zero, so shorter is less forgetting. EWC roughly
-  halves forgetting where a domain shift is present, and ER drives BWT to $\approx 0$ on DIL.
-  Joint has BWT $=0$ by construction; ER-Mixed is pending. \textbf{Preliminary} results.}
+  halves forgetting where a domain shift is present, and both replay methods (ER, DER++)
+  drive BWT to $\approx 0$ on DIL. Joint has BWT $=0$ by construction.}
   \label{fig:bwt-bars}
 \end{figure}
 
@@ -396,25 +418,31 @@ tasks; this is enabled for the full run.
 
 This comparison---does concentrating a remedy on the dominant-forgetting component
 beat treating all components uniformly?---requires the proposed DocCL mechanism, which
-is \emph{in progress}. The pilot diagnosis produced a characterisation-first result
-(\S\ref{sec:results-stability}, \S\ref{sec:method-fallback}): the dominant locus is the
-classifier head rather than a single architectural lever, so the targeted mechanism is
-being finalised under advisor review before this ablation is run. The result will be
-reported here once the method is fixed.
+is \emph{deferred}. The pilot diagnosis produced a characterisation-first result
+(\S\ref{sec:results-stability}, \S\ref{sec:method-fallback}): the dominant forgetting
+locus is the classifier head rather than any single \emph{architectural} lever (fusion,
+layout-position, modality-routing), so the cross-condition test did not select one of
+the three pre-registered candidates and the targeted mechanism was not finalised within
+this work. The component-targeting ablation is therefore left as future work
+(\S\ref{sec:results-discussion}); the completed benchmark already establishes the
+strong-baseline context (replay reaching the oracle) against which such a mechanism
+would have to compete.
 
 \section{Ablation Studies}
 \label{sec:results-ablation}
 
-The component-targeting ablation (Table~\ref{tab:ablation}) turns the DocCL mechanism
-on for each component in isolation to test whether the diagnosis predicts the best
-target. It depends on the proposed mechanism and is therefore \emph{in progress}; the
-scaffold below is populated once the method is finalised.
+The component-targeting ablation (Table~\ref{tab:ablation}) would turn the DocCL
+mechanism on for each component in isolation to test whether the diagnosis predicts the
+best target. It depends on the proposed mechanism and is therefore \emph{deferred to
+future work} (the diagnosis triggered the characterisation-only fallback,
+\S\ref{sec:results-key-ablation}); the scaffold below is retained for that future run.
 
 \begin{table}[!htbp]
   \centering
-  \caption[Component-targeting ablation (in progress)]{Effect of concentrating the
-  DocCL mechanism on each component in isolation; the diagnosis predicts which target
-  is best. \emph{In progress} --- depends on the proposed mechanism
+  \caption[Component-targeting ablation (deferred)]{Effect of concentrating the
+  DocCL mechanism on each component in isolation; the diagnosis would predict which
+  target is best. \emph{Deferred to future work} --- depends on the proposed mechanism,
+  which was not finalised after the inconclusive diagnosis
   (\S\ref{sec:results-key-ablation}).}
   \label{tab:ablation}
   % Generated by scripts/analyze_results.py + ingest_to_thesis.py; scaffold is the fallback.
@@ -435,34 +463,38 @@ scaffold below is populated once the method is finalised.
 \section{Computational Efficiency}
 \label{sec:results-compute}
 
-Table~\ref{tab:compute} reports the wall-clock and memory cost of the completed
-methods, measured on the single 6\,GB GPU under the preliminary configuration
-(batch 2, gradient checkpointing). All methods fit within the $5$\,GB VRAM ceiling.
-Regularisation and distillation add a modest constant overhead---EWC stores the
-diagonal Fisher and a parameter snapshot, LwF a frozen teacher copy---while replay is
-the expensive method: ER roughly doubles the per-run wall-clock because it runs a
-second forward/backward pass over a replay batch at every step. ``Run'' denotes one
+Table~\ref{tab:compute} reports the wall-clock and memory cost of the six methods,
+measured on the single 6\,GB GPU (batch 2, gradient checkpointing). Every method stays
+within the $5$\,GB VRAM ceiling---a hard constraint of the hardware that shaped the
+whole configuration. Regularisation and distillation add a modest constant overhead:
+EWC stores the diagonal Fisher and a parameter snapshot ($\sim$4.7\,GB peak), LwF a
+frozen teacher copy ($\sim$3.0\,GB). The replay methods are the expensive ones: ER and
+DER++ both run a second forward/backward pass over a replay batch at every step,
+roughly doubling the per-run wall-clock (a CIL-CORD run takes $\sim$2.3\,h for ER and
+$\sim$3--4\,h for DER++, versus $\sim$0.5\,h for naive), and DER++ additionally stores
+cached output logits alongside the replay buffer. This is the practical price of
+replay's accuracy: it is the strongest remedy but also the slowest. ``Run'' denotes one
 full continual scenario (three to six tasks).
 
 \begin{table}[!htbp]
   \centering
-  \caption[Computational overhead]{Wall-clock and memory overhead of the completed
+  \caption[Computational overhead]{Wall-clock and memory overhead of the six
   continual-learning methods relative to naive fine-tuning, measured on a single
   6\,GB RTX 2060 (batch 2, gradient checkpointing). ``Run'' $=$ one full continual
-  scenario. \textbf{Preliminary}; the DER++ and DocCL rows are in progress.}
+  scenario. The DocCL row is deferred (\S\ref{sec:results-discussion}).}
   \label{tab:compute}
-  % Generated by scripts/analyze_results.py + ingest_to_thesis.py; the fill below is preliminary.
+  % Auto-loaded from generated/table_compute.tex; the inline table below mirrors the final numbers.
   \IfFileExists{generated/table_compute.tex}{\input{generated/table_compute}}{%
   \begin{tabular}{llll}
     \toprule
     \textbf{Method} & \textbf{Wall-clock / run} & \textbf{Extra state} & \textbf{Peak VRAM} \\
     \midrule
-    Naive          & $\sim$24--40 min & ---                          & $\sim$2.6 GB \\
-    EWC            & $\sim$40--50 min & diagonal Fisher + $\theta^\star$ snapshot & $\sim$4.7 GB \\
-    LwF            & $\sim$40--50 min & frozen teacher copy          & $\sim$3.0 GB \\
-    ER             & $\sim$1.2--2.3 h & 200-doc replay buffer        & $<$5 GB \\
-    DER++          & in progress      & buffer + cached logits       & --- \\
-    \textbf{DocCL} & in progress      & ---                          & --- \\
+    Naive          & $\sim$0.5 h      & ---                          & $\sim$2.6 GB \\
+    EWC            & $\sim$0.7 h      & diagonal Fisher + $\theta^\star$ snapshot & $\sim$4.7 GB \\
+    LwF            & $\sim$0.7 h      & frozen teacher copy          & $\sim$3.0 GB \\
+    ER             & $\sim$1.2--2.3 h & 200-doc replay buffer        & $\sim$4.0 GB \\
+    DER++          & $\sim$3--4 h     & buffer + cached logits       & $\sim$4.7 GB \\
+    \textbf{DocCL} & --               & ---                          & -- \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -489,36 +521,47 @@ at the output, is the simplest instance---are the natural intervention, and it e
   \includegraphics[width=0.95\linewidth]{replay_mechanism.pdf}
   \caption[Why replay works]{From diagnosis to result: because forgetting is output-facing,
   replay's re-exposure of old-class targets keeps the classifier head aligned, which
-  explains its empirical win (DIL BWT $\approx 0$). The diagnosis-grounded hypothesis ---
-  that a mechanism targeting the head/late layers directly (DocCL) could match replay
-  without storing data --- remains open. \textbf{Preliminary}.}
+  explains its empirical win (both ER and DER++ reach DIL BWT $\approx 0$). The
+  diagnosis-grounded hypothesis --- that a mechanism targeting the head/late layers
+  directly (DocCL) could match replay without storing data --- remains open future work.}
   \label{fig:replay-mechanism}
 \end{figure}
 
 \paragraph{What the benchmark shows.}
 Across the three scenarios the ordering is unambiguous: replay $\gg$ regularisation
-$\gg$ distillation. ER essentially solves the domain-incremental scenario (AA $88.2$,
-BWT $\approx0$, matching the joint oracle), EWC roughly halves forgetting wherever a
-domain shift is present but not on fine-grained class-incremental learning, and LwF
-tracks the naive lower bound throughout. The dense token-classification setting with a
-growing head is the likely reason distillation fails: the old-class logits it distils
-decay regardless once their classes stop being reinforced. The scenario lens matters
-too---domain-incremental learning, with distinct documents under a fixed label space,
-is the most tractable for these methods, whereas fine-grained class-incremental
-learning over a single dataset is the hardest.
+$\gg$ distillation. Both replay methods essentially solve the domain-incremental
+scenario (ER AA $88.0$/BWT $+1.9$; DER++ $87.6$/$-2.1$, both matching the joint oracle)
+and reach the joint ceiling on Mixed; EWC roughly halves forgetting wherever a domain
+shift is present but not on fine-grained class-incremental learning; and LwF tracks the
+naive lower bound throughout. That the two replay variants land so close together---and
+that pure ER edges DER++ on the two hardest scenarios while DER++ is the more
+seed-stable---suggests the benefit comes from \emph{rehearsing past examples} per se
+rather than from the logit-distillation term DER++ adds on top. The dense
+token-classification setting with a growing head is the likely reason distillation
+(LwF) fails: the old-class logits it distils decay regardless once their classes stop
+being reinforced. The scenario lens matters too---domain-incremental learning, with
+distinct documents under a fixed label space, is the most tractable, whereas
+fine-grained class-incremental learning over a single dataset (60 classes in one
+growing head) is the hardest for every method, oracle included.
 
 \paragraph{Threats to validity.}
-Several caveats bound these conclusions. (i) The results are \emph{preliminary}: three
-epochs per task (not ten), a single 6\,GB GPU, and $41/54$ cells complete; the
-replay-heavy methods (ER-Mixed, DER++) and the prompt/LoRA baselines are not yet run,
-and the proposed DocCL remedy and its targeting ablation are deferred pending the
-method decision. (ii) Each scenario uses a single fixed task order for the main grid;
-the pilot showed order materially affects forgetting ($\sim$6 BWT points), so the full
-run repeats the main comparison under alternate orders. (iii) Forward transfer is not
-yet measured (\S\ref{sec:results-bwt-fwt}). (iv) The pilot's text-deprived conditions
-collapsed, which limited the statistical power of the cross-condition test. (v) All
-results are on the single primary backbone; whether the late-layer/head concentration
-generalises to LiLT and BROS is the planned secondary-backbone check. None of these
-undercut the two robust qualitative findings---forgetting is a late-layer/head
-phenomenon, and replay is the strongest remedy---but they delimit how far the exact
-numbers should be pushed before the full run completes.
+Several caveats bound these conclusions. (i) The configuration is reduced relative to
+the full protocol---three epochs per task (not ten) and batch size two on a single
+6\,GB GPU---but it was held \emph{fixed across all six methods}, so the method
+comparison is internally valid even if the absolute numbers would shift upward at ten
+epochs; the small per-seed standard deviations indicate the rankings are stable. (ii)
+The additional prompt/LoRA baselines and the proposed DocCL remedy with its targeting
+ablation were \emph{not run}---the Week-4 diagnosis was inconclusive and triggered the
+characterisation-only fallback---so the comparison covers the six core methods rather
+than the full registered design space. (iii) Each scenario uses a single fixed task
+order in the main grid; the pilot showed order materially affects forgetting
+($\sim$6 BWT points), so single-order numbers carry that caveat. (iv) Forward transfer
+is not measured (\S\ref{sec:results-bwt-fwt}); it is reported as unavailable rather than
+estimated. (v) The pilot's text-deprived conditions collapsed, which limited the
+statistical power of the cross-condition test. (vi) All results are on the single
+primary backbone (LayoutLMv3); whether the late-layer/head concentration and the
+replay-dominant ordering generalise to LiLT and BROS is a planned secondary-backbone
+check. None of these undercut the chapter's two robust findings---forgetting is a
+late-layer/head phenomenon, and replay (ER/DER++) is the strongest remedy, reaching the
+joint oracle on domain-incremental learning---but they delimit how far the exact numbers
+should be generalised.
