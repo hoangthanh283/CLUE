@@ -24,6 +24,19 @@ ok(){ echo "  ${c_grn}OK${c_off} $*"; }
 warn(){ echo "  ${c_yel}!${c_off} $*"; }
 die(){ echo "${c_red}ERROR:${c_off} $*" >&2; exit 1; }
 
+# ── 0. Minimal-image tools (pytorch:*-runtime lacks curl/unzip/git) ──────────────
+need_apt=""
+for t in curl unzip git; do command -v "$t" >/dev/null 2>&1 || need_apt="$need_apt $t"; done
+if [ -n "$need_apt" ]; then
+  info "Installing missing tools:$need_apt"
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -qq 2>/dev/null && apt-get install -y -qq $need_apt 2>/dev/null \
+      && ok "tools installed" || warn "apt-get failed for$need_apt — install them manually if a later step needs them"
+  else
+    warn "no apt-get; install$need_apt manually if needed"
+  fi
+fi
+
 # ── 1. GPUs ─────────────────────────────────────────────────────────────────────
 command -v nvidia-smi >/dev/null 2>&1 || die "nvidia-smi not found — are you on a GPU instance?"
 info "GPUs visible:"
