@@ -74,6 +74,72 @@ docker run --rm --gpus all -v "$PWD/results:/workspace/results" --entrypoint bas
   doccl-grid -c "python scripts/analyze_results.py && python scripts/ingest_to_thesis.py"
 ```
 
+### Watching progress (`docker logs`)
+`run_grid_multigpu.sh` prints a **heartbeat block** every `HEARTBEAT_SECS` (default 45s) plus
+filtered live training lines (`=== Task`, `val_f1`, `STOP`, `Final: AA`), so `docker logs -f
+<container>` shows both overall progress and what each slot is doing:
+```
+── HEARTBEAT ── 73/189 done | 0 failed | elapsed 2h11m | ETA ~3h28m
+    running: dil_xlingual_ewc_seed42 | === Task 3/5: dil_xfund_fr ===
+    running: cil_wildreceipt_der_pp_seed7 | val_f1=61.2 best=62.0 bad=1
+```
+A machine-readable `results/logs/progress.json` (`{done,total,failed,running:[...]}`) is also
+written each heartbeat for external dashboards.
+
+## On-demand / ephemeral instances (vast.ai, runpod, lambda, vilao.ai) — DURABLE RESUME
+
+**The problem:** an on-demand instance's local disk dies with the instance. `-v $PWD/results`
+only persists to *that ephemeral disk*, so a fresh instance has no `.done` markers and the
+~189-run grid restarts from zero — re-billing GPU-hours you already paid for. The grid's resume
+state is tiny (`metrics.json` + `matrix.npy` + `.done` ≈ 700 B/run, ~130 KB total), so the fix is
+to keep it in durable storage. Two options:
+
+### Option A — persistent/network volume (if your provider offers one)
+Mount the provider's persistent disk at the results path and leave sync off:
+```bash
+docker run ... -v /mnt/persistent/results:/workspace/results ... doccl-grid ...
+```
+⚠️ A plain *local* instance disk is **not** durable — only a true network/persistent volume is.
+
+### Option B — object-storage sync via rclone (RECOMMENDED, works on any provider)
+The scheduler pulls prior resume state at startup, pushes it every `SYNC_SECS` (default 300s) and
+on exit (incl. provider SIGTERM teardown). Off by default; enabled by setting `SYNC_REMOTE`.
+`rclone` is baked into the image.
+
+**Easiest backend: a private Hugging Face dataset repo** (you already have an HF token):
+```bash
+# 1) One-time: create a PRIVATE dataset repo to hold the resume state.
+huggingface-cli repo create doccl-results --type dataset --private    # -> <user>/doccl-results
+
+# 2) One-time: make an rclone remote for HF's S3-compatible endpoint, or use any S3/R2/B2.
+#    Simplest portable path is Cloudflare R2 / B2 / S3 (rclone "s3" backend). Example rclone.conf:
+#      [obj]
+#      type = s3
+#      provider = Cloudflare         # or Other / AWS / Backblaze
+#      access_key_id = <KEY>
+#      secret_access_key = <SECRET>
+#      endpoint = <your-r2-endpoint>
+#    Then base64 it for injection:  base64 -w0 ~/.config/rclone/rclone.conf
+
+# 3) Run with sync ON. Kill the instance any time; a new instance with the SAME command
+#    pulls the .done markers at startup and continues where it left off.
+docker run --rm --gpus all \
+  -e WANDB_API_KEY=KEY -e WANDB_PROJECT=CL4IE \
+  -e GPUS="0 1" -e JOBS_PER_GPU=2 -e BATCH_SIZE=16 \
+  -e SYNC_REMOTE="obj:doccl-results/results" \
+  -e RCLONE_CONFIG_B64="$(base64 -w0 ~/.config/rclone/rclone.conf)" \
+  -e SYNC_SECS=300 -e HEARTBEAT_SECS=45 \
+  -v "$PWD/.hf_cache:/workspace/.hf_cache" \
+  --entrypoint bash doccl-grid -c "bash scripts/run_grid_multigpu.sh"
+```
+> HF-native alternative to S3: rclone also has an experimental HF backend, or you can replace the
+> sync step with `huggingface-cli upload <user>/doccl-results results/ --include "*/.done" ...`.
+> The S3-compatible path (R2/B2) above is the most reliable with the baked-in rclone.
+
+**Resume guarantee:** spot-killed mid-run → that job has no `.done` → it simply re-runs on the next
+instance (correct). Completed jobs are skipped (`[skip]` in the log). When `SYNC_REMOTE` is unset,
+all sync calls are pure no-ops.
+
 ## 2. Run the full remote grid, SINGLE GPU (baselines → core → prompt → aggregate)
 
 ```bash
