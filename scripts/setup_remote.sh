@@ -47,25 +47,33 @@ NGPU=$(nvidia-smi --query-gpu=index --format=csv,noheader | wc -l)
 ok "$NGPU GPU(s) detected"
 
 # ── 2. Python deps (reuse the template's torch; install the rest) ────────────────
-# Always prefer the system python3 (the one the pytorch image ships). Never let a
-# previous partial uv run shadow it: unset PYTHON so we probe the image's python3 first.
-PY="python3"
-command -v "$PY" >/dev/null 2>&1 || PY="python"
-command -v "$PY" >/dev/null 2>&1 || die "python3/python not found"
-info "Python: $($PY --version 2>&1)"
+# Find the interpreter that actually HAS a working torch+CUDA. The pytorch/pytorch:*
+# images install torch into a conda env (/opt/conda/bin/python), which is NOT always
+# first on PATH — bare `python3` may exist with no torch, and `python` may not exist
+# at all. So probe a list of candidates and pick the first whose torch sees CUDA;
+# fall back to the first that merely imports torch; only then fall through to uv.
+PY=""
+TORCH_IMPORTABLE=""
+for cand in "${PYTHON:-}" /opt/conda/bin/python python3 python; do
+  [ -n "$cand" ] || continue
+  command -v "$cand" >/dev/null 2>&1 || [ -x "$cand" ] || continue
+  ver=$("$cand" -c 'import torch; print(torch.__version__)' 2>/dev/null) || continue
+  # Prefer an interpreter whose torch can see CUDA; take it immediately.
+  if "$cand" -c 'import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)' 2>/dev/null; then
+    PY="$cand"; TORCH_IMPORTABLE="$ver"; CUDA_OK=1; break
+  fi
+  # Otherwise remember the first torch-importable interpreter as a fallback.
+  [ -z "$PY" ] && { PY="$cand"; TORCH_IMPORTABLE="$ver"; CUDA_OK=0; }
+done
 
-# Probe torch from the IMAGE — suppress the CUDA-driver-version UserWarning so we can
-# distinguish "torch importable but GPU driver too old" from "torch not installed".
-TORCH_IMPORTABLE=$("$PY" -c 'import torch; print(torch.__version__)' 2>/dev/null || true)
 if [ -n "$TORCH_IMPORTABLE" ]; then
+  info "Python: $($PY --version 2>&1) ($PY)"
   ok "template torch ${TORCH_IMPORTABLE} found — reusing it (no reinstall)"
-  # CUDA availability check: warn but DO NOT die — the driver may be fine at runtime
-  # even if the torch CUDA init path emits a version-mismatch warning.  We let the
-  # grid start and fail fast on the first real GPU call if there's a true mismatch.
-  if "$PY" -c 'import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)' 2>/dev/null; then
+  # CUDA availability (computed during the interpreter probe): warn but DO NOT die.
+  if [ "${CUDA_OK:-0}" = "1" ]; then
     ok "CUDA available"
   else
-    warn "torch.cuda.is_available() returned False — driver/torch version mismatch?"
+    warn "no interpreter's torch could see CUDA — driver/torch version mismatch?"
     warn "Continuing anyway; the grid will error on the first GPU call if this is real."
     warn "If it fails, pick a pytorch image whose CUDA version matches the host driver."
   fi
