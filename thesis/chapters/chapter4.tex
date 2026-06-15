@@ -138,7 +138,7 @@ regardless of dataset or continual scenario:
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=.95\textwidth]{doc_pipeline}
+  \includegraphics[width=\textwidth,height=0.5\textheight,keepaspectratio]{doc_pipeline}
   \caption{The five-step document preprocessing pipeline. Dataset-provided OCR
   tokens, word boxes, and the page image are tokenised, normalised, and aligned
   into the tri-modal inputs of the backbone; colour chips mark which input
@@ -177,7 +177,7 @@ consumes.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.95\linewidth]{system_architecture.pdf}
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{system_architecture.pdf}
   \caption[System architecture]{System architecture. The continual-learning core
   exposes a uniform method interface; the backbone wrapper exposes extension points
   for classifier expansion, prompts, and LoRA banks; the instrumentation layer

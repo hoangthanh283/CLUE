@@ -113,7 +113,7 @@ sessions~0--4 respectively, reflecting how many receipts carry each session's fi
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.95\linewidth]{scenario_cil_cord.pdf}
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{scenario_cil_cord.pdf}
   \caption[The CIL-CORD class-incremental scenario]{The class-incremental
   CIL-CORD scenario. CORD's 30 fine-grained classes are introduced six at a time
   across five sessions over a single fixed input domain, so the label space grows
@@ -177,7 +177,7 @@ produced model-free by \texttt{scripts/dil\_label\_report.py}.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.95\linewidth]{scenario_dil.pdf}
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{scenario_dil.pdf}
   \caption[The DIL domain-incremental scenario]{The domain-incremental DIL
   scenario. A single unified four-entity schema (HEADER/KEY/VALUE/OTHER) is held
   fixed while the input distribution shifts along the sequence
@@ -222,7 +222,7 @@ isolation.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.95\linewidth]{scenario_mixed.pdf}
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{scenario_mixed.pdf}
   \caption[The Mixed compositional scenario]{The Mixed compositional scenario:
   a length-six task sequence whose boundaries alternate between new-class
   transitions (label growth within CORD at a fixed domain) and new-domain

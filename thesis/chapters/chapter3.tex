@@ -147,7 +147,7 @@ network with different input pathways switched on or off.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.95\linewidth]{diagnostic_conditions.pdf}
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{diagnostic_conditions.pdf}
   \caption[The diagnostic conditions as active and zeroed pathways]{The LayoutLMv3
   conditions C1--C4 realised on a single fixed architecture. Each panel shows the
   same LayoutLMv3 with a different subset of input pathways active (text, image,
@@ -219,7 +219,7 @@ component-agnostic view that the per-component metrics refine.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.9\linewidth,height=0.4\textheight,keepaspectratio]{forgetting_matrix_schematic.pdf}
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{forgetting_matrix_schematic.pdf}
   \caption[Annotated structure of the forgetting matrix]{Schematic structure of the
   accuracy matrix $R[i,j]$ (entity-F1 on task $j$ after training task $i$); symbolic
   labels only, with no measured values. The diagonal $R[i,i]$ records just-learned
@@ -270,7 +270,7 @@ Figure~\ref{fig:diagnostic-pipeline} shows it as a data-flow diagram.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.95\linewidth]{diagnostic_pipeline.pdf}
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{diagnostic_pipeline.pdf}
   \caption[The per-component diagnostic pipeline]{Data flow of the per-component
   diagnostic. The model is fine-tuned sequentially on
   FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE under a fixed modality mask, and
@@ -347,7 +347,7 @@ the characterisation-only fallback rather than to a method.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.95\linewidth,height=0.4\textheight,keepaspectratio]{method_selection_tree.pdf}
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{method_selection_tree.pdf}
   \caption[Decision tree mapping diagnostic outcomes to the remedy]{The decision
   rule as a tree over \emph{measurable} outcomes. A head/late-layer concentration
   ($H_a$) selects the depth/head-targeted DocCL; a uniform-across-depth pattern
