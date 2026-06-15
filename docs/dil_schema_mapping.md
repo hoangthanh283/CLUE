@@ -1,8 +1,8 @@
-# DIL Schema Mapping — FUNSD → SROIE → CORD
+# DIL Schema Mapping — FUNSD → SROIE → CORD (+ XFUND for cross-lingual DIL)
 
-The Domain-Incremental Learning (DIL) scenario requires that all three datasets
-share a unified label space. This document records the mapping decision and
-rationale.
+The Domain-Incremental Learning (DIL) scenario requires that all datasets share a
+unified label space. This document records the mapping decision and rationale, for
+both the original English `dil` scenario and the cross-lingual `dil_xlingual` scenario.
 
 ## Unified label space (9 BIO tags)
 
@@ -62,6 +62,27 @@ sub        → OTHER   (sub-totals/breakdowns — auxiliary)
 Void and sub categories represent auxiliary annotations that don't fit
 KEY/VALUE; mapping to OTHER preserves them rather than collapsing to O.
 
+### XFUND (cross-lingual DIL — `dil_xlingual`)
+
+XFUND is the multilingual (de/es/fr/it/ja/pt/zh) counterpart of FUNSD and shares
+FUNSD's **exact** entity schema, so it reuses the FUNSD mapping verbatim:
+
+```
+HEADER   → HEADER
+QUESTION → KEY
+ANSWER   → VALUE
+```
+
+(`DIL_NAME_MAPPING["xfund"] = DIL_NAME_MAPPING["funsd"]`.)
+
+**Why this matters scientifically:** in `dil_xlingual` the *only* thing that changes
+between tasks is the **language** — the unified label space is held fixed across all
+five language tasks, and there is no head growth. This isolates representation drift
+under language shift from any schema/label-space confound, making it the cleanest test
+of whether the output-side forgetting finding (head + late layers dominate) generalises
+beyond English. Default language order **de → es → fr → it → zh** spans four Latin-script
+languages plus Chinese, so the sequence stresses both vocabulary drift and a script change.
+
 ## Sequence ordering for DIL
 
 Sessions in order:
@@ -86,8 +107,9 @@ investigated as a robustness check.
 
 ## Where this is implemented
 
-- `doccl/data/dil_remapping.py` — `DIL_LabelRemapper`, mappings, unified label list
-- `doccl/data/scenarios.py::build_dil` — wires up the three remapped datasets
+- `doccl/data/dil_remapping.py` — `DIL_LabelRemapper`, mappings (incl. `xfund`), unified label list
+- `doccl/data/scenarios.py::build_dil` — wires up the three remapped English datasets
+- `doccl/data/scenarios.py::build_dil_xlingual` — wires up the XFUND language sequence (cross-lingual DIL)
 
 ## Validation
 

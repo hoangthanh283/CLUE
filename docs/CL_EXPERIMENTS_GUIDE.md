@@ -100,16 +100,39 @@ results/
 - **RAM**: 16GB+ recommended
 - **Storage**: ~20GB for results
 
-### Task Sequence
-All experiments follow the same 5-task sequence:
+### Scenarios (current `doccl`-branch machinery)
+> The legacy single 5-task sequence below is superseded. Scenarios are now built by
+> `doccl/data/scenarios.py` and selected via `scenario=<name>` (Hydra). Available:
+
+| Scenario | Setting | Sequence |
+|----------|---------|----------|
+| `cil_cord` | class-IL | CORD, 5 sessions × 6 fine classes (growing head) |
+| `cil_wildreceipt` (NEW) | class-IL | WildReceipt, 24 classes / 4 sessions (growing head) |
+| `dil` | domain-IL | FUNSD → SROIE → CORD (unified 9-tag schema) |
+| `dil_xlingual` (NEW) | domain-IL, **cross-lingual** | XFUND de → es → fr → it → zh (fixed schema) |
+| `mixed` | mixed | 6 interleaved class-IL + domain tasks |
+| `single_{funsd,cord,sroie,xfund,wildreceipt}` | single-task | FWT baselines (`b_i`) |
+
+Run the NEW scenarios (after the single-task baselines they need for FWT):
+```bash
+# baselines first (provide b_i for FWT), then the scoped pass:
+for s in 42 123 7; do
+  uv run python scripts/train.py method=naive scenario=single_xfund seed=$s
+  uv run python scripts/train.py method=naive scenario=single_wildreceipt seed=$s
+done
+SCENARIOS="dil_xlingual cil_wildreceipt" SEEDS="42 123 7" bash scripts/run_grid_remote.sh
+```
+The heavy new grid (~66 runs) is intended for a powerful GPU box via `docker/` — see
+`docker/README.md`. XFUND + WildReceipt both ship images via HuggingFace (no manual
+data prep). Legacy sequence (pre-`doccl` pipeline, kept for history):
 1. **FUNSD** → 2. **CORD** → 3. **SROIE** → 4. **WildReceipt** → 5. **XFUND-zh**
 
 ### Key Settings
-- **CL Setting**: Class-IL (single growing head)
-- **Batch Size**: 1 with gradient accumulation
-- **Epochs**: 10 per task
-- **Learning Rate**: 5e-5 with linear warmup
-- **Early Stopping**: 3 epochs patience
+- **CL Settings**: class-IL (growing head) + domain-IL (fixed unified schema); Task-IL deferred
+- **Batch Size**: 2 with gradient checkpointing (6 GB GPU); higher on a big GPU (docker)
+- **Epochs**: train-to-convergence via **val-F1 early stopping** (patience=2, cap=100ep)
+- **Learning Rate**: 5e-5 constant (no scheduler)
+- **Metrics**: AA, BWT, AF, and **real per-run FWT** (zero-shot term + single-task `b_i`)
 
 ## 🔍 Monitoring Progress
 

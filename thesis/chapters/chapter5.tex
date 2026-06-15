@@ -12,11 +12,16 @@ benchmark used in Chapter~\ref{ch:results}.
 \section{Datasets}
 \label{sec:exp-datasets}
 
-We use three public \gls{vrdu} datasets that together span forms and receipts and
-a wide range of label-space sizes (Table~\ref{tab:dataset-stats}). All three are
-used with their \emph{dataset-provided} \gls{ocr} and bounding boxes; we do not
-re-run \gls{ocr}, which removes a confound and keeps the pipeline fixed across the
-whole study.
+We use five public \gls{vrdu} datasets (Table~\ref{tab:dataset-stats}). Three
+English datasets---FUNSD, CORD, SROIE---form the core benchmark and span forms and
+receipts across a wide range of label-space sizes; two further datasets extend the
+benchmark onto axes the core trio cannot probe. \textbf{XFUND} adds a
+\emph{language-shift} axis (the multilingual sibling of FUNSD, seven non-English
+languages) and \textbf{WildReceipt} adds a \emph{scale and schema-richness} axis
+(a larger receipt corpus with a 24-class key/value schema). All datasets are used
+with their \emph{dataset-provided} \gls{ocr} and bounding boxes; we do not re-run
+\gls{ocr}, which removes a confound and keeps the pipeline fixed across the whole
+study.
 
 \paragraph{FUNSD.} Loaded from the HuggingFace release
 \texttt{nielsr/funsd-layoutlmv3}, FUNSD provides 149 training and 50 test
@@ -39,18 +44,40 @@ originals), SROIE provides 626 training and 347 test scanned receipts and, like
 FUNSD, ships no validation split. Its four fields (company, address, date,
 total) give 9 \gls{bio} tags, and it contributes the largest test split.
 
-All three datasets are consumed by the shared five-step preprocessing pipeline
-of \S\ref{sec:impl-pipeline}; \gls{ocr} transcriptions and word-level bounding
-boxes are dataset-provided throughout, so no \gls{ocr} engine enters the
-experimental loop.
+\paragraph{XFUND (cross-lingual extension).} Loaded from
+\texttt{nnul/xfund-multilingual}, XFUND is the multilingual counterpart of FUNSD,
+covering seven non-English languages (German, Spanish, French, Italian, Japanese,
+Portuguese, Chinese). It shares FUNSD's exact entity schema (HEADER, QUESTION,
+ANSWER $\to$ 7 \gls{bio} tags), which lets it reuse the unified domain-incremental
+mapping unchanged. XFUND supports the \emph{cross-lingual} domain-incremental
+scenario (\S\ref{sec:exp-dil}), in which the domain shift between tasks is the
+\emph{language} while the label space is held fixed---isolating representation drift
+under language shift from any schema confound. The default language order
+de\,$\rightarrow$\,es\,$\rightarrow$\,fr\,$\rightarrow$\,it\,$\rightarrow$\,zh spans
+four Latin-script languages plus Chinese, so the sequence stresses both vocabulary
+drift and a script change.
+
+\paragraph{WildReceipt (scale extension).} Loaded from
+\texttt{kaydee/wildreceipt}, WildReceipt is a larger English receipt corpus
+($\sim$1.7k images) with a richer 24-class key/value schema (paired
+\texttt{*\_key}/\texttt{*\_value} fields; the upstream \texttt{Ignore}/\texttt{Others}
+classes map to background), giving 49 \gls{bio} tags after run-encoding the upstream
+flat span labels. It hosts a second class-incremental scenario
+(\S\ref{sec:exp-cil}) at greater scale and label-space breadth than CORD.
+
+All datasets are consumed by the shared five-step preprocessing pipeline of
+\S\ref{sec:impl-pipeline}; \gls{ocr} transcriptions and word-level bounding boxes
+are dataset-provided throughout, so no \gls{ocr} engine enters the experimental
+loop. XFUND and WildReceipt ship page images with their HuggingFace releases, so no
+separate image-preparation step is required.
 
 \begin{table}[!htbp]
   \centering
-  \caption[Dataset statistics]{Statistics of the three datasets. Tag counts are
-  BIO-aware and include the background ``O'' tag; split sizes follow the
-  standard releases used here. OCR is dataset-provided throughout. FUNSD and
-  SROIE ship no validation split; validation usage is specified in
-  \S\ref{sec:exp-checkpointing}.}
+  \caption[Dataset statistics]{Statistics of the five datasets (three core +
+  two extension). Tag counts are BIO-aware and include the background ``O'' tag;
+  split sizes follow the standard releases used here. OCR is dataset-provided
+  throughout. FUNSD and SROIE ship no validation split; validation usage is
+  specified in \S\ref{sec:exp-checkpointing}. XFUND counts are per language.}
   \label{tab:dataset-stats}
   \small
   \setlength{\tabcolsep}{5pt}
@@ -61,6 +88,10 @@ experimental loop.
     FUNSD & 149 & --  & 50  & 4  & 7  & scanned forms ($\sim$700) \\
     CORD  & 800 & 100 & 100 & 30 & 61 & receipts, fine-grained ($\sim$80) \\
     SROIE & 626 & --  & 347 & 4  & 9  & scanned receipts ($\sim$150) \\
+    \midrule
+    \multicolumn{7}{l}{\itshape Extension datasets (language-shift and scale axes):} \\
+    XFUND & $\sim$149 & -- & $\sim$50 & 4 & 7 & multilingual forms, 7 languages \\
+    WildReceipt & $\sim$1.4k & -- & $\sim$0.3k & 24 & 49 & receipts, key/value schema \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -231,6 +262,36 @@ isolation.
   plasticity and stability jointly.}
   \label{fig:scenario-mixed}
 \end{figure}
+
+\subsection{Extended-Benchmark Scenarios (Language Shift and Scale)}
+\label{sec:exp-extended}
+
+Two further scenarios extend the benchmark beyond the three core English datasets,
+each probing an axis the core trio cannot. They reuse the same methods, metrics,
+seeds, and training protocol, so they compose directly with the core results.
+
+\paragraph{Cross-lingual domain-incremental (\texttt{dil\_xlingual}).} A
+domain-incremental sequence over XFUND in which the domain shift between tasks is
+the \emph{language}: de\,$\rightarrow$\,es\,$\rightarrow$\,fr\,$\rightarrow$\,it\,$\rightarrow$\,zh.
+Because every XFUND language shares FUNSD's schema, the unified label space
+(Table~\ref{tab:dil-map}, row ``FUNSD'') is held \emph{fixed} across all five tasks
+and the classifier head never grows. Forgetting in this scenario is therefore pure
+representation drift under language shift, with no label-space confound---making it a
+direct test of whether the output-side forgetting finding of
+Chapter~\ref{ch:results} generalises beyond English. The order interposes four
+Latin-script languages and a final logographic one (Chinese), so the sequence
+stresses both vocabulary drift and a script change.
+
+\paragraph{Larger-scale class-incremental (\texttt{cil\_wildreceipt}).} A second
+class-incremental scenario splits WildReceipt's 24 key/value entity classes into
+four sessions with a head that grows session by session, exactly as in
+\S\ref{sec:exp-cil} but at greater scale ($\sim$1.7k receipts) and label-space
+breadth (49 \gls{bio} tags). It tests whether the class-incremental findings hold
+when the host dataset is larger and its schema richer than CORD.
+
+These two scenarios are part of the benchmark and its tooling; their empirical
+results are obtained on the same grid as the core scenarios and reported alongside
+them (Chapter~\ref{ch:results}).
 
 \subsection{Task Ordering}
 \label{sec:exp-ordering}

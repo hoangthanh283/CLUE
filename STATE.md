@@ -1,15 +1,23 @@
 # STATE
 
 ## Active Work
-GRID COMPLETE — 54/54 baseline runs done (6 methods x 3 scenarios x 3 seeds), zero failures across
-~53h. Aggregated (analyze_results.py -> all_runs.csv, pivot_*.csv, table_main/ablation/compute.tex)
-and ingested into thesis/. Results: replay methods (ER, DER++) win — both ~match joint upper bound on
-dil (AA 88/87.5, BWT~0). EWC moderate (halves dil/mixed forgetting). LwF ~= naive (no benefit, dense
-token CIL). naive = catastrophic lower bound. FWT reported unavailable (honest, see docs/FWT_NOTE.md).
+**Converged grid re-running** with val-F1 early stopping (patience=2, cap=100ep) — replaces the
+earlier fixed 3-epoch budget that under-trained EWC. Order: single-task baselines (9, DONE) →
+DocCL (running) → Core(54)+Prompt(36) as local fallback (offload to powerful machine via docker/).
+Per-run **FWT now real** (zero-shot future-task term recorded + tracker seeded with b_i).
+
+**NEW datasets added (infrastructure only — grid runs LATER on the powerful machine):**
+- **XFUND** (`nnul/xfund-multilingual`) → cross-lingual **domain-IL** scenario `dil_xlingual`
+  (de→es→fr→it→zh, fixed label space → pure language-shift drift). The headline new experiment:
+  does output-side forgetting hold under language shift?
+- **WildReceipt** (`kaydee/wildreceipt`) → **class-IL** scenario `cil_wildreceipt` (24 classes,
+  49 BIO tags, 4 growing-head sessions). Adds scale + richer receipt schema.
+- Both loaders validated against real HF schemas; 19 fast tests pass. ~66 new grid runs pending.
 
 ## Last Decision
-- **3 epochs** not 10 (10 = ~6.7 days, infeasible). Model hit F1=88 after 1 epoch, so 3 is
-  converged + defensible. ~2 days for PHASE 3.
+- Train-to-convergence via **val-F1 early stopping** (was fixed 3ep — under-trained EWC).
+- New datasets: XFUND=domain-IL (language axis), WildReceipt=class-IL (scale axis). Task-IL stays
+  deferred. Run the new ~66 runs on the powerful machine (docker/), not the laptop.
 - **num_workers=0** mandatory: num_workers=4 forked the dataset into ~5×10 GB and OOM-crashed
   the machine. See memory [[clue-resource-limits]].
 - Hard ceilings: RAM < 14 GB, VRAM < 5 GB. Watchdog hard-aborts if crossed.

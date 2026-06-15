@@ -15,9 +15,17 @@ This document records a **continual-learning (CL) research project** on a master
 
 **Experimental grid = methods × scenarios × seeds:**
 - **Methods (6 core):** `naive` (lower bound), `joint` (upper bound), `ewc`, `lwf`, `er`, `der_pp`. (Deferred/optional: Phase-4 prompt/LoRA = `l2p`, `dualprompt`, `coda_prompt`, `o_lora`; Phase-5 proposed method `doccl` aliased to `DocCL_A`.)
-- **Scenarios (3):** `cil_cord` (class-incremental on CORD, 5 sessions), `dil` (domain-incremental FUNSD→SROIE→CORD with a unified 9-tag schema), `mixed` (6-task interleaved class-IL + domain shifts).
+- **Scenarios (3 original):** `cil_cord` (class-incremental on CORD, 5 sessions), `dil` (domain-incremental FUNSD→SROIE→CORD with a unified 9-tag schema), `mixed` (6-task interleaved class-IL + domain shifts).
+- **Scenarios (2 NEW, infrastructure added; grid runs later on a more powerful machine):**
+  `dil_xlingual` (cross-lingual **domain-IL** over XFUND languages de→es→fr→it→zh, fixed 9-tag
+  schema → pure language-shift drift, no head growth) and `cil_wildreceipt` (**class-IL** over
+  WildReceipt's 24 entity classes = 49 BIO tags, 4 growing-head sessions). These broaden the
+  benchmark beyond English/forms+receipts onto the **language-shift** and **scale** axes — the
+  weakest points of a 3-English-dataset benchmark. `dil_xlingual` is the headline new experiment:
+  *does the output-side forgetting finding hold under language shift?*
 - **Seeds (3):** 42, 123, 7.
-- **Core grid size:** 6 × 3 × 3 = **54 runs**.
+- **Core grid size:** 6 × 3 × 3 = **54 runs** (original scenarios); **+~66 runs** for the 2 new
+  scenarios (6 core × 2 × 3 + 9 prompt/LoRA + 9 DocCL + 6 single-task FWT baselines).
 
 **Hardware / hard constraints:** single **RTX 2060, 6 GB VRAM**; **15.9 GB system RAM**; 4 GB swap. User-imposed ceilings: **never exceed 14 GB RAM or 5 GB VRAM** (OOM crashes the whole machine). Python 3.12 `.venv` (no conda); torch 2.11+cu130; W&B online project `thanh-workspace/CL4IE`.
 
@@ -27,9 +35,20 @@ This document records a **continual-learning (CL) research project** on a master
 - **AF** (Average Forgetting) = −BWT
 - **FWT** (Forward Transfer) = mean over i>0 of (R[i-1, i] − b_i); requires single-task baselines b_i
 
-**Epoch budget:** **3 epochs/task** (user-approved). 10 epochs ≈ 6.7 days = infeasible; model reaches F1≈88 after 1 epoch, so 3 epochs is converged + defensible.
+**Epoch budget:** **train-to-convergence via val-F1 early stopping** (patience=2, min_delta=0.1 F1
+points, epoch cap=100, best-val weights restored). This replaces the earlier fixed **3-epoch**
+budget, which under-trained EWC (own-task F1 28–76 vs naive/LwF/DER++ at 86–91) and used no
+convergence criterion. The original 3-epoch results are archived in `results_3ep_archive/` as a
+fixed-budget comparison. Disclosure: no separate val split exists in FUNSD/CORD/SROIE, so the
+task's eval set doubles as the early-stop signal and the reported metric — a small optimistic
+selection bias, bounded by patience=2 and the archived fixed-budget comparison.
 
-**Final training config:** `batch_size=2`, `gradient_checkpointing=true`, `num_workers=0`, `method.epochs=3`, W&B online, each run inside a `systemd-run --user --scope -p MemoryMax=9G -p MemorySwapMax=0` cgroup so the kernel can OOM-kill only the run (never the machine).
+**Final training config:** `batch_size=2`, `gradient_checkpointing=true`, `num_workers=0`,
+`method.epochs=100` (early stopping ends most tasks in 4–8 ep), W&B online, each run inside a
+`systemd-run --user --scope -p MemoryMax=9G -p MemorySwapMax=0` cgroup so the kernel can OOM-kill
+only the run (never the machine). Per-run **FWT is now real**: `scripts/train.py` records the
+zero-shot future-task term R[i-1,i] and seeds the metrics tracker with the single-task baselines
+b_i, so FWT lands in every `metrics.json` (and is re-derived consistently at aggregation).
 
 ---
 
@@ -46,8 +65,8 @@ This document records a **continual-learning (CL) research project** on a master
 Branch **`doccl`** is the clean experiment infrastructure. `RUNBOOK.md` pipeline: **setup → pilot → [GATE A] → main grid + ablation → aggregate → ingest → write prose.**
 
 ### 1.2 Key source modules
-- `doccl/data/scenarios.py` — `build_cil_cord`, `build_dil`, `build_mixed`, `build_single`, `build_cil_funsd`; `CLScenario` dataclass; `_cil_head_snapshots()`.
-- `doccl/data/cord.py`, `funsd.py`, `sroie.py` — loaders with `_filter_by_labels` (class-IL splits) and lazy image loading.
+- `doccl/data/scenarios.py` — `build_cil_cord`, `build_dil`, `build_mixed`, `build_single`, `build_cil_funsd`, **`build_dil_xlingual`** (NEW, cross-lingual), **`build_cil_wildreceipt`** (NEW); `CLScenario` dataclass; `_cil_head_snapshots()`.
+- `doccl/data/cord.py`, `funsd.py`, `sroie.py`, **`xfund.py`** (NEW), **`wildreceipt.py`** (NEW) — loaders with `_filter_by_labels` (class-IL splits) and lazy image loading.
 - `doccl/data/cil_remapping.py` — `CIL_LabelRemapper` (created in this work).
 - `doccl/data/dil_remapping.py` — `DIL_LabelRemapper`, `DIL_UNIFIED_LABELS` (pre-existing).
 - `doccl/models/layoutlm_wrapper.py` — `LayoutLMv3Wrapper`: `expand_classifier`, `_force_linear_head`, `forward`.
@@ -71,9 +90,11 @@ Branch **`doccl`** is the clean experiment infrastructure. `RUNBOOK.md` pipeline
 ### 1.4 Datasets and label spaces
 | Dataset | HF id | Task | Native entities | Notes |
 |---------|-------|------|-----------------|-------|
-| FUNSD | `nielsr/funsd-layoutlmv3` | Forms | HEADER, QUESTION, ANSWER → 7 BIO incl. O | 149 train / 50 test |
+| FUNSD | `nielsr/funsd-layoutlmv3` | Forms (English) | HEADER, QUESTION, ANSWER → 7 BIO incl. O | 149 train / 50 test |
 | CORD-v2 | `naver-clova-ix/cord-v2` | Receipts | 30 fine classes → 61 BIO incl. O; super-granularity → 11 BIO | 800 train / 100 test; **avg 7.9 distinct entity categories per receipt** |
 | SROIE | `mp-02/sroie` (HF mirror) | Receipt KIE | COMPANY, DATE, ADDRESS, TOTAL → 9 BIO | 626 train |
+| **XFUND** (NEW) | `nnul/xfund-multilingual` | Forms, **7 languages** (de/es/fr/it/ja/pt/zh) | HEADER, QUESTION, ANSWER → 7 BIO incl. O (same schema as FUNSD) | LayoutLM-ready (images bundled); `id`=`<lang>_<split>_<n>`; bbox px→0–1000; XFUND `val`=our `test`. Used for cross-lingual domain-IL (`dil_xlingual`). |
+| **WildReceipt** (NEW) | `kaydee/wildreceipt` | Receipt KIE (English) | 26 flat classes (paired `*_key`/`*_value`; `Ignore`/`Others`→O) → **24 entity classes = 49 BIO incl. O** | ~1.7k receipts; flat span labels run-encoded to BIO (first token B-, rest I-); bbox already 0–1000. Used for class-IL (`cil_wildreceipt`). |
 
 ### 1.5 Scenario definitions
 **`cil_cord`** — Class-Incremental, 5 sessions × 6 fine classes; head grows 13→25→37→49→61 (O at index 0). Session classes:
@@ -86,6 +107,10 @@ Branch **`doccl`** is the clean experiment infrastructure. `RUNBOOK.md` pipeline
 **`dil`** — Domain-Incremental: FUNSD → SROIE → CORD-super, **unified 9-tag schema** `[O, B-HEADER, I-HEADER, B-KEY, I-KEY, B-VALUE, I-VALUE, B-OTHER, I-OTHER]`; native labels remapped via `DIL_LabelRemapper`; head pre-expanded to 9. Mapping rationale (from `docs/dil_schema_mapping.md`): FUNSD QUESTION→KEY, ANSWER→VALUE; SROIE COMPANY→KEY, ADDRESS/DATE/TOTAL→VALUE; CORD menu/sub_total/total→VALUE, void_menu/sub→OTHER.
 
 **`mixed`** — 6 tasks: FUNSD-s0 (HEADER+QUESTION) → FUNSD-s1 (ANSWER) → SROIE (4 fields) → CORD-super-s0 (menu+sub_total) → CORD-super-s1 (total+void_menu+sub) → FUNSD revisit. Head grows 5→7→15→19→25 (revisit reuses existing labels).
+
+**`dil_xlingual`** (NEW) — Cross-lingual Domain-Incremental over XFUND: **de → es → fr → it → zh**, each language a task. **Fixed** unified 9-tag schema (same as `dil`, via `DIL_NAME_MAPPING["xfund"]` = the FUNSD map, since XFUND shares FUNSD's HEADER/QUESTION/ANSWER schema). The label space is constant across tasks ⇒ **no head growth**, so forgetting here is pure representation drift under *language* shift (4 Latin scripts + Chinese). The headline new test of whether the output-side forgetting finding generalises beyond English. Builder: `build_dil_xlingual(langs=...)`.
+
+**`cil_wildreceipt`** (NEW) — Class-Incremental over WildReceipt's 24 entity classes split into 4 sessions (6 classes each); head grows session by session like `cil_cord`. Builder: `build_cil_wildreceipt(num_sessions=4)`; joint pool = one full-label WildReceipt set remapped to the final cumulative head.
 
 ---
 

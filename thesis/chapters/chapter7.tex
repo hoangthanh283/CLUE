@@ -134,11 +134,18 @@ combined class-and-domain shifts that vary the label space and the document genr
 simultaneously; both would stress the components differently and test whether a
 single mechanism-targeted remedy transfers across regimes.
 
-\emph{Cross-lingual continual document IE.} Extending the benchmark with a
-multilingual corpus such as XFUND would layer language shift on top of domain
-shift, asking whether forgetting concentrates in the text pathway when the script
-and vocabulary change while layout statistics stay comparatively stable---a setting
-the current English-only benchmark cannot probe.
+\emph{Cross-lingual continual document IE.} The benchmark now includes a
+cross-lingual domain-incremental scenario over XFUND
+(de\,$\rightarrow$\,es\,$\rightarrow$\,fr\,$\rightarrow$\,it\,$\rightarrow$\,zh,
+\S\ref{sec:exp-extended}) and a larger-scale class-incremental scenario over
+WildReceipt, so language shift and corpus scale are now first-class axes rather than
+gaps. The open question these enable---left for deeper analysis---is whether the
+per-component diagnosis itself shifts under language change: when script and
+vocabulary change while layout statistics stay comparatively stable, does forgetting
+move toward the text pathway, or does it remain output-side as in the English
+setting? Running the full per-component diagnostic (CKA, per-group Fisher) inside the
+cross-lingual scenario, and extending it to a wider language set, is the natural
+continuation.
 
 \emph{Richer, layout-aware remedies.} The diagnosis points to a specific component;
 a complementary direction is to enrich the remedy on the data side with a
