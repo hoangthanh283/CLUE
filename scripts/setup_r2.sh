@@ -2,9 +2,11 @@
 # Interactive helper: configure a Cloudflare R2 (or any S3-compatible) rclone remote
 # for the grid's durable-resume sync, then print the exact `docker run` command.
 #
-# Run on your laptop (or the GPU box). It writes ~/.config/rclone/rclone.conf with an
-# "obj" remote, does a tiny round-trip test against your bucket, and emits the docker
-# command with SYNC_REMOTE + RCLONE_CONFIG_B64 pre-filled.
+# SECURITY: run this on a TRUSTED machine (your laptop) ONLY — it writes credentials to
+# ~/.config/rclone/rclone.conf. Do NOT run it on a rented/on-demand GPU box (the disk is
+# shared and may be reused). The recommended deployment passes R2_* as runtime `-e` flags
+# instead, so no secret ever lands on the rented disk (see docker/README.md). This helper
+# is a convenience for the rclone-config / RCLONE_CONFIG_B64 path.
 #
 # Usage:  bash scripts/setup_r2.sh
 #         BUCKET=doccl-results PROVIDER=Cloudflare bash scripts/setup_r2.sh   # non-interactive-ish

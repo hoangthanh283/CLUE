@@ -70,26 +70,23 @@ EXTRA="training.batch_size=${BATCH_SIZE} training.gradient_checkpointing=false \
 training.num_workers=4 method.epochs=${EPOCHS_CAP} wandb.project=${WANDB_PROJECT:-CL4IE}"
 
 # ── Durable-resume sync (rclone; pure no-op unless sync is configured) ───────────
-# Convenience bridge: if R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY/R2_ENDPOINT are set
-# (e.g. from .env), auto-build the rclone 'obj' remote and SYNC_REMOTE from them, so
-# the user only manages .env — no manual RCLONE_CONFIG_B64. R2_BUCKET defaults below.
+# SECURITY: credentials are NEVER written to disk. When R2_* env vars are present we
+# configure the rclone 'obj' remote purely via RCLONE_CONFIG_<REMOTE>_<KEY> environment
+# variables (rclone reads these in-process), so nothing sensitive lands on the rented
+# instance's disk. Pass R2_* as runtime `-e` flags (NOT a persistent .env on the box).
 R2_BUCKET="${R2_BUCKET:-doccl-results}"
 maybe_build_r2_remote() {
   # Only when R2 creds are present AND the user hasn't already set SYNC_REMOTE explicitly.
   [ -n "${R2_ACCESS_KEY_ID:-}" ] && [ -n "${R2_SECRET_ACCESS_KEY:-}" ] && [ -n "${R2_ENDPOINT:-}" ] || return 0
-  mkdir -p "$HOME/.config/rclone"
-  cat > "$HOME/.config/rclone/rclone.conf" <<EOF
-[obj]
-type = s3
-provider = Cloudflare
-access_key_id = ${R2_ACCESS_KEY_ID}
-secret_access_key = ${R2_SECRET_ACCESS_KEY}
-endpoint = ${R2_ENDPOINT}
-region = auto
-EOF
-  chmod 600 "$HOME/.config/rclone/rclone.conf"
+  # rclone connection-via-env: defines an 'obj' s3 remote with no config file on disk.
+  export RCLONE_CONFIG_OBJ_TYPE=s3
+  export RCLONE_CONFIG_OBJ_PROVIDER=Cloudflare
+  export RCLONE_CONFIG_OBJ_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID}"
+  export RCLONE_CONFIG_OBJ_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}"
+  export RCLONE_CONFIG_OBJ_ENDPOINT="${R2_ENDPOINT}"
+  export RCLONE_CONFIG_OBJ_REGION=auto
   [ -n "$SYNC_REMOTE" ] || SYNC_REMOTE="obj:${R2_BUCKET}/results"
-  say "[sync] built rclone 'obj' remote from R2_* env -> ${SYNC_REMOTE}"
+  say "[sync] configured rclone 'obj' remote from R2_* env (in-process, no file on disk) -> ${SYNC_REMOTE}"
 }
 
 sync_setup() {
@@ -99,9 +96,12 @@ sync_setup() {
     say "[sync] rclone not installed — durable sync DISABLED"; SYNC_REMOTE=""; return 0
   fi
   if [ -n "$RCLONE_CONFIG_B64" ]; then
-    mkdir -p "$HOME/.config/rclone"
-    echo "$RCLONE_CONFIG_B64" | base64 -d > "$HOME/.config/rclone/rclone.conf" 2>/dev/null \
-      && say "[sync] injected rclone.conf" || say "[sync] WARN: could not decode RCLONE_CONFIG_B64"
+    # Optional fallback path: decode an injected rclone.conf to a TEMP file (cleaned up on
+    # exit), not the persistent ~/.config — so a config-file user also leaves nothing behind.
+    RCLONE_TMP_CONF=$(mktemp)
+    echo "$RCLONE_CONFIG_B64" | base64 -d > "$RCLONE_TMP_CONF" 2>/dev/null \
+      && { export RCLONE_CONFIG="$RCLONE_TMP_CONF"; chmod 600 "$RCLONE_TMP_CONF"; say "[sync] using injected rclone.conf (temp, auto-deleted on exit)"; } \
+      || say "[sync] WARN: could not decode RCLONE_CONFIG_B64"
   fi
   # Fail-fast preflight: prove we can write+list+delete on the remote BEFORE running 189
   # ungated jobs. A creds/bucket/endpoint mistake aborts in seconds, not after hours.
@@ -190,6 +190,8 @@ on_exit() {
   [ -n "${HB_PID:-}" ] && kill "$HB_PID" 2>/dev/null
   [ -n "${SYNC_PID:-}" ] && kill "$SYNC_PID" 2>/dev/null
   sync_push_once
+  # Wipe any temp rclone config (RCLONE_CONFIG_B64 fallback path) so no creds linger on disk.
+  [ -n "${RCLONE_TMP_CONF:-}" ] && shred -u "$RCLONE_TMP_CONF" 2>/dev/null || rm -f "${RCLONE_TMP_CONF:-}" 2>/dev/null
   say "[exit] heartbeat/sync stopped; final push done (or no-op)"
 }
 

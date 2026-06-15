@@ -108,29 +108,36 @@ on exit (incl. provider SIGTERM teardown). Off by default; enabled by setting `S
 a `.synccheck` on the remote): if creds/bucket/endpoint are wrong it aborts in seconds rather than
 running 189 un-persisted jobs (override with `SYNC_STRICT=0` to continue without sync).
 
-**Simplest setup — put the R2 creds in `.env`** (the scheduler auto-builds the rclone remote from
-them; no `RCLONE_CONFIG_B64` needed):
-```ini
-# .env  (R2 -> Manage R2 API Tokens -> Object Read&Write; endpoint is account-level)
-R2_ACCESS_KEY_ID=...
-R2_SECRET_ACCESS_KEY=...
-R2_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com
-R2_BUCKET=doccl-results          # optional; defaults to doccl-results
-```
-Then pass `.env` straight into the container and sync turns on automatically:
+#### Credentials — keep them OFF the rented disk
+
+A rented/on-demand box is shared and its disk may be reused or snapshotted, so **do not leave a
+`.env` (or any secret file) on it.** Pass R2 creds as **runtime `-e` flags** instead — the
+scheduler configures rclone purely from environment variables (`RCLONE_CONFIG_OBJ_*`), so nothing
+sensitive is ever written to disk inside the container:
+
 ```bash
-docker run --rm --gpus all --env-file .env \
+# Creds live only in this command's process env (e.g. read from YOUR LAPTOP's .env, or a
+# secret manager) — they never persist on the GPU instance.
+set -a; source .env; set +a    # on your laptop, NOT on the rented box
+docker run --rm --gpus all \
+  -e WANDB_API_KEY -e WANDB_PROJECT=CL4IE \
+  -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY -e R2_ENDPOINT -e R2_BUCKET=doccl-results \
   -e GPUS="0 1" -e JOBS_PER_GPU=2 -e BATCH_SIZE=16 \
   -v "$PWD/.hf_cache:/workspace/.hf_cache" \
   --entrypoint bash doccl-grid -c "bash scripts/run_grid_multigpu.sh"
 ```
-On startup the scheduler builds the rclone remote from `R2_*`, runs a **fail-fast preflight**
-(write+list+delete a `.synccheck`), and aborts in seconds if the creds/bucket are wrong. Verified
-round-trip against R2 with these exact env vars.
+(`-e VAR` with no `=value` forwards the value from the current shell — so the secret is never typed
+on the command line or saved in a file on the instance.) On startup the scheduler configures the
+rclone `obj` remote in-process, runs a **fail-fast preflight** (write+list+delete a `.synccheck`),
+and aborts in seconds if creds/bucket are wrong. **Verified round-trip against R2.**
 
-**Alternative — the helper** (`scripts/setup_r2.sh`) prompts for the three R2 values, writes
-`~/.config/rclone/rclone.conf`, round-trip-tests the bucket, and prints a `docker run` using
-`RCLONE_CONFIG_B64` instead of `.env`. Use whichever you prefer.
+**Token hygiene (important):** create the R2 API token as **Object Read & Write scoped to ONLY the
+`doccl-results` bucket**, and **delete/rotate it in the Cloudflare dashboard once the grid
+finishes.** Then even a leak is bounded to tiny resume files and is dead after the run.
+
+> Avoid `--env-file .env` if that means copying `.env` onto the rented box. `--env-file` is fine
+> only when the file lives on a trusted machine you control (e.g. your laptop driving a remote
+> Docker daemon). The `-e VAR` (forward-from-shell) form above is the safest default.
 
 **Easiest backend: a private Hugging Face dataset repo** (you already have an HF token):
 ```bash
