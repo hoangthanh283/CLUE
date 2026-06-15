@@ -69,8 +69,31 @@ SYNC_INCLUDES=(--include "*/.done" --include "*/metrics.json" --include "*/matri
 EXTRA="training.batch_size=${BATCH_SIZE} training.gradient_checkpointing=false \
 training.num_workers=4 method.epochs=${EPOCHS_CAP} wandb.project=${WANDB_PROJECT:-CL4IE}"
 
-# ── Durable-resume sync (rclone; pure no-op unless SYNC_REMOTE is set) ───────────
+# ── Durable-resume sync (rclone; pure no-op unless sync is configured) ───────────
+# Convenience bridge: if R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY/R2_ENDPOINT are set
+# (e.g. from .env), auto-build the rclone 'obj' remote and SYNC_REMOTE from them, so
+# the user only manages .env — no manual RCLONE_CONFIG_B64. R2_BUCKET defaults below.
+R2_BUCKET="${R2_BUCKET:-doccl-results}"
+maybe_build_r2_remote() {
+  # Only when R2 creds are present AND the user hasn't already set SYNC_REMOTE explicitly.
+  [ -n "${R2_ACCESS_KEY_ID:-}" ] && [ -n "${R2_SECRET_ACCESS_KEY:-}" ] && [ -n "${R2_ENDPOINT:-}" ] || return 0
+  mkdir -p "$HOME/.config/rclone"
+  cat > "$HOME/.config/rclone/rclone.conf" <<EOF
+[obj]
+type = s3
+provider = Cloudflare
+access_key_id = ${R2_ACCESS_KEY_ID}
+secret_access_key = ${R2_SECRET_ACCESS_KEY}
+endpoint = ${R2_ENDPOINT}
+region = auto
+EOF
+  chmod 600 "$HOME/.config/rclone/rclone.conf"
+  [ -n "$SYNC_REMOTE" ] || SYNC_REMOTE="obj:${R2_BUCKET}/results"
+  say "[sync] built rclone 'obj' remote from R2_* env -> ${SYNC_REMOTE}"
+}
+
 sync_setup() {
+  maybe_build_r2_remote
   [ -n "$SYNC_REMOTE" ] || return 0
   if ! command -v rclone >/dev/null 2>&1; then
     say "[sync] rclone not installed — durable sync DISABLED"; SYNC_REMOTE=""; return 0

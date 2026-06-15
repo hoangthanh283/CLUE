@@ -14,11 +14,23 @@ if [ -z "${WANDB_API_KEY:-}" ] && [ "${WANDB_MODE:-online}" = "online" ]; then
   echo "         Pass -e WANDB_API_KEY=... or set -e WANDB_MODE=offline."
 fi
 
-# Materialise a minimal .env if not mounted, so source .env in the scripts is harmless.
+# Materialise a minimal .env if not mounted, so `source .env` in the scripts is harmless.
+# Includes R2_* so durable-resume sync works when creds are passed via -e / --env-file
+# (the scheduler also reads these straight from the process env).
 [ -f .env ] || cat > .env <<EOF
 WANDB_API_KEY=${WANDB_API_KEY:-}
 WANDB_PROJECT=${WANDB_PROJECT:-CL4IE}
 WANDB_ENTITY=${WANDB_ENTITY:-}
+R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+R2_ENDPOINT=${R2_ENDPOINT:-}
+R2_BUCKET=${R2_BUCKET:-doccl-results}
 EOF
+
+if [ -n "${R2_ACCESS_KEY_ID:-}" ]; then
+  echo "  durable-resume: R2 creds present -> sync will be ON (bucket ${R2_BUCKET:-doccl-results})"
+else
+  echo "  durable-resume: no R2_* creds -> sync OFF (results on ephemeral disk only)"
+fi
 
 exec "$@"

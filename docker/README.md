@@ -108,9 +108,29 @@ on exit (incl. provider SIGTERM teardown). Off by default; enabled by setting `S
 a `.synccheck` on the remote): if creds/bucket/endpoint are wrong it aborts in seconds rather than
 running 189 un-persisted jobs (override with `SYNC_STRICT=0` to continue without sync).
 
-**Fastest setup — run the helper** (`scripts/setup_r2.sh`): it prompts for your R2/S3
-Access Key ID + Secret + Endpoint, writes `~/.config/rclone/rclone.conf`, round-trip-tests the
-bucket, and prints your exact `docker run` command. Then skip to step 3 below.
+**Simplest setup — put the R2 creds in `.env`** (the scheduler auto-builds the rclone remote from
+them; no `RCLONE_CONFIG_B64` needed):
+```ini
+# .env  (R2 -> Manage R2 API Tokens -> Object Read&Write; endpoint is account-level)
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com
+R2_BUCKET=doccl-results          # optional; defaults to doccl-results
+```
+Then pass `.env` straight into the container and sync turns on automatically:
+```bash
+docker run --rm --gpus all --env-file .env \
+  -e GPUS="0 1" -e JOBS_PER_GPU=2 -e BATCH_SIZE=16 \
+  -v "$PWD/.hf_cache:/workspace/.hf_cache" \
+  --entrypoint bash doccl-grid -c "bash scripts/run_grid_multigpu.sh"
+```
+On startup the scheduler builds the rclone remote from `R2_*`, runs a **fail-fast preflight**
+(write+list+delete a `.synccheck`), and aborts in seconds if the creds/bucket are wrong. Verified
+round-trip against R2 with these exact env vars.
+
+**Alternative — the helper** (`scripts/setup_r2.sh`) prompts for the three R2 values, writes
+`~/.config/rclone/rclone.conf`, round-trip-tests the bucket, and prints a `docker run` using
+`RCLONE_CONFIG_B64` instead of `.env`. Use whichever you prefer.
 
 **Easiest backend: a private Hugging Face dataset repo** (you already have an HF token):
 ```bash
