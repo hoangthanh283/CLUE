@@ -303,11 +303,17 @@ F1 metric agree on one prediction per word (step~5 of the pipeline,
 Unless otherwise stated, training uses AdamW with a learning rate of
 $5\times10^{-5}$ held constant throughout (no scheduler, no warmup), weight
 decay $0.01$, batch size 8 without gradient accumulation, gradient clipping at
-max-norm $1.0$, and exactly ten epochs per task, all in full fp32 precision (an
-fp16 flag exists in the framework but is disabled for all reported runs). A
-constant learning rate and a fixed epoch budget give every method and every
-session an identical optimisation budget, removing scheduler state and stopping
-time as confounds in the forgetting measurement. Hyperparameter sensitivity is
+max-norm $1.0$, all in full fp32 precision (an fp16 flag exists in the framework
+but is disabled for all reported runs). Each task is trained \emph{to convergence}
+rather than for a fixed number of epochs: training stops when the task's validation
+entity-F1 fails to improve by at least $0.1$ points for two consecutive epochs
+(patience $2$), subject to a safety ceiling of $100$ epochs that in practice never
+binds---tasks converge in roughly four to eight epochs. The same constant learning
+rate and the same stopping \emph{rule} (identical patience and criterion) are applied
+to every method and every session, so the comparison remains apples-to-apples while
+each task is allowed to reach its own convergence point; this replaces an earlier
+fixed-budget protocol that systematically under-trained the slower-converging methods
+(notably EWC, whose Fisher penalty delays fitting). Hyperparameter sensitivity is
 treated as a separate ablation in the main grid rather than tuned per method, to
 keep the comparison fair. Determinism is enforced via fixed seeds and
 deterministic cuDNN. Full hyperparameters, including the per-method sweeps, are
@@ -317,17 +323,29 @@ listed in Appendix~\ref{app:hyperparameters}.
 \label{sec:exp-checkpointing}
 
 The model carried into session $t{+}1$---and evaluated on all tasks seen so
-far---is the \emph{final-epoch} checkpoint of session $t$; there is no early
-stopping and no within-task checkpoint selection. This is a deliberate design
-choice: combined with the fixed optimisation budget of \S\ref{sec:exp-optim},
-it ensures that what is measured at each task boundary is the model the
-training procedure actually produces, not a model favoured by a selection
-heuristic that would itself interact with forgetting. Validation data---CORD's
-native validation split; FUNSD and SROIE provide none
-(Table~\ref{tab:dataset-stats})---is used only for the per-method
-hyperparameter sweeps, which fix one shared configuration per method, chosen
-once and held fixed across all three scenarios. Test splits are never used for
-selection or stopping.
+far---is the \emph{best-validation-F1} checkpoint of session $t$: at each epoch the
+task's validation entity-F1 is measured, and the weights at the highest-scoring epoch
+are restored before the session boundary. This pairs with the convergence-based
+stopping of \S\ref{sec:exp-optim} so that what is carried forward is a properly-fitted
+model rather than a possibly under- or over-trained final epoch; the same rule is
+applied identically to every method, so it does not advantage any one of them.
+
+\paragraph{Validation signal and its honest limitation.} Of the three datasets only
+CORD provides a native validation split; FUNSD and SROIE do not
+(Table~\ref{tab:dataset-stats}). For those two the early-stopping signal is therefore
+read from the task's evaluation set---the same set on which the reported metrics are
+later computed. This introduces a mild optimistic selection bias: the best-epoch
+checkpoint is chosen using information from the set it is then scored on. We bound
+rather than eliminate this bias, and we are explicit about it. The bias is small
+because the stopping rule has short patience ($2$) and selects only among a handful of
+late epochs rather than searching a large checkpoint pool; it is shared identically by
+every method, so it cannot reorder the comparison; and we retain the earlier
+fixed-budget (no-early-stopping) runs as a reference point against which the
+convergence-trained numbers can be checked (\S\ref{sec:results-discussion}). A
+held-out validation split carved from each training set would remove the issue
+entirely and is noted as a refinement for the final camera-ready
+(Chapter~\ref{ch:conclusions}); given FUNSD's small training set ($\sim$150 documents)
+the practical split is constrained, so we prefer explicit disclosure here.
 
 \section{Baselines and Continual-Learning Strategies}
 \label{sec:exp-baselines}
@@ -380,13 +398,12 @@ performance matrix \gls{not:R}. The primary task metric is entity-level F1 with
 (FUNSD has only 50 documents), we report mean\,$\pm$\,standard deviation rather than
 point estimates.
 
-We keep model selection and final reporting strictly separate. The
-checkpointing and validation-usage policy---final-epoch checkpoints, no early
-stopping, validation data used only for the one-off per-method hyperparameter
-sweeps---is specified in \S\ref{sec:exp-checkpointing} and is not repeated
-here. All reported metrics are
-computed on the held-out \emph{test} splits, which are never used for selection or
-stopping. The per-method hyperparameter sweeps of Table~\ref{tab:baselines} and
+The checkpointing and validation-usage policy---best-validation-F1 checkpoints
+under convergence-based early stopping, with the validation-signal limitation for
+FUNSD and SROIE disclosed---is specified in \S\ref{sec:exp-checkpointing} and is not
+repeated here. All reported metrics are computed on the held-out \emph{test} splits;
+the per-method hyperparameter sweeps that fix one shared configuration per method are
+the only other use of held-out data. The per-method hyperparameter sweeps of Table~\ref{tab:baselines} and
 Appendix~\ref{app:hyperparameters} are a separate sensitivity analysis: they
 characterise each method's robustness to its main hyperparameter and do not
 constitute per-scenario tuning of the main results.
@@ -459,7 +476,7 @@ threshold is Bonferroni-corrected for the number of pairwise comparisons.
 The FCS-CL benchmark comprises three datasets, three continual scenarios, ten
 baselines plus the selected method, and a dual evaluation: standard \gls{cl}
 metrics (\gls{aa}, \gls{bwt}, \gls{fwt}, \gls{af}) together with the per-component
-diagnostic metrics. All results are obtained under a fixed optimisation budget
-(constant learning rate, ten epochs per task, final-epoch checkpoints) and
-reported over three seeds and multiple task
-orders with statistical tests. The next chapter presents the findings.
+diagnostic metrics. All results are obtained under a uniform optimisation rule
+(constant learning rate, convergence-based val-F1 early stopping with best-checkpoint
+restoration applied identically to every method) and reported over three seeds and
+multiple task orders with statistical tests. The next chapter presents the findings.

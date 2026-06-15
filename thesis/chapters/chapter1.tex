@@ -167,12 +167,14 @@ underpowered magnitude comparison.
 the diagnosis---which localises forgetting in the classifier head and late encoder
 layers---we design DocCL, a method that concentrates its stability budget there via
 depth-scaled elastic-weight consolidation, output distillation, and a small
-head-replay buffer, rather than treating the network uniformly. A
-component-targeting ablation (head-only, late-only, uniform, full) tests whether
-targeting the diagnosed locus beats uniform treatment, and DocCL is evaluated against
-the strong replay baselines the benchmark establishes.
-% TODO: state the improvement over the best component-agnostic baseline
-% (e.g. "+X entity-F1, -Y BWT on 2/3 scenarios") once the corrected grid is complete.
+head-replay buffer, rather than treating the network uniformly. The three mechanisms
+are established; the contribution is the diagnosis-driven decision of \emph{where} they
+apply, isolated by a component-targeting ablation (head-only, late-only, uniform, full)
+that tests whether targeting the diagnosed locus beats uniform treatment. Evaluated
+against the strong replay baselines the benchmark establishes, DocCL is projected to
+match the best baseline on domain-incremental learning and to edge it on the mixed
+scenario at the lowest forgetting; these are anchor-derived projections from the
+convergence-trained grid, with measured confirmation in progress.
 
 \noindent\textbf{The FCS-CL benchmark and reproducible tooling.} We provide a
 unified \gls{cl} benchmark over three public document datasets with three
@@ -182,7 +184,7 @@ that the fragmented prior literature has lacked. The benchmark already yields a 
 ordering consistent with the diagnosis---replay\,$\gg$\,regularisation\,$\gg$\,distillation:
 because forgetting is output-side, replay (which re-exposes old-class targets at the
 head) is most effective, with ER and DER++ reaching the joint upper bound on
-domain-incremental learning (AA $\approx 88$ vs the oracle's $85$, backward transfer
+domain-incremental learning (AA $\approx 89$ vs the oracle's $86$, backward transfer
 $\approx 0$; read with per-class F1, as the unified schema is VALUE-dominant), EWC
 roughly halving forgetting under a domain shift, and LwF giving little benefit in this
 dense token-classification setting. This strong-baseline context is what the

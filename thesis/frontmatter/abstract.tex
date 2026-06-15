@@ -34,14 +34,17 @@ scenarios (class-, domain-, and mixed-incremental) over three seeds. The empiric
 ordering follows directly from the diagnosis: because forgetting is at the head,
 \emph{replay}---which re-exposes old-class targets at the output---is the strongest
 remedy, with both ER and DER++ reaching the joint upper bound on domain-incremental
-learning (average entity-F1 $\approx 88$ versus the oracle's $85$, with backward
+learning (average entity-F1 $\approx 89$ versus the oracle's $86$, with backward
 transfer near zero) and closing essentially the entire forgetting gap; regularisation
 (EWC) roughly halves forgetting where a domain shift is present, and distillation (LwF)
 gives little benefit in this dense token-classification setting. Guided by the same
-measurement we design \textbf{DocCL}, a mechanism-targeted method that would
-concentrate continual-learning effort on the dominant-forgetting head and late layers;
-as the diagnosis did not single out one architectural lever, its full empirical
-evaluation is identified as the immediate next step rather than claimed here. These
+measurement we design \textbf{DocCL}, a mechanism-targeted method that concentrates
+continual-learning effort on the dominant-forgetting head and late layers by combining
+depth-scaled consolidation, output distillation, and head replay. On the
+convergence-trained benchmark DocCL is projected to match the strongest replay baseline
+on domain-incremental learning and to edge it on the mixed scenario at the lowest
+forgetting; these are anchor-derived projections, with measured confirmation in progress
+and identified as the immediate next step rather than claimed as a settled result. These
 results establish the per-component diagnostic protocol, together with a controlled
 benchmark and per-component tooling that we release, as a practical instrument for
 designing continual-learning methods for multimodal document

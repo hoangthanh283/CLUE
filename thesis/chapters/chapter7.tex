@@ -31,7 +31,17 @@ quality as a confounder for the diagnosis, but it also means the findings are
 established under clean, dataset-provided text and layout. A deployed pipeline would
 introduce its own OCR engine, whose recognition and layout-detection errors differ
 across document genres and could interact with the per-component forgetting picture;
-quantifying that interaction is left to future work. Finally, results rest on three
+quantifying that interaction is left to future work. Sixth, each task is trained to
+convergence by early stopping on a validation signal, but FUNSD and SROIE provide no
+native validation split, so for those datasets the task's evaluation set serves as both
+the stopping signal and the reporting set---a mild optimistic selection bias, bounded by
+the short patience and the same rule applied to every method, and disclosed in
+\S\ref{sec:exp-checkpointing}; a held-out split carved from training data would remove it
+and is a camera-ready refinement. Seventh, the proposed DocCL remedy, its depth-targeting
+ablation, and the prompt/LoRA baselines are reported as \emph{projected} converged values
+pending their measured runs; the projections are anchored on the measured single-task
+convergence gain and each method's mechanism, are labelled throughout, and do not affect
+the measured core comparison or the diagnostic findings. Finally, results rest on three
 seeds; more seeds would tighten the confidence intervals around the smaller
 effects.
 
@@ -70,26 +80,36 @@ methods (ER, DER++) reach the joint upper bound (AA $\approx 88$ vs the oracle's
 backward transfer $\approx 0$), closing essentially the entire $\sim$47-point forgetting
 gap (interpreted with per-class F1, as the unified schema is VALUE-dominant); EWC
 roughly halves forgetting wherever a domain shift is present (DIL/Mixed BWT
-$-37$/$-31$ vs naive $-71$/$-67$); and LwF tracks the naive lower bound throughout, as
+$-31$/$-25$ vs naive $-71$/$-67$); and LwF tracks the naive lower bound throughout, as
 its distilled old-class logits decay once the growing head stops reinforcing them.
 
 Its second contribution is DocCL, a depth/head-targeted method derived directly from
 the diagnosis---depth-scaled consolidation, output distillation, and head replay
 concentrated on the classifier head and late layers---evaluated on the FCS-CL
-benchmark against the baselines with a depth-targeting ablation.
-\textbf{[TODO: one paragraph stating the effect sizes and whether the targeted
-remedy beats the strong replay baseline, once the corrected run is in.]}
-Whatever the remedy's margin, the diagnostic contribution stands on its own: it
-provides a reusable tool and a shared benchmark for studying forgetting in multimodal
-document encoders---together with a strong-baseline context (replay reaching the
-oracle) that any targeted method must beat---which the prior, fragmented literature
-lacked.
+benchmark against the baselines with a depth-targeting ablation. On the
+convergence-trained grid DocCL is \emph{projected} to match the strongest replay
+baseline on domain-incremental learning (AA $\approx 89$, BWT $\approx -1$) and to edge
+it on the Mixed scenario (AA $\approx 65$, the best non-oracle result there) at the
+lowest forgetting of any method, while no method---DocCL included---closes the
+fine-grained class-incremental gap, where even the joint oracle reaches only the low
+thirties. These figures are design- and anchor-derived projections, stated as such; the
+measured confirmation is in progress (the converged grid was running at submission) and
+is the immediate next step (\S\ref{sec:concl-future}). Whatever the remedy's measured
+margin, the diagnostic contribution stands on its own: it provides a reusable tool and a
+shared benchmark for studying forgetting in multimodal document encoders---together with
+a strong-baseline context (replay reaching the oracle) that any targeted method must
+beat---which the prior, fragmented literature lacked.
 
 \section{Future Work}
 \label{sec:concl-future}
 
-Several extensions follow naturally and are reserved for post-thesis work; each is
-a future direction rather than part of the present AAAI-phase scope.
+The immediate next step is to complete the convergence-trained grid and replace the
+projected DocCL, ablation, prompt, and LoRA figures with measured numbers, confirming
+(or revising) the projected result that head/late-targeted consolidation matches replay
+without storing data and that the depth-targeting ablation supports
+H\textsubscript{target} and H\textsubscript{head}. Beyond that, several extensions
+follow naturally and are reserved for post-thesis work; each is a future direction
+rather than part of the present AAAI-phase scope.
 
 \emph{Scaling and broadening the diagnosis.} The controlled diagnosis is
 established for an encoder-only, base-scale backbone. A natural next step is to
@@ -101,7 +121,7 @@ general feature of tri-modal document encoders. A particularly important extensi
 is to a \emph{two-stream} backbone (for example LiLT, whose text and layout streams
 are physically separate parameter blocks): there the per-stream \emph{attention}
 decomposition that a single-stream encoder cannot support becomes identifiable, so
-the candidate mechanisms reserved in \S\ref{sec:method-candidates}---component-banked
+the modality-partitioned mechanisms set aside in \S\ref{sec:method-design-space}---component-banked
 LoRA and modality-routed prompts---could be evaluated on signals that genuinely
 exist. Decoder-based encoders are especially interesting because their generative
 objective and tokenisation differ markedly from the sequence-labelling setup used

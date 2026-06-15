@@ -374,178 +374,43 @@ not needed and may under-protect where it is. The hypothesis of DocCL is that
 strength, freezing, or replay weighting---on the dominant-forgetting component
 improves the stability--plasticity trade-off at negligible extra cost.
 
-\subsection{Design Space: Mapping CL Families to LayoutLMv3}
+\subsection{Design Space: Where a Mechanism Can Attach in a Single-Stream Encoder}
 \label{sec:method-design-space}
 
-The candidates are constructed from three continual-learning families
-(\S\ref{sec:bg-cl-families}), each adapted to the tri-modal structure of
-LayoutLMv3. What is novel here is not the families themselves but \emph{where} they
-attach to a document encoder, since no published method exploits the layout stream.
+The three continual-learning families of \S\ref{sec:bg-cl-families}---regularisation,
+replay, and distillation---each leave one design choice open for a document encoder:
+\emph{where} in the network the mechanism concentrates its effort. This is precisely
+the choice that existing methods make blindly. EWC weights every parameter by its
+Fisher importance but applies the \emph{same} quadratic form everywhere; replay
+re-exposes whole inputs without regard to which layers most need grounding;
+distillation matches the full output without asking which representations have
+drifted. The contribution of this thesis is not a new family but a principled,
+\emph{measured} answer to the ``where'' question---and the honest constraint on that
+answer is the single-stream caveat of \S\ref{sec:method-components}.
 
-\paragraph{Where LoRA injects.} Low-rank adapters~\citep{hu2022lora} can be placed
-at four sites in LayoutLMv3: the text self-attention Q/K/V projections (the
-standard NLP recipe), the image-patch projection and visual self-attention, the 2D
-position (layout) embeddings, and the cross-modal fusion projection. The fusion
-projection offers the most leverage per parameter because it is the only site where
-the three streams interact; the layout site is the least explored and is plausibly
-where forms-versus-receipts shift concentrates gradient. O-LoRA~\citep{wang2023olora}
-keeps per-task subspaces globally orthogonal, which exhausts rank as tasks
-accumulate; allocating \emph{separate banks per component} relaxes this to a
-per-bank constraint.
+That caveat rules out an entire class of otherwise-appealing designs. One might wish
+to place per-modality low-rank adapters on a ``text'', ``visual'', and ``fusion''
+bank, or to route per-modality prompt sub-pools by a layout-aware query---both natural
+ideas, and both presupposing separable text-, visual-, and fusion-attention parameter
+groups. LayoutLMv3 has none: from the first encoder layer the streams share one set of
+query/key/value projections (\S\ref{sec:method-components}). We therefore do not
+pursue modality-partitioned adapters or routers here; they are reserved for a
+genuinely two-stream backbone where the streams physically exist
+(Chapter~\ref{ch:conclusions}). What the architecture \emph{does} separate is
+\emph{depth}---input embeddings, early/mid/late encoder blocks, and the task
+head---and depth is the axis along which the diagnosis (\S\ref{sec:method-diagnostic})
+can actually localise forgetting. The remedy is therefore built on the one axis the
+instrument can measure.
 
-\paragraph{Where prompts attach.} Prompt-pool methods such as
-L2P~\citep{wang2022l2p} select learnable tokens by querying a frozen backbone with
-a CLS feature. For a tri-modal encoder this raises two design questions: which
-stream(s) the prompts prepend to (text, visual, fusion), and whether the
-query/key mechanism should be made \emph{layout-aware} rather than CLS-only. Both
-are exploited by the candidates below.
-
-\paragraph{Where regularisation applies.} Rather than a single Fisher-weighted
-penalty over all parameters (EWC~\citep{kirkpatrick2017ewc}), the importance weight
-can be made \emph{component-specific}, concentrating protection on whichever group
-the diagnosis flags as fastest-drifting.
-
-\subsection{Candidate Designs}
-\label{sec:method-candidates}
-
-Because the method must be derived from the diagnosis, candidate designs were
-sketched in advance as a safety net for the measure-first approach. We retain the
-three original sketches below as design history, with an important correction. Two
-of them---Candidate~A (which assumes \emph{fusion} layers forget most) and
-Candidate~C (which assumes per-modality, visual-versus-text patterns)---presuppose
-signals that a \emph{single-stream} encoder cannot produce: as
-\S\ref{sec:method-components} explains, LayoutLMv3 has no separable fusion or
-visual-attention parameter group, so those branches are not realisable by the
-instrument. The corrected, adequately powered decision rule
-(\S\ref{sec:method-diag-hypotheses}) admits only the depth-localised outcomes, and
-the diagnosis selects the depth/head-targeted DocCL of
-\S\ref{sec:method-selected}---which is most closely related to Candidate~B
-(selective, group-weighted EWC), generalised from layout-position protection to
-depth/head protection. The sketches A and C are reserved as directions for the
-NeurIPS extension on a two-stream backbone where the streams physically exist.
-
-\subsubsection{Candidate A: Layout-Aware Prompts with Hierarchical LoRA (LAPP + H-LoRA)}
-\label{sec:method-cand-a}
-\emph{Triggered if the diagnosis shows fusion layers forget most and
-layout-sensitivity matters.} This candidate combines two components.
-
-\noindent\emph{LAPP (Layout-Aware Prompt Pool).} L2P's CLS-only query is replaced
-by a query that concatenates the CLS embedding with a projected layout signature,
-\[
-  q(x) = \big[\, h_{\mathrm{CLS}} \;;\; W_{\text{layout}}\,\phi(\text{boxes}) \,\big].
-\]
-The descriptor $\phi(\text{boxes})$ is made precise as a normalised spatial
-histogram. Each box $b_i$ contributes its centre
-$(c_x^{(i)}, c_y^{(i)}) = \big(\tfrac{b_{i,1}+b_{i,3}}{2},\, \tfrac{b_{i,2}+b_{i,4}}{2}\big)$,
-rescaled from $[0,1000]$ to $[0,1]^2$. The unit square is partitioned into a
-$4\times4$ grid of $16$ equal cells, and each centre is assigned to the single cell
-$\mathrm{cell}(i) = \big(\lfloor 4\,c_x^{(i)}\rfloor,\, \lfloor 4\,c_y^{(i)}\rfloor\big)$
-(clamped to the boundary). Counting centres per cell and $\ell_1$-normalising gives
-\[
-  \phi(\text{boxes})_k = \frac{1}{N}\sum_{i=1}^{N}
-    \mathbf{1}\!\big[\mathrm{cell}(i) = k\big]
-  \in \mathbb{R}^{16},
-  \qquad \sum_{k=1}^{16}\phi(\text{boxes})_k = 1,
-\]
-so $\phi(\text{boxes})$ is the layout-only, text-invariant geometry of the page (the
-\texttt{get\_\allowbreak layout\_\allowbreak signature} descriptor of \S\ref{sec:impl-instrumentation});
-$W_{\text{layout}}\colon\mathbb{R}^{16}\!\to\!\mathbb{R}^{768}$ is trainable. Given a
-prompt pool $\{(k_i, P_i)\}_{i=1}^{M}$ of key--prompt pairs, the prepended prompts
-are those whose keys are most similar to the layout-aware query under cosine
-similarity,
-\[
-  K_x = \operatorname*{top\text{-}K}_{i}\, \cos\!\big(q(x),\, k_i\big),
-\]
-and the pool keys $k_i$ are enriched the same way, so that documents are routed to
-prompts by spatial layout, not text alone.
-
-\noindent\emph{H-LoRA (Hierarchical LoRA).} Three rank-$r$ LoRA banks
-($r{=}8$) are allocated by component
-$b\in\{\text{text},\text{visual},\text{fusion}\}$: Bank~1 on the text Q/K/V
-projections, Bank~2 on the patch projection and visual self-attention, and Bank~3 on
-the cross-modal fusion projection---the key bank when fusion dominates.
-Orthogonality is enforced \emph{per bank} rather than globally: writing the new-task
-down-projection of bank $b$ as $A_t^{(b)}$ and stacking the columns of all
-earlier-task factors of the same bank as $A_{<t}^{(b)}$, the new factor is
-constrained to lie orthogonally to them \emph{within that bank},
-\[
-  \big(A_t^{(b)}\big)^{\!\top} A_{<t}^{(b)} = 0
-  \qquad \text{for each } b\in\{\text{text},\text{visual},\text{fusion}\}.
-\]
-This is a deliberate relaxation of O-LoRA's single global orthogonality
-constraint~\citep{wang2023olora}: confining orthogonality to each component's own
-bank delays the rank exhaustion that a global constraint suffers once enough tasks
-accumulate, while still suppressing cross-task interference where it matters most. A
-task may activate only a subset of banks, compatible with a
-D-MoLE-style~\citep{ge2025dmole} layer-wise allocation. The per-task parameter cost
-is small. A rank-$r$ adapter on a layer of width $d$ adds $2rd$ parameters (a
-$d\times r$ down-projection and an $r\times d$ up-projection), so across $L_b$
-adapted layers in bank $b$ the per-task cost is
-\[
-  \#\text{params}_{\text{H-LoRA}} \approx \sum_{b}\, 2\,r\,d\,L_b ,
-\]
-which at $r{=}8$, $d{=}768$ is on the order of $10^5$ parameters per task against the
-$\sim$133M frozen backbone---roughly a tenth of a percent.
-Figure~\ref{fig:candidate-a} sketches the two components together.
-
-\begin{figure}[!htbp]
-  \centering
-  \includegraphics[width=0.95\linewidth]{candidate_a_lapp_hlora.pdf}
-  \caption[Candidate~A: layout-aware prompts with hierarchical LoRA]{Candidate~A
-  (LAPP + H-LoRA). \emph{Left}: the layout-aware query concatenates the CLS
-  embedding with a projected $4\times4$ grid histogram of bounding-box centres and
-  selects prompts from the pool by cosine top-$K$, so routing depends on page
-  geometry rather than text alone. \emph{Right}: three component-wise low-rank banks
-  (text, visual, fusion) with orthogonality enforced within each bank rather than
-  globally; the fusion bank is the key one when fusion forgets most. The schematic is
-  illustrative and does not assert that this candidate is selected.}
-  \label{fig:candidate-a}
-\end{figure}
-
-\subsubsection{Candidate B: Layout-Protected Regularisation (L-EWC)}
-\label{sec:method-cand-b}
-\emph{Triggered if forgetting is broadly uniform but the 2D position embeddings
-drift fastest.} A selective EWC variant applies a high importance weight to the
-layout (2D position) embeddings and a low weight elsewhere,
-\[
-  \mathcal{L} = \mathcal{L}_{\mathrm{CE}}
-    + \lambda_{\text{layout}}\, F_{\text{layout}}\,(\theta_{\text{layout}} - \theta^{*}_{\text{layout}})^2
-    + \lambda_{\text{other}}\, F_{\text{other}}\,(\theta_{\text{other}} - \theta^{*}_{\text{other}})^2,
-\]
-with $\lambda_{\text{layout}} \gg \lambda_{\text{other}}$ and $F$ the per-group
-Fisher of \S\ref{sec:method-diag-metrics}. An optional layout-embedding
-distillation term from the previous-task model can be added. The method is cheap,
-theoretically motivated, and adds no inference-time parameters.
-
-\subsubsection{Candidate C: Modality-Routed Prompts}
-\label{sec:method-cand-c}
-\emph{Triggered if the forgetting pattern is scenario-dependent or per-modality.}
-Three prompt sub-pools $P_{\text{text}}, P_{\text{visual}}, P_{\text{layout}}$ are
-maintained, and a router activates one or more from input features,
-\[
-  r(x) = \mathrm{softmax}\!\big(\mathrm{MLP}([\,h_{\mathrm{CLS}};\,
-  \phi(\text{boxes});\, \bar{v}\,])\big),
-\]
-where $\bar{v}$ is a pooled visual feature; the selected sub-pool is prepended to
-its corresponding stream. This combines L2P's pool concept with explicit modality
-routing and naturally fits domain-incremental shifts (where S-Prompt-style
-per-domain prompts excel~\citep{wang2022sprompt}). Candidates~B and~C are contrasted
-in Figure~\ref{fig:candidate-bc}.
-
-\begin{figure}[!htbp]
-  \centering
-  \includegraphics[width=0.95\linewidth]{candidate_b_c.pdf}
-  \caption[Candidates~B and~C: layout-protected regularisation and modality-routed
-  prompts]{The two alternative candidates. \emph{Left} (Candidate~B, L-EWC): a
-  selective elastic-weight penalty places a large importance weight on the 2D
-  position (layout) embeddings and a small weight elsewhere, concentrating stability
-  on the fastest-drifting parameters with no inference-time cost. \emph{Right}
-  (Candidate~C, modality-routed prompts): a router maps input features to one or more
-  of three per-modality prompt sub-pools, each prepended to its own stream. Both are
-  shown as alternatives; the diagnosis, not this figure, decides which (if any) is
-  selected.}
-  \label{fig:candidate-bc}
-\end{figure}
+Within that constraint the natural realisation of each family is a
+\emph{component-specific} version of itself: a Fisher penalty whose strength varies by
+depth bucket rather than a single global $\lambda$ (regularisation); a buffer that
+re-exposes old classes at the drifting head rather than generic rehearsal (replay); and
+an output distillation that protects the output-facing representations specifically
+(distillation). These are exactly the three ingredients of the selected method
+(\S\ref{sec:method-selected}). The mechanisms themselves are established; what is novel
+is that \emph{where} each applies is fixed by measurement, not by a hand-tuned
+heuristic or a uniform default.
 
 \subsection{Testable Component Hypotheses}
 \label{sec:method-component-hypotheses}
@@ -583,8 +448,13 @@ infrastructure.
 
 The diagnosis localises forgetting in the \emph{classifier head and late encoder
 layers}, with the input encoders stable (Chapter~\ref{ch:results}). DocCL therefore
-spends its stability budget there, combining three mutually-reinforcing, each
-individually-ablatable mechanisms:
+spends its stability budget there. Its three ingredients are deliberately
+\emph{established} mechanisms---elastic-weight consolidation, output distillation, and
+replay; the contribution is not a new mechanism but the diagnosis-driven decision of
+\emph{where} each applies (the head and late layers, fixed by measurement rather than
+by a uniform default or a hand-tuned freezing heuristic), together with the
+component-targeting ablation that isolates the effect of that targeting. The three
+mechanisms are mutually-reinforcing and each individually ablatable:
 
 \begin{enumerate}
   \item \textbf{Depth-scaled elastic-weight consolidation.} A Fisher-weighted
@@ -603,19 +473,34 @@ individually-ablatable mechanisms:
 The total objective is $\mathcal{L} = \mathcal{L}_{\mathrm{CE}}
 + \tfrac{\lambda}{2}\sum_g w_g\, \mathcal{L}^{\mathrm{EWC}}_g
 + \alpha\,\mathcal{L}_{\mathrm{KD}} + \mathcal{L}_{\mathrm{replay}}$,
-with depth weights $w_g$ concentrated on head/late. A \texttt{target\_depth}
-control (\emph{full}, \emph{head-only}, \emph{late-only}, \emph{uniform}) drives the
+where the depth weights $w_g$ are concentrated on the diagnosed locus: with the depth
+buckets of \S\ref{sec:method-components},
+\[
+  w = \{\,\text{input}:0,\ \text{early}:0,\ \text{mid}:0.5,\ \text{late}:1.0,\ \text{head}:2.0\,\},
+\]
+so the head is anchored twice as strongly as the late layers and the stable input
+encoders are left free to adapt. A \texttt{target\_depth} control (\emph{full},
+\emph{head-only}, \emph{late-only}, \emph{uniform}) sets these weights and drives the
 component-targeting ablation that tests H\textsubscript{target} and
-H\textsubscript{head}. The mechanism reuses the EWC Fisher machinery, the LwF-style
-teacher, and the shared reservoir buffer, so it adds no fragile new infrastructure.
+H\textsubscript{head}: the \emph{uniform} setting spends the \emph{same} total
+stability budget evenly across depth, so any gap between \emph{full} and
+\emph{uniform} is attributable to the targeting alone, not to the mechanisms. The
+method reuses the EWC Fisher machinery, the LwF-style teacher, and the shared
+reservoir buffer, so it adds no fragile new infrastructure.
 
-\subsection{Fallback: Characterisation-Only}
+\subsection{Pre-Registered Fallback (Not Triggered)}
 \label{sec:method-fallback}
 
-If forgetting does not concentrate ($H_0$ not rejected \emph{at adequate power}),
-the diagnostic of \S\ref{sec:method-diagnostic} and the FCS-CL benchmark become the
-headline contributions, and the thesis is framed as a measurement-and-benchmark
-study. The value of the diagnosis is independent of the remedy's success.
+For completeness we record the contingency registered before the diagnosis was run:
+had forgetting \emph{not} concentrated ($H_0$ not rejected at adequate power), the
+diagnostic of \S\ref{sec:method-diagnostic} and the FCS-CL benchmark would have become
+the headline contributions and the remedy would have been withheld. The diagnosis did
+concentrate forgetting at the head and late layers (Chapter~\ref{ch:results}), so this
+branch was \emph{not} taken: DocCL is the selected, depth/head-targeted remedy. We
+state the fallback explicitly because pre-registering it---rather than choosing the
+method after seeing which design won---is what licenses the claim that DocCL's form was
+\emph{derived from} the measurement; and because the diagnostic's value stands
+independently of the remedy's margin regardless.
 
 \section{Summary}
 \label{sec:method-summary}
