@@ -1,5 +1,26 @@
 # Running the DocCL grid on a powerful machine (Docker)
 
+## ⚡ One command (recommended)
+
+```bash
+git clone <repo> && cd CLUE && git checkout doccl
+bash scripts/launch.sh
+```
+`scripts/launch.sh` does everything: checks Docker + GPU access, **prompts you for the
+W&B + Cloudflare R2 credentials** (held in memory only — never written to disk on this
+box), builds the image if needed, and launches the full multi-GPU grid with durable
+resume + a live progress heartbeat. Re-run it after any interruption — completed runs are
+skipped (pulled from R2). Press Enter at the R2 prompts to run without durable sync.
+
+> The credentials you type are forwarded into the container as runtime env vars and exist
+> only for the process lifetime. Nothing sensitive is saved to the (rented/shared) instance
+> disk. Scope the R2 token to your bucket and delete it after the grid finishes.
+
+The rest of this document explains the manual `docker build` / `docker run` paths and tuning
+that `launch.sh` automates.
+
+---
+
 This image runs the **heavy half** of the benchmark — Core (54 runs) + Prompt/LoRA
 (36 runs) + the single-task FWT baselines (9) — that we offload from the 6 GB laptop.
 DocCL (the proposed method) is run on the laptop and is **not** run here by default.
