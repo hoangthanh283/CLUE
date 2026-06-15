@@ -32,6 +32,10 @@ cd "$(dirname "$0")/.."
 if [ -x ".venv/bin/python" ]; then export PATH="$PWD/.venv/bin:$PATH"; fi
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 set -a; source .env 2>/dev/null || true; set +a
+# Interpreter: honor $PYTHON (set by setup_remote.sh for pip-into-template-python), else
+# 'python' (the uv .venv prepended above, or the system python).
+PYBIN="${PYTHON:-python}"
+command -v "$PYBIN" >/dev/null 2>&1 || PYBIN="python3"
 
 GPUS="${GPUS:-0 1}"; GPUS="${GPUS//,/ }"
 JOBS_PER_GPU="${JOBS_PER_GPU:-2}"
@@ -240,7 +244,7 @@ sync_pull
 # Prepare data once (SROIE local artifact; XFUND/WildReceipt pull from HF on first use).
 if [ ! -f data/sroie/train.json ]; then
   say "Preparing SROIE from HF mirror ..."
-  python scripts/prepare_sroie.py --source hf >> "$LOG" 2>&1 || say "prepare_sroie nonzero (continuing)"
+  "$PYBIN" scripts/prepare_sroie.py --source hf >> "$LOG" 2>&1 || say "prepare_sroie nonzero (continuing)"
 fi
 
 # Install exit trap + start background heartbeat & periodic push (after sync_pull).
@@ -266,13 +270,13 @@ run_one_bg() {  # <slot> <run_name> <overrides...>
       # Full log -> per-run file; a filtered view -> the main log (visible via `docker logs`).
       # CRITICAL: .done must gate on train.py's exit (PIPESTATUS[0]), NOT the pipeline's last
       # element (sed always exits 0), or a failed run would be falsely marked done.
-      CUDA_VISIBLE_DEVICES="$gpu" python scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA 2>&1 \
+      CUDA_VISIBLE_DEVICES="$gpu" "$PYBIN" scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA 2>&1 \
         | tee "results/logs/${run}.log" \
         | grep --line-buffered -E '=== Task|val_f1|STOP|Final: AA|Zero-shot' \
         | sed -u "s#^#    [${run} gpu${gpu}] #" >> "$LOG"
       rc=${PIPESTATUS[0]}
     else
-      CUDA_VISIBLE_DEVICES="$gpu" python scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA \
+      CUDA_VISIBLE_DEVICES="$gpu" "$PYBIN" scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA \
         >> "results/logs/${run}.log" 2>&1
       rc=$?
     fi
@@ -321,4 +325,4 @@ while [ ${#SLOT_PID[@]} -gt 0 ]; do
 done
 
 say "=== COMPLETE. done=$DONE_CT skip=$SKIP_CT fail=$FAIL_CT | total .done=$(ls results/*/.done 2>/dev/null | wc -l) ==="
-say "Next: python scripts/analyze_results.py && python scripts/ingest_to_thesis.py"
+say "Next: \$PYBIN scripts/analyze_results.py && \$PYBIN scripts/ingest_to_thesis.py"
