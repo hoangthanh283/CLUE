@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# One-command setup + run for a GPU CONTAINER instance (e.g. ViLao 2x RTX 4090).
+# One-command setup + run for a GPU CONTAINER instance (e.g. ViLao RTX A5000/4090).
 #
+# Designed for pytorch/pytorch:*-cuda*-runtime images (torch + CUDA pre-installed).
 # Use this when you are already INSIDE a container/VM with the GPUs visible (no
 # docker-in-docker) — i.e. you picked a PyTorch/CUDA template and SSH'd in. It:
 #   1) checks the GPUs are visible (nvidia-smi),
-#   2) installs the Python deps on top of the template's existing torch (pip install -e .),
-#      so the template's proven torch+CUDA+driver are reused (no CUDA-version mismatch),
+#   2) reuses the template's torch+CUDA (no reinstall); installs only missing project deps
+#      via pip install -e . — skipped entirely if deps are already present (re-entry fast path),
 #   3) installs rclone (for durable R2 resume),
 #   4) PROMPTS for W&B + Cloudflare R2 creds — held in memory only, never written to disk,
 #   5) runs the multi-GPU grid (scripts/run_grid_multigpu.sh) with durable resume + heartbeat.
@@ -46,23 +47,49 @@ NGPU=$(nvidia-smi --query-gpu=index --format=csv,noheader | wc -l)
 ok "$NGPU GPU(s) detected"
 
 # ── 2. Python deps (reuse the template's torch; install the rest) ────────────────
-PY="${PYTHON:-python3}"
-command -v "$PY" >/dev/null 2>&1 || die "$PY not found"
+# Always prefer the system python3 (the one the pytorch image ships). Never let a
+# previous partial uv run shadow it: unset PYTHON so we probe the image's python3 first.
+PY="python3"
+command -v "$PY" >/dev/null 2>&1 || PY="python"
+command -v "$PY" >/dev/null 2>&1 || die "python3/python not found"
 info "Python: $($PY --version 2>&1)"
-if "$PY" -c 'import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)' 2>/dev/null; then
-  ok "template torch present + CUDA OK ($("$PY" -c 'import torch;print(torch.__version__)')) — reusing it"
-  info "Installing remaining deps (pip install -e ., torch already satisfied) ..."
-  "$PY" -m pip install -q -e . 2>&1 | tail -3 || die "pip install -e . failed"
+
+# Probe torch from the IMAGE — suppress the CUDA-driver-version UserWarning so we can
+# distinguish "torch importable but GPU driver too old" from "torch not installed".
+TORCH_IMPORTABLE=$("$PY" -c 'import torch; print(torch.__version__)' 2>/dev/null || true)
+if [ -n "$TORCH_IMPORTABLE" ]; then
+  ok "template torch ${TORCH_IMPORTABLE} found — reusing it (no reinstall)"
+  # CUDA availability check: warn but DO NOT die — the driver may be fine at runtime
+  # even if the torch CUDA init path emits a version-mismatch warning.  We let the
+  # grid start and fail fast on the first real GPU call if there's a true mismatch.
+  if "$PY" -c 'import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)' 2>/dev/null; then
+    ok "CUDA available"
+  else
+    warn "torch.cuda.is_available() returned False — driver/torch version mismatch?"
+    warn "Continuing anyway; the grid will error on the first GPU call if this is real."
+    warn "If it fails, pick a pytorch image whose CUDA version matches the host driver."
+  fi
+  # Fast-path: if project package already importable (re-entering same container), skip pip.
+  if "$PY" -c 'import doccl' 2>/dev/null; then
+    ok "project deps already installed — skipping pip install"
+  else
+    info "Installing project deps (pip install -e ., torch already satisfied) ..."
+    "$PY" -m pip install -q -e . 2>&1 | tail -3 || die "pip install -e . failed"
+  fi
 else
-  warn "no working torch in the base image — installing the full locked stack via uv (may pull a CUDA build that needs a recent driver)"
+  warn "torch not found in base image — installing full locked stack via uv"
+  warn "(This will pull a torch wheel; ensure it matches the host CUDA driver)"
   command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
   uv sync --extra dev || die "uv sync failed"
   PY=".venv/bin/python"
-  "$PY" -c 'import torch; assert torch.cuda.is_available(), "CUDA not available after install"' \
-    || die "torch installed but CUDA not available — pick a template whose driver matches (see README)"
+  if ! "$PY" -c 'import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)' 2>/dev/null; then
+    warn "CUDA not available after uv install — driver/torch mismatch likely."
+    warn "Pick a pytorch image whose CUDA version matches the host driver and re-run."
+    warn "Continuing anyway in case the GPU is accessible at runtime."
+  fi
 fi
-# Tell run_grid_multigpu.sh which interpreter to use (uv .venv or the template's python3).
+# Tell run_grid_multigpu.sh which interpreter to use.
 export PYTHON="$PY"
 ok "deps ready (interpreter: $PY)"
 
