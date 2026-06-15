@@ -34,7 +34,9 @@ class DERpp(NaiveFineTune):
         self.alpha = config.get("alpha", 0.5)  # MSE weight
         self.beta = config.get("beta", 0.5)  # CE weight
 
-    def train_task(self, task: TaskInfo, train_loader: DataLoader) -> TrainMetrics:
+    def train_task(
+        self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None
+    ) -> TrainMetrics:
         self.model.train()
         optimizer = torch.optim.AdamW(
             self.trainable_parameters(),
@@ -43,6 +45,7 @@ class DERpp(NaiveFineTune):
         )
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
+        stopper = self.make_early_stopper(val_loader)
 
         total_loss = 0.0
         n_steps = 0
@@ -98,7 +101,10 @@ class DERpp(NaiveFineTune):
                     "mse": f"{mse_loss.item():.3f}",
                     "rce": f"{replay_ce_loss.item():.3f}",
                 })
+            if self._early_stop_after_epoch(stopper, val_loader, task, epoch):
+                break
 
+        stopper.restore_best(self.model)
         return TrainMetrics(
             task_id=task.task_id,
             loss=total_loss / max(n_steps, 1),

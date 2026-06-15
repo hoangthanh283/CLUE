@@ -55,7 +55,9 @@ class EWC(NaiveFineTune):
             penalty = penalty + (fisher_val[idx] * (p[idx] - theta_star[idx]) ** 2).sum()
         return penalty
 
-    def train_task(self, task: TaskInfo, train_loader: DataLoader) -> TrainMetrics:
+    def train_task(
+        self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None
+    ) -> TrainMetrics:
         self.model.train()
         optimizer = torch.optim.AdamW(
             self.trainable_parameters(),
@@ -64,9 +66,11 @@ class EWC(NaiveFineTune):
         )
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
+        stopper = self.make_early_stopper(val_loader)
 
         total_loss = 0.0
         n_steps = 0
+        ewc_loss = torch.zeros((), device=self.device)
         for epoch in range(epochs):
             pbar = tqdm(train_loader, desc=f"EWC T{task.task_id} ep{epoch+1}/{epochs}", leave=False)
             for batch in pbar:
@@ -82,11 +86,17 @@ class EWC(NaiveFineTune):
                 total_loss += float(loss.item())
                 n_steps += 1
                 pbar.set_postfix({"ce": f"{ce_loss.item():.3f}", "ewc": f"{ewc_loss.item():.3f}"})
+            if self._early_stop_after_epoch(stopper, val_loader, task, epoch):
+                break
 
+        stopper.restore_best(self.model)
         return TrainMetrics(
             task_id=task.task_id,
             loss=total_loss / max(n_steps, 1),
             n_steps=n_steps,
+            # Penalty at the last *trained* epoch (a diagnostic only). After
+            # restore_best the model weights are the best-val checkpoint, which may
+            # differ — this value is not recomputed on the restored weights.
             extra={"ewc_penalty_final": float(ewc_loss.item())},
         )
 

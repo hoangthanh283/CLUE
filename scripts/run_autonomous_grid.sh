@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# Autonomous baseline-grid driver (deadline run, 3 epochs).
+# Autonomous baseline-grid driver (train-to-convergence: val-F1 early stopping).
 #
 # Runs the full pipeline sequentially, resume-safe, within hard resource limits:
 #   PHASE 3 (54 core) -> single-task FWT baselines (9) -> PHASE 4 (36 prompt/LoRA)
 #   -> PHASE 5 (9 doccl) -> aggregate -> ingest.
 #
-# Safety: every training run uses num_workers=0 (no DataLoader fork OOM), bs=1 +
-# gradient checkpointing (VRAM < 5 GB), epochs=3. A separate watchdog
+# Training protocol: each task trains until its held-out val-F1 stops improving for
+# `early_stop_patience` consecutive epochs (then best-val weights are restored), with
+# a high epoch ceiling (100) that should rarely bind. This replaces the earlier fixed
+# 3-epoch budget, which under-trained EWC and used no convergence criterion.
+#
+# Safety: every training run uses num_workers=0 (no DataLoader fork OOM), bs=2 +
+# gradient checkpointing (VRAM < 5 GB). A separate watchdog
 # (run_grid_watchdog.sh) enforces RAM<14GB / VRAM<5GB and kills this driver if breached.
 #
 # "skip + continue": a failed run is logged and skipped, never halting the pipeline
@@ -23,12 +28,17 @@ LOG=results/logs/autonomous.log
 mkdir -p results/logs
 say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
-# 3-epoch deadline budget + memory-safe DataLoader + limited-VRAM recipe.
+# Train-to-convergence budget + memory-safe DataLoader + limited-VRAM recipe.
 # Gradient checkpointing ON: the regularization/replay methods (EWC stores Fisher+theta_star
 # for all params; LwF holds a frozen teacher; ER/DER hold replay batches) need more VRAM than
 # naive/joint, and without checkpointing EWC OOM'd the 6 GB GPU at ~5.6 GB. Checkpointing keeps
 # every method under ~2.6 GB VRAM (proven across the naive/joint runs). bs=2 retained.
-EXTRA="training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 method.epochs=3 wandb.project=CL4IE"
+# epochs=100 is a safety ceiling; val-F1 early stopping (patience=2) ends each task at
+# convergence and restores its best-val weights. Most tasks stop in 4-8 epochs.
+# Early stopping is ON by default in code (make_early_stopper: enabled when a val_loader
+# is present, patience defaults to 2) so no method.early_stop* override is needed here —
+# the method configs are immutable and Hydra struct-mode rejects unknown keys.
+EXTRA="training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 method.epochs=100 wandb.project=CL4IE"
 export WANDB_MODE=online
 
 # HARD per-run memory cap: each train.py runs in a cgroup capped at MEM_CAP with swap
@@ -47,7 +57,7 @@ run_capped() {
     fi
 }
 
-say "=== AUTONOMOUS GRID START (3 epochs) ==="
+say "=== AUTONOMOUS GRID START (train-to-convergence, val-F1 early stopping patience=2, cap=100ep) ==="
 
 # ── PHASE 3: core baselines (54) ───────────────────────────────────────────────
 say "PHASE 3 core baselines (naive joint ewc lwf er der_pp x cil_cord dil mixed x 3 seeds)"

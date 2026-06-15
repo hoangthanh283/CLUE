@@ -116,7 +116,13 @@ class PromptBasedMethod(NaiveFineTune):
         return out.last_hidden_state[:, 0]  # (B, D)
 
     # ─── training / evaluation ──────────────────────────────────────────────
-    def train_task(self, task: TaskInfo, train_loader: DataLoader) -> TrainMetrics:
+    def train_task(
+        self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None
+    ) -> TrainMetrics:
+        # NOTE: prompt-based methods use a custom forward_with_prompts path, so the
+        # base-class val-F1 helper (which calls self.model(**batch)) does not apply;
+        # they retain the fixed epoch budget. val_loader is accepted for signature
+        # compatibility only.
         self.model.train()
         optimizer = torch.optim.AdamW(
             self.trainable_parameters(),

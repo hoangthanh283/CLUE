@@ -256,7 +256,9 @@ def main(cfg: DictConfig) -> None:
         # Lifecycle
         method.before_task(task, train_loader)
         t0 = time.perf_counter()
-        train_metrics = method.train_task(task, train_loader)
+        # Pass the current task's eval loader as the validation signal for val-F1
+        # early stopping (train until current-task F1 plateaus, then restore best).
+        train_metrics = method.train_task(task, train_loader, val_loader=eval_loader)
         task_times.append(time.perf_counter() - t0)
         method.after_task(task, train_loader)
 
