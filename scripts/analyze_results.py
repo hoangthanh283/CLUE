@@ -30,6 +30,7 @@ Usage:
     python scripts/analyze_results.py                       # local results/ (default)
     python scripts/analyze_results.py --source wandb --project doccl-aaai2027
 """
+
 from __future__ import annotations
 
 import argparse
@@ -47,15 +48,27 @@ except ImportError:
 
 # ─── Display maps (match thesis chapter 6 row/column labels) ────────────────────
 METHOD_ORDER = [
-    "naive", "ewc", "lwf", "er", "der_pp",
-    "l2p", "dualprompt", "coda_prompt", "o_lora", "doccl",
+    "naive",
+    "ewc",
+    "lwf",
+    "er",
+    "der_pp",
+    "l2p",
+    "dualprompt",
+    "coda_prompt",
+    "o_lora",
+    "doccl",
 ]  # 'joint' is rendered separately as the oracle row
 METHOD_DISPLAY = {
     "naive": "Naive (lower bound)",
     "joint": "Joint (upper bound)",
-    "ewc": "EWC", "lwf": "LwF",
-    "er": "ER", "der_pp": "DER++",
-    "l2p": "L2P", "dualprompt": "DualPrompt", "coda_prompt": "CODA-Prompt",
+    "ewc": "EWC",
+    "lwf": "LwF",
+    "er": "ER",
+    "der_pp": "DER++",
+    "l2p": "L2P",
+    "dualprompt": "DualPrompt",
+    "coda_prompt": "CODA-Prompt",
     "o_lora": "O-LoRA",
     "doccl": "\\textbf{DocCL (ours)}",
 }
@@ -63,12 +76,15 @@ SCENARIO_ORDER = ["cil_cord", "dil", "mixed"]
 SCENARIO_DISPLAY = {"cil_cord": "CIL-CORD", "dil": "DIL", "mixed": "Mixed"}
 # DocCL depth-targeting ablation (Table 6.7). "all" is the full method; the rest
 # are ablations. Legacy component names are kept for any old doccl_a/b/c runs.
-TARGET_ORDER = ["head_only", "late_only", "uniform", "all",
-                "text", "visual", "layout", "fusion"]
+TARGET_ORDER = ["head_only", "late_only", "uniform", "all", "text", "visual", "layout", "fusion"]
 TARGET_DISPLAY = {
-    "all": "All (full DocCL)", "head_only": "Head only", "late_only": "Late layers only",
+    "all": "All (full DocCL)",
+    "head_only": "Head only",
+    "late_only": "Late layers only",
     "uniform": "Uniform (all depths)",
-    "text": "Text only", "visual": "Visual only", "layout": "Layout only",
+    "text": "Text only",
+    "visual": "Visual only",
+    "layout": "Layout only",
     "fusion": "Fusion only",
 }
 # The canonical full-method markers (not an ablation variant).
@@ -96,6 +112,7 @@ def _is_full_method(series: "pd.Series") -> "pd.Series":
     """Mask of canonical (non-ablation) runs: target is null or 'all'."""
     return series.isna() | (series == "all")
 
+
 # ─── FWT baseline mapping (see docs/FWT_NOTE.md) ────────────────────────────────
 # Per-task underlying *dataset* for each multi-task scenario, in task order. The
 # single-task naive baseline b_i for task i is the from-scratch F1 on this dataset,
@@ -110,9 +127,18 @@ SCENARIO_TASK_DATASETS: dict[str, list[str]] = {
     "dil": ["funsd", "sroie", "cord"],
     "cil_cord": ["cord", "cord", "cord", "cord", "cord"],
     "mixed": ["funsd", "funsd", "sroie", "cord", "cord", "funsd"],
+    # Cross-lingual DIL: 5 language tasks share the single XFUND baseline.
+    "dil_xlingual": ["xfund", "xfund", "xfund", "xfund", "xfund"],
+    "cil_wildreceipt": ["wildreceipt", "wildreceipt", "wildreceipt", "wildreceipt"],
 }
 # Single-task baseline run scenario name for each dataset (build_single → SCENARIO_REGISTRY).
-SINGLE_SCENARIO = {"funsd": "single_funsd", "cord": "single_cord", "sroie": "single_sroie"}
+SINGLE_SCENARIO = {
+    "funsd": "single_funsd",
+    "cord": "single_cord",
+    "sroie": "single_sroie",
+    "xfund": "single_xfund",
+    "wildreceipt": "single_wildreceipt",
+}
 
 
 # ─── Sources ────────────────────────────────────────────────────────────────────
@@ -215,7 +241,9 @@ def aggregate(df: pd.DataFrame, metric: str = "AA") -> pd.DataFrame:
 
 
 # ─── Table 6.1 — main comparison ────────────────────────────────────────────────
-def write_main_table(df: pd.DataFrame, output: Path, metric: str = "AA", proposed: str = "doccl") -> None:
+def write_main_table(
+    df: pd.DataFrame, output: Path, metric: str = "AA", proposed: str = "doccl"
+) -> None:
     df = _finished(df, metric)
     # Only the un-ablated proposed run (target null or "all") belongs in the main table.
     df = df[(df["method"] != proposed) | _is_full_method(df["target"])]
@@ -234,8 +262,16 @@ def write_main_table(df: pd.DataFrame, output: Path, metric: str = "AA", propose
             if not baselines:
                 continue
             best_base = mean.loc[baselines, s].idxmax()
-            a = df[(df["method"] == proposed) & (df["scenario"] == s)].sort_values("seed")[metric].tolist()
-            b = df[(df["method"] == best_base) & (df["scenario"] == s)].sort_values("seed")[metric].tolist()
+            a = (
+                df[(df["method"] == proposed) & (df["scenario"] == s)]
+                .sort_values("seed")[metric]
+                .tolist()
+            )
+            b = (
+                df[(df["method"] == best_base) & (df["scenario"] == s)]
+                .sort_values("seed")[metric]
+                .tolist()
+            )
             p = _paired_pvalue(a, b)
             daggers[s] = (p == p) and p < 0.05
 
@@ -245,7 +281,9 @@ def write_main_table(df: pd.DataFrame, output: Path, metric: str = "AA", propose
         f"% Metric: {metric} (mean $\\pm$ std over seeds). $\\dagger$: p<0.05 vs best baseline (paired).",
         f"\\begin{{tabular}}{{{col_spec}}}",
         "\\toprule",
-        "\\textbf{Method} & " + " & ".join(f"\\textbf{{{SCENARIO_DISPLAY[s]}}}" for s in scenarios) + " \\\\",
+        "\\textbf{Method} & "
+        + " & ".join(f"\\textbf{{{SCENARIO_DISPLAY[s]}}}" for s in scenarios)
+        + " \\\\",
         "\\midrule",
     ]
 
@@ -258,7 +296,9 @@ def write_main_table(df: pd.DataFrame, output: Path, metric: str = "AA", propose
             mu = float(mean.loc[m, s])
             sd = float(std.loc[m, s]) if not pd.isna(std.loc[m, s]) else 0.0
             is_best = abs(mu - best[s]) < 1e-9 and m != "joint"
-            cells.append(_cell(mu, sd, bold=is_best, dagger=(m == proposed and daggers.get(s, False))))
+            cells.append(
+                _cell(mu, sd, bold=is_best, dagger=(m == proposed and daggers.get(s, False)))
+            )
         return f"{METHOD_DISPLAY.get(m, m)} & " + " & ".join(cells) + " \\\\"
 
     for m in methods:
@@ -350,7 +390,9 @@ def plot_forgetting_curves(
     fig, ax = plt.subplots(figsize=(7, 4.5))
     plotted = False
     for m in methods:
-        mats = [np.array(x, dtype=float) for x in sub[sub["method"] == m]["matrix"] if x is not None]
+        mats = [
+            np.array(x, dtype=float) for x in sub[sub["method"] == m]["matrix"] if x is not None
+        ]
         if not mats:
             continue
         avg = np.nanmean(np.stack(mats), axis=0)  # (T, T) averaged over seeds
@@ -415,8 +457,9 @@ def compute_single_task_baselines(df: pd.DataFrame) -> dict[str, dict[str, float
     return out
 
 
-def compute_fwt_per_run(matrix: list | None, scenario: str,
-                        baselines: dict[str, dict[str, float]]) -> float:
+def compute_fwt_per_run(
+    matrix: list | None, scenario: str, baselines: dict[str, dict[str, float]]
+) -> float:
     """True FWT for one run = mean_{i>0} (R[i-1, i] - b_i).
 
     Uses the zero-shot upper-triangular entries R[i-1, i] now recorded by train.py
@@ -445,8 +488,7 @@ def add_fwt_column(df: pd.DataFrame, baselines: dict[str, dict[str, float]]) -> 
     """Populate df['FWT'] from saved matrices + single-task baselines (true FWT)."""
     df = df.copy()
     df["FWT"] = [
-        compute_fwt_per_run(m, sc, baselines)
-        for m, sc in zip(df["matrix"], df["scenario"])
+        compute_fwt_per_run(m, sc, baselines) for m, sc in zip(df["matrix"], df["scenario"])
     ]
     return df
 
@@ -465,14 +507,18 @@ def write_baseline_table(df: pd.DataFrame, output: Path) -> dict[str, dict[str, 
     # CSV (machine-readable, for thesis/generated/ ingestion).
     csv_path = output.with_suffix(".csv")
     csv_rows = [
-        {"dataset": d, "single_task_f1_mean": baselines[d]["mean"],
-         "single_task_f1_std": baselines[d]["std"], "n_seeds": baselines[d]["count"]}
+        {
+            "dataset": d,
+            "single_task_f1_mean": baselines[d]["mean"],
+            "single_task_f1_std": baselines[d]["std"],
+            "n_seeds": baselines[d]["count"],
+        }
         for d in datasets
     ]
     output.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(csv_rows, columns=["dataset", "single_task_f1_mean", "single_task_f1_std", "n_seeds"]).to_csv(
-        csv_path, index=False
-    )
+    pd.DataFrame(
+        csv_rows, columns=["dataset", "single_task_f1_mean", "single_task_f1_std", "n_seeds"]
+    ).to_csv(csv_path, index=False)
 
     # LaTeX (single-task upper-reference the thesis can cite).
     lines = [
@@ -557,12 +603,15 @@ def main():
     df = add_fwt_column(df, baselines)
     df = _add_target_column(df)  # unify target_depth / target_component → "target"
 
-    df.drop(columns=["matrix"], errors="ignore").to_csv(args.output_dir / "all_runs.csv", index=False)
+    df.drop(columns=["matrix"], errors="ignore").to_csv(
+        args.output_dir / "all_runs.csv", index=False
+    )
 
     for metric in args.metrics:
         if metric == "FWT" and df["FWT"].isna().all():
-            print("\n=== FWT === unavailable (no run has the zero-shot term; "
-                  "see docs/FWT_NOTE.md)")
+            print(
+                "\n=== FWT === unavailable (no run has the zero-shot term; " "see docs/FWT_NOTE.md)"
+            )
             continue
         agg = aggregate(df, metric=metric)
         print(f"\n=== {metric} ===\n{agg.to_string(index=False)}")

@@ -161,7 +161,9 @@ def test_scenario_registry():
     from doccl.data.scenarios import SCENARIO_REGISTRY
 
     expected = {"single_funsd", "single_cord", "single_sroie",
-                "cil_funsd", "cil_cord", "dil", "mixed", "pilot"}
+                "single_xfund", "single_wildreceipt",
+                "cil_funsd", "cil_cord", "cil_wildreceipt",
+                "dil", "dil_xlingual", "mixed", "pilot"}
     assert expected.issubset(set(SCENARIO_REGISTRY.keys()))
 
 

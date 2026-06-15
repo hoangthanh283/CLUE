@@ -5,6 +5,7 @@ Usage:
     python scripts/train.py method=ewc scenario=cil_cord seed=42
     python scripts/train.py method=der_pp scenario=cil_cord training.epochs=15
 """
+
 from __future__ import annotations
 
 import json
@@ -44,6 +45,10 @@ SCENARIO_TASK_DATASETS: dict[str, list[str]] = {
     "dil": ["funsd", "sroie", "cord"],
     "cil_cord": ["cord", "cord", "cord", "cord", "cord"],
     "mixed": ["funsd", "funsd", "sroie", "cord", "cord", "funsd"],
+    # Cross-lingual DIL: all 5 language tasks share the single XFUND baseline (schema
+    # is constant across languages), mirroring how cil_cord reuses one CORD baseline.
+    "dil_xlingual": ["xfund", "xfund", "xfund", "xfund", "xfund"],
+    "cil_wildreceipt": ["wildreceipt", "wildreceipt", "wildreceipt", "wildreceipt"],
 }
 
 
@@ -120,7 +125,7 @@ def save_run_metrics(
     """
     peak_mem_mb = None
     if torch.cuda.is_available():
-        peak_mem_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
+        peak_mem_mb = torch.cuda.max_memory_allocated() / (1024**2)
     metrics = {
         "method": cfg.method.name,
         "scenario": cfg.scenario.name,
@@ -239,8 +244,11 @@ def main(cfg: DictConfig) -> None:
         cfg.scenario.name, Path("results/table_single_task_baselines.csv")
     )
     if fwt_baselines is not None:
-        log.info("Loaded FWT baselines b_i for %s: %s", cfg.scenario.name,
-                 [round(b, 2) for b in fwt_baselines])
+        log.info(
+            "Loaded FWT baselines b_i for %s: %s",
+            cfg.scenario.name,
+            [round(b, 2) for b in fwt_baselines],
+        )
     tracker = CLMetricsTracker(num_tasks=len(scenario.tasks), baseline_perf=fwt_baselines)
     eval_loaders_seen: dict[int, DataLoader] = {}
     out_dir = Path(cfg.output_dir) / run.name

@@ -9,13 +9,13 @@ This module provides:
     - DIL_UNIFIED_LABELS: the canonical 9-tag BIO label list
     - DIL_MAPPING: dict[dataset_name -> dict[native_label_id -> unified_label_id]]
 """
+
 from __future__ import annotations
 
 from typing import Any
 
 import torch
 from torch.utils.data import Dataset
-
 
 # Unified DIL schema (4 entity classes + O = 9 BIO tags)
 DIL_UNIFIED_LABELS = [
@@ -77,6 +77,19 @@ DIL_NAME_MAPPING: dict[str, dict[str, str]] = {
         "I-void_menu": "I-OTHER",
         "B-sub": "B-OTHER",
         "I-sub": "I-OTHER",
+    },
+    # XFUND shares FUNSD's exact entity schema (HEADER/QUESTION/ANSWER), so it uses
+    # the identical mapping. Used by the cross-lingual DIL scenario where the domain
+    # shift is *language*, not schema — the unified label space is constant across
+    # tasks, isolating representation drift.
+    "xfund": {
+        "O": "O",
+        "B-HEADER": "B-HEADER",
+        "I-HEADER": "I-HEADER",
+        "B-QUESTION": "B-KEY",
+        "I-QUESTION": "I-KEY",
+        "B-ANSWER": "B-VALUE",
+        "I-ANSWER": "I-VALUE",
     },
 }
 

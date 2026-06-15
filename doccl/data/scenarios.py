@@ -11,6 +11,7 @@ Plus utility scenarios:
 
 TIL is deferred to NeurIPS extension.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -22,7 +23,13 @@ from doccl.data.cord import CORDDataset
 from doccl.data.dil_remapping import DIL_LabelRemapper, DIL_UNIFIED_LABELS
 from doccl.data.funsd import FUNSDDataset
 from doccl.data.sroie import SROIEDataset
+from doccl.data.wildreceipt import WildReceiptDataset
+from doccl.data.xfund import XFUNDDataset
 from doccl.types import ScenarioType, TaskInfo
+
+# Default language order for the cross-lingual DIL scenario: 4 Latin-script + Chinese,
+# so the sequence stresses both vocabulary drift and a script change (de→es→fr→it→zh).
+XLINGUAL_DEFAULT_LANGS = ["de", "es", "fr", "it", "zh"]
 
 
 def _cil_head_snapshots(
@@ -125,13 +132,46 @@ def build_cil_cord(num_sessions: int = 5) -> CLScenario:
         )
 
     cls_per_session = [
-        ["menu.cnt", "menu.discountprice", "menu.itemsubtotal", "menu.nm", "menu.num", "menu.price"],
-        ["menu.unitprice", "menu.vatyn", "menu.sub.cnt", "menu.sub.nm", "menu.sub.price", "menu.sub.unitprice"],
-        ["sub_total.discount_price", "sub_total.etc", "sub_total.othersvc_price",
-         "sub_total.service_price", "sub_total.subtotal_price", "sub_total.tax_price"],
-        ["total.cashprice", "total.changeprice", "total.creditcardprice",
-         "total.emoneyprice", "total.menuqty_cnt", "total.menutype_cnt"],
-        ["total.total_etc", "total.total_price", "void_menu.nm", "void_menu.price", "sub.nm", "sub.cnt"],
+        [
+            "menu.cnt",
+            "menu.discountprice",
+            "menu.itemsubtotal",
+            "menu.nm",
+            "menu.num",
+            "menu.price",
+        ],
+        [
+            "menu.unitprice",
+            "menu.vatyn",
+            "menu.sub.cnt",
+            "menu.sub.nm",
+            "menu.sub.price",
+            "menu.sub.unitprice",
+        ],
+        [
+            "sub_total.discount_price",
+            "sub_total.etc",
+            "sub_total.othersvc_price",
+            "sub_total.service_price",
+            "sub_total.subtotal_price",
+            "sub_total.tax_price",
+        ],
+        [
+            "total.cashprice",
+            "total.changeprice",
+            "total.creditcardprice",
+            "total.emoneyprice",
+            "total.menuqty_cnt",
+            "total.menutype_cnt",
+        ],
+        [
+            "total.total_etc",
+            "total.total_price",
+            "void_menu.nm",
+            "void_menu.price",
+            "sub.nm",
+            "sub.cnt",
+        ],
     ]
 
     bio_splits = [[f"B-{c}" for c in s] + [f"I-{c}" for c in s] for s in cls_per_session]
@@ -170,7 +210,67 @@ def build_cil_cord(num_sessions: int = 5) -> CLScenario:
         for i in range(len(bio_splits))
     ]
     return CLScenario(
-        "cil_cord", ScenarioType.CIL, tasks, train_dss, eval_dss,
+        "cil_cord",
+        ScenarioType.CIL,
+        tasks,
+        train_dss,
+        eval_dss,
+        joint_train_datasets=joint_train,
+    )
+
+
+def build_cil_wildreceipt(num_sessions: int = 4) -> CLScenario:
+    """WildReceipt class-incremental: 24 entity classes → num_sessions sessions.
+
+    Mirrors build_cil_cord. WildReceipt's BIO LABEL_NAMES are derived from the upstream
+    ClassLabel at load time, so we instantiate the train split once to read the class
+    list, partition the 24 entity classes (each contributing B-/I-) across sessions,
+    and grow the head session by session via CIL_LabelRemapper.
+    """
+    # Read the (data-derived) full BIO label set once. After this, WildReceiptDataset
+    # LABEL_NAMES/NUM_LABELS class attributes are populated.
+    full_train = WildReceiptDataset(split="train")
+    entity_classes = [
+        n[2:] for n in WildReceiptDataset.LABEL_NAMES if n.startswith("B-")
+    ]  # 24 class names (key/value pairs), upstream order
+
+    # Partition entity classes as evenly as possible into num_sessions.
+    per = -(-len(entity_classes) // num_sessions)  # ceil
+    class_sessions = [entity_classes[i : i + per] for i in range(0, len(entity_classes), per)]
+    bio_splits = [[f"B-{c}" for c in s] + [f"I-{c}" for c in s] for s in class_sessions]
+
+    snapshots, label_sets = _cil_head_snapshots(bio_splits)
+
+    def _wrap(split: str) -> list[Dataset]:
+        wrapped = []
+        for i, lbls in enumerate(bio_splits):
+            base = WildReceiptDataset(split=split, label_filter=lbls)
+            wrapped.append(CIL_LabelRemapper(base, base.id_to_label, snapshots[i]))
+        return wrapped
+
+    train_dss = _wrap("train")
+    eval_dss = _wrap("test")
+
+    # Joint pool: one full-label WildReceipt set remapped into the final cumulative head.
+    full_head = snapshots[-1]
+    joint_train = [CIL_LabelRemapper(full_train, full_train.id_to_label, full_head)]
+
+    tasks = [
+        TaskInfo(
+            task_id=i,
+            task_name=f"wildreceipt_cil_t{i}",
+            label_set=label_sets[i],
+            is_first=(i == 0),
+            is_last=(i == len(bio_splits) - 1),
+        )
+        for i in range(len(bio_splits))
+    ]
+    return CLScenario(
+        "cil_wildreceipt",
+        ScenarioType.CIL,
+        tasks,
+        train_dss,
+        eval_dss,
         joint_train_datasets=joint_train,
     )
 
@@ -238,6 +338,41 @@ def build_dil() -> CLScenario:
     return CLScenario("dil", ScenarioType.DIL, tasks, train_dss, eval_dss)
 
 
+def build_dil_xlingual(langs: list[str] | None = None) -> CLScenario:
+    """Cross-lingual domain-incremental: XFUND language sequence, unified schema.
+
+    The domain shift here is *language* (default de→es→fr→it→zh), NOT schema: every
+    XFUND language shares FUNSD's HEADER/QUESTION/ANSWER tags, mapped into the fixed
+    DIL unified label space. Because the label space is constant across tasks, the head
+    never grows and forgetting is pure representation drift — the cleanest test of
+    whether the output-side forgetting finding holds under language shift.
+
+    Tasks are disjoint documents (different languages), so joint_train_datasets=None
+    (the Joint path concatenates train_datasets correctly, as in build_dil).
+    """
+    langs = langs or XLINGUAL_DEFAULT_LANGS
+
+    train_dss: list[Dataset] = []
+    eval_dss: list[Dataset] = []
+    tasks: list[TaskInfo] = []
+    for i, lang in enumerate(langs):
+        tr = XFUNDDataset("train", lang=lang)
+        te = XFUNDDataset("test", lang=lang)
+        train_dss.append(DIL_LabelRemapper(tr, "xfund", tr.id_to_label))
+        eval_dss.append(DIL_LabelRemapper(te, "xfund", te.id_to_label))
+        tasks.append(
+            TaskInfo(
+                task_id=i,
+                task_name=f"dil_xfund_{lang}",
+                label_set=DIL_UNIFIED_LABELS,
+                is_first=(i == 0),
+                is_last=(i == len(langs) - 1),
+                metadata={"native_dataset": "xfund", "lang": lang},
+            )
+        )
+    return CLScenario("dil_xlingual", ScenarioType.DIL, tasks, train_dss, eval_dss)
+
+
 # ─── Mixed scenario ────────────────────────────────────────────────────────────
 
 
@@ -263,58 +398,70 @@ def build_mixed() -> CLScenario:
     # Session 0-1: FUNSD class-IL
     funsd_s0_labels = ["B-HEADER", "I-HEADER", "B-QUESTION", "I-QUESTION"]
     funsd_s1_labels = ["B-ANSWER", "I-ANSWER"]
-    sessions.append({
-        "name": "mixed_funsd_s0",
-        "labels": funsd_s0_labels,
-        "train": FUNSDDataset("train", label_filter=funsd_s0_labels),
-        "test": FUNSDDataset("test", label_filter=funsd_s0_labels),
-        "metadata": {"phase": "funsd-CIL-1of2"},
-    })
-    sessions.append({
-        "name": "mixed_funsd_s1",
-        "labels": funsd_s1_labels,
-        "train": FUNSDDataset("train", label_filter=funsd_s1_labels),
-        "test": FUNSDDataset("test", label_filter=funsd_s1_labels),
-        "metadata": {"phase": "funsd-CIL-2of2"},
-    })
+    sessions.append(
+        {
+            "name": "mixed_funsd_s0",
+            "labels": funsd_s0_labels,
+            "train": FUNSDDataset("train", label_filter=funsd_s0_labels),
+            "test": FUNSDDataset("test", label_filter=funsd_s0_labels),
+            "metadata": {"phase": "funsd-CIL-1of2"},
+        }
+    )
+    sessions.append(
+        {
+            "name": "mixed_funsd_s1",
+            "labels": funsd_s1_labels,
+            "train": FUNSDDataset("train", label_filter=funsd_s1_labels),
+            "test": FUNSDDataset("test", label_filter=funsd_s1_labels),
+            "metadata": {"phase": "funsd-CIL-2of2"},
+        }
+    )
 
     # Session 2: SROIE (domain shift — forms to receipts)
     sroie_labels = SROIEDataset.LABEL_NAMES[1:]  # exclude 'O'
-    sessions.append({
-        "name": "mixed_sroie",
-        "labels": sroie_labels,
-        "train": SROIEDataset("train"),
-        "test": SROIEDataset("test"),
-        "metadata": {"phase": "domain-shift-1"},
-    })
+    sessions.append(
+        {
+            "name": "mixed_sroie",
+            "labels": sroie_labels,
+            "train": SROIEDataset("train"),
+            "test": SROIEDataset("test"),
+            "metadata": {"phase": "domain-shift-1"},
+        }
+    )
 
     # Session 3-4: CORD class-IL on super classes
     cord_s0_super = ["B-menu", "I-menu", "B-sub_total", "I-sub_total"]
     cord_s1_super = ["B-total", "I-total", "B-void_menu", "I-void_menu", "B-sub", "I-sub"]
-    sessions.append({
-        "name": "mixed_cord_s0",
-        "labels": cord_s0_super,
-        "train": CORDDataset("train", "super", label_filter=cord_s0_super),
-        "test": CORDDataset("test", "super", label_filter=cord_s0_super),
-        "metadata": {"phase": "cord-CIL-1of2"},
-    })
-    sessions.append({
-        "name": "mixed_cord_s1",
-        "labels": cord_s1_super,
-        "train": CORDDataset("train", "super", label_filter=cord_s1_super),
-        "test": CORDDataset("test", "super", label_filter=cord_s1_super),
-        "metadata": {"phase": "cord-CIL-2of2"},
-    })
+    sessions.append(
+        {
+            "name": "mixed_cord_s0",
+            "labels": cord_s0_super,
+            "train": CORDDataset("train", "super", label_filter=cord_s0_super),
+            "test": CORDDataset("test", "super", label_filter=cord_s0_super),
+            "metadata": {"phase": "cord-CIL-1of2"},
+        }
+    )
+    sessions.append(
+        {
+            "name": "mixed_cord_s1",
+            "labels": cord_s1_super,
+            "train": CORDDataset("train", "super", label_filter=cord_s1_super),
+            "test": CORDDataset("test", "super", label_filter=cord_s1_super),
+            "metadata": {"phase": "cord-CIL-2of2"},
+        }
+    )
 
     # Session 5: FUNSD revisit (tests retention against domain interference)
     funsd_all = FUNSDDataset.LABEL_NAMES[1:]  # already added in S0/S1, won't re-expand
-    sessions.append({
-        "name": "mixed_funsd_revisit",
-        "labels": funsd_all,
-        "train": FUNSDDataset("train"),
-        "test": FUNSDDataset("test"),
-        "metadata": {"phase": "domain-return"},
-    })
+    sessions.append(
+        {
+            "name": "mixed_funsd_revisit",
+            "labels": funsd_all,
+            "train": FUNSDDataset("train"),
+            "test": FUNSDDataset("test"),
+            "metadata": {"phase": "domain-return"},
+        }
+    )
 
     # Cumulative head snapshots over the per-session label sets, then wrap each
     # session's native dataset so its ids land in the head-index space for that session.
@@ -353,7 +500,11 @@ def build_mixed() -> CLScenario:
         for i, s in enumerate(sessions)
     ]
     return CLScenario(
-        "mixed", ScenarioType.MIXED, tasks, train_dss, eval_dss,
+        "mixed",
+        ScenarioType.MIXED,
+        tasks,
+        train_dss,
+        eval_dss,
         joint_train_datasets=joint_train,
     )
 
@@ -372,6 +523,14 @@ def build_single(dataset_name: str) -> CLScenario:
     elif dataset_name == "sroie":
         train, test = SROIEDataset("train"), SROIEDataset("test")
         labels = SROIEDataset.LABEL_NAMES
+    elif dataset_name == "xfund":
+        # Single-task XFUND baseline uses one representative language (fr) for the FWT
+        # b_i reference of the cross-lingual scenario (all langs share the schema).
+        train, test = XFUNDDataset("train", lang="fr"), XFUNDDataset("test", lang="fr")
+        labels = XFUNDDataset.LABEL_NAMES
+    elif dataset_name == "wildreceipt":
+        train, test = WildReceiptDataset("train"), WildReceiptDataset("test")
+        labels = WildReceiptDataset.LABEL_NAMES
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}")
 
@@ -382,9 +541,7 @@ def build_single(dataset_name: str) -> CLScenario:
         is_first=True,
         is_last=True,
     )
-    return CLScenario(
-        f"single_{dataset_name}", ScenarioType.SINGLE, [task], [train], [test]
-    )
+    return CLScenario(f"single_{dataset_name}", ScenarioType.SINGLE, [task], [train], [test])
 
 
 def build_pilot(order: list[int] | None = None) -> CLScenario:
@@ -433,9 +590,13 @@ SCENARIO_REGISTRY = {
     "single_funsd": lambda: build_single("funsd"),
     "single_cord": lambda: build_single("cord"),
     "single_sroie": lambda: build_single("sroie"),
+    "single_xfund": lambda: build_single("xfund"),
+    "single_wildreceipt": lambda: build_single("wildreceipt"),
     "cil_funsd": build_cil_funsd,
     "cil_cord": build_cil_cord,
+    "cil_wildreceipt": build_cil_wildreceipt,
     "dil": build_dil,
+    "dil_xlingual": build_dil_xlingual,
     "mixed": build_mixed,
     "pilot": build_pilot,
 }
