@@ -12,12 +12,28 @@ Outputs:
 from __future__ import annotations
 
 import json
+import re
+from math import comb
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+
+
+def min_achievable_p(n1: int, n2: int) -> float:
+    """Smallest two-sided Mann–Whitney U p-value achievable with group sizes
+    ``n1``, ``n2`` (under perfect separation).
+
+    Equals ``2 / C(n1+n2, n2)``. If this floor exceeds the (Bonferroni-corrected)
+    significance threshold, the test *cannot* reject H0 regardless of the data —
+    the comparison is underpowered by construction and a non-rejection is a
+    foregone conclusion of the sample size, not evidence (review C3).
+    """
+    if n1 < 1 or n2 < 1:
+        return float("nan")
+    return 2.0 / comb(n1 + n2, n2)
 
 
 def load_pilot_results(pilot_dir: Path) -> list[dict]:
@@ -52,7 +68,7 @@ def to_long_dataframe(results: list[dict]) -> pd.DataFrame:
                     "value": cka_val,
                 })
 
-        # Fisher records
+        # Fisher records (importance level to the current task)
         for fisher_rec in r["fisher_records"]:
             tidx = fisher_rec["task_idx"]
             for group, val in fisher_rec["fisher_per_group"].items():
@@ -63,6 +79,20 @@ def to_long_dataframe(results: list[dict]) -> pd.DataFrame:
                     "task_idx": tidx,
                     "group": group,
                     "value": val,
+                })
+
+        # Displacement records (old-task-Fisher-weighted movement = forgetting)
+        for disp_rec in r.get("displacement_records", []):
+            boundary = disp_rec["task_boundary"]
+            for group, val in disp_rec.get("by_group", {}).items():
+                rows.append({
+                    "condition": cond, "seed": seed, "metric": "displacement",
+                    "boundary": boundary, "group": group, "value": val,
+                })
+            for bucket, val in disp_rec.get("by_depth", {}).items():
+                rows.append({
+                    "condition": cond, "seed": seed, "metric": "displacement_depth",
+                    "boundary": boundary, "group": bucket, "value": val,
                 })
 
         # Accuracy records
@@ -212,12 +242,16 @@ def condition_bwt_test(results: list[dict], reference: str = "c4_full", alpha: f
         return None
     rivals = sorted(c for c in by_cond if c != reference)
     bonf = alpha / max(len(rivals), 1)
-    rows, reject_any = [], False
+    n_ref = len(by_cond[reference])
+    rows, reject_any, any_underpowered = [], False, False
     for c in rivals:
         p = _mannwhitney(by_cond[reference], by_cond[c])
+        floor = min_achievable_p(n_ref, len(by_cond[c]))
+        underpowered = (floor == floor) and floor > bonf
+        any_underpowered = any_underpowered or underpowered
         sig = (p == p) and p < bonf  # p==p screens NaN
         reject_any = reject_any or sig
-        rows.append((c, float(np.mean(by_cond[c])), p, sig))
+        rows.append((c, float(np.mean(by_cond[c])), p, sig, floor, underpowered))
     return {
         "reference": reference,
         "ref_mean": float(np.mean(by_cond[reference])),
@@ -225,7 +259,85 @@ def condition_bwt_test(results: list[dict], reference: str = "c4_full", alpha: f
         "bonferroni": bonf,
         "rivals": rows,
         "reject_H0": reject_any,
-        "n_per_group": len(by_cond[reference]),
+        "any_underpowered": any_underpowered,
+        "n_per_group": n_ref,
+    }
+
+
+def component_profile_test(
+    df: pd.DataFrame,
+    reference: str = "c4_full",
+    metric: str = "displacement_depth",
+    alpha: float = 0.05,
+) -> dict | None:
+    """Distribution-targeting test (review C3): do conditions forget in a
+    *different place*, not just by a different *amount*?
+
+    For each condition we form the mean per-component forgetting **profile** (the
+    vector of ``metric`` values across groups, L1-normalised to a distribution),
+    then compare the reference profile to each rival's with the cosine distance
+    ``1 - cos``. A permutation test over the pooled per-seed profiles gives a
+    p-value on "are these two forgetting *distributions* different?", which the
+    scalar |BWT| test cannot answer. Returns ``None`` if the metric is absent
+    (e.g. older result files without displacement).
+    """
+    sub = df[df["metric"] == metric]
+    if sub.empty:
+        return None
+    groups = sorted(sub["group"].unique())
+
+    def _profiles(cond: str) -> list[np.ndarray]:
+        cc = sub[sub["condition"] == cond]
+        out = []
+        for seed, g in cc.groupby("seed"):
+            vec = g.groupby("group")["value"].mean().reindex(groups).fillna(0.0).to_numpy()
+            s = vec.sum()
+            out.append(vec / s if s > 0 else vec)
+        return out
+
+    ref_profiles = _profiles(reference)
+    if not ref_profiles:
+        return None
+    ref_mean = np.mean(ref_profiles, axis=0)
+
+    def _cos_dist(a: np.ndarray, b: np.ndarray) -> float:
+        na, nb = np.linalg.norm(a), np.linalg.norm(b)
+        if na < 1e-12 or nb < 1e-12:
+            return float("nan")
+        return float(1.0 - np.dot(a, b) / (na * nb))
+
+    rivals = sorted(c for c in sub["condition"].unique() if c != reference)
+    bonf = alpha / max(len(rivals), 1)
+    rng = np.random.default_rng(0)
+    rows, reject_any = [], False
+    for c in rivals:
+        riv_profiles = _profiles(c)
+        if not riv_profiles:
+            continue
+        riv_mean = np.mean(riv_profiles, axis=0)
+        observed = _cos_dist(ref_mean, riv_mean)
+        # Permutation test: shuffle condition labels over the pooled profiles.
+        pool = ref_profiles + riv_profiles
+        n_ref = len(ref_profiles)
+        count, n_perm = 0, 2000
+        for _ in range(n_perm):
+            rng.shuffle(pool)
+            a = np.mean(pool[:n_ref], axis=0)
+            b = np.mean(pool[n_ref:], axis=0)
+            if _cos_dist(a, b) >= observed:
+                count += 1
+        p = (count + 1) / (n_perm + 1)
+        sig = p < bonf
+        reject_any = reject_any or sig
+        rows.append((c, observed, p, sig))
+    return {
+        "reference": reference,
+        "metric": metric,
+        "groups": groups,
+        "alpha": alpha,
+        "bonferroni": bonf,
+        "rivals": rows,
+        "reject_H0": reject_any,
     }
 
 
@@ -269,6 +381,105 @@ def component_hypothesis_test(df: pd.DataFrame, condition: str = "c4_full", alph
     }
 
 
+def _canonical_depth(layer: str) -> str:
+    """Map a backbone-specific CKA layer name to a backbone-agnostic depth point.
+
+    Both LayoutLMv3-base and BERT-base have 12 layers, so the probe points
+    (embeddings, L0, L6, L11, head) line up across backbones — enabling the
+    LayoutLMv3-vs-BERT depth-gradient contrast (review M1).
+    """
+    if "patch_embed" in layer:
+        return "patch"
+    if "classifier" in layer:
+        return "head"
+    m = re.search(r"encoder\.layer\.(\d+)", layer)
+    if m:
+        return f"L{int(m.group(1))}"
+    if "embeddings" in layer:
+        return "embeddings"
+    return layer
+
+
+def _bert_contrast_lines(df: pd.DataFrame) -> list[str]:
+    """Markdown table contrasting the per-depth CKA gradient of the unimodal
+    baseline (Cb/BERT) against the multimodal conditions at the first boundary.
+
+    The key scientific question (review M1): does the multimodal encoder forget
+    in a *different place* than a true unimodal text encoder, or does it just
+    reproduce the known unimodal depth gradient?
+    """
+    cka = df[df["metric"] == "cka"].copy()
+    out = [
+        "",
+        "### Multimodal-vs-unimodal contrast (CKA depth gradient, first boundary)",
+        "",
+    ]
+    if cka.empty or "cb_bert" not in set(cka["condition"]):
+        out.append("_No BERT (cb_bert) CKA data — run the `cb_bert` condition to populate._")
+        return out
+    first = sorted(cka["boundary"].unique())[0]
+    sub = cka[cka["boundary"] == first].copy()
+    sub["depth"] = sub["layer"].map(_canonical_depth)
+    pivot = sub.groupby(["depth", "condition"])["value"].mean().reset_index()
+    depth_order = ["embeddings", "patch", "L0", "L6", "L11", "head"]
+    conds = sorted(pivot["condition"].unique())
+    out += [
+        f"Mean CKA (1.0 = no drift) at boundary `{first}`:",
+        "",
+        "| Depth | " + " | ".join(conds) + " |",
+        "|" + "---|" * (len(conds) + 1),
+    ]
+    for d in depth_order:
+        rowvals = []
+        for c in conds:
+            v = pivot[(pivot["depth"] == d) & (pivot["condition"] == c)]["value"]
+            rowvals.append("--" if v.empty else f"{v.iloc[0]:.3f}")
+        if all(x == "--" for x in rowvals):
+            continue
+        out.append(f"| {d} | " + " | ".join(rowvals) + " |")
+    out += [
+        "",
+        "_Read the late-layer (L11) and head rows: if the multimodal conditions "
+        "drift *more* (lower CKA) or *differently* than `cb_bert`, the depth/head "
+        "forgetting is multimodal-specific rather than a re-confirmation of the "
+        "unimodal result._",
+    ]
+    return out
+
+
+def plot_displacement_bars(df: pd.DataFrame, output_path: Path) -> None:
+    """Bar chart of old-task-Fisher-weighted displacement (the forgetting
+    localizer) per depth bucket, per condition, at the first task boundary."""
+    disp = df[df["metric"] == "displacement_depth"].copy()
+    if disp.empty:
+        print("No displacement data — skipping displacement bars")
+        return
+    first = sorted(disp["boundary"].unique())[0]
+    sub = disp[disp["boundary"] == first]
+    agg = sub.groupby(["condition", "group"])["value"].agg(["mean", "std"]).reset_index()
+    order = ["input", "early", "mid", "late", "head"]
+    groups = [g for g in order if g in set(agg["group"])]
+    conditions = sorted(agg["condition"].unique())
+
+    fig, ax = plt.subplots(figsize=(11, 6))
+    x = np.arange(len(groups))
+    width = 0.8 / max(len(conditions), 1)
+    for i, cond in enumerate(conditions):
+        sub_c = agg[agg["condition"] == cond].set_index("group").reindex(groups)
+        ax.bar(x + i * width - 0.4, sub_c["mean"].fillna(0), width,
+               yerr=sub_c["std"].fillna(0), label=cond, capsize=2)
+    ax.set_xticks(x)
+    ax.set_xticklabels(groups)
+    ax.set_ylabel("Fisher-weighted displacement (forgetting)")
+    ax.set_title(f"Where forgetting lives by depth (boundary {first})")
+    ax.legend()
+    fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {output_path}")
+
+
 def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: Path) -> None:
     """Generate a markdown summary of pilot findings."""
     lines = [
@@ -299,10 +510,14 @@ def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: P
 
     cond_test = condition_bwt_test(results, reference="c4_full")
     lines += [
-        "### Cross-condition: does full-multimodal forgetting differ from C1-C3?",
+        "### Cross-condition (magnitude): does full-multimodal |BWT| differ from C1-C3/Cb?",
         "",
         "**H0:** |BWT| of C4 equals that of the ablated/unimodal conditions.  ",
-        "**H1:** C4 forgets differently from at least one of C1-C3.",
+        "**H1:** C4 forgets a different *amount* than at least one rival.",
+        "",
+        "_Note: this scalar-magnitude test is reported with its statistical-power "
+        "floor. A non-rejection whose floor exceeds α is **inconclusive by "
+        "construction** (underpowered), not evidence for H0 (review C3)._",
         "",
     ]
     if cond_test is None:
@@ -313,14 +528,55 @@ def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: P
             f"(n={cond_test['n_per_group']} per group, α={cond_test['alpha']}, "
             f"Bonferroni α'={cond_test['bonferroni']:.4f}).",
             "",
-            "| Rival condition | mean \\|BWT\\| | p (vs C4) | significant |",
+            "| Rival | mean \\|BWT\\| | p (vs C4) | min achievable p | significant | underpowered |",
+            "|---|---|---|---|---|---|",
+        ]
+        for c, mean, p, sig, floor, under in cond_test["rivals"]:
+            pstr = "n/a" if p != p else f"{p:.4f}"
+            fstr = "n/a" if floor != floor else f"{floor:.4f}"
+            lines.append(
+                f"| {c} | {mean:.2f} | {pstr} | {fstr} | "
+                f"{'**yes**' if sig else 'no'} | {'**yes**' if under else 'no'} |"
+            )
+        if cond_test["reject_H0"]:
+            verdict = "**reject H0**"
+        elif cond_test["any_underpowered"]:
+            verdict = ("**inconclusive (underpowered)** — at least one comparison's "
+                       "minimum achievable p exceeds α'; add seeds before reading this as H0")
+        else:
+            verdict = "fail to reject H0"
+        lines += ["", f"Verdict: {verdict}."]
+
+    # ─── Distribution-targeting test (where, not how much) ────────────────────
+    prof_test = component_profile_test(df, reference="c4_full", metric="displacement_depth")
+    lines += [
+        "",
+        "### Cross-condition (location): do conditions forget in a *different place*?",
+        "",
+        "**H0:** the per-depth forgetting *profile* of C4 equals each rival's.  ",
+        "**H1:** the forgetting *distribution* across depth differs (permutation test "
+        "on the displacement profile — the question |BWT| cannot answer).",
+        "",
+    ]
+    if prof_test is None:
+        lines.append("_No displacement data — re-run the pilot to populate this test._")
+    else:
+        lines += [
+            f"- Reference **{prof_test['reference']}**, metric `{prof_test['metric']}`, "
+            f"Bonferroni α'={prof_test['bonferroni']:.4f}.",
+            "",
+            "| Rival | cosine distance of profiles | p (perm) | significant |",
             "|---|---|---|---|",
         ]
-        for c, mean, p, sig in cond_test["rivals"]:
+        for c, dist, p, sig in prof_test["rivals"]:
+            dstr = "n/a" if dist != dist else f"{dist:.3f}"
             pstr = "n/a" if p != p else f"{p:.4f}"
-            lines.append(f"| {c} | {mean:.2f} | {pstr} | {'**yes**' if sig else 'no'} |")
-        verdict = "**reject H0**" if cond_test["reject_H0"] else "fail to reject H0"
+            lines.append(f"| {c} | {dstr} | {pstr} | {'**yes**' if sig else 'no'} |")
+        verdict = "**reject H0**" if prof_test["reject_H0"] else "fail to reject H0"
         lines += ["", f"Verdict: {verdict} at the Bonferroni-corrected level."]
+
+    # ─── BERT-vs-LayoutLMv3 depth gradient (multimodal-specific contrast) ─────
+    lines += _bert_contrast_lines(df)
 
     comp_test = component_hypothesis_test(df, condition="c4_full")
     lines += [
@@ -350,9 +606,12 @@ def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: P
             "",
             f"Verdict: {verdict}. ",
             "",
-            "_Decision rule (CLAUDE.md): fusion-dominant → Candidate A; layout-position "
-            "drift → Candidate B; scenario-dependent → Candidate C; no clear pattern "
-            "(fail to reject H0) → characterization-only fallback._",
+            "_Decision rule (revised; only measurable branches — review M4): "
+            "head/late-layer-dominant forgetting → depth/head-targeted DocCL "
+            "(classifier + late-layer protection); uniform across depth → uniform "
+            "consolidation; no concentration → characterization-only. The earlier "
+            "fusion-dominant / per-modality-visual branches are removed because a "
+            "single-stream encoder cannot produce those signals._",
         ]
 
     lines += [
@@ -391,6 +650,7 @@ def main():
 
     plot_cka_heatmap(df, args.figures_dir / "cka_heatmap.pdf")
     plot_fisher_bars(df, args.figures_dir / "fisher_bars.pdf")
+    plot_displacement_bars(df, args.figures_dir / "displacement_bars.pdf")
     plot_forgetting_matrix(df, args.figures_dir / "forgetting_matrix.pdf")
     write_findings_summary(df, results, args.pilot_dir / "findings_summary.md")
 

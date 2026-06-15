@@ -4,9 +4,10 @@
 # Phases (methods × scenarios × seeds):
 #   PHASE=3 (core)     : naive joint ewc lwf er der_pp        (~54 runs)
 #   PHASE=4 (advanced) : l2p dualprompt coda_prompt o_lora    (~36 runs)
-#   PHASE=5 (selected) : doccl  (the pilot-selected proposed method)
-#   PHASE=ablation     : proposed method × {text,visual,layout,fusion,uniform}
-#                        on ABLATION_SCENARIOS (Table 6.2)
+#   PHASE=5 (selected) : doccl  (the depth/head-targeted proposed method)
+#   PHASE=ablation     : DocCL × {all, head_only, late_only, uniform}
+#                        on ABLATION_SCENARIOS (Table 6.7 — does targeting the
+#                        diagnosed head/late locus beat uniform treatment?)
 #   PHASE=all          : all baselines + doccl
 #
 # W&B defaults to OFFLINE (Vast.ai). Set WANDB_MODE=online for live logging.
@@ -25,7 +26,9 @@ SEEDS="${SEEDS:-42 123 7}"
 WANDB_MODE="${WANDB_MODE:-offline}"
 
 PROPOSED="${PROPOSED:-doccl}"
-COMPONENTS="${COMPONENTS:-text visual layout fusion uniform}"
+# Depth-targeting ablation variants for the selected DocCL (review M3/M4):
+#   all (full method) | head_only | late_only | uniform
+DEPTH_TARGETS="${DEPTH_TARGETS:-all head_only late_only uniform}"
 ABLATION_SCENARIOS="${ABLATION_SCENARIOS:-cil_cord}"
 
 # Extra Hydra overrides appended to every run. For a limited-VRAM GPU:
@@ -69,16 +72,16 @@ run_one() {
 }
 
 if [ "$PHASE" = "ablation" ]; then
-    echo "=== DocCL Component-Targeting Ablation (Table 6.2) ==="
-    echo "Proposed:   $PROPOSED   Components: $COMPONENTS"
+    echo "=== DocCL Depth-Targeting Ablation (Table 6.7) ==="
+    echo "Proposed:   $PROPOSED   Depth targets: $DEPTH_TARGETS"
     echo "Scenarios:  $ABLATION_SCENARIOS   Seeds: $SEEDS   W&B: $WANDB_MODE"
     echo
     for scenario in $ABLATION_SCENARIOS; do
         for seed in $SEEDS; do
-            for comp in $COMPONENTS; do
-                run_one "${scenario}_${PROPOSED}_seed${seed}_${comp}" \
+            for tgt in $DEPTH_TARGETS; do
+                run_one "${scenario}_${PROPOSED}_seed${seed}_${tgt}" \
                     method="$PROPOSED" scenario="$scenario" seed="$seed" \
-                    "method.target_component=$comp"
+                    "method.target_depth=$tgt"
             done
         done
     done

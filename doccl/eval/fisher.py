@@ -28,6 +28,7 @@ def empirical_fisher_diagonal(
     dataloader: DataLoader,
     n_samples: int = 200,
     device: str | torch.device = "cuda",
+    modality_mask=None,
 ) -> dict[str, torch.Tensor]:
     """Compute diagonal of empirical Fisher information matrix.
 
@@ -36,6 +37,12 @@ def empirical_fisher_diagonal(
         dataloader: provides labeled batches (input_ids, bbox, pixel_values, labels)
         n_samples: number of samples to use (more = more accurate, slower)
         device: forward pass device
+        modality_mask: optional ``ModalityMask`` for the pilot conditions. When
+            given, it is forwarded to the model so the Fisher estimate is taken
+            under the **same** masked inputs the condition trained on (fixes the
+            mask-agnostic per-condition Fisher flagged in review m3). Models
+            whose ``forward`` does not accept ``modality_mask`` (e.g. the BERT
+            baseline) should pass ``None``.
 
     Returns:
         {param_name: Fisher diagonal tensor (same shape as param)}
@@ -44,6 +51,7 @@ def empirical_fisher_diagonal(
     fisher: dict[str, torch.Tensor] = {
         name: torch.zeros_like(p) for name, p in model.named_parameters() if p.requires_grad
     }
+    extra_kwargs = {} if modality_mask is None else {"modality_mask": modality_mask}
 
     seen = 0
     pbar = tqdm(dataloader, desc="Fisher", leave=False)
@@ -52,7 +60,9 @@ def empirical_fisher_diagonal(
         labels = batch["labels"]
 
         _zero_grads(model)
-        outputs = model(**{k: v for k, v in batch.items() if k != "labels"})
+        outputs = model(
+            **{k: v for k, v in batch.items() if k != "labels"}, **extra_kwargs
+        )
         logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
 
         # Compute log-likelihood of (input, predicted-label) under the model.
@@ -135,4 +145,84 @@ def fisher_drop(
                 out[k] = (fisher_after[k] - base) / base
             else:
                 out[k] = 0.0
+    return out
+
+
+def snapshot_params(model: nn.Module) -> dict[str, torch.Tensor]:
+    """Detached CPU copy of all trainable parameters, keyed by name.
+
+    Used to record ``θ^{t-1}`` before training a task so the post-task
+    displacement can be measured (see ``fisher_weighted_displacement``).
+    """
+    return {
+        name: p.detach().clone().cpu()
+        for name, p in model.named_parameters()
+        if p.requires_grad
+    }
+
+
+def fisher_weighted_displacement(
+    fisher_old: dict[str, torch.Tensor],
+    params_before: dict[str, torch.Tensor],
+    params_after: dict[str, torch.Tensor],
+    param_groups: dict[str, list[nn.Parameter]],
+    model: nn.Module,
+    reduction: str = "mean",
+) -> dict[str, float]:
+    r"""Per-group old-task-Fisher-weighted parameter displacement.
+
+    .. math::
+        D_g = \sum_{\phi \in g} F^{(t-1)}_\phi \,
+              \big(\theta^{(t)}_\phi - \theta^{(t-1)}_\phi\big)^2
+
+    This is a **forgetting-specific** localizer (review C4): it is large where
+    parameters that were important to the *previous* task (high ``F^{(t-1)}``)
+    have *moved* most. Unlike raw Fisher *level*, which is largest at the head by
+    construction of the loss geometry for any classifier, ``D_g`` says where the
+    old task's knowledge was actually overwritten.
+
+    Args:
+        fisher_old: per-parameter Fisher diagonal computed on the OLD task
+            (before training the new task), keyed by parameter name.
+        params_before / params_after: ``θ^{t-1}`` / ``θ^{t}`` snapshots
+            (``snapshot_params`` output), keyed by parameter name.
+        param_groups: name → list of parameters (``model.param_groups`` or
+            ``model.param_groups_by_depth``).
+        model: used to map parameter objects back to their names.
+        reduction: ``"mean"`` (per-parameter mean, comparable across
+            differently-sized groups — default, used for the "where forgetting
+            lives" plots) or ``"sum"`` (the raw quadratic above).
+
+    Returns:
+        {group_name: scalar displacement}
+    """
+    if reduction not in ("mean", "sum"):
+        raise ValueError(f"reduction must be 'mean' or 'sum', got {reduction!r}")
+    param_id_to_name = {id(p): name for name, p in model.named_parameters()}
+    out: dict[str, float] = {}
+    for group_name, params in param_groups.items():
+        total = 0.0
+        count = 0
+        for p in params:
+            name = param_id_to_name.get(id(p))
+            if (
+                name is None
+                or name not in fisher_old
+                or name not in params_before
+                or name not in params_after
+            ):
+                continue
+            f = fisher_old[name].cpu()  # same shape as θ^{t-1}
+            before = params_before[name].cpu()
+            after = params_after[name].cpu()
+            # The classifier head grows across CIL boundaries: θ^t can be wider
+            # than θ^{t-1}. Forgetting of the OLD task lives in the *old* rows, so
+            # crop θ^t to the overlap before differencing.
+            if after.shape != before.shape:
+                crop = tuple(slice(0, min(a, b)) for a, b in zip(after.shape, before.shape))
+                after = after[crop]
+            disp = (after - before) ** 2
+            total += float((f * disp).sum())
+            count += f.numel()
+        out[group_name] = total / max(count, 1) if reduction == "mean" else total
     return out

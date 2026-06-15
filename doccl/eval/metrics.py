@@ -12,8 +12,11 @@ Definitions (matrix R[i][j] = perf on task j after training task i):
 """
 from __future__ import annotations
 
+from collections import Counter
+
 import numpy as np
 from seqeval.metrics import (
+    classification_report as seq_report,
     f1_score as seq_f1,
     precision_score as seq_precision,
     recall_score as seq_recall,
@@ -35,6 +38,59 @@ def compute_token_f1(
         "precision": seq_precision([gold_str], [pred_str], zero_division=0) * 100,
         "recall": seq_recall([gold_str], [pred_str], zero_division=0) * 100,
     }
+
+
+def compute_per_class_f1(
+    preds: list[int],
+    labels: list[int],
+    label_map: dict[int, str],
+) -> dict[str, dict[str, float]]:
+    """Per-entity-type precision/recall/F1/support via seqeval.
+
+    Returns ``{entity_type: {"precision", "recall", "f1", "support"}}`` (values
+    in %; support is the raw gold-span count). Used to diagnose whether an
+    aggregate score is carried by one dominant class — e.g. the VALUE-dominant
+    DIL schema where KEY appears only in FUNSD/SROIE (review M5).
+    """
+    if not preds:
+        return {}
+    pred_str = [label_map.get(p, "O") for p in preds]
+    gold_str = [label_map.get(l, "O") for l in labels]
+    report = seq_report([gold_str], [pred_str], output_dict=True, zero_division=0)
+    out: dict[str, dict[str, float]] = {}
+    for cls, vals in report.items():
+        if not isinstance(vals, dict):
+            continue
+        out[cls] = {
+            "precision": vals.get("precision", 0.0) * 100,
+            "recall": vals.get("recall", 0.0) * 100,
+            "f1": vals.get("f1-score", 0.0) * 100,
+            "support": float(vals.get("support", 0)),
+        }
+    return out
+
+
+def label_frequencies(
+    labels: list[int],
+    label_map: dict[int, str],
+) -> dict[str, dict[str, int]]:
+    """Count BIO-tag and entity-type frequencies in a flat label stream.
+
+    ``-100`` (ignored) positions are skipped. Returns
+    ``{"bio": {tag: count}, "entity": {entity_type: count}}`` where the entity
+    count tallies span *starts* (``B-`` tags), the right unit for "how many KEY
+    spans exist in this task" — the evidence the DIL interpretation needs (M5).
+    """
+    bio: Counter[str] = Counter()
+    entity: Counter[str] = Counter()
+    for lid in labels:
+        if lid == -100:
+            continue
+        name = label_map.get(lid, "O")
+        bio[name] += 1
+        if name.startswith("B-"):
+            entity[name[2:]] += 1
+    return {"bio": dict(bio), "entity": dict(entity)}
 
 
 class CLMetricsTracker:

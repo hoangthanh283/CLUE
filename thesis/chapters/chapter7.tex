@@ -9,14 +9,21 @@
 This study is deliberately scoped, and several limitations should be read
 alongside its findings. First, the controlled diagnosis centres on a single
 primary backbone, LayoutLMv3-base; although LiLT and BROS are used to test
-generalisation on a reduced subset, the per-component picture is established most
-firmly for one architecture. Second, the task sequence comprises three public
-datasets (FUNSD, CORD, SROIE); while they span forms and receipts and a wide range
-of label-space sizes, they are modest in scale and do not cover every document
-genre. Third, the text-only diagnostic condition (C1) is a same-architecture
-LayoutLMv3 with its non-text pathways zeroed rather than a true unimodal encoder,
-so it is the closest apples-to-apples text baseline rather than an independent
-one. Fourth, the work targets token-level key-information extraction and does not
+generalisation on a reduced subset, the forgetting-localisation picture is
+established most firmly for one architecture, and---because LayoutLMv3 is
+single-stream---the analysis localises forgetting by depth, input stream, and head
+rather than by a separable visual-attention or fusion component, which that
+architecture does not provide. A genuinely per-stream \emph{attention}
+decomposition would require a two-stream backbone and is left to future work.
+Second, the task sequence comprises three public datasets (FUNSD, CORD, SROIE);
+while they span forms and receipts and a wide range of label-space sizes, they are
+modest in scale and do not cover every document genre, and the unified DIL schema
+is VALUE-dominant (KEY present only in FUNSD/SROIE), which is why DIL results are
+reported with per-class F1. Third, the modalities' contribution is read
+behaviourally from the input-masking conditions (C1--C4) and against an external
+unimodal BERT baseline; the within-architecture conditions cannot, on their own,
+attribute forgetting to attention sub-blocks the single-stream encoder shares.
+Fourth, the work targets token-level key-information extraction and does not
 address entity linking, relation extraction, or generative document IE. Fifth, all
 results use the OCR transcriptions and bounding boxes supplied with the benchmark
 datasets and never re-run a recogniser; this is a deliberate choice that removes OCR
@@ -33,23 +40,26 @@ effects.
 
 This thesis set out to answer \emph{where} a tri-modal document encoder forgets,
 and to use that answer to design a continual-learning remedy. Its first
-contribution is a per-component forgetting diagnostic that attributes catastrophic
-forgetting to the text, visual, layout, and fusion components of LayoutLMv3 under
-a controlled modality-ablation protocol, using complementary representational
-(CKA) and importance-based (Fisher) metrics together with standard forgetting
+contribution is a forgetting-localisation diagnostic that locates catastrophic
+forgetting along the depth of LayoutLMv3 and across its separable input streams and
+classifier head, under a controlled modality-ablation protocol and against a true
+unimodal (BERT) baseline, using complementary per-token representational (CKA) and
+old-task-Fisher-weighted displacement metrics together with standard forgetting
 measures.
 
 The diagnosis returns a clear and somewhat counter-intuitive finding: under naive
 sequential fine-tuning LayoutLMv3 forgets almost totally---an earlier task that
 scores $88$ entity-F1 collapses to $\sim$2 F1 after a single subsequent task---and
-this forgetting is \emph{output-side}, not fusion-specific. It concentrates in the
-classifier head and the late encoder layers: the head dominates per-group Fisher
-importance by roughly an order of magnitude, and per-layer CKA drift rises
-monotonically with depth (from $1.00$ at the input encoders to $0.22$ at the head),
-while the input encoders are essentially unchanged. The cross-condition test could
-not statistically distinguish the full multimodal model's forgetting from its
-unimodal ablations, so the original premise that multimodal encoders forget
-differently \emph{in fusion} is not supported; the locus is the output head.
+this forgetting is \emph{output-side}. It concentrates in the classifier head and
+the late encoder layers: per-token CKA drift rises monotonically with depth (from
+$1.00$ at the input encoders to $0.22$ at the head) and the Fisher-weighted
+displacement of the old task's parameters is largest there, while the input encoders
+are essentially unchanged. We are careful about what this does and does not claim:
+because LayoutLMv3 is single-stream we do \emph{not} assert a ``fusion-specific''
+effect (fusion is not a measurable parameter component here), and the question of
+whether the multimodal encoder forgets in a different \emph{place} than a unimodal
+one is answered by the BERT contrast and an adequately powered, distribution-targeting
+test rather than by the underpowered scalar magnitude comparison of an earlier pass.
 
 The benchmark of continual-learning strategies confirms what this diagnosis predicts.
 Across the three scenarios the ordering is unambiguous---replay $\gg$ regularisation
@@ -58,20 +68,22 @@ because the damage is at the head, \emph{replay}, which re-exposes old-class tar
 the output, is the most effective remedy. On domain-incremental learning both replay
 methods (ER, DER++) reach the joint upper bound (AA $\approx 88$ vs the oracle's $85$,
 backward transfer $\approx 0$), closing essentially the entire $\sim$47-point forgetting
-gap; EWC roughly halves forgetting wherever a domain shift is present (DIL/Mixed BWT
+gap (interpreted with per-class F1, as the unified schema is VALUE-dominant); EWC
+roughly halves forgetting wherever a domain shift is present (DIL/Mixed BWT
 $-37$/$-31$ vs naive $-71$/$-67$); and LwF tracks the naive lower bound throughout, as
 its distilled old-class logits decay once the growing head stops reinforcing them.
 
-The proposed method, DocCL---a mechanism that would concentrate continual-learning
-effort on the dominant-forgetting head and late layers---was designed from the
-diagnosis but \emph{not} empirically evaluated in this work: the diagnosis was
-inconclusive as to which single architectural lever dominates, so per a pre-registered
-fallback the diagnosis and benchmark are reported as the primary contribution and the
-full DocCL evaluation is left as the immediate next step (\S\ref{sec:concl-future}).
-The diagnostic contribution stands on its own: it provides a reusable tool and a shared
-benchmark for studying forgetting in multimodal document encoders---together with a
-strong-baseline context (replay reaching the oracle) that any future targeted method
-must beat---which the prior, fragmented literature lacked.
+Its second contribution is DocCL, a depth/head-targeted method derived directly from
+the diagnosis---depth-scaled consolidation, output distillation, and head replay
+concentrated on the classifier head and late layers---evaluated on the FCS-CL
+benchmark against the baselines with a depth-targeting ablation.
+\textbf{[TODO: one paragraph stating the effect sizes and whether the targeted
+remedy beats the strong replay baseline, once the corrected run is in.]}
+Whatever the remedy's margin, the diagnostic contribution stands on its own: it
+provides a reusable tool and a shared benchmark for studying forgetting in multimodal
+document encoders---together with a strong-baseline context (replay reaching the
+oracle) that any targeted method must beat---which the prior, fragmented literature
+lacked.
 
 \section{Future Work}
 \label{sec:concl-future}
@@ -84,10 +96,16 @@ established for an encoder-only, base-scale backbone. A natural next step is to
 re-run the same per-component protocol on larger and architecturally different
 backbones---LayoutLMv3-large, the multilingual LayoutXLM, and decoder-based or
 instruction-tuned document MLLMs such as InternVL3---to test whether the
-dominant-forgetting component is a property of the LayoutLMv3-base design or a more
-general feature of tri-modal document encoders. Decoder-based encoders are
-especially interesting because their generative objective and tokenisation differ
-markedly from the sequence-labelling setup used here.
+dominant-forgetting locus is a property of the LayoutLMv3-base design or a more
+general feature of tri-modal document encoders. A particularly important extension
+is to a \emph{two-stream} backbone (for example LiLT, whose text and layout streams
+are physically separate parameter blocks): there the per-stream \emph{attention}
+decomposition that a single-stream encoder cannot support becomes identifiable, so
+the candidate mechanisms reserved in \S\ref{sec:method-candidates}---component-banked
+LoRA and modality-routed prompts---could be evaluated on signals that genuinely
+exist. Decoder-based encoders are especially interesting because their generative
+objective and tokenisation differ markedly from the sequence-labelling setup used
+here.
 
 \emph{Additional continual scenarios.} The three studied scenarios cover
 class-incremental and domain-incremental shifts. Future work could add

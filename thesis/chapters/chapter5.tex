@@ -161,8 +161,19 @@ forms $\to$ receipts $\to$ fine-grained receipts). The mapping
 FUNSD aligns naturally (QUESTION/ANSWER $=$ KEY/VALUE), SROIE has no explicit
 key/value split (COMPANY is treated as KEY-like, the rest as VALUE), and CORD has
 no KEY at all (productive content maps to VALUE, void/sub to OTHER). The asymmetric
-SROIE mapping is chosen so that every tag receives discriminative gradient signal;
-the resulting sparsity of KEY outside FUNSD is recorded as a known limitation.
+SROIE mapping is chosen so that every tag receives discriminative gradient signal.
+Two consequences of this construction are made explicit rather than hidden, because
+they bear directly on how the DIL results must be read. First, KEY originates
+\emph{only} from FUNSD (QUESTION) and SROIE (COMPANY); CORD contributes none, so the
+unified schema is \emph{VALUE-dominant}. Second, the SROIE BIO tags are themselves
+run-encoded from a single-token-per-field ($S$-scheme) mirror (first token of a run
+$\to$ \texttt{B-}, the rest $\to$ \texttt{I-}). We therefore \emph{report per-class
+F1 and per-task label frequencies} for every DIL result
+(\S\ref{sec:eval-seeds}, Chapter~\ref{ch:results}): a high aggregate average
+accuracy on a VALUE-dominant schema is only interpreted as genuine cross-domain
+retention if the sparse classes (KEY in particular) are themselves retained, and is
+otherwise flagged as a label-degeneracy artefact. The per-task frequencies are
+produced model-free by \texttt{scripts/dil\_label\_report.py}.
 
 \begin{figure}[!htbp]
   \centering
@@ -418,13 +429,28 @@ LayoutLM is the natural point of comparison from the literature.
 \subsection{Repeated-Seed Protocol and Statistical Testing}
 \label{sec:eval-seeds}
 
-All main results are reported as mean\,$\pm$\,standard deviation over three seeds
-($42, 123, 7$) and, where applicable, over the alternate task orders. Comparisons
-between the selected method and the strongest baseline use a paired test (paired
-$t$-test or Wilcoxon signed-rank over the per-seed, per-order results), and the
+Main \emph{grid} results are reported as mean\,$\pm$\,standard deviation over three
+seeds ($42, 123, 7$) and, where applicable, over the alternate task orders;
+comparisons between the selected method and the strongest baseline use a paired
+test (paired $t$-test or Wilcoxon signed-rank over the per-seed, per-order results).
+
+The \emph{pilot diagnosis} carries a stricter requirement, because a rank test on
+small samples is power-limited: the minimum achievable two-sided Mann--Whitney
+$p$-value is $2/\binom{n_1+n_2}{n_2}$, so with three seeds per condition the floor
+($2/\binom{6}{3}=0.10$) lies above any Bonferroni threshold and the test
+\emph{cannot} reject its null regardless of the data. The pilot therefore uses
+\emph{at least five seeds per condition} (plus the alternate order), lowering the
+cross-condition floor to $2/\binom{10}{5}=0.0079$; every reported non-rejection is
+accompanied by its power floor and is labelled \emph{inconclusive by construction}
+whenever the floor exceeds $\alpha$ (\S\ref{sec:method-diag-hypotheses}). The
 per-component diagnosis uses a Mann--Whitney U test with Bonferroni correction
-across the eight parameter groups (\S\ref{sec:method-diag-hypotheses}). When
-comparing the selected method against all baselines at once, the significance
+across the parameter/depth groups, and is complemented by a distribution-targeting
+permutation test on the per-depth forgetting \emph{profile} (C4 versus the unimodal
+C1 and Cb), which tests whether conditions forget in a different \emph{place} rather
+than merely by a different \emph{amount}. Representational drift is measured with
+\emph{per-token} CKA over $n\ge 500$ distinct valid tokens (not mean-pooled document
+vectors, and above the hidden width $768$ to avoid the high-variance $n<p$ regime).
+When comparing the selected method against all baselines at once, the significance
 threshold is Bonferroni-corrected for the number of pairwise comparisons.
 
 \section{Summary}

@@ -1,15 +1,28 @@
-# Proposed-method alias used by the Phase-5 grid (`method=doccl`).
-# PLACEHOLDER: currently mirrors Candidate A. At the Week-4 pilot decision gate,
-# replace this body with the selected winner's hyperparameters (copy doccl_a/b/c.yaml)
-# AND repoint METHOD_REGISTRY["doccl"] in scripts/train.py to the same class.
-# Not a pre-lock — the `doccl` grid is only run after the diagnosis selects the candidate.
+# DocCL — the selected depth/head-targeted method (METHOD_REGISTRY["doccl"]).
+# Derived from the corrected per-component diagnosis: forgetting concentrates in
+# the classifier head + late encoder layers, so DocCL combines depth-scaled EWC,
+# output distillation, and a small head-replay buffer there.
+#
+# target_depth drives the component-targeting ablation (Table 6.7):
+#   all (full) | head_only | late_only | uniform
 name: doccl
 lr: 5.0e-5
 weight_decay: 0.01
 epochs: 10
 max_grad_norm: 1.0
-lora_rank: 8
-lora_alpha: 16
-lora_dropout: 0.1
-lambda_ortho: 0.5
-target_component: uniform
+
+# Depth-scaled EWC
+lambda_: 2000.0          # global scale on the Fisher-weighted penalty
+fisher_n_samples: 200
+ewc_gamma: 1.0
+target_depth: all        # all | head_only | late_only | uniform
+lambda_uniform: 1.0      # per-bucket weight when target_depth=uniform
+
+# Output distillation (head/late protection)
+kd_alpha: 1.0
+temperature: 2.0
+
+# Head re-exposure replay
+use_replay: true
+buffer_size: 200
+replay_batch_size: 8

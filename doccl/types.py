@@ -24,11 +24,23 @@ class ScenarioType(str, Enum):
 
 
 class ModalityMask(str, Enum):
-    """Which modalities are active during forward pass.
-    Used by pilot study conditions C1-C4.
+    """Which input streams are active during the forward pass.
+
+    Used by the pilot-study conditions. Each mask zeroes the *inactive* input
+    streams while keeping the architecture fixed (same layers, same shapes), so
+    differences in forgetting are attributable to the modalities in play.
+
+        TEXT_ONLY     C1: text present; image + layout zeroed (real text-only
+                      LayoutLMv3 — keeps ``input_ids``).
+        IMAGE_LAYOUT  C2: image + layout present; text zeroed (PAD).
+        TEXT_LAYOUT   C3: text + layout present; image zeroed.
+        FULL          C4: all three streams (standard LayoutLMv3).
+
+    The external unimodal baseline (BERT-base) is a *separate* model
+    (``doccl.models.bert_wrapper``), not a mask on LayoutLMv3.
     """
 
-    TEXT_ONLY = "text_only"  # C1 (BERT-style) or LayoutLM-no-image-no-layout
+    TEXT_ONLY = "text_only"  # C1: text only (image + layout zeroed)
     IMAGE_LAYOUT = "image_layout"  # C2: LayoutLM no text
     TEXT_LAYOUT = "text_layout"  # C3: LayoutLM no image
     FULL = "full"  # C4: LayoutLM full

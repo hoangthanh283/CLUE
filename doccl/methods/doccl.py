@@ -1,33 +1,32 @@
-"""DocCL — the three candidate proposed methods (A / B / C).
+"""DocCL — the selected depth/head-targeted method (plus legacy candidates).
 
-Per the measure-first design (CLAUDE.md), the proposed method is *selected at the
-Week-4 pilot decision gate*, not pre-locked. We pre-implement all three sketched
-candidates so the winner runs immediately once the per-component diagnosis is in:
+The corrected per-component diagnosis (review C2/M1/M3) shows forgetting
+concentrates in the **classifier head and late encoder layers** of the
+single-stream LayoutLMv3, not in a separable "fusion" or "visual" component (those
+are not measurable on a single-stream encoder). The selected method is therefore
+``DocCL`` below: a depth/head-targeted consolidation that spends its stability
+budget where forgetting actually lives. It is the registry's ``doccl``.
 
-    Candidate A — LAPP + H-LoRA          (fusion-dominant forgetting + layout matters)
-    Candidate B — Layout-Protected EWC   (uniform forgetting but 2D position drifts)
-    Candidate C — Modality-Routed Prompts (scenario-dependent per-modality patterns)
-
-Each exposes a ``target_component`` knob ({text, visual, layout, fusion, uniform})
-so the Table 6.2 ablation — "does concentrating the mechanism on the
-diagnosed component beat uniform treatment?" — runs through one interface. After
-the pilot, the winner is aliased to ``doccl`` in ``scripts/train.py``.
-
-Each candidate is a focused, runnable mechanism that reuses existing infrastructure
-(O-LoRA, EWC, the prompt base) rather than a fragile combination — the AAAI-Lite
-scope. If a candidate is selected, §3.3.6 specifies it in full.
+``DocCL_A/B/C`` are the earlier sketched candidates kept as ablation variants and
+for the NeurIPS extension; the abandoned fusion-dominant / per-modality-visual
+decision branches they served are removed from the thesis decision rule (M4).
 """
 from __future__ import annotations
 
+import copy
 import logging
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from doccl.methods.buffer import ReservoirBuffer
 from doccl.methods.ewc import EWC
+from doccl.methods.naive import NaiveFineTune
 from doccl.methods.o_lora import OLoRA
 from doccl.methods.prompt_base import PromptBasedMethod, PromptPool
+from doccl.eval.fisher import empirical_fisher_diagonal
+from doccl.types import TaskInfo, TrainMetrics
 
 log = logging.getLogger(__name__)
 
@@ -90,12 +89,16 @@ class DocCL_B(EWC):
 
     name = "doccl_b"
 
+    # Maps an ablation target to a populated ``param_groups`` key. The single-stream
+    # encoder has no separable ``fusion`` group (review C2), so the closest mixing
+    # projection is the attention output (``attn_out``).
     COMPONENT_TO_GROUP = {
         "layout": "layout_2d_pos_embed",
-        "text": "text_attn",
+        "text": "attn_qkv",
         "visual": "image_patch_embed",
-        "fusion": "fusion",
+        "fusion": "attn_out",
         "ffn": "ffn",
+        "head": "classifier",
     }
 
     def __init__(self, model, config):
@@ -198,3 +201,207 @@ class DocCL_C(PromptBasedMethod):
         stacked = torch.stack(prompts, dim=1)  # (B, n_pools, K*Lp, D)
         combined = (weights.unsqueeze(-1).unsqueeze(-1) * stacked).sum(dim=1)  # (B, K*Lp, D)
         return combined, self.lambda_key * aux / len(self.MODALITIES)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DocCL — the SELECTED method: depth/head-targeted consolidation
+# ─────────────────────────────────────────────────────────────────────────────
+class DocCL(NaiveFineTune):
+    """Depth/head-targeted continual learning — the method the diagnosis selects.
+
+    Forgetting concentrates in the classifier head and late encoder layers (the
+    CKA depth gradient + old-task-Fisher-weighted displacement), while the input
+    encoders stay stable. DocCL spends its stability budget there, combining three
+    mutually-reinforcing, individually-ablatable mechanisms:
+
+      1. **Depth-scaled EWC** — a Fisher-weighted quadratic penalty whose per-bucket
+         strength scales with where forgetting lives (head ≫ late > mid ≫ early ≈
+         input ≈ 0), via ``model.param_groups_by_depth``.
+      2. **Output distillation** — KL distillation of the previous task's output
+         distribution from a frozen teacher, which protects the output-facing
+         (head + late) representations functionally.
+      3. **Head re-exposure replay** — a small reservoir buffer (replay was the
+         strongest baseline) keeps the head grounded in earlier tasks.
+
+    ``target_depth`` ∈ {``all`` (full), ``head_only``, ``late_only``, ``uniform``}
+    drives the component-targeting ablation (Table 6.7): does concentrating the
+    mechanism on the diagnosed locus beat treating the network uniformly?
+    """
+
+    name = "doccl"
+
+    # Per-bucket penalty multipliers for the full method ("all").
+    _DEPTH_LAMBDA = {"input": 0.0, "early": 0.0, "mid": 0.5, "late": 1.0, "head": 2.0}
+
+    def __init__(self, model, config):
+        super().__init__(model, config)
+        self.lambda_ = config.get("lambda_", 2000.0)  # global EWC scale
+        self.kd_alpha = config.get("kd_alpha", 1.0)
+        self.temperature = config.get("temperature", 2.0)
+        self.fisher_n_samples = config.get("fisher_n_samples", 200)
+        self.replay_batch_size = config.get("replay_batch_size", 8)
+        self.target_depth = config.get("target_depth", "all")
+        self.use_replay = config.get("use_replay", True)
+        self.state.custom["theta_star"] = {}  # name → snapshot tensor
+        self.state.custom["fisher"] = {}  # name → accumulated Fisher diagonal
+        self.state.custom["teacher"] = None
+        if self.use_replay:
+            self.state.buffer = ReservoirBuffer(capacity=config.get("buffer_size", 200))
+        self._depth_lambda = self._resolve_depth_lambda(self.target_depth, config)
+
+    def _resolve_depth_lambda(self, target: str, config: dict) -> dict[str, float]:
+        base = dict(self._DEPTH_LAMBDA)
+        if target == "all":
+            return base
+        if target == "uniform":
+            u = config.get("lambda_uniform", 1.0)
+            return {k: u for k in base}
+        if target == "head_only":
+            return {k: (base["head"] if k == "head" else 0.0) for k in base}
+        if target == "late_only":
+            return {k: (base["late"] if k == "late" else 0.0) for k in base}
+        raise ValueError(
+            f"Unknown target_depth {target!r}; expected all/uniform/head_only/late_only"
+        )
+
+    def _name_to_bucket(self) -> dict[str, str]:
+        """name → depth bucket, rebuilt each call since the head grows across tasks."""
+        id_to_name = {id(p): n for n, p in self.model.named_parameters()}
+        mapping: dict[str, str] = {}
+        for bucket, params in self.model.param_groups_by_depth.items():
+            for p in params:
+                n = id_to_name.get(id(p))
+                if n is not None:
+                    mapping[n] = bucket
+        return mapping
+
+    def _depth_penalty(self) -> torch.Tensor:
+        """Depth-scaled Fisher-weighted quadratic anchor to the previous task."""
+        if not self.state.custom["fisher"]:
+            return torch.zeros((), device=self.device)
+        buckets = self._name_to_bucket()
+        params = dict(self.model.named_parameters())
+        penalty = torch.zeros((), device=self.device)
+        for name, fisher_val in self.state.custom["fisher"].items():
+            if name not in params or name not in self.state.custom["theta_star"]:
+                continue
+            lam = self._depth_lambda.get(buckets.get(name, "input"), 0.0)
+            if lam == 0.0:
+                continue
+            p = params[name]
+            theta_star = self.state.custom["theta_star"][name]
+            # Classifier head grows across CIL boundaries — penalise only the rows
+            # present in all three tensors (the old classes that have a prior).
+            min_shape = tuple(
+                min(a, b, c) for a, b, c in zip(p.shape, theta_star.shape, fisher_val.shape)
+            )
+            idx = tuple(slice(0, s) for s in min_shape)
+            penalty = penalty + lam * (fisher_val[idx] * (p[idx] - theta_star[idx]) ** 2).sum()
+        return penalty
+
+    def _kd_loss(
+        self, student_logits: torch.Tensor, teacher_logits: torch.Tensor, mask: torch.Tensor
+    ) -> torch.Tensor:
+        """KL distillation on the previously-known logits (head/late protection)."""
+        T = self.temperature
+        n_old = teacher_logits.shape[-1]
+        student_old = student_logits[..., :n_old]
+        valid = mask.unsqueeze(-1).expand_as(student_old)
+        student_log = F.log_softmax(student_old / T, dim=-1)
+        teacher_prob = F.softmax(teacher_logits / T, dim=-1)
+        kd = F.kl_div(student_log, teacher_prob, reduction="none") * (T ** 2)
+        return (kd * valid).sum() / valid.sum().clamp(min=1)
+
+    def train_task(self, task: TaskInfo, train_loader, val_loader=None) -> TrainMetrics:
+        from tqdm import tqdm
+        self.model.train()
+        teacher = self.state.custom.get("teacher")
+        if teacher is not None:
+            teacher.to(self.device)
+            teacher.eval()
+        optimizer = torch.optim.AdamW(
+            self.trainable_parameters(),
+            lr=self.config.get("lr", 5e-5),
+            weight_decay=self.config.get("weight_decay", 0.01),
+        )
+        epochs = self.config.get("epochs", 10)
+        max_grad_norm = self.config.get("max_grad_norm", 1.0)
+        stopper = self.make_early_stopper(val_loader)
+
+        total_loss, n_steps = 0.0, 0
+        for epoch in range(epochs):
+            pbar = tqdm(train_loader, desc=f"DocCL T{task.task_id} ep{epoch+1}/{epochs}", leave=False)
+            for batch in pbar:
+                batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
+                optimizer.zero_grad()
+
+                outputs = self.model(**batch)
+                ce_loss = outputs.loss
+                reg_loss = (self.lambda_ / 2) * self._depth_penalty()
+
+                kd_loss = torch.zeros((), device=self.device)
+                if teacher is not None:
+                    with torch.no_grad():
+                        t_out = teacher(**{k: v for k, v in batch.items() if k != "labels"})
+                    mask = batch["labels"] != -100
+                    kd_loss = self.kd_alpha * self._kd_loss(outputs.logits, t_out.logits, mask)
+
+                replay_loss = torch.zeros((), device=self.device)
+                if self.use_replay:
+                    replay = self.state.buffer.sample(self.replay_batch_size)
+                    if replay is not None:
+                        replay = {k: v.to(self.device) for k, v in replay.items()}
+                        replay.pop("_logits", None)
+                        replay_loss = self.model(**replay).loss
+
+                loss = ce_loss + reg_loss + kd_loss + replay_loss
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.trainable_parameters(), max_grad_norm)
+                optimizer.step()
+
+                if self.use_replay:
+                    self.state.buffer.add_batch({k: v for k, v in batch.items() if torch.is_tensor(v)})
+
+                total_loss += float(loss.item())
+                n_steps += 1
+                pbar.set_postfix({
+                    "ce": f"{ce_loss.item():.3f}",
+                    "reg": f"{float(reg_loss):.3f}",
+                    "kd": f"{float(kd_loss):.3f}",
+                })
+            if self._early_stop_after_epoch(stopper, val_loader, task, epoch):
+                break
+
+        stopper.restore_best(self.model)
+        return TrainMetrics(task_id=task.task_id, loss=total_loss / max(n_steps, 1), n_steps=n_steps)
+
+    def after_task(self, task: TaskInfo, train_loader) -> None:
+        """Snapshot θ*, accumulate Fisher, and snapshot the teacher."""
+        self.state.custom["theta_star"] = {
+            name: p.detach().clone()
+            for name, p in self.model.named_parameters()
+            if p.requires_grad
+        }
+        new_fisher = empirical_fisher_diagonal(
+            self.model, train_loader, n_samples=self.fisher_n_samples, device=self.device
+        )
+        gamma = self.config.get("ewc_gamma", 1.0)
+        for name, f in new_fisher.items():
+            old = self.state.custom["fisher"].get(name)
+            if old is None or old.shape != f.shape:
+                if old is not None:  # pad the (smaller, pre-expansion) old Fisher
+                    padded = torch.zeros_like(f)
+                    idx = tuple(slice(0, s) for s in old.shape)
+                    padded[idx] = old
+                    old = padded
+                self.state.custom["fisher"][name] = f if old is None else gamma * old + f
+            else:
+                self.state.custom["fisher"][name] = gamma * old + f
+
+        teacher = copy.deepcopy(self.model)
+        for p in teacher.parameters():
+            p.requires_grad = False
+        teacher.eval()
+        if hasattr(teacher.model, "gradient_checkpointing_disable"):
+            teacher.model.gradient_checkpointing_disable()
+        self.state.custom["teacher"] = teacher

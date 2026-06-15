@@ -1,32 +1,28 @@
 #!/usr/bin/env python3
-"""GATE A: map the pilot's dominant-component verdict to the proposed method.
+"""GATE A: map the pilot diagnosis to the proposed-method decision.
 
-Reads results/pilot/findings_summary.md, extracts the per-component (C4) verdict
-and dominant Fisher group, and prints one of:
+Reads results/pilot/findings_summary.md and prints one of:
 
-    A   -> Candidate A (doccl_a, H-LoRA)         [fusion-dominant]
-    B   -> Candidate B (doccl_b, Layout-EWC)     [layout-position drift]
-    C   -> Candidate C (doccl_c, Routed Prompts) [scenario-dependent per-modality]
-    FALLBACK                                      [fail to reject H0 / no data]
+    DOCCL       -> proceed with the depth/head-targeted DocCL method
+    FALLBACK    -> characterization-only paper (no method)
 
-Decision rule (RUNBOOK / CLAUDE.md):
-  - fusion-dominant forgetting          -> A
-  - 2D layout-position drift dominates  -> B
-  - scenario-dependent per-modality     -> C
-  - no clear pattern (fail to reject H0)-> characterization-only fallback
+Revised decision rule (review M4 — only *measurable* branches). The earlier
+3-candidate tree (fusion-dominant -> A, layout-drift -> B, per-modality -> C) is
+removed because a single-stream LayoutLMv3 cannot produce a separable fusion or
+visual-attention signal (review C2). What the corrected instrument CAN show is
+*where along depth* forgetting concentrates:
 
-Dominant Fisher group names come from doccl/eval/fisher.py param_groups:
-  text_word_embed, layout_2d_pos_embed, image_patch_embed, text_attn, ffn,
-  classifier, other.
+  - forgetting concentrated in the classifier head / late encoder layers
+        -> DOCCL (depth/head-targeted consolidation)
+  - forgetting uniform across depth, or no concentration (fail to reject H0)
+        -> FALLBACK (characterization-only)
 
-Mapping group -> candidate:
-  layout_2d_pos_embed         -> B   (layout-position drift)
-  ffn / text_attn / other     -> A   (fusion / cross-modal mixing in the trunk)
-  image_patch_embed           -> C   (visual modality dominates -> routed prompts)
-  text_word_embed             -> C   (single-modality dominance -> routed prompts)
-  classifier                  -> A   (head-level; treat as fusion/trunk default)
+Evidence used: the per-component verdict + dominant group (Fisher importance) and,
+when present, the displacement-by-depth signal — both written by
+``doccl.pilot.analyze``. Output-facing dominant groups are ``classifier`` (and the
+``late`` / ``head`` depth buckets).
 
-Exit code 0 always; the decision is on stdout (last line = the token).
+Exit code 0 always; the decision token is the last stdout line.
 """
 from __future__ import annotations
 
@@ -34,15 +30,8 @@ import re
 import sys
 from pathlib import Path
 
-GROUP_TO_CANDIDATE = {
-    "layout_2d_pos_embed": "B",
-    "ffn": "A",
-    "text_attn": "A",
-    "other": "A",
-    "classifier": "A",
-    "image_patch_embed": "C",
-    "text_word_embed": "C",
-}
+# Dominant signals that indicate an output-facing (head/late) forgetting locus.
+HEAD_LATE_SIGNALS = {"classifier", "late", "head"}
 
 
 def decide(summary_path: Path) -> tuple[str, str]:
@@ -50,28 +39,25 @@ def decide(summary_path: Path) -> tuple[str, str]:
         return "FALLBACK", f"findings_summary.md not found at {summary_path}"
 
     text = summary_path.read_text()
-
-    # Per-component verdict line: "Verdict: **reject H0**." or "fail to reject H0"
     comp_section = text.split("### Per-component", 1)
     if len(comp_section) < 2:
         return "FALLBACK", "no per-component section in summary"
     comp = comp_section[1]
 
-    reject = "reject H0" in comp and "fail to reject H0" not in comp.split("Verdict")[1] \
-        if "Verdict" in comp else False
+    rejected = "Verdict" in comp and "reject H0" in comp.split("Verdict")[1] \
+        and "fail to reject H0" not in comp.split("Verdict")[1]
 
-    m = re.search(r"Dominant component:\s*\*\*([a-z0-9_]+)\*\*", comp)
+    m = re.search(r"[Dd]ominant(?: component)?:\s*\*\*([a-z0-9_]+)\*\*", comp)
     dominant = m.group(1) if m else None
 
-    if not reject or dominant is None:
-        return "FALLBACK", (
-            f"fail to reject H0 (no clear dominant component); dominant={dominant!r}"
-        )
-
-    candidate = GROUP_TO_CANDIDATE.get(dominant)
-    if candidate is None:
-        return "FALLBACK", f"unmapped dominant group {dominant!r}"
-    return candidate, f"dominant={dominant} -> Candidate {candidate}"
+    if rejected and dominant in HEAD_LATE_SIGNALS:
+        return "DOCCL", f"head/late-dominant forgetting (dominant={dominant}) -> DocCL"
+    if not rejected:
+        return "FALLBACK", f"no concentration (fail to reject H0); dominant={dominant!r}"
+    return "FALLBACK", (
+        f"dominant={dominant!r} is not output-facing; depth/head targeting "
+        "not indicated -> characterization-only"
+    )
 
 
 def main() -> None:

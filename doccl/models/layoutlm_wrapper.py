@@ -16,6 +16,7 @@ import torch
 import torch.nn as nn
 from transformers import LayoutLMv3ForTokenClassification, LayoutLMv3Processor
 
+from doccl.models import param_grouping
 from doccl.types import ModalityMask
 
 logger = logging.getLogger(__name__)
@@ -173,7 +174,8 @@ class LayoutLMv3Wrapper(nn.Module):
         modality_mask=FULL          → standard LayoutLMv3 (text + image + layout)
         modality_mask=TEXT_LAYOUT   → image masked (C3 in pilot)
         modality_mask=IMAGE_LAYOUT  → text masked (C2 in pilot)
-        modality_mask=TEXT_ONLY     → image AND layout masked (degenerate, sanity)
+        modality_mask=TEXT_ONLY     → image AND layout masked; TEXT KEPT
+                                      (C1: a real text-only LayoutLMv3)
         """
         masked_input_ids, masked_pixel_values, masked_bbox = self._apply_mask(
             input_ids, pixel_values, bbox, modality_mask
@@ -194,12 +196,20 @@ class LayoutLMv3Wrapper(nn.Module):
         bbox: torch.Tensor,
         mask: ModalityMask,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Zero out specific modalities for pilot conditions.
+        """Zero out the *inactive* input streams for a pilot condition.
 
-        Implementation note: we replace text with [PAD] tokens and zero-out
-        pixel_values/bbox rather than modifying the model. This preserves
+        We replace inactive text with [PAD] tokens and zero-out the inactive
+        ``pixel_values``/``bbox`` rather than modifying the model, preserving
         architecture identity (same layers, same shapes) — critical for the
         pilot's apples-to-apples claim.
+
+        Stream activity per condition (✓ = kept, ✗ = zeroed):
+
+            mask          text  image  layout
+            FULL           ✓     ✓      ✓
+            TEXT_LAYOUT    ✓     ✗      ✓   (C3)
+            IMAGE_LAYOUT   ✗     ✓      ✓   (C2)
+            TEXT_ONLY      ✓     ✗      ✗   (C1 — text is KEPT)
         """
         if mask == ModalityMask.FULL:
             return input_ids, pixel_values, bbox
@@ -208,17 +218,18 @@ class LayoutLMv3Wrapper(nn.Module):
         new_pixel_values = pixel_values
         new_bbox = bbox
 
-        if mask in (ModalityMask.IMAGE_LAYOUT, ModalityMask.TEXT_ONLY):
-            # Mask text: replace with PAD (id=1 in roberta tokenizer used by LayoutLMv3)
+        # Mask text only when the condition removes the text stream (C2). C1
+        # (TEXT_ONLY) and C3 (TEXT_LAYOUT) keep real ``input_ids``.
+        if mask == ModalityMask.IMAGE_LAYOUT:
             pad_id = self.processor.tokenizer.pad_token_id
             new_input_ids = torch.full_like(input_ids, pad_id)
 
+        # Zero the image when the condition removes the visual stream (C1, C3).
         if mask in (ModalityMask.TEXT_LAYOUT, ModalityMask.TEXT_ONLY):
-            # Mask image: zero pixel values
             new_pixel_values = torch.zeros_like(pixel_values)
 
+        # Zero the layout only for the text-only condition (C1).
         if mask == ModalityMask.TEXT_ONLY:
-            # Also mask layout
             new_bbox = torch.zeros_like(bbox)
 
         return new_input_ids, new_pixel_values, new_bbox
@@ -284,48 +295,37 @@ class LayoutLMv3Wrapper(nn.Module):
         logits = self.model.classifier(self.model.dropout(text_out))
         return logits
 
+    # ─── CKA probe layers (depth points for representational drift) ────────────
+    @property
+    def cka_layers(self) -> list[str]:
+        """Module names probed for per-layer CKA, spanning input→depth→head.
+
+        Shared depth points (embeddings, early/mid/late encoder, classifier) line
+        up with the BERT baseline's so the LayoutLMv3-vs-unimodal depth-gradient
+        contrast (review M1) is apples-to-apples; ``patch_embed`` is
+        LayoutLMv3-only.
+        """
+        last = self.num_layers - 1
+        mid = self.num_layers // 2
+        return [
+            "model.layoutlmv3.embeddings",
+            "model.layoutlmv3.patch_embed",
+            f"model.layoutlmv3.encoder.layer.0",
+            f"model.layoutlmv3.encoder.layer.{mid}",
+            f"model.layoutlmv3.encoder.layer.{last}",
+            "model.classifier",
+        ]
+
     # ─── Parameter groups for Fisher analysis (pilot study) ────────────────────
     @property
     def param_groups(self) -> dict[str, list[nn.Parameter]]:
-        """Named parameter groups used for per-component Fisher analysis.
+        """Named, fully-populated component groups (see ``param_grouping``)."""
+        return param_grouping.param_groups(self.model)
 
-        Groups align with the architectural components hypothesized to forget
-        differently (text-attention, visual-attention, fusion, classifier).
-        """
-        groups: dict[str, list[nn.Parameter]] = {
-            "text_word_embed": [],
-            "layout_2d_pos_embed": [],
-            "image_patch_embed": [],
-            "text_attn": [],
-            "visual_attn": [],
-            "fusion": [],  # cross-modal attn projections
-            "ffn": [],  # feedforward layers
-            "classifier": [],
-        }
-        for name, p in self.model.named_parameters():
-            if not p.requires_grad:
-                continue
-            if "word_embeddings" in name:
-                groups["text_word_embed"].append(p)
-            elif "x_position_embeddings" in name or "y_position_embeddings" in name or "h_position_embeddings" in name or "w_position_embeddings" in name:
-                groups["layout_2d_pos_embed"].append(p)
-            elif "patch_embed" in name:
-                groups["image_patch_embed"].append(p)
-            elif "classifier" in name:
-                groups["classifier"].append(p)
-            elif "attention" in name and ("query" in name or "key" in name or "value" in name):
-                # All attention Q/K/V — distinguish text vs visual layers if possible
-                # In LayoutLMv3 single-stream, text and image attend together — mark as "text_attn"
-                # for now. Refine after inspecting actual module names.
-                groups["text_attn"].append(p)
-            elif "intermediate" in name or "output.dense" in name:
-                groups["ffn"].append(p)
-            else:
-                # Catch-all for anything not matched
-                groups.setdefault("other", []).append(p)
-
-        # Drop empty groups
-        return {k: v for k, v in groups.items() if v}
+    @property
+    def param_groups_by_depth(self) -> dict[str, list[nn.Parameter]]:
+        """Encoder parameters bucketed by depth (input/early/mid/late/head)."""
+        return param_grouping.param_groups_by_depth(self.model, self.num_layers)
 
     # ─── Freeze controls ───────────────────────────────────────────────────────
     def freeze_backbone(self) -> None:

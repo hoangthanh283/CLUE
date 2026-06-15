@@ -1,29 +1,40 @@
 #!/usr/bin/env bash
-# Run the full pilot study: 4 conditions × 3 seeds = 12 sequential runs.
+# Run the corrected pilot study: 5 conditions × 5 seeds = 25 sequential runs
+# (plus an optional reverse-order set for the stability + power analysis).
 # Each run trains on FUNSD → CORD → SROIE (3 tasks, naive sequential) and saves a
 # JSON to results/pilot/ (the pilot runner does NOT use W&B — no offline concern).
 #
-# Estimated total: ~18 GPU-hours on RTX 4090.
+# Conditions (review C1/C2/M1):
+#   cb_bert      external BERT-base unimodal text baseline (the unimodal contrast)
+#   c1_text      real text-only LayoutLMv3 (text kept; image + layout zeroed)
+#   c2_no_text   image + layout
+#   c3_no_image  text + layout
+#   c4_full      full tri-modal
+#
+# Seeds: 5 per condition so the cross-condition Mann–Whitney floor
+#   2/C(n1+n2,n2) drops below the Bonferroni threshold (review C3): 5 vs 5 →
+#   2/C(10,5)=0.0079 < 0.0167. Run on the RTX 4090 (NOT the RTX 2060 — review m1).
+#
+# Estimated total: ~30–35 GPU-hours on RTX 4090 (BERT runs are cheap).
 #
 # Usage:
-#   bash scripts/run_pilot.sh                          # all 4 conditions, 3 seeds
-#   CONDITIONS="c4_full" bash scripts/run_pilot.sh     # subset
+#   bash scripts/run_pilot.sh                          # 5 conditions, 5 seeds
+#   CONDITIONS="c4_full cb_bert" bash scripts/run_pilot.sh   # subset
 #   SEEDS="42" bash scripts/run_pilot.sh               # single seed for debugging
-#   ORDER="2 1 0" bash scripts/run_pilot.sh            # alternate task order (§6.1.3
-#                                                      # stability check; pooled by analyze)
+#   ORDER="2 1 0" bash scripts/run_pilot.sh            # reverse order (stability + power)
 
 set -euo pipefail
 
-CONDITIONS="${CONDITIONS:-c1_bert c2_no_text c3_no_image c4_full}"
-SEEDS="${SEEDS:-42 123 7}"
+CONDITIONS="${CONDITIONS:-cb_bert c1_text c2_no_text c3_no_image c4_full}"
+SEEDS="${SEEDS:-42 123 7 1 2}"
 EPOCHS="${EPOCHS:-10}"
 BATCH_SIZE="${BATCH_SIZE:-8}"
 OUTPUT_DIR="${OUTPUT_DIR:-results/pilot}"
 ORDER="${ORDER:-}"   # empty = default FUNSD→CORD→SROIE; e.g. "2 1 0" = reversed
-# Limited-VRAM: GRAD_CKPT=1, lower BATCH_SIZE and probe sizes.
+# The 4090 fits full batches; GRAD_CKPT=1 only if you must subset VRAM.
 GRAD_CKPT="${GRAD_CKPT:-}"
-CKA_N="${CKA_N:-500}"
-FISHER_N="${FISHER_N:-200}"
+CKA_N="${CKA_N:-2000}"     # valid TOKENS for per-token CKA (review M2: N >= 500)
+FISHER_N="${FISHER_N:-500}"
 
 MEM_ARGS="--cka_n_samples $CKA_N --fisher_n_samples $FISHER_N"
 [ -n "$GRAD_CKPT" ] && MEM_ARGS="$MEM_ARGS --gradient_checkpointing"

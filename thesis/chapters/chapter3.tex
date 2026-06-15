@@ -51,28 +51,43 @@ and---uniquely here---how that degradation is distributed across the
 \subsection{Defining a Component}
 \label{sec:method-components}
 
-We partition the encoder parameters into interpretable groups corresponding to the
-tri-modal structure of the backbone:
+We partition the encoder parameters into groups that are \emph{genuinely
+separable} in the backbone. A caveat governs this partition and is central to the
+honesty of the analysis: LayoutLMv3 is a \emph{single-stream} encoder. Only the
+\emph{input} embeddings are modality-specific; from the first encoder layer
+onward, text and visual patch tokens are concatenated and share the \emph{same}
+query/key/value projections. There is therefore no identifiable
+``text-attention'' versus ``visual-attention'' versus ``cross-modal fusion''
+\emph{parameter} group---those projections are one shared set. We do not pretend
+otherwise. We group instead by what the architecture actually separates:
 
 \begin{itemize}
-  \item \textbf{Text stream} --- word embeddings and the query/key/value
-        projections of the text self-attention.
-  \item \textbf{Visual stream} --- image-patch projection and visual
-        self-attention.
+  \item \textbf{Text word embeddings} --- the token embedding table
+        (\texttt{text\_word\_embed}).
   \item \textbf{Layout embeddings} --- the 2D position embeddings encoding
-        bounding-box geometry.
-  \item \textbf{Cross-modal fusion} --- the projections that combine modalities
-        across the shared attention.
-  \item \textbf{Task head} --- the token-classification layer (tracked separately
-        as it is expanded for new labels).
+        bounding-box geometry (\texttt{layout\_2d\_pos\_embed}).
+  \item \textbf{Visual patch embedding} --- the image-patch projection
+        (\texttt{image\_patch\_embed}).
+  \item \textbf{Shared self-attention} --- the (single-stream) query/key/value
+        projections (\texttt{attn\_qkv}) and the attention output projection
+        (\texttt{attn\_out}), reported separately rather than folded into the
+        feed-forward block.
+  \item \textbf{Feed-forward and normalisation} --- the position-wise
+        feed-forward blocks (\texttt{ffn}) and layer norms (\texttt{layernorm}).
+  \item \textbf{Task head} --- the token-classification layer
+        (\texttt{classifier}), tracked separately as it is expanded for new
+        labels.
 \end{itemize}
 
-Concretely the parameters are aggregated into eight groups for Fisher analysis
-(\texttt{text\_word\_embed}, \texttt{layout\_2d\_pos\_embed},
-\texttt{image\_patch\_embed}, \texttt{text\_attn}, \texttt{visual\_attn},
-\texttt{fusion}, \texttt{ffn}, \texttt{classifier}) and six representative layers
-for CKA tracking (low/mid/high text layers, embeddings, patch embedding, and the
-classifier).
+These groups are exhaustive and every one is populated; a residual catch-all is
+verified empty for the stock backbone. The modalities' \emph{behavioural}
+contributions are recovered separately, by the input-masking conditions of
+\S\ref{sec:method-diag-ablation}, and forgetting is additionally localised by
+\emph{depth} (input / early / mid / late encoder layers / head), the axis along
+which a single-stream encoder is most naturally heterogeneous. For CKA tracking we
+probe six depth-matched points (embeddings, patch embedding, early/mid/late
+encoder layers, and the classifier) so the gradient can be compared across
+backbones, including the unimodal BERT baseline.
 
 \section{A Per-Component Forgetting Diagnostic}
 \label{sec:method-diagnostic}
@@ -89,50 +104,58 @@ attribute forgetting to components.
 \subsection{Controlled Modality Ablation}
 \label{sec:method-diag-ablation}
 
-A naive comparison---``BERT versus LayoutLMv3''---confounds the modality
-contribution with architectural differences (layer counts, attention structure,
-positional encodings). Instead we hold the architecture fixed and mask input
-modalities of a \emph{single} LayoutLMv3, defining four apples-to-apples
-conditions, summarised in Table~\ref{tab:diagnostic-conditions}. The same model is
-run with text only (C1), image+layout (C2), text+layout (C3), and the full
-tri-modal input (C4). Because only the inputs differ, any difference in forgetting
-is attributable to the modalities in play rather than to the network. We note one
-caveat: the text-only condition still carries zeroed layout and visual pathways,
-so it is the closest same-architecture text baseline rather than a true unimodal
-encoder; a dedicated text-only backbone is a possible follow-up if the results
-warrant it.
+We use two complementary controls. First, to isolate the modalities
+\emph{behaviourally} without confounding architecture, we hold the architecture
+fixed and mask the input streams of a \emph{single} LayoutLMv3, defining four
+apples-to-apples conditions C1--C4 (Table~\ref{tab:diagnostic-conditions}): text
+only (C1), image+layout (C2), text+layout (C3), and the full tri-modal input (C4).
+Because only the inputs differ, any difference in forgetting is attributable to the
+modalities in play rather than to the network. Critically, the text-only condition
+(C1) keeps the real text tokens and zeroes \emph{only} the image and layout
+streams---it is a genuine text-only LayoutLMv3, not a null input.
+
+Second, because a same-architecture mask cannot tell us whether a multimodal
+encoder forgets \emph{differently} from a unimodal one, we add an \emph{external}
+unimodal baseline Cb: a true BERT-base text encoder, tokenised with its own
+WordPiece vocabulary on the same documents and run through the same instrument
+(per-token CKA, per-group importance, displacement, forgetting metrics). The
+within-architecture conditions answer ``which stream/depth forgets''; the Cb
+contrast answers ``is this multimodal-specific?''.
 
 \begin{table}[!htbp]
   \centering
-  \caption[The four diagnostic conditions]{The four apples-to-apples diagnostic
-  conditions. The same LayoutLMv3 architecture is used throughout; only the active
-  input modalities differ, isolating each modality's contribution to forgetting.}
+  \caption[The diagnostic conditions]{The diagnostic conditions. C1--C4 are the
+  \emph{same} LayoutLMv3 architecture under different input-stream masks (only the
+  active inputs differ); Cb is an external true-unimodal baseline. C1 keeps real
+  text (image and layout zeroed)---it is not a null-input condition.}
   \label{tab:diagnostic-conditions}
   \begin{tabular}{cll}
     \toprule
-    \textbf{ID} & \textbf{Active modalities} & \textbf{Purpose} \\
+    \textbf{ID} & \textbf{Model / active inputs} & \textbf{Purpose} \\
     \midrule
-    C1 & text only          & closest same-architecture text baseline \\
-    C2 & image + layout     & isolate visual+layout-only forgetting \\
-    C3 & text + layout      & isolate text+layout-only forgetting \\
-    C4 & text + image + layout (full) & main subject of analysis \\
+    Cb & BERT-base, text only          & external true-unimodal contrast \\
+    C1 & LayoutLMv3, text only         & real text-only (image + layout zeroed) \\
+    C2 & LayoutLMv3, image + layout    & isolate visual+layout-only forgetting \\
+    C3 & LayoutLMv3, text + layout     & isolate text+layout-only forgetting \\
+    C4 & LayoutLMv3, full tri-modal    & main subject of analysis \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Figure~\ref{fig:diagnostic-conditions} depicts the four conditions as the same
+Figure~\ref{fig:diagnostic-conditions} depicts the LayoutLMv3 conditions as the same
 network with different input pathways switched on or off.
 
 \begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.95\linewidth]{diagnostic_conditions.pdf}
-  \caption[The four diagnostic conditions as active and zeroed pathways]{The four
-  diagnostic conditions C1--C4 realised on a single fixed architecture. Each panel
-  shows the same LayoutLMv3 with a different subset of input pathways active (text,
-  image, layout) and the remainder zeroed at the input: text only (C1), image and
-  layout (C2), text and layout (C3), and the full tri-modal input (C4). Because only
-  the inputs differ, any difference in forgetting is attributable to the modalities
-  in play rather than to the network.}
+  \caption[The diagnostic conditions as active and zeroed pathways]{The LayoutLMv3
+  conditions C1--C4 realised on a single fixed architecture. Each panel shows the
+  same LayoutLMv3 with a different subset of input pathways active (text, image,
+  layout) and the remainder zeroed at the input: real text only (C1), image and
+  layout (C2), text and layout (C3), and the full tri-modal input (C4). The external
+  unimodal baseline Cb (BERT-base) is a separate model, not a mask. Because only the
+  inputs differ across C1--C4, any difference in forgetting is attributable to the
+  modalities in play rather than to the network.}
   \label{fig:diagnostic-conditions}
 \end{figure}
 
@@ -142,25 +165,47 @@ network with different input pathways switched on or off.
 We measure forgetting with three complementary instruments, following the
 multiple-instrument principle motivated in \S\ref{sec:bg-superficial-essential}.
 
-\paragraph{Representational drift (linear CKA).} For each tracked layer we compute
-the linear CKA~\citep{kornblith2019similarity} between activations of the model
-after task $t-1$ and after task $t$ on a fixed probe set. Given two centred
-activation matrices $X \in \mathbb{R}^{n\times p}$ and $Y \in \mathbb{R}^{n\times
-q}$,
+\paragraph{Representational drift (per-token linear CKA).} For each tracked layer
+we compute the linear CKA~\citep{kornblith2019similarity} between activations of
+the model after task $t-1$ and after task $t$ on a fixed probe set. Given two
+centred activation matrices $X \in \mathbb{R}^{n\times p}$ and $Y \in
+\mathbb{R}^{n\times q}$,
 \[
   \mathrm{CKA}(X,Y) = \frac{\lVert Y^\top X \rVert_F^2}
   {\lVert X^\top X \rVert_F \, \lVert Y^\top Y \rVert_F}.
 \]
-A large drop in CKA at a layer marks it as a forgetting hotspot.
+A drop of CKA below $1$ at a layer marks it as a drift hotspot. Two design choices
+matter for validity. First, token classification lives in the \emph{per-token}
+representation, so we compute CKA over \emph{individual valid tokens} (the
+classifier-relevant first-subword positions), not over a document-mean vector that
+would average $\sim$500 token vectors per page and could read ``no drift'' while
+the token geometry has reorganised. Second, the probe collects $n\ge 500$ distinct
+tokens (well above the hidden width $p=768$), so the estimate is not in the
+high-variance $n<p$ regime; activations are captured \emph{under the condition's
+modality mask} so each condition is probed on the inputs it was trained on.
 
-\paragraph{Per-group Fisher information.} For each parameter group $g$ we compute
-the empirical Fisher (squared-gradient) importance on a task's data,
+\paragraph{Where forgetting lives: importance vs.\ displacement.} We separate two
+distinct quantities that are easily conflated. The empirical Fisher
+\emph{importance} of a group $g$ on a task's own data,
 \[
   F_g = \frac{1}{|\mathcal{D}|}\sum_{(x,y)\in\mathcal{D}}
         \sum_{\phi\in g}\Big(\frac{\partial \log p_\theta(y\mid x)}{\partial \phi}\Big)^2 ,
 \]
-and track how $F_g$ shifts across tasks. Groups whose importance drops most are
-losing their task-relevant representations.
+measures how \emph{sensitive} the loss is to $g$ \emph{for that task}. It is
+\emph{not} a forgetting signal: the classifier head carries the largest such
+gradients for \emph{any} token classifier (BERT included) by the geometry of the
+cross-entropy output layer, regardless of whether those parameters were
+\emph{moved}. To localise \emph{forgetting} we use the old-task-Fisher-weighted
+\emph{displacement} between the checkpoint before and after a task,
+\[
+  D_g = \sum_{\phi\in g} F^{(t-1)}_\phi\,
+        \big(\theta^{(t)}_\phi - \theta^{(t-1)}_\phi\big)^2 ,
+\]
+which is large precisely where parameters that mattered for the \emph{previous}
+task ($F^{(t-1)}$) have been overwritten. We report $D_g$ per component group and
+per depth bucket (input/early/mid/late/head) as the primary forgetting localiser,
+with Fisher \emph{importance} reported alongside but never labelled forgetting.
+Fisher is computed under each condition's modality mask.
 
 \paragraph{Forgetting matrix.} We record the standard accuracy matrix
 $R[i,j]$, the entity-F1 on task $j$ after training task $i$, from which we derive
@@ -239,64 +284,78 @@ Figure~\ref{fig:diagnostic-pipeline} shows it as a data-flow diagram.
 \subsection{Hypotheses and Decision Rule}
 \label{sec:method-diag-hypotheses}
 
-We test a null hypothesis $H_0$ that forgetting is uniform across components
-against $H_1$ that it concentrates in specific ones. The test is built from the
-per-component drop values produced by Algorithm~\ref{alg:forgetting-decomposition}.
-For each parameter group $g$ we form a sample of drop values, one per
-(seed, task-boundary) pair, where a drop is either the representational drop
-$1 - \mathrm{CKA}$ at the layer(s) associated with $g$ or the per-group Fisher drop;
-the two instruments are tested separately. To avoid pseudo-replication, the values
-are aggregated \emph{per seed first}---the per-seed statistic is the mean drop over
-that seed's task boundaries---and only these seed-level summaries enter the
-across-seed test, so the unit of analysis is the seed, not the individual boundary.
-For each group $g$ we then compare its seed-level drops against the pooled
-seed-level drops of the remaining seven groups with a one-sided
-Mann--Whitney U test (alternative: group $g$ drops are stochastically larger). We
-reject $H_0$ for group $g$ when
-\[
-  p_g < \alpha = \frac{0.05}{8} \approx 0.0063 ,
-\]
-a Bonferroni correction over the eight parameter groups; $H_1$ (non-uniform
-forgetting) is supported when at least one group's drop is significantly larger
-under this threshold. Beyond the binary $H_0$/$H_1$, three sub-patterns are of
-particular interest because each implies a different remedy;
-Table~\ref{tab:subhypotheses} maps them to the candidate they trigger. If no group
-separates---i.e.\ $H_0$ cannot be rejected for any $g$---the thesis falls back to a
-characterisation-only contribution (\S\ref{sec:method-fallback}).
+We test a null hypothesis $H_0$ that forgetting is uniform across the network
+against $H_1$ that it concentrates along depth (in particular at the classifier
+head and late encoder layers). The test uses the per-group displacement $D_g$ and
+per-depth displacement of \S\ref{sec:method-diag-metrics}, aggregated \emph{per
+seed first} (the per-seed statistic is the mean over that seed's boundaries) so the
+unit of analysis is the seed. For the dominant (largest mean) bucket we compare its
+seed-level displacements against the pooled remaining buckets with a one-sided
+Mann--Whitney U test, rejecting $H_0$ for a bucket when $p_g < 0.05/(K-1)$ for $K$
+buckets.
+
+\paragraph{Statistical power (a hard constraint on the design).} A rank test on
+small samples has a \emph{minimum achievable} two-sided $p$-value of
+$2/\binom{n_1+n_2}{n_2}$ even under perfect separation. With three seeds per group
+this floor is $2/\binom{6}{3}=0.10$, far above any Bonferroni threshold: such a
+test \emph{cannot} reject $H_0$ regardless of the data, so a ``failure to reject''
+would be an artefact of sample size, not evidence. We therefore run \emph{at least
+five seeds} per condition (and pool the alternate task order), which lowers the
+floor for the cross-condition contrast to $2/\binom{10}{5}=0.0079$, below the
+corrected threshold. Every reported non-rejection is accompanied by its power
+floor, and any comparison whose floor exceeds $\alpha$ is labelled
+\emph{inconclusive by construction} rather than evidence for $H_0$.
+
+\paragraph{Location, not just magnitude.} Asking whether a multimodal encoder
+forgets \emph{differently} is a question about the \emph{distribution} of
+forgetting across components, which a scalar test on total backward-transfer
+magnitude cannot answer. We therefore add a distribution-targeting test: for each
+condition we form the per-depth displacement \emph{profile} (an $L_1$-normalised
+vector over buckets) and compare the profile of C4 against each unimodal reference
+(C1 and the external Cb) with a permutation test on the cosine distance between
+mean profiles. This directly tests ``do they forget in a different \emph{place}?''.
+
+The diagnostic outcome maps to the remedy through the measurable branches of
+Table~\ref{tab:subhypotheses} and Figure~\ref{fig:selection-tree}. We deliberately
+restrict the decision to signals the instrument can actually produce: because
+LayoutLMv3 is single-stream, ``fusion-dominant'' or ``visual-attention-dominant''
+branches are \emph{not realisable} and are excluded; the admissible outcomes are a
+head/late-layer concentration, a uniform-across-depth pattern, or no concentration.
 
 \begin{table}[!htbp]
   \centering
-  \caption[Diagnostic sub-hypotheses and the candidate each triggers]{Sub-hypotheses
-  considered in the diagnosis and the remedy each one selects. The pilot does not
-  pre-commit to any; the dominant pattern decides
+  \caption[Diagnostic outcomes and the remedy each selects]{Measurable diagnostic
+  outcomes and the remedy each selects. Only outcomes the single-stream instrument
+  can realise are admitted; the decision is a function of the pilot
   (\S\ref{sec:method-selection}).}
   \label{tab:subhypotheses}
   \begin{tabularx}{\textwidth}{l L l}
     \toprule
     \textbf{Pattern} & \textbf{Signature} & \textbf{Triggers} \\
     \midrule
-    $H_a$ fusion-heavy & Fusion group drops most in C4, not C1--C3 & Candidate~A (\S\ref{sec:method-cand-a}) \\
-    $H_b$ position-drift & 2D position embeddings drift fastest, broadly uniform else & Candidate~B (\S\ref{sec:method-cand-b}) \\
-    $H_c$ scenario-dependent & Pattern differs across task transitions & Candidate~C (\S\ref{sec:method-cand-c}) \\
-    $H_0$ no clear pattern & No group separates after correction & Characterisation-only (\S\ref{sec:method-fallback}) \\
+    $H_a$ head/late-dominant & Displacement concentrates at the head and late layers & DocCL: depth/head-targeted (\S\ref{sec:method-selection}) \\
+    $H_b$ uniform-across-depth & Displacement broadly even across depth buckets & Uniform consolidation \\
+    $H_0$ no concentration & No bucket separates after correction (with adequate power) & Characterisation-only (\S\ref{sec:method-fallback}) \\
     \bottomrule
   \end{tabularx}
 \end{table}
 
 The mapping from diagnostic outcome to remedy is made explicit in
-Figure~\ref{fig:selection-tree}: the decision is a function of the pilot, so no
-single candidate is committed to in advance, and the no-pattern branch leads to the
-characterisation-only fallback rather than to a method.
+Figure~\ref{fig:selection-tree}: the decision is a function of the pilot, so the
+mechanism is not committed to in advance, and the no-concentration branch leads to
+the characterisation-only fallback rather than to a method.
 
 \begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.85\linewidth]{method_selection_tree.pdf}
-  \caption[Decision tree mapping diagnostic outcomes to candidates]{The Week-4
-  decision rule as a tree. Each diagnostic outcome selects exactly one branch:
-  fusion-heavy ($H_a$) selects Candidate~A, position-drift ($H_b$) selects
-  Candidate~B, scenario- or modality-dependent ($H_c$) selects Candidate~C, and no
-  significant separation ($H_0$) selects the characterisation-only fallback. The
-  branch is determined by the diagnosis, not chosen in advance.}
+  \caption[Decision tree mapping diagnostic outcomes to the remedy]{The decision
+  rule as a tree over \emph{measurable} outcomes. A head/late-layer concentration
+  ($H_a$) selects the depth/head-targeted DocCL; a uniform-across-depth pattern
+  ($H_b$) selects uniform consolidation; no significant concentration (at adequate
+  power, $H_0$) selects the characterisation-only fallback. Unrealisable branches
+  (fusion- or visual-attention-dominant) are excluded because a single-stream
+  encoder cannot produce those signals. \emph{Figure to be regenerated from
+  \texttt{figures\_src/drawio/} to match these branches.}}
   \label{fig:selection-tree}
 \end{figure}
 
@@ -349,12 +408,21 @@ the diagnosis flags as fastest-drifting.
 \subsection{Candidate Designs}
 \label{sec:method-candidates}
 
-Because the method must be derived from the diagnosis, three candidate designs are
-specified in advance; one is selected once the diagnosis is known
-(\S\ref{sec:method-selection}). This pre-specification is the safety net for the
-measure-first approach. All three are privacy-friendly (memory-free), in keeping
-with the soft no-storage preference appropriate to documents that carry personally
-identifiable information.
+Because the method must be derived from the diagnosis, candidate designs were
+sketched in advance as a safety net for the measure-first approach. We retain the
+three original sketches below as design history, with an important correction. Two
+of them---Candidate~A (which assumes \emph{fusion} layers forget most) and
+Candidate~C (which assumes per-modality, visual-versus-text patterns)---presuppose
+signals that a \emph{single-stream} encoder cannot produce: as
+\S\ref{sec:method-components} explains, LayoutLMv3 has no separable fusion or
+visual-attention parameter group, so those branches are not realisable by the
+instrument. The corrected, adequately powered decision rule
+(\S\ref{sec:method-diag-hypotheses}) admits only the depth-localised outcomes, and
+the diagnosis selects the depth/head-targeted DocCL of
+\S\ref{sec:method-selected}---which is most closely related to Candidate~B
+(selective, group-weighted EWC), generalised from layout-position protection to
+depth/head protection. The sketches A and C are reserved as directions for the
+NeurIPS extension on a two-stream backbone where the streams physically exist.
 
 \subsubsection{Candidate A: Layout-Aware Prompts with Hierarchical LoRA (LAPP + H-LoRA)}
 \label{sec:method-cand-a}
@@ -482,17 +550,18 @@ in Figure~\ref{fig:candidate-bc}.
 \subsection{Testable Component Hypotheses}
 \label{sec:method-component-hypotheses}
 
-Independently of which candidate is selected, two component-level hypotheses are
-pre-registered and map one-to-one to ablations in
-Chapter~\ref{ch:results}:
+Two method-level hypotheses are pre-registered and map one-to-one to the
+component-targeting ablation in Chapter~\ref{ch:results}:
 
 \begin{itemize}
-  \item \textbf{H\textsubscript{LAPP}.} A layout signature $\phi(\text{boxes})$
-        injected into the prompt query improves entity-F1 by $\ge 3$ points on the
-        domain-incremental scenario over a CLS-only query (the L2P baseline).
-  \item \textbf{H\textsubscript{H-LoRA}.} Hierarchical (text\,+\,visual\,+\,fusion)
-        LoRA banks outperform a single-bank O-LoRA by $\ge 2$ points on the mixed
-        scenario at the same total parameter budget.
+  \item \textbf{H\textsubscript{target}.} Concentrating the stability budget on the
+        diagnosed locus (the classifier head and late encoder layers) outperforms
+        spreading the same budget uniformly across depth (the \emph{uniform}
+        ablation) by $\ge 2$ entity-F1 on $\ge 2/3$ scenarios.
+  \item \textbf{H\textsubscript{head}.} Head-only protection recovers most of the
+        gain of the full method; adding late-layer protection and head replay adds
+        a further measurable improvement (the \emph{head-only} vs.\ \emph{late-only}
+        vs.\ \emph{full} ablation).
 \end{itemize}
 
 A falsified hypothesis remains informative and is reported as such.
@@ -500,46 +569,63 @@ A falsified hypothesis remains informative and is reported as such.
 \subsection{Selection Criterion}
 \label{sec:method-selection}
 
-The selected method follows directly from the dominant pattern: fusion-dominant
-$\rightarrow$ Candidate~A; uniform-with-position-drift $\rightarrow$ Candidate~B;
-scenario- or modality-dependent $\rightarrow$ Candidate~C; no clear pattern
-$\rightarrow$ fallback (\S\ref{sec:method-fallback}). Beyond alignment with the
-diagnosis, the selected candidate must be implementable within the Week 10--11
-budget, defensible under reviewer scrutiny, and compatible with the existing
-LAPP/H-LoRA infrastructure where applicable.
+The remedy follows directly from the measurable diagnostic outcome
+(Table~\ref{tab:subhypotheses}): a head/late-layer concentration selects the
+depth/head-targeted DocCL of \S\ref{sec:method-selected}; a uniform-across-depth
+pattern selects uniform consolidation; no concentration (at adequate power) selects
+the characterisation-only fallback (\S\ref{sec:method-fallback}). Beyond alignment
+with the diagnosis, the method must be implementable within the compute budget,
+defensible under reviewer scrutiny, and reuse the existing EWC/replay/distillation
+infrastructure.
 
-\subsection{The Selected Method}
+\subsection{The Selected Method: DocCL}
 \label{sec:method-selected}
 
-% =========================== TODO (Week 4) ===========================
-% LOCKED AT THE PILOT DECISION POINT. After the diagnosis of
-% \S\ref{sec:method-diagnostic} is analysed, fill in:
-%   - the selected candidate and the evidence that selected it;
-%   - the full method specification and design choices;
-%   - Algorithm 2 (mechanism-targeted continual learning);
-%   - the complexity/overhead analysis.
-% Do NOT pre-commit the method before the pilot completes.
-% =====================================================================
-\textbf{[To be completed at the Week-4 method-decision point.]} The specific
-mechanism, its algorithm block (Algorithm~2), and its complexity analysis are
-finalised once the diagnosis identifies the dominant-forgetting component, per the
-selection criterion above.
+The diagnosis localises forgetting in the \emph{classifier head and late encoder
+layers}, with the input encoders stable (Chapter~\ref{ch:results}). DocCL therefore
+spends its stability budget there, combining three mutually-reinforcing, each
+individually-ablatable mechanisms:
+
+\begin{enumerate}
+  \item \textbf{Depth-scaled elastic-weight consolidation.} A Fisher-weighted
+        quadratic anchor to the previous task whose per-bucket weight scales with
+        where forgetting lives---high on the head and late layers, near zero on the
+        stable input encoders---using the depth grouping of
+        \S\ref{sec:method-components}.
+  \item \textbf{Output distillation.} A temperature-softened KL term matching the
+        previous task's output distribution from a frozen teacher, which protects
+        the output-facing (head and late) representations functionally.
+  \item \textbf{Head re-exposure replay.} A small reservoir buffer---replay being
+        the strongest baseline in the diagnosis---keeps the head grounded in earlier
+        tasks.
+\end{enumerate}
+
+The total objective is $\mathcal{L} = \mathcal{L}_{\mathrm{CE}}
++ \tfrac{\lambda}{2}\sum_g w_g\, \mathcal{L}^{\mathrm{EWC}}_g
++ \alpha\,\mathcal{L}_{\mathrm{KD}} + \mathcal{L}_{\mathrm{replay}}$,
+with depth weights $w_g$ concentrated on head/late. A \texttt{target\_depth}
+control (\emph{full}, \emph{head-only}, \emph{late-only}, \emph{uniform}) drives the
+component-targeting ablation that tests H\textsubscript{target} and
+H\textsubscript{head}. The mechanism reuses the EWC Fisher machinery, the LwF-style
+teacher, and the shared reservoir buffer, so it adds no fragile new infrastructure.
 
 \subsection{Fallback: Characterisation-Only}
 \label{sec:method-fallback}
 
-If no component dominates ($H_0$ not rejected), the diagnostic of
-\S\ref{sec:method-diagnostic} and the FCS-CL benchmark become the headline
-contributions, and the thesis is framed as a measurement-and-benchmark study. The
-value of the diagnosis is independent of the remedy's success.
+If forgetting does not concentrate ($H_0$ not rejected \emph{at adequate power}),
+the diagnostic of \S\ref{sec:method-diagnostic} and the FCS-CL benchmark become the
+headline contributions, and the thesis is framed as a measurement-and-benchmark
+study. The value of the diagnosis is independent of the remedy's success.
 
 \section{Summary}
 \label{sec:method-summary}
 
-We have defined components of a tri-modal document encoder, a controlled
-modality-ablation protocol, and three complementary metrics (CKA, per-group
-Fisher, forgetting matrix) that together attribute forgetting to components. The
-remedy, DocCL, concentrates its mechanism on the dominant-forgetting component;
-its concrete form is selected from three pre-specified candidates once the
-diagnosis is known. The next chapter describes how this methodology is realised in
-software.
+We have defined the genuinely separable components of a single-stream tri-modal
+document encoder, a controlled modality-ablation protocol with an external unimodal
+contrast, and complementary metrics---per-token CKA, per-group importance, an
+old-task-Fisher-weighted displacement (the forgetting localiser), and the
+forgetting matrix---that together localise forgetting by depth, stream, and head.
+The remedy, DocCL, concentrates its stability budget on the diagnosed head/late
+locus; its form follows from the diagnosis under a pre-registered, adequately
+powered decision rule. The next chapter describes how this methodology is realised
+in software.

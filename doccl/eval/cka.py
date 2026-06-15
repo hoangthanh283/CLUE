@@ -75,29 +75,77 @@ def cka_per_layer(
     return results
 
 
+def _select_vectors(
+    feat: Tensor,
+    attention_mask: Tensor | None,
+    labels: Tensor | None,
+    token_level: bool,
+) -> Tensor:
+    """Reduce a captured ``(B, L, D)`` activation to a ``(M, D)`` matrix.
+
+    Token-level (default): return one vector per **valid token** — the positions
+    the token classifier actually uses (``attention_mask==1`` and, when labels
+    are available, ``labels != -100``, i.e. real first-subword tokens). This
+    preserves the per-token geometry that mean-pooling destroys (review M2).
+    Sequences longer than the text length (encoder outputs that append visual
+    patch tokens) are sliced to the text span before masking; activations with
+    no text alignment (e.g. the patch embedding) keep all positions.
+
+    Document-level (``token_level=False``): mean-pool over the sequence, the old
+    behaviour, kept as a secondary robustness measure.
+    """
+    if feat.dim() != 3:
+        return feat  # already (B, D) — e.g. pooler output
+    B, L, D = feat.shape
+    if not token_level:
+        return feat.mean(dim=1)  # (B, D)
+
+    valid: Tensor | None = None
+    if attention_mask is not None:
+        a_len = attention_mask.shape[1]
+        if L >= a_len:
+            f = feat[:, :a_len, :]  # text span (drop appended visual patches)
+            valid = attention_mask.bool()
+            if labels is not None and labels.shape[1] == a_len:
+                valid = valid & (labels != -100)
+        else:
+            # Activation shorter than text (e.g. patch_embed): keep all positions.
+            return feat.reshape(B * L, D)
+    else:
+        return feat.reshape(B * L, D)
+    return f[valid]  # (M_valid, D)
+
+
 def collect_activations(
     model: torch.nn.Module,
     dataloader,
     layer_names: list[str],
-    max_samples: int = 500,
+    max_samples: int = 2000,
     device: str | torch.device = "cuda",
+    token_level: bool = True,
+    modality_mask=None,
 ) -> dict[str, Tensor]:
-    """Run forward passes and collect mean-pooled activations from named layers.
+    """Run forward passes and collect activations from named layers.
 
-    Uses forward hooks to capture intermediate outputs. Mean-pools over sequence
-    length to get one (d,)-dim vector per sample.
+    By default returns one vector **per valid token** (``token_level=True``),
+    counting ``max_samples`` in tokens; pass ``token_level=False`` for the legacy
+    mean-pooled (one-vector-per-document) behaviour. ``modality_mask`` is
+    forwarded to the model so the probe respects the pilot condition.
 
     Args:
         model: model to inspect (in eval mode)
         dataloader: provides input batches
-        layer_names: list of module names matching `model.named_modules()`
-        max_samples: stop after collecting this many samples total
+        layer_names: module names matching ``model.named_modules()``
+        max_samples: stop after this many tokens (token-level) or documents
         device: where to run forward passes
+        token_level: per-token (True) vs mean-pooled document vectors (False)
+        modality_mask: optional ``ModalityMask`` forwarded to ``model.forward``
 
     Returns:
         {layer_name: (N, d) tensor of activations}
     """
     model.eval()
+    latest: dict[str, Tensor] = {}
     captured: dict[str, list[Tensor]] = {name: [] for name in layer_names}
     hooks = []
 
@@ -108,30 +156,39 @@ def collect_activations(
 
         def _make_hook(layer_name: str):
             def hook(_module, _input, output):
-                # Output may be tuple (some HF layers return (hidden, attn))
                 feat = output[0] if isinstance(output, tuple) else output
-                # Pool over sequence length: (B, L, D) -> (B, D)
-                if feat.dim() == 3:
-                    feat = feat.mean(dim=1)
-                captured[layer_name].append(feat.detach().cpu())
+                latest[layer_name] = feat.detach()
             return hook
 
         hooks.append(name_to_module[name].register_forward_hook(_make_hook(name)))
 
+    extra = {} if modality_mask is None else {"modality_mask": modality_mask}
     n_collected = 0
     try:
         with torch.no_grad():
             for batch in dataloader:
                 batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}
-                model(**{k: v for k, v in batch.items() if k != "labels"})
-                n_collected += batch["input_ids"].shape[0]
+                attn = batch.get("attention_mask")
+                labels = batch.get("labels")
+                latest.clear()
+                model(**{k: v for k, v in batch.items() if k != "labels"}, **extra)
+                for name in layer_names:
+                    feat = latest.get(name)
+                    if feat is None:
+                        continue
+                    vecs = _select_vectors(feat, attn, labels, token_level)
+                    captured[name].append(vecs.detach().cpu())
+                ref = captured[layer_names[0]]
+                n_collected = (
+                    sum(c.shape[0] for c in ref) if token_level
+                    else n_collected + batch["input_ids"].shape[0]
+                )
                 if n_collected >= max_samples:
                     break
     finally:
         for h in hooks:
             h.remove()
 
-    # Concatenate and truncate
     out = {}
     for name, chunks in captured.items():
         if chunks:

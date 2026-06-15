@@ -323,6 +323,41 @@ def test_doccl_ab_train_step():
 
 
 @pytest.mark.slow
+def test_doccl_depth_targeted_train_step():
+    """The selected DocCL (depth/head-targeted) constructs, steps, and snapshots.
+
+    Runs two consecutive tasks so the depth-scaled EWC penalty, the teacher
+    distillation, and the head-replay paths all execute (the penalty is zero on
+    the first task and active on the second).
+    """
+    from doccl.methods.doccl import DocCL
+    from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
+    from doccl.types import TaskInfo
+
+    B, L = 2, 32
+
+    def make_batch():
+        return {
+            "input_ids": torch.randint(1, 1000, (B, L)),
+            "bbox": torch.randint(0, 1000, (B, L, 4)),
+            "pixel_values": torch.randn(B, 3, 224, 224),
+            "attention_mask": torch.ones(B, L, dtype=torch.long),
+            "labels": torch.randint(0, 7, (B, L)),
+        }
+
+    task = TaskInfo(task_id=0, task_name="t0", label_set=[str(i) for i in range(7)])
+    m = DocCL(
+        LayoutLMv3Wrapper(num_labels=7),
+        {"epochs": 1, "fisher_n_samples": 4, "buffer_size": 8, "target_depth": "all"},
+    )
+    m.model.id_to_label = {i: str(i) for i in range(7)}
+    assert m.train_task(task, [make_batch()]).n_steps == 1
+    m.after_task(task, [make_batch()])  # snapshot θ*, Fisher, teacher
+    # Second task: penalty + KD + replay are now active.
+    assert m.train_task(task, [make_batch()]).n_steps == 1
+
+
+@pytest.mark.slow
 @pytest.mark.gpu
 def test_layoutlmv3_load_and_forward():
     """Verify LayoutLMv3 loads and runs a forward pass."""

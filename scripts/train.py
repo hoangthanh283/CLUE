@@ -21,10 +21,10 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import ConcatDataset, DataLoader
 
 from doccl.data.scenarios import get_scenario
-from doccl.eval.metrics import CLMetricsTracker
+from doccl.eval.metrics import CLMetricsTracker, compute_per_class_f1
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.der import DERpp
-from doccl.methods.doccl import DocCL_A, DocCL_B, DocCL_C
+from doccl.methods.doccl import DocCL, DocCL_A, DocCL_B, DocCL_C
 from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.er import ER
 from doccl.methods.ewc import EWC
@@ -82,16 +82,15 @@ METHOD_REGISTRY = {
     "l2p": L2P,
     "dualprompt": DualPrompt,
     "coda_prompt": CODAPrompt,
-    # Proposed-method candidates — pre-implemented; one is selected at the Week-4
-    # pilot decision gate (CLAUDE.md). Each accepts method.target_component for the
-    # component-targeting ablation (Table 6.2).
+    # Proposed method: depth/head-targeted DocCL, derived from the corrected
+    # diagnosis (forgetting concentrates in the classifier head + late layers).
+    # ``method.target_depth`` ∈ {all, head_only, late_only, uniform} drives the
+    # component-targeting ablation (Table 6.7).
+    "doccl": DocCL,
+    # Legacy sketched candidates, kept as ablation variants / NeurIPS extension.
     "doccl_a": DocCL_A,
     "doccl_b": DocCL_B,
     "doccl_c": DocCL_C,
-    # PLACEHOLDER alias for the proposed method. At the Week-4 gate, repoint this to
-    # the pilot-selected winner (doccl_a/b/c). Not a pre-lock: the Phase-5 grid for
-    # `doccl` is only run *after* the diagnosis selects the candidate.
-    "doccl": DocCL_A,
 }
 
 
@@ -127,6 +126,7 @@ def save_run_metrics(
         "scenario": cfg.scenario.name,
         "seed": int(cfg.seed),
         "target_component": cfg.method.get("target_component"),
+        "target_depth": cfg.method.get("target_depth"),
         **tracker.to_dict(),
         "wall_time_per_task_s": [float(t) for t in task_times],
         "total_wall_time_s": float(sum(task_times)),
@@ -141,17 +141,51 @@ def save_run_metrics(
     log.info("Saved metrics to %s", out_dir / "metrics.json")
 
 
+def save_per_class_f1(out_dir: Path, model, eval_loaders: dict, device) -> None:
+    """Per-entity-type F1 on the final model for each seen task (review M5).
+
+    DIL-degeneracy evidence: surfaces whether an aggregate F1 is carried by a
+    dominant class (e.g. VALUE) while sparse classes (KEY, present only in
+    FUNSD/SROIE) are effectively unlearned. Uses the standard model forward, so
+    call only for standard-forward methods.
+    """
+    model.eval()
+    id_to_label = getattr(model, "id_to_label", {})
+    out: dict[str, dict] = {}
+    with torch.no_grad():
+        for tid, loader in eval_loaders.items():
+            preds, golds = [], []
+            for batch in loader:
+                batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}
+                outputs = model(**{k: v for k, v in batch.items() if k != "labels"})
+                logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
+                p = logits.argmax(-1)
+                lbl = batch["labels"]
+                m = lbl != -100
+                preds.extend(p[m].cpu().tolist())
+                golds.extend(lbl[m].cpu().tolist())
+            out[str(tid)] = compute_per_class_f1(preds, golds, id_to_label)
+    with open(out_dir / "per_class_f1.json", "w") as f:
+        json.dump(out, f, indent=2)
+    log.info("Saved per-class F1 to %s", out_dir / "per_class_f1.json")
+
+
 @hydra.main(version_base=None, config_path="../configs", config_name="default")
 def main(cfg: DictConfig) -> None:
     log.info("Config:\n%s", OmegaConf.to_yaml(cfg))
     set_seed(cfg.seed)
 
     # ─── W&B init ──────────────────────────────────────────────────────────────
-    # Include target_component in the run name so component-targeting ablation runs
-    # (same method, different bank) get distinct result dirs and are identifiable.
+    # Include the ablation knob in the run name so ablation runs (same method,
+    # different target) get distinct result dirs and are identifiable. DocCL uses
+    # target_depth; the legacy candidates use target_component.
     run_name = f"{cfg.scenario.name}_{cfg.method.name}_seed{cfg.seed}"
     target_component = cfg.method.get("target_component")
-    if target_component is not None:
+    target_depth = cfg.method.get("target_depth")
+    if cfg.method.name == "doccl" and target_depth not in (None, "all"):
+        # "all" is the canonical full method (no suffix); ablations get one.
+        run_name += f"_{target_depth}"
+    elif target_component is not None:
         run_name += f"_{target_component}"
     run = wandb.init(
         project=cfg.wandb.project,
@@ -342,6 +376,15 @@ def main(cfg: DictConfig) -> None:
     np.save(out_dir / "matrix.npy", tracker.matrix)
     log.info("Saved matrix to %s", out_dir)
     save_run_metrics(out_dir, cfg, tracker, method, task_times)
+
+    # Per-class F1 on the final model — DIL-degeneracy evidence (review M5).
+    # Standard-forward methods only (prompt/LoRA methods have a custom forward).
+    _STD_FORWARD = {"naive", "joint", "ewc", "lwf", "er", "der_pp", "doccl"}
+    if cfg.method.name in _STD_FORWARD:
+        try:
+            save_per_class_f1(out_dir, model, eval_loaders_seen, device)
+        except Exception as e:  # never fail a run over a diagnostic
+            log.warning("per-class F1 skipped: %s", e)
 
     wandb.finish()
 
