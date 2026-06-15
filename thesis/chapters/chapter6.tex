@@ -100,7 +100,7 @@ table is consistent with but, on its own, cannot establish.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.72\linewidth]{diag_forgetting_matrix.pdf}
+  \includegraphics[width=0.9\linewidth,height=0.4\textheight,keepaspectratio]{diag_forgetting_matrix.pdf}
   \caption[Forgetting-matrix heatmap]{Heatmap of the performance matrix $R[i,j]$ (entity-F1
   on task $j$ after training task $i$; C4, seed 42). The diagonal (just-learned) stays high
   while the sub-diagonal (retention of an earlier task after later training) collapses to
@@ -188,7 +188,7 @@ from the corrected re-run; until then it carries the Cb column as em-dash.}
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.88\linewidth]{diag_cka_depth.pdf}
+  \includegraphics[width=0.95\linewidth,height=0.4\textheight,keepaspectratio]{diag_cka_depth.pdf}
   \caption[Per-layer representational drift (CKA depth gradient)]{Per-layer
   representational drift (linear CKA between consecutive checkpoints) as a function of
   depth, for the two task boundaries. The input encoders do not drift ($\mathrm{CKA}=1.0$)
@@ -511,7 +511,7 @@ values are projected from the measured baselines pending the converged run.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.85\linewidth]{diag_forgetting_curves.pdf}
+  \includegraphics[width=0.95\linewidth,height=0.4\textheight,keepaspectratio]{diag_forgetting_curves.pdf}
   \caption[Forgetting trajectory under naive fine-tuning]{Per-task entity-F1 as the naive
   sequential pilot progresses (C4, seed 42). Each task is learned to a strong F1 when it is
   the current task (bold markers: 88.0 / 93.0 / 80.5) and then collapses to $\sim$2--4 F1
