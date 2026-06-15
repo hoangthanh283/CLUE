@@ -37,6 +37,40 @@ from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
 log = logging.getLogger(__name__)
 
 
+# Per-task dataset for each scenario (mirrors analyze_results.SCENARIO_TASK_DATASETS
+# and doccl/data/scenarios.py). Used to map single-task baselines b_i onto task slots
+# so the metrics tracker can compute a real per-run FWT.
+SCENARIO_TASK_DATASETS: dict[str, list[str]] = {
+    "dil": ["funsd", "sroie", "cord"],
+    "cil_cord": ["cord", "cord", "cord", "cord", "cord"],
+    "mixed": ["funsd", "funsd", "sroie", "cord", "cord", "funsd"],
+}
+
+
+def load_fwt_baselines(scenario_name: str, baseline_csv: Path) -> list[float] | None:
+    """Build the per-task baseline vector b_i for FWT from the single-task CSV.
+
+    Returns a list aligned to the scenario's tasks (b_i = from-scratch single-task F1
+    on task i's dataset), or None if the scenario is unmapped or the CSV/datasets are
+    missing — in which case FWT is left as NaN (honestly unavailable) for this run.
+    """
+    datasets = SCENARIO_TASK_DATASETS.get(scenario_name)
+    if datasets is None or not baseline_csv.exists():
+        return None
+    import csv
+
+    means: dict[str, float] = {}
+    try:
+        with baseline_csv.open() as fh:
+            for row in csv.DictReader(fh):
+                means[row["dataset"]] = float(row["single_task_f1_mean"])
+    except (OSError, KeyError, ValueError):
+        return None
+    if not all(d in means for d in datasets):
+        return None  # missing a needed dataset baseline → don't fabricate FWT
+    return [means[d] for d in datasets]
+
+
 METHOD_REGISTRY = {
     "naive": NaiveFineTune,
     "joint": JointMultiTask,
@@ -164,7 +198,16 @@ def main(cfg: DictConfig) -> None:
         torch.cuda.reset_peak_memory_stats()
 
     # ─── CL loop ───────────────────────────────────────────────────────────────
-    tracker = CLMetricsTracker(num_tasks=len(scenario.tasks))
+    # Seed the tracker with single-task baselines b_i so it can compute a real per-run
+    # FWT (alongside AA/BWT/AF) once the zero-shot upper-triangular term is recorded
+    # below. None if baselines aren't available yet → FWT stays NaN (honest).
+    fwt_baselines = load_fwt_baselines(
+        cfg.scenario.name, Path("results/table_single_task_baselines.csv")
+    )
+    if fwt_baselines is not None:
+        log.info("Loaded FWT baselines b_i for %s: %s", cfg.scenario.name,
+                 [round(b, 2) for b in fwt_baselines])
+    tracker = CLMetricsTracker(num_tasks=len(scenario.tasks), baseline_perf=fwt_baselines)
     eval_loaders_seen: dict[int, DataLoader] = {}
     out_dir = Path(cfg.output_dir) / run.name
 
@@ -251,6 +294,16 @@ def main(cfg: DictConfig) -> None:
             num_workers=cfg.training.num_workers,
             pin_memory=True,
         )
+        # Zero-shot (forward-transfer) term: evaluate the model on THIS task BEFORE
+        # training it — i.e. R[task_idx-1, task_idx], the upper-triangular entry FWT
+        # needs. The classifier head was just expanded (new rows ~ N(0, 0.02)), so this
+        # is a genuine zero-shot reading carried over from the previous task. We do this
+        # before before_task/train_task so no current-task gradient has touched the model.
+        if task_idx > 0:
+            zs = method.evaluate({task_idx: eval_loader})
+            tracker.matrix[task_idx - 1, task_idx] = zs[task_idx].f1
+            log.info("Zero-shot on task %d (for FWT): F1=%.2f", task_idx, zs[task_idx].f1)
+
         eval_loaders_seen[task_idx] = eval_loader
 
         # Lifecycle

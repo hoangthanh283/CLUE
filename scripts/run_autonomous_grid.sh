@@ -59,13 +59,12 @@ run_capped() {
 
 say "=== AUTONOMOUS GRID START (train-to-convergence, val-F1 early stopping patience=2, cap=100ep) ==="
 
-# ── PHASE 3: core baselines (54) ───────────────────────────────────────────────
-say "PHASE 3 core baselines (naive joint ewc lwf er der_pp x cil_cord dil mixed x 3 seeds)"
-PHASE=3 EXTRA="$EXTRA" bash scripts/run_grid.sh >> "$LOG" 2>&1 || say "phase3 returned nonzero (continuing)"
-say "PHASE 3 done markers: $(ls results/*_{naive,joint,ewc,lwf,er,der_pp}_seed*/.done 2>/dev/null | wc -l)"
-
-# ── Single-task FWT baselines (9) ──────────────────────────────────────────────
-say "Single-task FWT baselines (naive x {single_funsd,single_cord,single_sroie} x 3 seeds)"
+# ── Single-task FWT baselines (9) — RUN FIRST ──────────────────────────────────
+# These produce the b_i term (from-scratch single-task F1 per dataset) that true FWT
+# subtracts. Running them BEFORE the core methods means results/table_single_task_
+# baselines.csv exists when each CL run starts, so train.py can seed the metrics
+# tracker and write a real per-run FWT into metrics.json alongside AA/BWT/AF.
+say "Single-task FWT baselines (naive x {single_funsd,single_cord,single_sroie} x 3 seeds) — FIRST"
 for sc in single_funsd single_cord single_sroie; do
   for s in 42 123 7; do
     run="${sc}_naive_seed${s}"
@@ -79,6 +78,16 @@ for sc in single_funsd single_cord single_sroie; do
     fi
   done
 done
+
+# Materialise the b_i baseline CSV from the single-task runs so the CL runs below can
+# read it for per-run FWT. (analyze_results.py also (re)writes this at the end.)
+say "Building single-task baseline CSV (b_i) for per-run FWT ..."
+python scripts/analyze_results.py >> "$LOG" 2>&1 || say "baseline-CSV build returned nonzero (continuing)"
+
+# ── PHASE 3: core baselines (54) ───────────────────────────────────────────────
+say "PHASE 3 core baselines (naive joint ewc lwf er der_pp x cil_cord dil mixed x 3 seeds)"
+PHASE=3 EXTRA="$EXTRA" bash scripts/run_grid.sh >> "$LOG" 2>&1 || say "phase3 returned nonzero (continuing)"
+say "PHASE 3 done markers: $(ls results/*_{naive,joint,ewc,lwf,er,der_pp}_seed*/.done 2>/dev/null | wc -l)"
 
 # ── PHASE 4: prompt/LoRA baselines (36) ────────────────────────────────────────
 say "PHASE 4 prompt/LoRA (l2p dualprompt coda_prompt o_lora x cil_cord dil mixed x 3 seeds)"

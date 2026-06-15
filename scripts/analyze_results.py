@@ -384,6 +384,42 @@ def compute_single_task_baselines(df: pd.DataFrame) -> dict[str, dict[str, float
     return out
 
 
+def compute_fwt_per_run(matrix: list | None, scenario: str,
+                        baselines: dict[str, dict[str, float]]) -> float:
+    """True FWT for one run = mean_{i>0} (R[i-1, i] - b_i).
+
+    Uses the zero-shot upper-triangular entries R[i-1, i] now recorded by train.py
+    and the single-task baselines b_i (mean over seeds) mapped through
+    SCENARIO_TASK_DATASETS. Returns NaN if the matrix lacks the zero-shot term
+    (older lower-triangular runs) or a needed dataset baseline is missing — never
+    fabricates a value.
+    """
+    if matrix is None:
+        return float("nan")
+    R = np.array(matrix, dtype=float)
+    datasets = SCENARIO_TASK_DATASETS.get(scenario)
+    if datasets is None or R.ndim != 2 or R.shape[0] < 2:
+        return float("nan")
+    diffs = []
+    for i in range(1, R.shape[0]):
+        zs = R[i - 1, i]  # zero-shot on task i before training it
+        ds = datasets[i] if i < len(datasets) else None
+        b = baselines.get(ds, {}).get("mean") if ds else None
+        if not np.isnan(zs) and b is not None:
+            diffs.append(zs - b)
+    return float(np.mean(diffs)) if diffs else float("nan")
+
+
+def add_fwt_column(df: pd.DataFrame, baselines: dict[str, dict[str, float]]) -> pd.DataFrame:
+    """Populate df['FWT'] from saved matrices + single-task baselines (true FWT)."""
+    df = df.copy()
+    df["FWT"] = [
+        compute_fwt_per_run(m, sc, baselines)
+        for m, sc in zip(df["matrix"], df["scenario"])
+    ]
+    return df
+
+
 def write_baseline_table(df: pd.DataFrame, output: Path) -> dict[str, dict[str, float]]:
     """Emit the single-task baseline table (b_i per dataset) as CSV + LaTeX.
 
@@ -467,7 +503,7 @@ def main():
     parser.add_argument("--entity", default=None)
     parser.add_argument("--output_dir", type=Path, default=Path("results"))
     parser.add_argument("--proposed", default="doccl")
-    parser.add_argument("--metrics", nargs="+", default=["AA", "BWT", "AF"])
+    parser.add_argument("--metrics", nargs="+", default=["AA", "BWT", "AF", "FWT"])
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -482,12 +518,19 @@ def main():
     if df.empty:
         print("No runs found. Run the grid first (scripts/run_grid.sh).")
         return
+    # Compute the single-task baselines b_i first, then derive TRUE FWT per run from
+    # the zero-shot upper-triangular term R[i-1, i] (now recorded by train.py) minus
+    # b_i. Runs whose matrix lacks the zero-shot term (legacy lower-triangular) get
+    # FWT=NaN and are simply excluded from the FWT aggregate — never fabricated.
+    baselines = compute_single_task_baselines(df)
+    df = add_fwt_column(df, baselines)
+
     df.drop(columns=["matrix"], errors="ignore").to_csv(args.output_dir / "all_runs.csv", index=False)
 
     for metric in args.metrics:
-        # FWT cannot be measured post-hoc (lower-triangular matrices); never aggregate
-        # it as if it were a real number. Report its unavailability explicitly instead.
-        if metric == "FWT":
+        if metric == "FWT" and df["FWT"].isna().all():
+            print("\n=== FWT === unavailable (no run has the zero-shot term; "
+                  "see docs/FWT_NOTE.md)")
             continue
         agg = aggregate(df, metric=metric)
         print(f"\n=== {metric} ===\n{agg.to_string(index=False)}")
@@ -498,9 +541,9 @@ def main():
     write_compute_table(df, args.output_dir / "table_compute.tex")
     plot_forgetting_curves(df, args.output_dir / "figure_forgetting_curves.pdf")
 
-    # Single-task baseline reference (the b_i term of FWT) + honest FWT status. True
-    # zero-shot FWT is unavailable from stored matrices — see docs/FWT_NOTE.md.
-    baselines = write_baseline_table(df, args.output_dir / "table_single_task_baselines.tex")
+    # Single-task baseline reference (the b_i term of FWT). FWT itself is now computed
+    # as a real column above when the zero-shot term is present (see add_fwt_column).
+    write_baseline_table(df, args.output_dir / "table_single_task_baselines.tex")
     report_fwt_status(df, baselines)
 
 

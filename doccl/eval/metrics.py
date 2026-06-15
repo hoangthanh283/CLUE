@@ -74,14 +74,21 @@ class CLMetricsTracker:
         return -self.backward_transfer()
 
     def forward_transfer(self) -> float:
-        """FWT = mean over tasks i>0 of (R[i-1, i] - b_i). Requires baseline."""
+        """FWT = mean over tasks i>0 of (R[i-1, i] - b_i). Requires baseline.
+
+        Returns NaN (not 0.0) when the per-run baseline b_i was not seeded — 0.0
+        is a real FWT value (no transfer) and must not be confused with "unknown".
+        The zero-shot term R[i-1, i] is recorded by train.py and persisted in the
+        matrix, so true FWT is computed at aggregation time (analyze_results.py)
+        where the single-task baselines b_i are available.
+        """
         if self.baseline is None:
-            return 0.0
+            return float("nan")
         diffs = []
         for i in range(1, self.num_tasks):
             if not np.isnan(self.matrix[i - 1, i]):
                 diffs.append(self.matrix[i - 1, i] - self.baseline[i])
-        return float(np.mean(diffs)) if diffs else 0.0
+        return float(np.mean(diffs)) if diffs else float("nan")
 
     def per_task_forgetting(self) -> dict[int, float]:
         """Forgetting per individual task (for diagnostic plots)."""
