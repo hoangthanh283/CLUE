@@ -44,7 +44,37 @@ docker build -t doccl-grid -f docker/Dockerfile .
 The build installs deps from `uv.lock` (reproducible) and bakes the source in. SROIE
 data is **not** baked — it is regenerated from the HuggingFace mirror on first run.
 
-## 2. Run the full remote grid (baselines → core → prompt → aggregate)
+## Multi-GPU (e.g. 2× RTX 4090) — fastest path to COMPLETE results
+
+For a multi-GPU box, use the **parallel scheduler** `scripts/run_grid_multigpu.sh`
+instead of the serial `run_grid_remote.sh`. It builds the full ~189-job grid
+(single-task baselines → core → prompt/LoRA → DocCL + depth ablation), then keeps
+every GPU slot saturated (one `train.py` per slot, pinned via `CUDA_VISIBLE_DEVICES`),
+resume-safe via `results/<run>/.done`. The model is ~3 GB, so a 24 GB 4090 fits
+several jobs at once with large batches and no gradient checkpointing.
+
+```bash
+# Inspect the plan first (no execution):
+docker run --rm --gpus all --entrypoint bash doccl-grid -c \
+  "DRY_RUN=1 bash scripts/run_grid_multigpu.sh"
+
+# Run the COMPLETE grid on 2 GPUs, 2 jobs/GPU = 4 concurrent, bs=16:
+docker run --rm --gpus all \
+  -e WANDB_API_KEY=YOUR_KEY -e WANDB_PROJECT=CL4IE \
+  -e GPUS="0 1" -e JOBS_PER_GPU=2 -e BATCH_SIZE=16 \
+  -v "$PWD/results:/workspace/results" -v "$PWD/.hf_cache:/workspace/.hf_cache" \
+  --entrypoint bash doccl-grid -c "bash scripts/run_grid_multigpu.sh"
+```
+
+Tune for throughput: replay-free methods (naive/joint/ewc/lwf/prompt/LoRA) tolerate
+`BATCH_SIZE=32` and `JOBS_PER_GPU=3`; ER/DER++ hold a replay buffer, so keep them at
+`JOBS_PER_GPU=2`, `BATCH_SIZE=16` if VRAM gets tight. Then aggregate (incl. real FWT):
+```bash
+docker run --rm --gpus all -v "$PWD/results:/workspace/results" --entrypoint bash \
+  doccl-grid -c "python scripts/analyze_results.py && python scripts/ingest_to_thesis.py"
+```
+
+## 2. Run the full remote grid, SINGLE GPU (baselines → core → prompt → aggregate)
 
 ```bash
 docker run --rm --gpus all \
