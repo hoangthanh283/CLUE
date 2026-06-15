@@ -25,6 +25,7 @@ import torch
 from datasets import Image as HFImage
 from datasets import load_dataset
 from PIL import Image as PILImage
+from PIL import ImageOps
 from torch.utils.data import Dataset
 from transformers import LayoutLMv3Processor
 
@@ -42,15 +43,21 @@ def _open_image(raw: Any) -> PILImage.Image:
 
     With ``Image(decode=False)`` a cell is ``{"bytes": <png/jpg bytes>, "path": <str|None>}``
     (or, defensively, an already-decoded PIL image / a path). Returns an RGB PIL image.
+
+    ``ImageOps.exif_transpose`` is applied to match HF's own ``decode_example`` (which
+    applies it): without it, an EXIF-rotated page would be fed to the model in a different
+    orientation than its bboxes were normalised against. Harmless no-op when there is no
+    EXIF orientation tag (the common case for these scanned-form bundles).
     """
     if isinstance(raw, PILImage.Image):
-        return raw.convert("RGB")
-    if isinstance(raw, dict):
-        if raw.get("bytes") is not None:
-            return PILImage.open(io.BytesIO(raw["bytes"])).convert("RGB")
-        if raw.get("path"):
-            return PILImage.open(raw["path"]).convert("RGB")
-    raise TypeError(f"Unexpected image cell type: {type(raw)!r}")
+        img = raw
+    elif isinstance(raw, dict) and raw.get("bytes") is not None:
+        img = PILImage.open(io.BytesIO(raw["bytes"]))
+    elif isinstance(raw, dict) and raw.get("path"):
+        img = PILImage.open(raw["path"])
+    else:
+        raise TypeError(f"Unexpected image cell type: {type(raw)!r}")
+    return ImageOps.exif_transpose(img).convert("RGB")
 
 
 def _read_size(raw: Any) -> tuple[int, int]:
@@ -59,17 +66,23 @@ def _read_size(raw: Any) -> tuple[int, int]:
     ``PILImage.open`` is lazy — it parses only the header, so ``.size`` is available
     before any pixel data is decoded. This is what lets _parse_examples read every
     row's dimensions cheaply instead of decoding all 7 languages' pages into RAM.
+
+    EXIF orientation is honoured (swapping w/h for a 90/270 rotation) so the dims used
+    to normalise bboxes match the orientation __getitem__ feeds the model. ``.size`` with
+    a non-trivial EXIF tag still needs no pixel decode — only the orientation byte.
     """
     if isinstance(raw, PILImage.Image):
-        return raw.size
-    if isinstance(raw, dict):
-        if raw.get("bytes") is not None:
-            with PILImage.open(io.BytesIO(raw["bytes"])) as im:
-                return im.size
-        if raw.get("path"):
-            with PILImage.open(raw["path"]) as im:
-                return im.size
-    raise TypeError(f"Unexpected image cell type: {type(raw)!r}")
+        img = raw
+    elif isinstance(raw, dict) and raw.get("bytes") is not None:
+        img = PILImage.open(io.BytesIO(raw["bytes"]))
+    elif isinstance(raw, dict) and raw.get("path"):
+        img = PILImage.open(raw["path"])
+    else:
+        raise TypeError(f"Unexpected image cell type: {type(raw)!r}")
+    exif = img.getexif()
+    orientation = exif.get(0x0112, 1)  # EXIF Orientation tag; 1 = normal
+    w, h = img.size
+    return (h, w) if orientation in (5, 6, 7, 8) else (w, h)
 
 
 def _normalize_box(box: list[int], width: int, height: int) -> list[int]:
