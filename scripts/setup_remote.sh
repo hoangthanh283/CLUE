@@ -69,13 +69,22 @@ done
 if [ -n "$TORCH_IMPORTABLE" ]; then
   info "Python: $($PY --version 2>&1) ($PY)"
   ok "template torch ${TORCH_IMPORTABLE} found — reusing it (no reinstall)"
-  # CUDA availability (computed during the interpreter probe): warn but DO NOT die.
+  # CUDA availability gate. HARD STOP if torch can't see the GPU — otherwise training
+  # silently falls back to CPU (~100x slower, ~27s/iter) and burns paid GPU-hours doing
+  # nothing useful. This exact trap (driver too old for the image's torch -> CPU fallback)
+  # wasted hours on a VastAI/rented box. Set ALLOW_CPU=1 to override (debugging only).
   if [ "${CUDA_OK:-0}" = "1" ]; then
-    ok "CUDA available"
+    ok "CUDA available — torch can see the GPU"
+  elif [ "${ALLOW_CPU:-0}" = "1" ]; then
+    warn "torch CANNOT see the GPU, but ALLOW_CPU=1 set — continuing on CPU (very slow)."
   else
-    warn "no interpreter's torch could see CUDA — driver/torch version mismatch?"
-    warn "Continuing anyway; the grid will error on the first GPU call if this is real."
-    warn "If it fails, pick a pytorch image whose CUDA version matches the host driver."
+    echo
+    die "torch cannot see the GPU (CUDA unavailable) — training would run on CPU (~100x slower).
+       Driver/torch mismatch: this image's torch needs a newer CUDA driver than the host provides.
+       FIX: pick a VastAI image whose CUDA matches the host driver, e.g.
+         pytorch/pytorch:2.x-cuda12.x-cudnn9-runtime  (match 12.x to the host's nvidia-smi CUDA)
+       Quick check on any box:  python -c 'import torch; print(torch.cuda.is_available())'
+       To force CPU anyway (NOT for the grid): ALLOW_CPU=1 bash scripts/setup_remote.sh"
   fi
   # Fast-path: skip pip ONLY if the project AND its real runtime deps all import.
   # `import doccl` alone is NOT sufficient — doccl is importable just from the source
