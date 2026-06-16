@@ -35,12 +35,15 @@ say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 # for all params; LwF holds a frozen teacher; ER/DER hold replay batches) need more VRAM than
 # naive/joint, and without checkpointing EWC OOM'd the 6 GB GPU at ~5.6 GB. Checkpointing keeps
 # every method under ~2.6 GB VRAM (proven across the naive/joint runs). bs=2 retained.
-# epochs=100 is a safety ceiling; val-F1 early stopping (patience=2) ends each task at
-# convergence and restores its best-val weights. Most tasks stop in 4-8 epochs.
-# Early stopping is ON by default in code (make_early_stopper: enabled when a val_loader
-# is present, patience defaults to 2) so no method.early_stop* override is needed here —
-# the method configs are immutable and Hydra struct-mode rejects unknown keys.
-EXTRA="training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 method.epochs=100 wandb.project=CL4IE"
+# epochs=100 is a safety ceiling; val-F1 early stopping ends each task at convergence and
+# restores its best-val weights. Loosened from the code defaults (patience=2, min_delta=0.1)
+# to patience=1, min_delta=0.5: on the harder CORD CIL sessions val-F1 climbs slowly and
+# noisily (e.g. 51->86 over 26 epochs) so the tight default rarely triggered, making DocCL
+# runs 7-9 h each. patience=1 + a 0.5-F1 improvement threshold stops a session once it stops
+# gaining >=0.5 F1, cutting runtime ~2-3x at a small cost in final convergence. The keys are
+# appended with '+method.' because the immutable method configs don't define them (Hydra
+# struct-mode rejects a plain override of an absent key).
+EXTRA="training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 method.epochs=100 +method.early_stop_patience=1 +method.early_stop_min_delta=0.5 wandb.project=CL4IE"
 export WANDB_MODE=online
 
 # HARD per-run memory cap: each train.py runs in a cgroup capped at MEM_CAP with swap
