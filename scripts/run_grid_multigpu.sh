@@ -155,6 +155,11 @@ sync_push_loop() { while :; do sleep "$SYNC_SECS"; sync_push_once; done; }
 
 # ── Heartbeat: filesystem-only live progress block (no dependency on slot arrays) ─
 GRID_START_TS=$(date +%s)
+# Unique per-launch marker written into the (persistent, appended) LOG. The heartbeat
+# counts [FAIL lines only AFTER this marker, so the "failed" tally reflects THIS run's
+# real failures — not every failure ever printed across relaunches (which made the
+# count monotonically climb and never drop, even after the underlying bug was fixed).
+SESSION_MARKER="=== GRID SESSION START ${GRID_START_TS} ==="
 write_progress_json() {  # <total> <done> <failed>
   local tmp="${PROGRESS_JSON}.tmp" first=1 f rn
   {
@@ -177,7 +182,9 @@ heartbeat_loop() {  # <total>
     sleep "$HEARTBEAT_SECS"
     local done_ct fail_ct elapsed eta="n/a" f rn last
     done_ct=$(ls results/*/.done 2>/dev/null | wc -l)
-    fail_ct=$(grep -c '\[FAIL' "$LOG" 2>/dev/null || echo 0)
+    # Count [FAIL only AFTER this launch's session marker (not stale failures from
+    # prior relaunches appended to the same persistent log).
+    fail_ct=$(awk -v m="$SESSION_MARKER" 'index($0,m){c=0;seen=1;next} seen&&/\[FAIL/{c++} END{print c+0}' "$LOG" 2>/dev/null || echo 0)
     elapsed=$(( $(date +%s) - GRID_START_TS ))
     if [ "$done_ct" -gt 0 ]; then
       local per=$(( elapsed / done_ct )) remain
@@ -237,6 +244,7 @@ done; done; fi
 
 NUM_GPUS=$(echo $GPUS | wc -w)
 TOTAL_SLOTS=$(( NUM_GPUS * JOBS_PER_GPU ))
+say "$SESSION_MARKER"   # per-launch boundary; heartbeat counts [FAIL only after this
 say "=== MULTI-GPU GRID: ${#JOBS[@]} jobs, ${NUM_GPUS} GPU(s) x ${JOBS_PER_GPU} = ${TOTAL_SLOTS} slots, bs=${BATCH_SIZE}, cap=${EPOCHS_CAP}ep ==="
 
 if [ "$DRY_RUN" = "1" ]; then
