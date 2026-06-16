@@ -46,6 +46,10 @@ EPOCHS_CAP="${EPOCHS_CAP:-100}"
 # languages, WildReceipt) can exhaust HOST RAM at the default x4 across all slots and
 # trip the OOM killer (SIGKILL -> rc=137). Lower to 2 on RAM-constrained boxes.
 NUM_WORKERS="${NUM_WORKERS:-4}"
+# Gradient checkpointing: default off (big GPUs prefer the speed). Set GRAD_CKPT=true on
+# VRAM-constrained boxes (e.g. only a few GB free) — it trades ~20-30%% compute for a large
+# activation-memory saving, letting a job fit where it otherwise OOMs.
+GRAD_CKPT="${GRAD_CKPT:-false}"
 SEEDS="${SEEDS:-42 123 7}"
 SCENARIOS="${SCENARIOS:-cil_cord dil mixed dil_xlingual cil_wildreceipt}"
 CORE_METHODS="${CORE_METHODS:-naive joint ewc lwf er der_pp}"
@@ -79,7 +83,7 @@ say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 SYNC_INCLUDES=(--include "*/.done" --include "*/metrics.json" --include "*/matrix.npy"
                --include "table_single_task_baselines.csv")
 
-EXTRA="training.batch_size=${BATCH_SIZE} training.gradient_checkpointing=false \
+EXTRA="training.batch_size=${BATCH_SIZE} training.gradient_checkpointing=${GRAD_CKPT} \
 training.num_workers=${NUM_WORKERS} method.epochs=${EPOCHS_CAP} wandb.project=${WANDB_PROJECT:-CL4IE}"
 
 # ── Durable-resume sync (rclone; pure no-op unless sync is configured) ───────────
