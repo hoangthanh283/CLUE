@@ -18,6 +18,8 @@ the prompt injection itself lives in ``LayoutLMv3Wrapper.forward_with_prompts``.
 """
 from __future__ import annotations
 
+import logging
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -27,6 +29,8 @@ from tqdm import tqdm
 from doccl.eval.metrics import compute_token_f1
 from doccl.methods.naive import NaiveFineTune
 from doccl.types import EvalMetrics, TaskInfo, TrainMetrics
+
+log = logging.getLogger(__name__)
 
 
 class PromptPool(nn.Module):
@@ -116,13 +120,50 @@ class PromptBasedMethod(NaiveFineTune):
         return out.last_hidden_state[:, 0]  # (B, D)
 
     # ─── training / evaluation ──────────────────────────────────────────────
+    @torch.no_grad()
+    def _prompt_val_f1(self, val_loader: DataLoader) -> float:
+        """Entity-F1 on a held-out loader using the PROMPT forward path.
+
+        The base-class ``current_task_val_f1`` calls ``self.model(**batch)`` (the
+        standard forward, no prompts), so it cannot be reused here. This mirrors the
+        prediction logic in ``evaluate`` for a single loader and restores train mode,
+        giving prompt methods a real early-stop signal instead of a fixed budget.
+        """
+        was_training = self.model.training
+        self.model.eval()
+        id_to_label = getattr(self.model, "id_to_label", None) or {
+            i: str(i) for i in range(self.model.model.config.num_labels)
+        }
+        all_preds: list[int] = []
+        all_labels: list[int] = []
+        for batch in val_loader:
+            batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
+            query = self._query(batch)
+            prompt_embeds, _ = self._select_prompts(query, batch)
+            logits = self.model.forward_with_prompts(
+                input_ids=batch["input_ids"],
+                bbox=batch["bbox"],
+                pixel_values=batch["pixel_values"],
+                prompt_embeds=prompt_embeds,
+                attention_mask=batch.get("attention_mask"),
+            )
+            preds = logits.argmax(dim=-1)
+            labels = batch["labels"][:, : logits.shape[1]]
+            mask = labels != -100
+            all_preds.extend(preds[mask].cpu().tolist())
+            all_labels.extend(labels[mask].cpu().tolist())
+        f1 = compute_token_f1(all_preds, all_labels, id_to_label)["f1"]
+        if was_training:
+            self.model.train()
+        return f1
+
     def train_task(
         self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None
     ) -> TrainMetrics:
-        # NOTE: prompt-based methods use a custom forward_with_prompts path, so the
-        # base-class val-F1 helper (which calls self.model(**batch)) does not apply;
-        # they retain the fixed epoch budget. val_loader is accepted for signature
-        # compatibility only.
+        # Prompt methods use a custom forward_with_prompts path, so the base-class
+        # val-F1 helper does not apply — we early-stop on _prompt_val_f1 instead, so
+        # prompt/LoRA runs converge and stop like every other method rather than
+        # burning the full epoch budget.
         self.model.train()
         optimizer = torch.optim.AdamW(
             self.trainable_parameters(),
@@ -131,10 +172,13 @@ class PromptBasedMethod(NaiveFineTune):
         )
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
+        # Early stopping on the prompt-aware val-F1 (disabled if no val_loader).
+        stopper = self.make_early_stopper(val_loader)
 
         total_loss = 0.0
         n_steps = 0
         for epoch in range(epochs):
+            self.model.train()
             pbar = tqdm(
                 train_loader, desc=f"{self.name} T{task.task_id} ep{epoch+1}/{epochs}", leave=False
             )
@@ -164,6 +208,19 @@ class PromptBasedMethod(NaiveFineTune):
                 n_steps += 1
                 pbar.set_postfix({"ce": f"{ce.item():.3f}", "aux": f"{float(aux):.4f}"})
 
+            # Prompt-aware early stopping: evaluate val-F1, stop on plateau.
+            if stopper.enabled and val_loader is not None:
+                val_f1 = self._prompt_val_f1(val_loader)
+                should_stop = stopper.step(val_f1, self.model, epoch)
+                log.info(
+                    "%s T%s ep%d val_f1=%.4f best=%.4f bad=%d%s",
+                    self.name, task.task_id, epoch + 1, val_f1, stopper.best_f1,
+                    stopper.num_bad_epochs, " -> STOP" if should_stop else "",
+                )
+                if should_stop:
+                    break
+
+        stopper.restore_best(self.model)
         return TrainMetrics(
             task_id=task.task_id, loss=total_loss / max(n_steps, 1), n_steps=n_steps
         )
