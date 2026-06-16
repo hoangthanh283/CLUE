@@ -279,10 +279,24 @@ def main(cfg: DictConfig) -> None:
             num_workers=cfg.training.num_workers,
             pin_memory=True,
         )
+        # Early-stopping val signal for Joint: the pooled eval set across ALL tasks
+        # (Joint trains on all data, so its convergence is measured over all tasks).
+        # Without this, train_task got val_loader=None and trained the full
+        # method.epochs budget — 100 forced epochs over the huge pooled dataset, the
+        # single biggest time sink in the grid. With it, Joint early-stops on
+        # plateaued pooled val-F1 exactly like every other method.
+        joint_val = ConcatDataset(list(scenario.eval_datasets))
+        joint_val_loader = DataLoader(
+            joint_val,
+            batch_size=cfg.training.batch_size,
+            shuffle=False,
+            num_workers=cfg.training.num_workers,
+            pin_memory=True,
+        )
         # Train once on joint data
         synthetic_task = scenario.tasks[0]
         t0 = time.perf_counter()
-        method.train_task(synthetic_task, joint_loader)
+        method.train_task(synthetic_task, joint_loader, val_loader=joint_val_loader)
         joint_time = time.perf_counter() - t0
 
         # Evaluate on each task's eval set
