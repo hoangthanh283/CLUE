@@ -16,6 +16,27 @@ lwf er der_pp) + BERT text-only + prompt/LoRA (l2p dualprompt coda_prompt o_lora
 DocCL + currency (er_cflat cl_lora). Verified: the two remotes' DRY_RUN job lists are
 fully disjoint.
 
+## 0. FIRST: prime R2 so nothing already-done is re-run (mandatory)
+
+The grid only re-runs jobs whose `.done` is **absent from R2** — every box pulls `.done`
+markers from the shared bucket (`sync_pull`) before building its job list, then skips any
+job already marked done. But that skip only works if R2 *contains* the completed runs.
+The runs finished so far live in **this box's local `results/`**, not R2. Seed R2 from
+them ONCE, before launching any remote:
+
+```bash
+# On this (local) box, with the R2 creds:
+R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_ENDPOINT=... R2_BUCKET=doccl-results \
+  bash scripts/sync_results_to_r2.sh          # push local .done/metrics -> R2
+R2_ACCESS_KEY_ID=... ... bash scripts/sync_results_to_r2.sh --list   # confirm coverage
+```
+
+Then **always launch the remotes WITH R2 creds** (so `sync_pull` runs and `SYNC_STRICT=1`
+aborts if the bucket is unreachable — it will NOT silently re-run un-persisted work). A
+box launched with no R2 creds falls back to local-only skipping and would re-run its whole
+partition from scratch. After the remotes finish, refresh this box:
+`bash scripts/sync_results_to_r2.sh --pull`.
+
 ## 1. RTX 6000 Ada — `setup_remote.sh`
 
 ```bash
