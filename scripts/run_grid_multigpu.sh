@@ -375,32 +375,38 @@ run_one_bg() {  # <slot> <run_name> <overrides...>
   local gpu="${GPU_ARR[$(( slot % NUM_GPUS ))]}"
   local marker="results/${run}/.done"
   if [ -f "$marker" ]; then echo "skip"; return 0; fi
-  # Heavy prompt methods (dualprompt/l2p/coda_prompt) hold ~17 GiB/process at bs16 with NO
-  # grad-checkpointing — three co-resident exceed a 44 GiB card and OOM (rc=1). Force
-  # gradient_checkpointing=true for ONLY those run-names so they drop to ~9-10 GiB and pack
-  # JOBS_PER_GPU=4 safely; everything else keeps the global GRAD_CKPT (speed). The override
-  # is appended AFTER $EXTRA so Hydra's last-wins makes it authoritative. HEAVY_GRAD_CKPT=0
-  # disables this (e.g. a single-job-per-GPU box where the speed matters more).
-  local heavy_ckpt=""
-  if [ "${HEAVY_GRAD_CKPT:-1}" = "1" ]; then
-    case "$run" in
-      *_dualprompt_*|*_l2p_*|*_coda_prompt_*)
-        heavy_ckpt="training.gradient_checkpointing=true" ;;
-    esac
-  fi
+  # Heavy prompt methods (dualprompt/l2p/coda_prompt) get two run-name-targeted overrides,
+  # both appended AFTER $EXTRA so Hydra's last-wins makes them authoritative:
+  #   1. gradient_checkpointing=true — they hold ~17 GiB/process at bs16 with NO ckpt; three
+  #      co-resident exceed a 44 GiB card and OOM (rc=1). Ckpt drops them to ~9-10 GiB so
+  #      JOBS_PER_GPU=4 packs safely. HEAVY_GRAD_CKPT=0 disables.
+  #   2. epochs=PROMPT_EPOCHS_CAP (default 30) — the global EPOCHS_CAP (100) is wasteful here:
+  #      prompt baselines top out at AA 0-30 on this task and dualprompt was still inching up
+  #      at ep28 (~25->30 AA, diminishing). 30 captures ~all realistic gain while bounding
+  #      VRAM residency (long residency was what made 3-way overlap likely). A fair, standard
+  #      budget for cited prompt baselines. PROMPT_EPOCHS_CAP= (empty) keeps the global cap.
+  local heavy_ckpt="" prompt_epochs=""
+  case "$run" in
+    *_dualprompt_*|*_l2p_*|*_coda_prompt_*)
+      [ "${HEAVY_GRAD_CKPT:-1}" = "1" ] && heavy_ckpt="training.gradient_checkpointing=true"
+      # ${VAR-30}: 30 only when UNSET; an explicit PROMPT_EPOCHS_CAP= (empty) keeps the global cap.
+      local _pe="${PROMPT_EPOCHS_CAP-30}"
+      [ -n "$_pe" ] && prompt_epochs="method.epochs=${_pe}"
+      ;;
+  esac
   (
     local rc
     if [ "$TEE_TRAIN" = "1" ]; then
       # Full log -> per-run file; a filtered view -> the main log (visible via `docker logs`).
       # CRITICAL: .done must gate on train.py's exit (PIPESTATUS[0]), NOT the pipeline's last
       # element (sed always exits 0), or a failed run would be falsely marked done.
-      CUDA_VISIBLE_DEVICES="$gpu" "$PYBIN" scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA $heavy_ckpt 2>&1 \
+      CUDA_VISIBLE_DEVICES="$gpu" "$PYBIN" scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA $heavy_ckpt $prompt_epochs 2>&1 \
         | tee "results/logs/${run}.log" \
         | grep --line-buffered -E '=== Task|val_f1|STOP|Final: AA|Zero-shot' \
         | sed -u "s#^#    [${run} gpu${gpu}] #" >> "$LOG"
       rc=${PIPESTATUS[0]}
     else
-      CUDA_VISIBLE_DEVICES="$gpu" "$PYBIN" scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA $heavy_ckpt \
+      CUDA_VISIBLE_DEVICES="$gpu" "$PYBIN" scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA $heavy_ckpt $prompt_epochs \
         >> "results/logs/${run}.log" 2>&1
       rc=$?
     fi
