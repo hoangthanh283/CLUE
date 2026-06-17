@@ -133,14 +133,24 @@ sync_setup() {
   # ungated jobs. A creds/bucket/endpoint mistake aborts in seconds, not after hours.
   local tmp; tmp=$(mktemp -d)
   echo "ok $(date +%s)" > "$tmp/.synccheck"
-  if rclone copy "$tmp" "$SYNC_REMOTE" --include ".synccheck" >> "$LOG" 2>&1 \
-     && rclone lsf "$SYNC_REMOTE" 2>/dev/null | grep -q ".synccheck"; then
+  # Capture rclone's OWN error so a failure is diagnosable (SignatureDoesNotMatch=typo'd
+  # secret, 403=token perms, no-such-host/timeout=network) instead of an opaque "FAILED".
+  local pf_err; pf_err=$(rclone copy "$tmp" "$SYNC_REMOTE" --include ".synccheck" 2>&1 | tee -a "$LOG")
+  if [ -z "$pf_err" ] || ! echo "$pf_err" | grep -qiE "error|fail|denied|forbidden|signature|no such|timeout|refused"; then
+    rclone lsf "$SYNC_REMOTE" 2>/dev/null | grep -q ".synccheck" && local pf_ok=1 || local pf_ok=0
+  else
+    local pf_ok=0
+  fi
+  if [ "${pf_ok:-0}" = "1" ]; then
     rclone delete "$SYNC_REMOTE/.synccheck" >> "$LOG" 2>&1 || true
     rm -rf "$tmp"
     say "[sync] preflight OK — durable resume ON -> ${SYNC_REMOTE}"
   else
     rm -rf "$tmp"
     say "[sync] PREFLIGHT FAILED on ${SYNC_REMOTE} — check bucket/token/endpoint."
+    # Surface rclone's actual error on-screen (the real root cause) — last 3 non-empty lines.
+    [ -n "$pf_err" ] && echo "$pf_err" | grep -v "^$" | tail -3 | sed 's/^/  [rclone] /'
+    say "[sync] hint: verify key/secret length (this token = 32-char key, 64-char secret) and that the R2 token has Object Read & Write on '${R2_BUCKET}'."
     if [ "${SYNC_STRICT:-1}" = "1" ]; then
       say "[sync] SYNC_STRICT=1 (default): aborting so you don't run un-persisted. Set SYNC_STRICT=0 to run anyway."
       exit 3
