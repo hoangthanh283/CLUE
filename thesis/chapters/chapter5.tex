@@ -411,22 +411,36 @@ the practical split is constrained, so we prefer explicit disclosure here.
 \section{Baselines and Continual-Learning Strategies}
 \label{sec:exp-baselines}
 
-We compare against ten baselines spanning the major families, plus the selected
-DocCL method, all under the shared interface of \S\ref{sec:impl-cl-core}
-(Table~\ref{tab:baselines}). Methods are reproduced and validated against their
-published behaviour before being extended (for example, \gls{er} is made to work
-before DER++). The selected DocCL method is added once the diagnosis fixes its
-design (\S\ref{sec:method-selected}). Default settings---\gls{ewc}
-$\lambda{=}1000$ with the Fisher estimated over 200 samples, DER++
+We compare against a deliberately representative baseline suite spanning the major
+families, plus the selected DocCL method, all under the shared interface of
+\S\ref{sec:impl-cl-core} (Table~\ref{tab:baselines}). Each family is covered by its
+strongest classical member and, where applicable, a current (2025) member, so the
+comparison is both fair and up to date rather than exhaustive: in the prompt family
+we report CODA-Prompt~\citep{smith2023coda} as the strongest member and cite its
+predecessors L2P~\citep{wang2022l2p} and DualPrompt~\citep{wang2022dualprompt} as
+methodological ancestors rather than re-running a dominated method; the regularisation
+and LoRA families add the recent C-Flat++~\citep{bian2024cflat} and
+CL-LoRA~\citep{he2025cllora} as their 2025 members. A genuine external text-only
+comparator (BERT-base, no layout or vision) is included so the ``text is load-bearing''
+finding rests on a real unimodal encoder rather than a masked multimodal one. Methods
+are reproduced and validated against their published behaviour before being extended
+(for example, \gls{er} is made to work before DER++). The selected DocCL method is
+added once the diagnosis fixes its design (\S\ref{sec:method-selected}). Default
+settings---\gls{ewc} $\lambda{=}1000$ with the Fisher estimated over 200 samples, DER++
 $\alpha{=}\beta{=}0.5$, O-LoRA rank 8 on the query/key/value projections with
-orthogonality weight $0.5$, L2P pool of ten length-5 prompts with top-5
-retrieval---are tabulated in Appendix~\ref{app:hyperparameters}.
+orthogonality weight $0.5$, C-Flat++ neighbourhood $\rho{=}0.05$ on top of ER, CL-LoRA
+rank 8 with shared-adapter distillation---are tabulated in
+Appendix~\ref{app:hyperparameters}.
 
 \begin{table}[!htbp]
   \centering
-  \caption[Baseline suite]{The ten baselines (plus the post-pilot DocCL method)
-  evaluated on the primary backbone, with the main hyperparameter swept for each.
-  Naive and Joint are the lower and oracle-upper bounds.}
+  \caption[Baseline suite]{The reported baseline suite (plus the post-pilot DocCL
+  method) evaluated on the primary backbone, with the main hyperparameter swept for
+  each. Each family is represented by its strongest classical member and a 2025 member
+  where applicable. Naive and Joint are the lower and oracle-upper bounds; BERT is an
+  external text-only comparator. L2P and DualPrompt are cited as prompt-family
+  ancestors (\S\ref{sec:exp-baselines}) but not reported, being dominated by
+  CODA-Prompt.}
   \label{tab:baselines}
   \begin{tabularx}{\textwidth}{l l L}
     \toprule
@@ -435,13 +449,14 @@ retrieval---are tabulated in Appendix~\ref{app:hyperparameters}.
     Bounds         & Naive (sequential FT) & lower bound \\
                    & Joint (multi-task)    & oracle upper bound \\
     Regularisation & EWC  & \citet{kirkpatrick2017ewc}; $\lambda\in\{10^2,10^3,10^4\}$ \\
-                   & LwF  & \citet{li2017lwf}; $\alpha\in\{0.5,1,2\}$, $T{=}2$ \\
+                   & C-Flat++ (2025) & \citet{bian2024cflat}; $\rho{=}0.05$ on ER \\
+    Distillation   & LwF  & \citet{li2017lwf}; $\alpha\in\{0.5,1,2\}$, $T{=}2$ \\
     Replay         & ER   & \citet{rolnick2019er}; buffer $\in\{200,500\}$ \\
                    & DER++& \citet{buzzega2020der}; logit weight $\in\{0.1,0.5,1\}$ \\
-    Prompt-based   & L2P  & \citet{wang2022l2p}; pool $\in\{5,10,20\}$ \\
-                   & DualPrompt & \citet{wang2022dualprompt} \\
-                   & CODA-Prompt & \citet{smith2023coda} \\
+    Prompt-based   & CODA-Prompt & \citet{smith2023coda} \\
     LoRA-based     & O-LoRA & \citet{wang2023olora}; rank $\in\{4,8,16\}$ \\
+                   & CL-LoRA (2025) & \citet{he2025cllora}; rank 8, shared-adapter KD \\
+    Text-only      & BERT (external) & unimodal text comparator (no layout/vision) \\
     Proposed       & DocCL & post-pilot (Chapter~\ref{ch:methodology}) \\
     \bottomrule
   \end{tabularx}

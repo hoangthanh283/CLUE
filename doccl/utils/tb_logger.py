@@ -14,6 +14,7 @@ forgetting story is visible *while* a run trains:
 Gracefully degrades to a no-op when the ``tensorboard`` package is unavailable, so a
 run never fails over logging.
 """
+
 from __future__ import annotations
 
 import logging
@@ -110,6 +111,60 @@ class TBLogger:
         row = matrix[task_idx, : task_idx + 1]
         if np.any(~np.isnan(row)):
             self.writer.add_scalar("metrics/running_AA", float(np.nanmean(row)), task_idx)
+
+    # ─── Deep diagnostics (gated by cfg.tensorboard.diagnostics) ─────────────────
+    # These expose the *existing* analysis machinery (param_grouping / fisher / cka)
+    # as TensorBoard series. The caller computes the quantities (so the logger keeps
+    # no model/torch state); the logger just writes histograms + scalars. Heavier
+    # than the always-on retention scalars, so they are flag-gated in train.py.
+
+    def log_param_histograms(
+        self,
+        named_groups: dict[str, list],
+        prefix: str,
+        step: int,
+        which: str = "weight",
+    ) -> None:
+        """Per-group weight or gradient histograms + per-group L2 norm scalars.
+
+        Args:
+            named_groups: group_name → list of ``nn.Parameter`` (e.g.
+                ``model.param_groups`` or ``model.param_groups_by_depth``).
+            prefix: TB tag prefix, e.g. ``"weights"`` / ``"weights_by_depth"`` /
+                ``"grads"`` / ``"grads_by_depth"``.
+            step: global step (task index or epoch counter).
+            which: ``"weight"`` (param values) or ``"grad"`` (``.grad`` tensors).
+        """
+        if not self.enabled:
+            return
+        import torch
+
+        for group, params in named_groups.items():
+            vals = []
+            for p in params:
+                t = p.grad if which == "grad" else p
+                if t is not None:
+                    vals.append(t.detach().reshape(-1))
+            if not vals:
+                continue
+            flat = torch.cat(vals)
+            if flat.numel() == 0 or not torch.isfinite(flat).all():
+                continue
+            self.writer.add_histogram(f"{prefix}/{group}", flat, step)
+            self.writer.add_scalar(f"{prefix}_l2/{group}", float(flat.norm(2)), step)
+
+    def log_group_scalars(self, values: dict[str, float], prefix: str, step: int) -> None:
+        """Per-group scalar series (Fisher importance, Fisher-weighted displacement, CKA).
+
+        ``values`` is e.g. ``fisher_per_group(...)`` or
+        ``fisher_weighted_displacement(...)`` or ``cka_per_layer(...)`` output —
+        ``{group_or_layer: scalar}``. Tags become ``{prefix}/{group}``.
+        """
+        if not self.enabled:
+            return
+        for k, v in values.items():
+            if v is not None and np.isfinite(v):
+                self.writer.add_scalar(f"{prefix}/{k}", float(v), step)
 
     def log_forgetting_matrix(
         self, matrix: np.ndarray, step: int, task_names: list[str] | None = None

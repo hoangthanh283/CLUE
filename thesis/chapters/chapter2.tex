@@ -223,7 +223,12 @@ where $M_\ell$ spans the core gradient space of past tasks at layer $\ell$ and
 $\epsilon_{\text{th}}$ controls how much of the past subspace is
 protected~\citep{saha2021gpm}. \Gls{ogd}~\citep{farajtabar2020ogd} follows the
 same orthogonality principle directly in gradient space. Such methods are stable
-but the protected subspace grows until its capacity is exhausted.
+but the protected subspace grows until its capacity is exhausted. A complementary
+recent line targets the \emph{geometry} of the minimum rather than the gradient
+subspace: C-Flat~\citep{bian2024cflat} adds a sharpness-aware, zeroth-order
+flatness penalty on top of any \gls{cl} method, steering optimisation toward flat
+minima that empirically forget less---a plug-and-play optimiser-side remedy we adopt
+as the family's 2025 representative.
 \emph{Implication for document \gls{ie}.} Projection methods are inherently
 per-layer---implicit evidence that forgetting is not uniform across depth---but
 the \gls{svd} of 512-token tri-modal activations is costly, and the protected
@@ -257,7 +262,11 @@ update into frozen weight matrices,
 so each task adds only $2dr$ parameters while $W_0$ stays fixed
 \citep{hu2022lora}. \gls{olora}~\citep{wang2023olora} keeps the per-task
 subspaces $BA$ orthogonal across tasks, and InfLoRA~\citep{liang2024inflora}
-constrains new adapters to be orthogonal to the input subspaces of old tasks.
+constrains new adapters to be orthogonal to the input subspaces of old tasks. Its
+2025 successor CL-LoRA~\citep{he2025cllora} pairs a \emph{task-shared} adapter that
+retains cross-task knowledge by distillation with an orthogonality-constrained
+\emph{task-specific} adapter, the dual-adapter design we adopt as the family's
+current member.
 That such adapters can be allocated \emph{per layer} rather than uniformly is
 exploited by D-MoLE~\citep{ge2025dmole}, which dynamically routes a budget of
 low-rank experts to the layers where adaptation is most needed---direct evidence

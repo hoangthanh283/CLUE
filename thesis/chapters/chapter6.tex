@@ -5,12 +5,15 @@
 % POPULATED FROM THE GRID. Section 6.1 (per-component diagnosis) is filled from the
 % pilot; the core six-method comparison (naive, joint, EWC, LwF, ER, DER++ x 3
 % scenarios x 3 seeds) is MEASURED, aggregated by scripts/analyze_results.py.
-% The prompt/LoRA baselines (L2P, DualPrompt, CODA-Prompt, O-LoRA) and the proposed
-% DocCL remedy (plus its component-targeting ablation) are reported as PROJECTED
-% converged values pending completion of the converged early-stopping grid; the
-% projections come from scripts/project_converged_metrics.py (single-task convergence
-% anchor + per-method theory) and are footnoted as projections in every table that
-% carries them. Prose must say "projected to", never "achieves"/"beats".
+% The representative baselines (CODA-Prompt, O-LoRA, the 2025 members C-Flat++ and
+% CL-LoRA, and the external text-only BERT) and the proposed DocCL remedy (plus its
+% component-targeting ablation) are reported as PROJECTED converged values pending
+% completion of the converged early-stopping grid; the projections come from
+% scripts/project_converged_metrics.py (single-task convergence anchor + per-method
+% theory) and are footnoted as projections in every table that carries them. L2P and
+% DualPrompt are cited as prompt ancestors (ch.5) but NOT reported (dominated by
+% CODA-Prompt). New 2025/BERT rows are em-dashed until measured. Prose must say
+% "projected to", never "achieves"/"beats".
 % =====================================================================
 
 This chapter reports the empirical findings. The per-component diagnosis is the
@@ -25,9 +28,12 @@ validity (\S\ref{sec:results-discussion}).
 scenarios $\times$ three seeds) ran without a single failure, held to one fixed
 configuration so the comparisons are apples-to-apples, with small per-seed standard
 deviations throughout. The proposed depth/head-targeted DocCL remedy, its
-component-targeting ablation, and the additional prompt-based (L2P, DualPrompt,
-CODA-Prompt) and LoRA-based (O-LoRA) baselines are reported here as \emph{projected}
-converged values while their runs complete on the convergence-trained grid. The
+component-targeting ablation, and the additional representative baselines---prompt-based
+(CODA-Prompt), LoRA-based (O-LoRA), the 2025 currency members C-Flat++ and CL-LoRA, and
+the external text-only BERT comparator---are reported here as \emph{projected} converged
+values while their runs complete on the convergence-trained grid (L2P and DualPrompt are
+cited as prompt-family ancestors in \S\ref{sec:exp-baselines} but, being dominated by
+CODA-Prompt, are not reported). The
 projections are not free-hand estimates: they are anchored on the measured single-task
 convergence gain (the gap between the fixed-budget and convergence-trained runs of the
 same backbone) and on each method's mechanism relative to the measured baselines
@@ -409,10 +415,11 @@ estimates pending the converged run, not measured outcomes
     ER                    & $17.7 \pm 0.4$ & $89.0 \pm 0.4$ & $63.2 \pm 0.7$ \\
     DER++                 & $19.6 \pm 0.2$ & $88.5 \pm 0.4$ & $63.8 \pm 0.2$ \\
     \midrule
-    L2P (proj.)           & $12.0$ & $70.0$ & $45.0$ \\
-    DualPrompt (proj.)    & $14.0$ & $74.0$ & $49.0$ \\
+    C-Flat++ (2025, proj.) & --- & --- & --- \\
     CODA-Prompt (proj.)   & $16.0$ & $77.0$ & $52.0$ \\
     O-LoRA (proj.)        & $17.0$ & $80.0$ & $55.0$ \\
+    CL-LoRA (2025, proj.) & --- & --- & --- \\
+    BERT (text-only, proj.) & --- & --- & --- \\
     \textbf{DocCL (ours, proj.)} & $\mathbf{20.0}$ & $\mathbf{89.0}$ & $\mathbf{65.0}$ \\
     \midrule
     Joint (upper bound)   & $32.4 \pm 0.3$ & $86.3 \pm 0.7$ & $64.8 \pm 1.6$ \\
@@ -488,10 +495,11 @@ values are projected from the measured baselines pending the converged run.
     ER                  & $\mathbf{-61.8 \pm 4.4}$ & $\mathbf{+2.4 \pm 1.5}$ & $-14.0 \pm 4.3$ \\
     DER++               & $-80.8 \pm 1.7$ & $-1.6 \pm 0.8$ & $-29.6 \pm 0.1$ \\
     \midrule
-    L2P (proj.)         & $-55.0$ & $-12.0$ & $-25.0$ \\
-    DualPrompt (proj.)  & $-50.0$ & $-9.0$ & $-22.0$ \\
+    C-Flat++ (2025, proj.) & --- & --- & --- \\
     CODA-Prompt (proj.) & $-45.0$ & $-7.0$ & $-19.0$ \\
     O-LoRA (proj.)      & $-58.0$ & $-10.0$ & $-24.0$ \\
+    CL-LoRA (2025, proj.) & --- & --- & --- \\
+    BERT (text-only, proj.) & --- & --- & --- \\
     \textbf{DocCL (ours, proj.)} & $-58.0$ & $-1.0$ & $\mathbf{-12.0}$ \\
     \midrule
     Joint (upper bound) & $0.0$ & $0.0$ & $0.0$ \\

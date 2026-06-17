@@ -17,23 +17,26 @@ from pathlib import Path
 import hydra
 import numpy as np
 import torch
-import wandb
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import ConcatDataset, DataLoader
 
+import wandb
 from doccl.data.encoders import build_encoder
 from doccl.data.scenarios import get_scenario
 from doccl.eval.metrics import CLMetricsTracker, compute_per_class_f1
+from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.der import DERpp
 from doccl.methods.doccl import DocCL, DocCL_A, DocCL_B, DocCL_C
 from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.er import ER
+from doccl.methods.er_cflat import ERCFlat
 from doccl.methods.ewc import EWC
 from doccl.methods.l2p import L2P
 from doccl.methods.lwf import LwF
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
 from doccl.methods.o_lora import OLoRA
+from doccl.models.bert_family_wrapper import BERTWrapper
 from doccl.models.bros_wrapper import BROSWrapper
 from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
 from doccl.models.lilt_wrapper import LiLTWrapper
@@ -49,6 +52,8 @@ MODEL_REGISTRY = {
     "layoutlmv3": LayoutLMv3Wrapper,
     "lilt": LiLTWrapper,
     "bros": BROSWrapper,
+    # External text-only comparator (unimodal): the genuine BERT baseline.
+    "bert": BERTWrapper,
 }
 
 
@@ -126,7 +131,11 @@ METHOD_REGISTRY = {
     "lwf": LwF,
     "er": ER,
     "der_pp": DERpp,
+    # 2025 currency baseline: C-Flat++ (flat-minima/SAM) bolted onto ER.
+    "er_cflat": ERCFlat,
     "o_lora": OLoRA,
+    # 2025 currency baseline: CL-LoRA (dual-adapter LoRA), successor to O-LoRA.
+    "cl_lora": CLLoRA,
     "l2p": L2P,
     "dualprompt": DualPrompt,
     "coda_prompt": CODAPrompt,
@@ -173,6 +182,9 @@ def save_run_metrics(
         "method": cfg.method.name,
         "scenario": cfg.scenario.name,
         "seed": int(cfg.seed),
+        # Backbone family so the result pipeline can distinguish e.g. a text-only
+        # BERT "naive" run from the LayoutLMv3 "naive" run (same method string).
+        "model_family": cfg.model.get("family", "layoutlmv3"),
         "target_component": cfg.method.get("target_component"),
         "target_depth": cfg.method.get("target_depth"),
         **tracker.to_dict(),
@@ -218,6 +230,35 @@ def save_per_class_f1(out_dir: Path, model, eval_loaders: dict, device) -> None:
     log.info("Saved per-class F1 to %s", out_dir / "per_class_f1.json")
 
 
+def log_boundary_diagnostics(
+    tb,
+    model,
+    fisher_old: dict,
+    params_before: dict,
+    boundary: str,
+    step: int,
+) -> None:
+    """Log the forgetting localiser at a task boundary (reuses eval/fisher).
+
+    Writes, for the just-finished task transition, the old-task Fisher-weighted
+    parameter displacement (per component group AND per depth bucket) — i.e. *where*
+    the previous task's knowledge was overwritten. This is the forgetting-specific
+    localiser the pilot computes; here it runs for every CL method. (Per-layer CKA is
+    available via doccl.eval.cka for a dedicated representation-drift study.)
+    """
+    from doccl.eval.fisher import fisher_weighted_displacement, snapshot_params
+
+    params_after = snapshot_params(model)
+    disp_group = fisher_weighted_displacement(
+        fisher_old, params_before, params_after, model.param_groups, model
+    )
+    disp_depth = fisher_weighted_displacement(
+        fisher_old, params_before, params_after, model.param_groups_by_depth, model
+    )
+    tb.log_group_scalars(disp_group, f"displacement/{boundary}", step)
+    tb.log_group_scalars(disp_depth, f"displacement_by_depth/{boundary}", step)
+
+
 @hydra.main(version_base=None, config_path="../configs", config_name="default")
 def main(cfg: DictConfig) -> None:
     log.info("Config:\n%s", OmegaConf.to_yaml(cfg))
@@ -228,6 +269,11 @@ def main(cfg: DictConfig) -> None:
     # different target) get distinct result dirs and are identifiable. DocCL uses
     # target_depth; the legacy candidates use target_component.
     run_name = f"{cfg.scenario.name}_{cfg.method.name}_seed{cfg.seed}"
+    # Non-default backbones (BERT text-only, LiLT, BROS) suffix the run so their
+    # result dirs/metrics don't collide with the LayoutLMv3 run of the same method.
+    model_family = cfg.model.get("family", "layoutlmv3")
+    if model_family != "layoutlmv3":
+        run_name += f"_{model_family}"
     target_component = cfg.method.get("target_component")
     target_depth = cfg.method.get("target_depth")
     if cfg.method.name == "doccl" and target_depth not in (None, "all"):
@@ -312,6 +358,16 @@ def main(cfg: DictConfig) -> None:
     tb = TBLogger(out_dir / "tb", enabled=bool(cfg.get("tensorboard", {}).get("enabled", True)))
     task_names = [t.task_name for t in scenario.tasks]
     last_step = len(scenario.tasks) - 1
+
+    # Deep forgetting diagnostics (gradient/weight histograms + Fisher-weighted
+    # displacement + per-layer CKA at task boundaries). Heavier than the always-on
+    # retention scalars, so off by default — enable for a dedicated analysis run
+    # via tensorboard.diagnostics=true. Attaching tb to the method turns on the
+    # shared per-epoch weight-histogram hook (doccl.methods.base).
+    tb_diag_on = bool(tb.enabled and cfg.get("tensorboard", {}).get("diagnostics", False))
+    if tb_diag_on:
+        method.tb_diag = tb
+        log.info("TB deep diagnostics enabled (weight/grad histograms + Fisher/CKA).")
 
     # Special path for Joint: concatenate all train datasets and treat as 1 task
     if cfg.method.name == "joint":
@@ -432,6 +488,21 @@ def main(cfg: DictConfig) -> None:
 
         eval_loaders_seen[task_idx] = eval_loader
 
+        # Deep diagnostic (opt-in): before training task t, snapshot θ^{t-1} and the
+        # OLD task's Fisher so the post-task Fisher-weighted displacement localises
+        # where the previous task's knowledge moves. Skipped on the first task (no
+        # "previous" task yet) and when diagnostics are off (keeps the grid fast).
+        diag_params_before = None
+        diag_fisher_old = None
+        if tb_diag_on and task_idx > 0:
+            from doccl.eval.fisher import empirical_fisher_diagonal, snapshot_params
+
+            prev_loader = eval_loaders_seen[task_idx - 1]
+            diag_params_before = snapshot_params(model)
+            diag_fisher_old = empirical_fisher_diagonal(
+                model, prev_loader, n_samples=200, device=device
+            )
+
         # Lifecycle
         method.before_task(task, train_loader)
         t0 = time.perf_counter()
@@ -440,6 +511,19 @@ def main(cfg: DictConfig) -> None:
         train_metrics = method.train_task(task, train_loader, val_loader=eval_loader)
         task_times.append(time.perf_counter() - t0)
         method.after_task(task, train_loader)
+
+        if tb_diag_on and diag_params_before is not None:
+            try:
+                log_boundary_diagnostics(
+                    tb,
+                    model,
+                    diag_fisher_old,
+                    diag_params_before,
+                    f"{task_idx-1}_to_{task_idx}",
+                    task_idx,
+                )
+            except Exception as e:  # never fail a run over a diagnostic
+                log.warning("boundary diagnostics skipped: %s", e)
 
         # Evaluate on all seen tasks
         results = method.evaluate(eval_loaders_seen)
@@ -488,7 +572,9 @@ def main(cfg: DictConfig) -> None:
 
     # Per-class F1 on the final model — DIL-degeneracy evidence (review M5).
     # Standard-forward methods only (prompt/LoRA methods have a custom forward).
-    _STD_FORWARD = {"naive", "joint", "ewc", "lwf", "er", "der_pp", "doccl"}
+    # er_cflat uses ER's standard model forward (no PEFT/prompts) → eligible.
+    # cl_lora is PEFT-wrapped (custom forward) → excluded, like o_lora.
+    _STD_FORWARD = {"naive", "joint", "ewc", "lwf", "er", "der_pp", "er_cflat", "doccl"}
     if cfg.method.name in _STD_FORWARD:
         try:
             save_per_class_f1(out_dir, model, eval_loaders_seen, device)

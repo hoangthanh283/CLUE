@@ -16,3 +16,8 @@ tensorboard:
   # Live forgetting diagnostic (retention-matrix heatmap + per-task curves) written
   # to results/<run>/tb. View with: tensorboard --logdir results
   enabled: true
+  # Deep diagnostics: per-component/depth weight histograms (every epoch) + old-task
+  # Fisher-weighted displacement at task boundaries (where forgetting lives). Heavier
+  # (an extra Fisher pass per boundary) — OFF for the grid, enable for analysis runs:
+  #   tensorboard.diagnostics=true
+  diagnostics: false

@@ -47,16 +47,22 @@ except ImportError:
 
 
 # ─── Display maps (match thesis chapter 6 row/column labels) ────────────────────
+# Reported method order: classical families (each represented by its strongest
+# member) + the 2025 "currency" baselines next to their family peers + DocCL last.
+# L2P/DualPrompt are deliberately demoted to cite-only (the prompt family is
+# represented by CODA-Prompt); they stay in METHOD_DISPLAY so any legacy run still
+# renders, but are omitted from METHOD_ORDER so they are not reported as baselines.
 METHOD_ORDER = [
     "naive",
     "ewc",
+    "er_cflat",  # 2025 currency: ER + C-Flat++ (flat-minima)
     "lwf",
     "er",
     "der_pp",
-    "l2p",
-    "dualprompt",
     "coda_prompt",
     "o_lora",
+    "cl_lora",  # 2025 currency: CL-LoRA (dual-adapter, successor to O-LoRA)
+    "bert_textonly",  # external text-only comparator (naive on BERT backbone)
     "doccl",
 ]  # 'joint' is rendered separately as the oracle row
 METHOD_DISPLAY = {
@@ -66,10 +72,13 @@ METHOD_DISPLAY = {
     "lwf": "LwF",
     "er": "ER",
     "der_pp": "DER++",
+    "er_cflat": "ER + C-Flat++ (2025)",
     "l2p": "L2P",
     "dualprompt": "DualPrompt",
     "coda_prompt": "CODA-Prompt",
     "o_lora": "O-LoRA",
+    "cl_lora": "CL-LoRA (2025)",
+    "bert_textonly": "BERT (text-only)",
     "doccl": "\\textbf{DocCL (ours)}",
 }
 SCENARIO_ORDER = ["cil_cord", "dil", "mixed"]
@@ -156,11 +165,17 @@ def load_local_runs(results_dir: Path) -> pd.DataFrame:
             continue
         with open(mp) as f:
             d = json.load(f)
+        # Backbone-distinguished method key: a naive run on the BERT backbone is the
+        # external text-only comparator, not the LayoutLMv3 lower bound — surface it
+        # as its own "bert_textonly" row so the two never merge.
+        method = d.get("method", "?")
+        if d.get("model_family") == "bert":
+            method = "bert_textonly"
         rows.append(
             {
                 "name": mp.parent.name,
                 "state": "finished",
-                "method": d.get("method", "?"),
+                "method": method,
                 "scenario": d.get("scenario", "?"),
                 "seed": d.get("seed", -1),
                 "target_component": d.get("target_component"),
