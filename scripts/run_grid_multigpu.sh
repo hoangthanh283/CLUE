@@ -129,28 +129,34 @@ sync_setup() {
       && { export RCLONE_CONFIG="$RCLONE_TMP_CONF"; chmod 600 "$RCLONE_TMP_CONF"; say "[sync] using injected rclone.conf (temp, auto-deleted on exit)"; } \
       || say "[sync] WARN: could not decode RCLONE_CONFIG_B64"
   fi
+  # Cred-shape self-check FIRST: a blind paste into the secret prompt can silently drop
+  # chars (read -s echoes nothing). R2 tokens are 32-char key / 64-char secret; warn if
+  # the captured creds don't match so a paste typo is obvious before rclone even runs.
+  local kl="${#R2_ACCESS_KEY_ID}" sl="${#R2_SECRET_ACCESS_KEY}"
+  say "[sync] cred lengths: key=${kl} (expect 32), secret=${sl} (expect 64)"
+  if [ "$kl" != "32" ] || [ "$sl" != "64" ]; then
+    say "[sync] WARN: cred length mismatch — likely a mistyped/mis-pasted credential."
+    say "[sync] Fix: export R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY in the env and relaunch (avoids the blind prompt)."
+  fi
   # Fail-fast preflight: prove we can write+list+delete on the remote BEFORE running 189
-  # ungated jobs. A creds/bucket/endpoint mistake aborts in seconds, not after hours.
+  # ungated jobs. Run with -vv so the REAL error (403/Signature/skew/no-host) always prints.
   local tmp; tmp=$(mktemp -d)
   echo "ok $(date +%s)" > "$tmp/.synccheck"
-  # Capture rclone's OWN error so a failure is diagnosable (SignatureDoesNotMatch=typo'd
-  # secret, 403=token perms, no-such-host/timeout=network) instead of an opaque "FAILED".
-  local pf_err; pf_err=$(rclone copy "$tmp" "$SYNC_REMOTE" --include ".synccheck" 2>&1 | tee -a "$LOG")
-  if [ -z "$pf_err" ] || ! echo "$pf_err" | grep -qiE "error|fail|denied|forbidden|signature|no such|timeout|refused"; then
-    rclone lsf "$SYNC_REMOTE" 2>/dev/null | grep -q ".synccheck" && local pf_ok=1 || local pf_ok=0
-  else
-    local pf_ok=0
-  fi
-  if [ "${pf_ok:-0}" = "1" ]; then
+  local pf_err pf_rc
+  pf_err=$(rclone copy "$tmp" "$SYNC_REMOTE" --include ".synccheck" -vv 2>&1); pf_rc=$?
+  echo "$pf_err" >> "$LOG"
+  if [ "$pf_rc" -eq 0 ] && rclone lsf "$SYNC_REMOTE" 2>/dev/null | grep -q ".synccheck"; then
     rclone delete "$SYNC_REMOTE/.synccheck" >> "$LOG" 2>&1 || true
     rm -rf "$tmp"
     say "[sync] preflight OK — durable resume ON -> ${SYNC_REMOTE}"
   else
     rm -rf "$tmp"
-    say "[sync] PREFLIGHT FAILED on ${SYNC_REMOTE} — check bucket/token/endpoint."
-    # Surface rclone's actual error on-screen (the real root cause) — last 3 non-empty lines.
-    [ -n "$pf_err" ] && echo "$pf_err" | grep -v "^$" | tail -3 | sed 's/^/  [rclone] /'
-    say "[sync] hint: verify key/secret length (this token = 32-char key, 64-char secret) and that the R2 token has Object Read & Write on '${R2_BUCKET}'."
+    say "[sync] PREFLIGHT FAILED (rclone rc=${pf_rc}) on ${SYNC_REMOTE} — check bucket/token/endpoint."
+    # Surface rclone's actual error on-screen — the real root cause (prefer error/fatal lines).
+    local shown; shown=$(echo "$pf_err" | grep -iE "error|fail|denied|forbidden|signature|skew|no such|timeout|refused|403|400|401" | tail -3)
+    [ -z "$shown" ] && shown=$(echo "$pf_err" | grep -v "^$" | tail -3)
+    [ -n "$shown" ] && echo "$shown" | sed 's/^/  [rclone] /'
+    say "[sync] hint: R2 token must have Object Read & Write on '${R2_BUCKET}'; key/secret must be 32/64 chars."
     if [ "${SYNC_STRICT:-1}" = "1" ]; then
       say "[sync] SYNC_STRICT=1 (default): aborting so you don't run un-persisted. Set SYNC_STRICT=0 to run anyway."
       exit 3
