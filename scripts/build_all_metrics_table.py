@@ -19,6 +19,7 @@ from __future__ import annotations
 import csv
 import glob
 import json
+import math
 import statistics as st
 from collections import defaultdict
 from pathlib import Path
@@ -81,8 +82,11 @@ def load_measured(pattern_dirs: list[str]) -> dict:
                 m = "bert_textonly"
             if m in METH and s in SC:
                 for k in ("AA", "BWT", "AF", "FWT"):
-                    if d.get(k) is not None:
-                        agg[(m, s)][k].append(d[k])
+                    v = d.get(k)
+                    # Skip None and NaN (FWT is NaN for runs not seeded with the
+                    # single-task baseline CSV, e.g. ewc/lwf/er/der_pp).
+                    if v is not None and not (isinstance(v, float) and math.isnan(v)):
+                        agg[(m, s)][k].append(v)
     return agg
 
 
