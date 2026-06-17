@@ -86,19 +86,19 @@ its distilled old-class logits decay once the growing head stops reinforcing the
 Its second contribution is DocCL, a depth/head-targeted method derived directly from
 the diagnosis---depth-scaled consolidation, output distillation, and head replay
 concentrated on the classifier head and late layers---evaluated on the FCS-CL
-benchmark against the baselines with a depth-targeting ablation. On the
-convergence-trained grid DocCL is \emph{projected} to match the strongest replay
-baseline on domain-incremental learning (AA $\approx 89$, BWT $\approx -1$) and to edge
-it on the Mixed scenario (AA $\approx 65$, the best non-oracle result there) at the
-lowest forgetting of any method, while no method---DocCL included---closes the
-fine-grained class-incremental gap, where even the joint oracle reaches only the low
-thirties. These figures are design- and anchor-derived projections, stated as such; the
-measured confirmation is in progress (the converged grid was running at submission) and
-is the immediate next step (\S\ref{sec:concl-future}). Whatever the remedy's measured
-margin, the diagnostic contribution stands on its own: it provides a reusable tool and a
-shared benchmark for studying forgetting in multimodal document encoders---together with
-a strong-baseline context (replay reaching the oracle) that any targeted method must
-beat---which the prior, fragmented literature lacked.
+benchmark against the baselines. Measured over three seeds, DocCL \emph{reaches the joint
+oracle} on domain-incremental learning (AA $84.7$ vs the oracle's $84.8$, backward transfer
+$-4.6$), closing essentially the entire forgetting gap, but it does \emph{not} surpass
+experience replay, which sits $\sim$3 points higher (ER/DER++ $\approx 88$); on the Mixed
+scenario DocCL ($57.6$) tracks below both replay ($\approx 61$) and the oracle ($64.8$),
+and no method---DocCL included---closes the fine-grained class-incremental gap, where even
+the joint oracle reaches only the low thirties. The honest finding is therefore that
+diagnosis-driven head/late targeting is sufficient to match the oracle and close the
+forgetting gap on a domain shift, performing competitively with---but not exceeding---data
+replay. The diagnostic contribution stands on its own regardless: it provides a reusable
+tool and a shared benchmark for studying forgetting in multimodal document
+encoders---together with the finding that replay remains the strongest single
+remedy---which the prior, fragmented literature lacked.
 
 \section{Future Work}
 \label{sec:concl-future}
