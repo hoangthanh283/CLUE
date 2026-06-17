@@ -93,6 +93,19 @@ significance test needs all five. Then `python -m doccl.pilot.analyze --pilot_di
 - **Watchdog** (`run_grid_watchdog.sh`, 5.8 GB VRAM cap) is for the **6 GB card only** —
   do NOT run it on the 48 GB boxes.
 - All three log to W&B project `CL4IE`; runs aggregate in one dashboard.
+- **TensorBoard for every run (default on):** each run writes `results/<run>/tb/`
+  (retention curves + forgetting-matrix heatmaps + scalars) — `tensorboard.enabled:true`
+  in `configs/default.yaml`, no flag needed. These logs are **synced to/from R2** alongside
+  the resume markers (they're tiny — the whole 234-run grid is <~40 MB), so you can pull a
+  remote box's logs and analyse locally for the thesis:
+  ```bash
+  bash scripts/sync_results_to_r2.sh --pull   # brings results/<run>/tb/ to this box
+  tensorboard --logdir results                 # one board across all runs
+  ```
+  (For the *deep* per-component diagnosis — weight/grad histograms + Fisher displacement —
+  add `tensorboard.diagnostics=true` to a run; it's OFF by default on the grid because it
+  costs an extra Fisher pass per task. Use it on a few targeted analysis runs, not the
+  whole grid.)
 - When scenarios finish, pull R2 and run `scripts/analyze_results.py` +
   `scripts/build_all_metrics_table.py` to emit the Ch.6 tables (the new method display
   names er_cflat / cl_lora / bert_textonly are already wired).
