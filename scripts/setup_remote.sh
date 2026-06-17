@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# One-command setup + run for a GPU CONTAINER instance (e.g. ViLao RTX A5000/4090).
+# One-command setup + run for a GPU CONTAINER instance on ANY provider (VastAI, ViLao,
+# RunPod, etc.). This is THE single entry point — there is no separate per-provider script.
 #
 # Designed for pytorch/pytorch:*-cuda*-runtime images (torch + CUDA pre-installed).
 # Use this when you are already INSIDE a container/VM with the GPUs visible (no
@@ -45,6 +46,20 @@ nvidia-smi --query-gpu=index,name,memory.total,driver_version --format=csv,nohea
 NGPU=$(nvidia-smi --query-gpu=index --format=csv,noheader | wc -l)
 [ "$NGPU" -ge 1 ] || die "no GPUs detected"
 ok "$NGPU GPU(s) detected"
+
+# Free-VRAM sanity: a dirty/shared rented box may have a foreign process holding the
+# card. Warn loudly if <40% is free so you catch it before launching (and wasting paid
+# hours) instead of OOM-ing per job.
+FREE_MIB=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ')
+TOTAL_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ')
+if [ -n "${FREE_MIB:-}" ] && [ -n "${TOTAL_MIB:-}" ]; then
+  ok "VRAM free: ${FREE_MIB} / ${TOTAL_MIB} MiB"
+  if [ "$FREE_MIB" -lt $(( TOTAL_MIB * 4 / 10 )) ]; then
+    warn "Most VRAM already in use by another process (foreign/shared box?)."
+    warn "Check: nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader"
+    warn "If it's not yours and unkillable, reprovision — this box is crippled."
+  fi
+fi
 
 # ── 2. Python deps (reuse the template's torch; install the rest) ────────────────
 # Find the interpreter that actually HAS a working torch+CUDA. The pytorch/pytorch:*
@@ -175,13 +190,18 @@ export PROMPT_METHODS="${PROMPT_METHODS:-l2p dualprompt coda_prompt o_lora}"
 export RUN_DOCCL="${RUN_DOCCL:-1}"
 export RUN_ABLATION="${RUN_ABLATION:-1}"
 export ABLATION_SCENARIOS="${ABLATION_SCENARIOS:-cil_cord dil mixed dil_xlingual cil_wildreceipt}"
+# Scenario partition: defaults to ALL 5, but a caller (e.g. setup_vastai.sh, or a
+# per-machine launch) can set SCENARIOS to a disjoint subset so several boxes split the
+# grid with zero overlap (their job lists never intersect -> no R2-race waste).
+export SCENARIOS="${SCENARIOS:-cil_cord dil mixed dil_xlingual cil_wildreceipt}"
 export AMP="${AMP:-1}"   # bf16 on (RTX 4090); set AMP=0 for exact fp32
 
 # Count the planned jobs so you see the full scope before it starts.
 NJOBS=$(DRY_RUN=1 bash scripts/run_grid_multigpu.sh 2>/dev/null | grep -cE "  ->  " || echo "?")
 
 echo
-info "Launching FULL grid: ${NJOBS} runs (core + prompt/LoRA + DocCL + full ablation, all 5 scenarios x 3 seeds)"
+info "Launching grid: ${NJOBS} runs (core + prompt/LoRA + DocCL + ablation + currency)"
+info "  SCENARIOS='${SCENARIOS}'  (partition this box owns)"
 info "  GPUS='${GPUS}' JOBS_PER_GPU=${JOBS_PER_GPU} BATCH_SIZE=${BATCH_SIZE} bf16=$([ "${AMP}" = "1" ] && echo ON || echo OFF) W&B=${WANDB_MODE} sync=$([ -n "${R2_ACCESS_KEY_ID:-}" ] && echo ON || echo OFF)"
 echo "  ${c_dim}heartbeat + filtered training lines stream below; re-run this script to resume.${c_off}"
 echo

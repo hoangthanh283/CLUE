@@ -240,6 +240,10 @@ CORE_AFTER_DOCCL="${CORE_AFTER_DOCCL:-der_pp}"
 
 add_singletask() {
   # Single-task baselines (provide b_i for FWT). One dataset per single scenario.
+  # Scenario-INDEPENDENT, so they don't follow the SCENARIOS partition — set
+  # RUN_SINGLETASK=0 on all-but-one box when partitioning the grid across machines,
+  # so the single-task set runs on exactly one box (no cross-machine duplication).
+  [ "${RUN_SINGLETASK:-1}" = "1" ] || return 0
   for sc in single_funsd single_cord single_sroie single_xfund single_wildreceipt; do
     for s in $SEEDS; do add_job "${sc}_naive_seed${s}" "method=naive scenario=${sc} seed=${s}"; done
   done
