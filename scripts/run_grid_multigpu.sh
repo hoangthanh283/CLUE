@@ -216,7 +216,16 @@ heartbeat_loop() {  # <total>
   while :; do
     sleep "$HEARTBEAT_SECS"
     local done_ct fail_ct elapsed eta="n/a" f rn last
-    done_ct=$(ls results/*/.done 2>/dev/null | wc -l)
+    # Count .done ONLY for THIS launch's jobs (HB_MANIFEST), so done_ct can never exceed
+    # total even when results/ holds other partitions'/stale .done markers (shared R2 bucket).
+    if [ -f "$HB_MANIFEST" ]; then
+      done_ct=0
+      while IFS= read -r rn; do
+        [ -n "$rn" ] && [ -f "results/${rn}/.done" ] && done_ct=$((done_ct+1))
+      done < "$HB_MANIFEST"
+    else
+      done_ct=$(ls results/*/.done 2>/dev/null | wc -l)   # fallback (manifest absent)
+    fi
     # Count [FAIL only AFTER this launch's session marker (not stale failures from
     # prior relaunches appended to the same persistent log).
     fail_ct=$(awk -v m="$SESSION_MARKER" 'index($0,m){c=0;seen=1;next} seen&&/\[FAIL/{c++} END{print c+0}' "$LOG" 2>/dev/null || echo 0)
@@ -247,6 +256,7 @@ on_exit() {
   sync_push_once
   # Wipe any temp rclone config (RCLONE_CONFIG_B64 fallback path) so no creds linger on disk.
   [ -n "${RCLONE_TMP_CONF:-}" ] && shred -u "$RCLONE_TMP_CONF" 2>/dev/null || rm -f "${RCLONE_TMP_CONF:-}" 2>/dev/null
+  [ -n "${HB_MANIFEST:-}" ] && rm -f "$HB_MANIFEST" 2>/dev/null
   say "[exit] heartbeat/sync stopped; final push done (or no-op)"
 }
 
@@ -335,6 +345,13 @@ else
   # Tier 3 — 2025 currency baselines.
   add_currency
 fi
+
+# This launch's run-names, one per line. The heartbeat counts ONLY these .done markers as
+# "done" — NOT every results/*/.done on disk. On a shared R2 bucket the local results/ also
+# holds the OTHER box's completed runs (pulled by sync) plus stale .done from prior launches,
+# so `ls results/*/.done | wc -l` over-counts and produced the nonsensical 145/141 (done > total).
+HB_MANIFEST="results/logs/.hb_jobs_$$"
+printf '%s\n' "${JOBS[@]}" | cut -d'|' -f1 > "$HB_MANIFEST"
 
 NUM_GPUS=$(echo $GPUS | wc -w)
 TOTAL_SLOTS=$(( NUM_GPUS * JOBS_PER_GPU ))
@@ -454,5 +471,5 @@ while [ ${#SLOT_PID[@]} -gt 0 ]; do
   sleep 5
 done
 
-say "=== COMPLETE. done=$DONE_CT skip=$SKIP_CT fail=$FAIL_CT | total .done=$(ls results/*/.done 2>/dev/null | wc -l) ==="
+say "=== COMPLETE. done=$DONE_CT skip=$SKIP_CT fail=$FAIL_CT (this launch) | markers in results/ (all partitions)=$(ls results/*/.done 2>/dev/null | wc -l) ==="
 say "Next: \$PYBIN scripts/analyze_results.py && \$PYBIN scripts/ingest_to_thesis.py"
