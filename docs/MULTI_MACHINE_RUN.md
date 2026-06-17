@@ -25,10 +25,9 @@ The runs finished so far live in **this box's local `results/`**, not R2. Seed R
 them ONCE, before launching any remote:
 
 ```bash
-# On this (local) box, with the R2 creds:
-R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_ENDPOINT=... R2_BUCKET=doccl-results \
-  bash scripts/sync_results_to_r2.sh          # push local .done/metrics -> R2
-R2_ACCESS_KEY_ID=... ... bash scripts/sync_results_to_r2.sh --list   # confirm coverage
+# On this (local) box — it PROMPTS for the R2 creds (held in memory, never on disk):
+bash scripts/sync_results_to_r2.sh          # push local .done/metrics -> R2
+bash scripts/sync_results_to_r2.sh --list   # confirm coverage
 ```
 
 Then **always launch the remotes WITH R2 creds** (so `sync_pull` runs and `SYNC_STRICT=1`

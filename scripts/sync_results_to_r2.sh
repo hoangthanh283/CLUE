@@ -11,26 +11,35 @@
 # It can also PULL R2 -> local (--pull) to refresh this box with what the remotes finished,
 # and LIST what R2 currently has (--list) so you can confirm coverage before launching.
 #
-# Usage (creds via env, never written to disk — same as setup_remote.sh):
-#   R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_ENDPOINT=... [R2_BUCKET=doccl-results] \
-#     bash scripts/sync_results_to_r2.sh            # push local .done/metrics -> R2 (default)
-#   ... bash scripts/sync_results_to_r2.sh --pull   # pull R2 -> local (refresh after remotes run)
-#   ... bash scripts/sync_results_to_r2.sh --list   # list run-names present in R2
+# Just run it — it PROMPTS for the R2 creds (held in memory, never written to disk). Any
+# cred already in the environment is reused (no prompt), so it also works non-interactively.
+#   bash scripts/sync_results_to_r2.sh            # push local .done/metrics -> R2 (default)
+#   bash scripts/sync_results_to_r2.sh --pull     # pull R2 -> local (refresh after remotes run)
+#   bash scripts/sync_results_to_r2.sh --list     # list run-names present in R2
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
 MODE="${1:-push}"   # push | --push | pull | --pull | list | --list
 MODE="${MODE#--}"
 
-R2_BUCKET="${R2_BUCKET:-doccl-results}"
+# ── Credentials (prompt if not already in env; memory only, never written to disk) ──
+prompt_secret(){ local var="$1" label="$2"; [ -n "${!1:-}" ] && { echo "  $label (from env)"; return; }; read -r -s -p "  ${label}: " v; echo; printf -v "$var" '%s' "$v"; }
+prompt_plain(){  local var="$1" label="$2" def="${3:-}"; [ -n "${!1:-}" ] && { echo "  $label = ${!1} (env)"; return; }; read -r -p "  ${label}${def:+ [$def]}: " v; printf -v "$var" '%s' "${v:-$def}"; }
+
+command -v rclone >/dev/null 2>&1 || { echo "ERROR: rclone not installed."; exit 1; }
+
+echo "Cloudflare R2 credentials (Enter reuses any env value):"
+prompt_secret R2_ACCESS_KEY_ID     "R2 Access Key ID"
+prompt_secret R2_SECRET_ACCESS_KEY "R2 Secret Access Key"
+prompt_plain  R2_ENDPOINT          "R2 Endpoint URL"
+prompt_plain  R2_BUCKET            "R2 Bucket" "doccl-results"
+[ -n "${R2_ACCESS_KEY_ID:-}" ] && [ -n "${R2_SECRET_ACCESS_KEY:-}" ] && [ -n "${R2_ENDPOINT:-}" ] \
+  || { echo "ERROR: R2 Access Key ID, Secret, and Endpoint are all required."; exit 1; }
+
 SYNC_REMOTE="obj:${R2_BUCKET}/results"
 # Only the tiny resume markers travel (mirrors run_grid_multigpu.sh SYNC_INCLUDES).
 INCLUDES=(--include "*/.done" --include "*/metrics.json" --include "*/matrix.npy"
           --include "table_single_task_baselines.csv")
-
-command -v rclone >/dev/null 2>&1 || { echo "ERROR: rclone not installed."; exit 1; }
-[ -n "${R2_ACCESS_KEY_ID:-}" ] && [ -n "${R2_SECRET_ACCESS_KEY:-}" ] && [ -n "${R2_ENDPOINT:-}" ] \
-  || { echo "ERROR: set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT (and optionally R2_BUCKET)."; exit 1; }
 
 # In-process rclone 'obj' remote (no config file on disk) — identical to the grid's.
 export RCLONE_CONFIG_OBJ_TYPE=s3
