@@ -9,5 +9,9 @@ epochs: 10
 max_grad_norm: 1.0
 buffer_size: 200
 replay_batch_size: 8
-rho: 0.05            # SAM neighbourhood radius (epsilon = rho * g/||g||)
-cflat_lambda: 0.1   # C-Flat curvature weight; 0.0 = plain SAM
+rho: 0.05  # SAM neighbourhood radius (epsilon = rho * g/||g||)
+# C-Flat curvature weight. 0.0 = plain SAM (sharpness-aware flat-minima, the
+# verified default). >0 adds the zeroth-order curvature term but needs a second
+# live graph + curvature buffer that OOMs the 6 GB box when shared with the grid;
+# set cflat_lambda=0.1 only on a larger GPU (>=16 GB free).
+cflat_lambda: 0.0

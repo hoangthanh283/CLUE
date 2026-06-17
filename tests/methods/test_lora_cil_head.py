@@ -73,3 +73,17 @@ def test_cl_lora_survives_cil_head_expansion():
     method.before_task(TaskInfo(task_id=1, task_name="t1", label_set=["O"] + _T1_NEW), None)
     loss = _forward_with_new_class(model)
     assert loss == loss
+
+
+def test_olora_survives_repeated_cil_expansions():
+    """Multi-boundary CIL (cil_cord has 5 head growths): the sync must hold each time."""
+    model, method = _build(OLoRA)
+    # Three sequential expansions, mimicking task boundaries 1, 2, 3.
+    for i, new in enumerate([["B-A", "I-A"], ["B-B", "I-B"], ["B-C", "I-C"]]):
+        model.expand_classifier(new)
+        method.before_task(
+            TaskInfo(task_id=i + 1, task_name=f"t{i+1}", label_set=["O"] + new), None
+        )
+        loss = _forward_with_new_class(model)  # label = newest class each round
+        assert loss == loss
+    assert model.model.classifier.out_features == len(_T0_LABELS) + 6
