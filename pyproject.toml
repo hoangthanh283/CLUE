@@ -23,10 +23,19 @@ dependencies = [
     # UPGRADE the image's torch and re-download the whole ~4GB nvidia-* CUDA wheel stack
     # on every fresh rented box — pure waste, since the code uses no torch>=2.3 API.
     "torch>=2.2.0",
-    "transformers>=4.41.0",
+    # UPPER CAPS are load-bearing, not cosmetic. With torch pinned at 2.2.0 (above), a
+    # floor-only "transformers>=4.41.0" lets pip resolve to the LATEST transformers, whose
+    # 4.49+ kernel-hub refactor (integrations.hub_kernels -> conversion_mapping ->
+    # core_model_loading) hard-requires torch>=2.4. On a torch-2.2 box transformers then
+    # *disables* PyTorch (logs "PyTorch >= 2.4 is required ... not found"), and a class-def
+    # annotation `list[nn.Module]` in integrations/accelerate.py blows up with
+    # `NameError: name 'nn' is not defined` the moment peft imports transformers internals
+    # — killing every grid job at rc=1. Cap transformers AND peft to the last series that
+    # supports torch 2.2 and pairs cleanly. Do NOT remove the upper bounds.
+    "transformers>=4.41.0,<4.49",
     "datasets>=4.0.0",
-    "accelerate>=0.30.0",
-    "peft>=0.11.0",
+    "accelerate>=0.30.0,<1.2",
+    "peft>=0.11.0,<0.14",
     "sentencepiece>=0.2.0",
     "Pillow>=10.3.0",
     "torchvision>=0.17.0",
