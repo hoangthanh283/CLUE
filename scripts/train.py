@@ -277,6 +277,12 @@ def main(cfg: DictConfig) -> None:
     method_cls = METHOD_REGISTRY[cfg.method.name]
     method = method_cls(model, OmegaConf.to_container(cfg.method, resolve=True))
 
+    # Opt-in mixed precision (bf16 on Ampere+, else fp16). Methods that wire the AMP
+    # helpers (NaiveFineTune → naive/joint/doccl) honor this; others run full precision.
+    method.amp_enabled = bool(cfg.training.get("amp", False) or cfg.training.get("fp16", False))
+    if method.amp_enabled:
+        log.info("Mixed precision enabled (cfg.training.amp/fp16).")
+
     # Activation checkpointing (after any PEFT wrapping) — fits small-VRAM GPUs.
     if cfg.training.get("gradient_checkpointing", False):
         model.enable_gradient_checkpointing()

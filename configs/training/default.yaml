@@ -1,6 +1,10 @@
 batch_size: 8
 num_workers: 4
 gradient_accumulation_steps: 1
+# Mixed precision (wired into NaiveFineTune → naive/joint/doccl). Auto-selects bf16 on
+# Ampere+ (no loss scaling), else fp16 with a GradScaler. ~1.5-2x faster on the 4090.
+# `fp16` is honored as an alias of `amp`. Default off → runs are byte-identical.
+amp: false
 fp16: false
 # Recompute activations in backward to cut training memory. Turn on for limited-VRAM
 # GPUs so full fine-tuning fits at a small batch size.
