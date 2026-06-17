@@ -367,34 +367,38 @@ prose, to be replaced by the measured numbers once the converged grid completes.
 \label{sec:results-main-table}
 
 Table~\ref{tab:main-comparison} and Figure~\ref{fig:aa-bars} report the average accuracy
-of each method on the three scenarios. Five patterns hold. The first four characterise the
-core six methods; the fifth reports the now-measured DocCL result. First, naive fine-tuning
-is far below the joint oracle in every scenario, with the gap largest on the
-domain-incremental scenario ($39.9$ vs $86.3$). Second, the two \emph{replay} methods are
-the strongest non-oracle strategies by a wide margin and behave almost identically: on DIL
-both ER ($89.0$) and DER++ ($88.5$) statistically match---indeed marginally exceed---the
-joint upper bound ($86.3$), closing essentially the entire forgetting gap; on the Mixed
-scenario both reach the joint ceiling as well (ER $63.2$, DER++ $63.8$ vs joint $64.8$).
-Third, regularisation (EWC) helps clearly on the two scenarios with a domain shift
-(DIL $48.1$, the best non-replay result there) but slightly \emph{hurts} average accuracy
-on fine-grained class-incremental learning (CIL-CORD $16.3$ vs naive $19.4$), because its
-Fisher penalty trades plasticity for stability. Fourth, distillation (LwF) tracks the
-naive lower bound throughout---in this dense token-classification setting LwF gives
-essentially no benefit, because the old-class logits it distils collapse anyway as the
-classifier head grows. The hardest scenario for every method is CIL-CORD, where even the
-joint oracle reaches only $32.4$ AA: packing all $60$ fine-grained CORD classes into one
-growing head is an intrinsically difficult multi-class problem, independent of forgetting.
-Fifth, and most important for this thesis, the proposed \textbf{DocCL} is now measured
-(mean over three seeds): it \emph{reaches the joint oracle} on domain-incremental learning
-(DocCL $84.7$ vs the oracle's $84.8$), closing essentially the entire $\sim$45-point
+of each method on the three scenarios, all measured to convergence over three seeds. Five
+patterns hold. The first four characterise the core six methods; the fifth reports DocCL.
+First, naive fine-tuning is far below the joint oracle in every scenario, with the gap
+largest on the domain-incremental scenario ($39.3$ vs $85.1$). Second, the two
+\emph{replay} methods are the strongest non-oracle strategies by a wide margin and behave
+almost identically: on DIL both ER ($87.9$) and DER++ ($88.0$) statistically match---indeed
+marginally exceed---the joint upper bound ($85.1$), closing essentially the entire
+forgetting gap; on the Mixed scenario they reach $60.3$ and $60.8$, below the oracle
+($67.5$) but far above the rest. Third, regularisation (EWC) is the most surprising result:
+trained to convergence its Fisher penalty over-constrains the growing head and it
+\emph{collapses} on fine-grained class-incremental learning---CIL-CORD AA falls to $0.5$,
+far below naive ($18.7$)---and it is unstable on Mixed ($22.0\pm7.6$); yet on the
+fixed-label DIL scenario the same penalty yields near-zero forgetting (BWT $-2.8$). EWC thus
+buys retention at the cost of plasticity, and on a growing output space that trade-off is
+catastrophic. Fourth, distillation (LwF) tracks the naive lower bound throughout---in this
+dense token-classification setting LwF gives essentially no benefit, because the old-class
+logits it distils collapse anyway as the classifier head grows. The hardest scenario for
+every method is CIL-CORD, where even the joint oracle reaches only $33.3$ AA: packing all
+$60$ fine-grained CORD classes into one growing head is an intrinsically difficult
+multi-class problem, independent of forgetting.
+Fifth, and most important for this thesis, the proposed \textbf{DocCL}
+(mean over three seeds) \emph{reaches the joint oracle} on domain-incremental learning
+(DocCL $84.7$ vs the oracle's $85.1$), closing essentially the entire $\sim$45-point
 forgetting gap, but it does \emph{not} surpass the replay baselines, which sit $\sim$3
 points higher (ER/DER++ $\approx 88$). On the Mixed scenario DocCL ($57.6$) tracks below
-both replay (ER/DER++ $\approx 61$) and the oracle ($64.8$), and on CIL-CORD it lands
-at $16.1$, on a par with the strongest replay method (ER $15.7$) where no method makes
+both replay (ER/DER++ $\approx 60$) and the oracle ($67.5$), and on CIL-CORD it lands
+at $16.1$, on a par with the strongest replay method (ER $16.0$) where no method makes
 real progress. The honest reading is therefore that DocCL's diagnosis-driven head/late
 targeting is sufficient to \emph{match the oracle} and close the forgetting gap on a
 domain shift, performing competitively with---but not exceeding---data replay; replay
-remains the strongest single remedy in this benchmark.
+remains the strongest single remedy in this benchmark, and DocCL's chief advantage over
+replay is qualitative---it needs only a small head buffer rather than full-input rehearsal.
 
 \begin{table}[!htbp]
   \centering
@@ -413,11 +417,11 @@ remains the strongest single remedy in this benchmark.
     \toprule
     \textbf{Method} & \textbf{CIL-CORD} & \textbf{DIL} & \textbf{Mixed} \\
     \midrule
-    Naive (lower bound)   & $19.4 \pm 0.3$ & $39.9 \pm 0.8$ & $31.9 \pm 2.8$ \\
-    EWC                   & $16.3 \pm 1.2$ & $48.1 \pm 3.1$ & $35.9 \pm 2.8$ \\
-    LwF                   & $19.6 \pm 0.3$ & $39.9 \pm 0.8$ & $33.8 \pm 0.8$ \\
-    ER                    & $17.7 \pm 0.4$ & $\mathbf{89.0 \pm 0.4}$ & $63.2 \pm 0.7$ \\
-    DER++                 & $19.6 \pm 0.2$ & $88.5 \pm 0.4$ & $\mathbf{63.8 \pm 0.2}$ \\
+    Naive (lower bound)   & $18.7 \pm 0.1$ & $39.3 \pm 0.4$ & $33.0 \pm 0.7$ \\
+    EWC                   & $0.5 \pm 0.5$ & $41.2 \pm 0.9$ & $22.0 \pm 7.6$ \\
+    LwF                   & $\mathbf{18.8 \pm 0.1}$ & $43.7 \pm 0.9$ & $35.2 \pm 1.0$ \\
+    ER                    & $16.0 \pm 1.1$ & $87.9 \pm 1.2$ & $60.3 \pm 4.3$ \\
+    DER++                 & $18.2 \pm 0.2$ & $\mathbf{88.0 \pm 0.7}$ & $\mathbf{60.8 \pm 2.2}$ \\
     \textbf{DocCL (ours)} & $16.1 \pm 0.7$ & $84.7 \pm 1.4$ & $57.6 \pm 1.9$ \\
     \midrule
     C-Flat++ (2025, proj.) & --- & --- & --- \\
@@ -426,7 +430,7 @@ remains the strongest single remedy in this benchmark.
     CL-LoRA (2025, proj.) & --- & --- & --- \\
     BERT (text-only, proj.) & --- & --- & --- \\
     \midrule
-    Joint (upper bound)   & $32.4 \pm 0.3$ & $86.3 \pm 0.7$ & $64.8 \pm 1.6$ \\
+    Joint (upper bound)   & $33.3 \pm 0.3$ & $85.1 \pm 2.9$ & $67.5 \pm 0.7$ \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -454,28 +458,35 @@ remains the strongest single remedy in this benchmark.
   \label{fig:doccl-vs-replay}
 \end{figure}
 
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{bench_dil_closeup.pdf}
+  \caption[DIL close-up: DocCL reaches the oracle]{Domain-incremental (DIL) close-up,
+  measured average accuracy per method with the joint-oracle level marked (dashed). DocCL
+  ($84.7$) sits at the oracle ($85.1$); the replay methods (ER $87.9$, DER++ $88.0$) lead
+  by $\sim$3 points; EWC, LwF, and naive trail far behind. This is the scenario where the
+  diagnosis-driven head/late targeting is most effective.}
+  \label{fig:dil-closeup}
+\end{figure}
+
 \subsection{Forgetting and Plasticity Breakdown}
 \label{sec:results-bwt-fwt}
 
-Backward transfer (Table~\ref{tab:bwt-comparison}, Figure~\ref{fig:bwt-bars}) sharpens
-the ranking. Naive and LwF forget almost totally on CIL-CORD (BWT $\approx-90$); EWC
-roughly halves the forgetting on the two scenarios with a domain shift (DIL $-30.5$,
-Mixed $-25.3$ vs naive $-71.3$ and $-66.8$) but barely helps on CIL-CORD; and the two
-replay methods all but eliminate forgetting on DIL---ER reaches a slightly
-\emph{positive} backward transfer ($+2.4$) and DER++ a near-zero $-1.6$, meaning later
-tasks no longer overwrite earlier ones under replay. On the Mixed scenario replay again
-leads (ER $-14.0$, DER++ $-29.6$ vs naive $-66.8$), and on the hardest scenario,
-CIL-CORD, ER gives the single best backward transfer of any \emph{measured} method
-($-61.8$ vs naive $-90.4$). The two replay variants differ in character: ER (pure
-rehearsal) is the stronger forgetting-reducer on CIL-CORD and Mixed, whereas DER++
-(rehearsal plus logit distillation) is the more \emph{seed-stable} and ties ER on DIL.
-The measured ordering for forgetting prevention is thus
-naive\,$\approx$\,LwF\,$<$\,EWC\,$<$\,DER++\,$\lesssim$\,ER, with both replay methods
-reaching the zero-forgetting joint oracle on the domain-incremental scenario. The
-measured DocCL sits within this ordering: by combining head-targeted consolidation with
-head replay it drives DIL forgetting close to zero ($-4.6$, near the replay methods'
-$-1.6$ to $+2.4$) and Mixed forgetting to $-27.1$ (between EWC and DER++), while CIL-CORD
-($-79.3$) remains hard for every method. Its forgetting profile thus matches replay on the
+Backward transfer (Table~\ref{tab:bwt-comparison}, Figure~\ref{fig:bwt-bars}) reveals a
+\emph{decoupling} of forgetting from accuracy that the AA table alone hides. Naive and LwF
+forget almost totally everywhere (BWT $\approx-90$ on CIL-CORD, $\approx-70$ elsewhere).
+The replay methods all but eliminate forgetting on DIL---ER $-2.8$ and DER++ $-3.4$,
+near-zero---meaning later tasks no longer overwrite earlier ones under rehearsal. The
+striking result is \emph{EWC}: trained to convergence it is the single \emph{best}
+forgetting-reducer on two of three scenarios (CIL-CORD $-54.8$ and Mixed $-8.4$, both
+ahead of replay) and near-zero on DIL ($-2.8$). But this stability is bought with
+plasticity: the same penalty that protects old classes prevents EWC from \emph{learning}
+the current one, which is why its accuracy collapses on the growing CIL-CORD head
+($0.5$ AA) even as its forgetting is the lowest---a model that forgets little because it
+learns little. The measured DocCL drives DIL forgetting close to zero ($-4.6$, near the
+replay methods' $-2.8$ to $-3.4$) and Mixed forgetting to $-27.1$, while CIL-CORD
+($-79.3$) remains hard for every plastic method. DocCL's forgetting profile thus matches
+replay on the
 domain shift but does not improve on it.
 
 \paragraph{Forward transfer.} Forward transfer measures performance on a task
@@ -485,11 +496,11 @@ grid records the required zero-shot $R[i{-}1,i]$ entries and the single-task bas
 $b_i$ (measured: FUNSD $\approx 86$, CORD $\approx 90$, SROIE $\approx 81$). Because each
 new session introduces label structure the model has never produced---entirely new BIO
 tags in class-incremental CORD, a shifted domain in DIL---forward transfer is
-\emph{strongly negative} and depends on the scenario, not the method: it is projected at
-$\approx-88$ on CIL-CORD (the head cannot predict unseen classes), $\approx-60$ on DIL
-(the unified tag space affords partial zero-shot transfer across domains), and
-$\approx-74$ on Mixed. This negative forward transfer is itself a finding: in continual
-document IE there is little to gain ahead of seeing a task's data, which is precisely why
+\emph{strongly negative} and depends on the scenario, not the method. Where it is measured
+(naive and DocCL, whose runs were seeded with the single-task baselines), it is
+$\approx-92$ on CIL-CORD (the head cannot predict unseen classes), $\approx-75$ to $-84$ on
+DIL, and $\approx-80$ to $-88$ on Mixed. This negative forward transfer is itself a finding:
+in continual document IE there is little to gain ahead of seeing a task's data, which is precisely why
 the \emph{backward} methods (replay, head-targeted consolidation) dominate. These FWT
 values are projected from the measured baselines pending the converged run.
 
@@ -498,20 +509,20 @@ values are projected from the measured baselines pending the converged run.
   \caption[Backward transfer across scenarios]{Backward transfer (BWT); closer to $0$
   is less forgetting. Best non-oracle per column in bold. The core six methods and
   \textbf{DocCL} are measured (mean\,$\pm$\,std over three seeds); the remaining
-  prompt/LoRA rows are \emph{projected} (marked ``(proj.)'') as in
-  Table~\ref{tab:main-comparison}. Negative BWT reflects forgetting; positive values
-  (ER on DIL) indicate later tasks help earlier ones. DocCL drives DIL forgetting close
-  to zero ($-4.6$), near replay.}
+  prompt/LoRA rows are \emph{projected} (marked ``(proj.)''). Note that EWC has the lowest
+  forgetting on two scenarios but at a severe accuracy cost (Table~\ref{tab:main-comparison}):
+  it forgets little because it learns little. Replay and DocCL drive DIL forgetting to
+  near zero while remaining accurate.}
   \label{tab:bwt-comparison}
   \begin{tabular}{lccc}
     \toprule
     \textbf{Method} & \textbf{CIL-CORD} & \textbf{DIL} & \textbf{Mixed} \\
     \midrule
-    Naive (lower bound) & $-90.4 \pm 1.0$ & $-71.3 \pm 2.5$ & $-66.8 \pm 2.5$ \\
-    EWC                 & $-74.2 \pm 2.3$ & $-30.5 \pm 2.0$ & $-25.3 \pm 5.9$ \\
-    LwF                 & $-90.4 \pm 0.7$ & $-72.0 \pm 1.3$ & $-65.3 \pm 1.0$ \\
-    ER                  & $\mathbf{-61.8 \pm 4.4}$ & $\mathbf{+2.4 \pm 1.5}$ & $\mathbf{-14.0 \pm 4.3}$ \\
-    DER++               & $-80.8 \pm 1.7$ & $-1.6 \pm 0.8$ & $-29.6 \pm 0.1$ \\
+    Naive (lower bound) & $-90.1 \pm 0.6$ & $-72.6 \pm 1.3$ & $-66.0 \pm 0.6$ \\
+    EWC                 & $\mathbf{-54.8 \pm 8.6}$ & $-2.8 \pm 0.9$ & $\mathbf{-8.4 \pm 2.4}$ \\
+    LwF                 & $-93.7 \pm 0.6$ & $-69.1 \pm 1.4$ & $-66.4 \pm 1.2$ \\
+    ER                  & $-68.3 \pm 3.2$ & $\mathbf{-2.8 \pm 1.7}$ & $-23.5 \pm 5.6$ \\
+    DER++               & $-86.2 \pm 3.2$ & $-3.4 \pm 1.4$ & $-34.8 \pm 2.0$ \\
     \textbf{DocCL (ours)} & $-79.3 \pm 5.9$ & $-4.6 \pm 1.6$ & $-27.1 \pm 8.1$ \\
     \midrule
     C-Flat++ (2025, proj.) & --- & --- & --- \\
@@ -529,10 +540,21 @@ values are projected from the measured baselines pending the converged run.
   \centering
   \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{bench_bwt_bars.pdf}
   \caption[Backward transfer by method and scenario]{Backward transfer (BWT) of each method,
-  grouped by scenario; bars hang below zero, so shorter is less forgetting. EWC roughly
-  halves forgetting where a domain shift is present, and both replay methods (ER, DER++)
-  drive BWT to $\approx 0$ on DIL. Joint has BWT $=0$ by construction.}
+  grouped by scenario; bars hang below zero, so shorter is less forgetting. Converged EWC
+  has the least forgetting on CIL-CORD and Mixed (but at a severe accuracy cost---see
+  Table~\ref{tab:main-comparison}), and replay (ER, DER++) and DocCL drive BWT to
+  $\approx 0$ on DIL. Joint has BWT $=0$ by construction.}
   \label{fig:bwt-bars}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{bench_af_bars.pdf}
+  \caption[Average forgetting by method and scenario]{Average forgetting (AF, the magnitude
+  of backward transfer; lower is better) of each method per scenario. The pattern mirrors
+  backward transfer: EWC and replay minimise forgetting on the domain-shift scenarios, while
+  naive and LwF forget almost everything on CIL-CORD. DocCL keeps DIL forgetting near zero.}
+  \label{fig:af-bars}
 \end{figure}
 
 \begin{figure}[!htbp]
@@ -672,20 +694,22 @@ intervention, which also explains \emph{why} replay is so effective below
 \end{figure}
 
 \paragraph{What the benchmark shows.}
-Across the three scenarios the ordering is unambiguous: replay $\gg$ regularisation
-$\gg$ distillation. Both replay methods essentially solve the domain-incremental
-scenario (ER AA $89.0$/BWT $+2.4$; DER++ $88.5$/$-1.6$, both matching the joint oracle)
-and reach the joint ceiling on Mixed. We interpret this DIL near-oracle result
+Across the three scenarios the accuracy ordering is unambiguous: replay $\gg$
+regularisation $\gg$ distillation. Both replay methods essentially solve the
+domain-incremental scenario (ER AA $87.9$/BWT $-2.8$; DER++ $88.0$/$-3.4$, both matching
+the joint oracle of $85.1$) and lead on Mixed. We interpret this DIL near-oracle result
 \emph{cautiously and with per-class evidence}, because the unified DIL schema is
 VALUE-dominant (KEY originates only from FUNSD/SROIE; \S\ref{sec:eval-seeds}), so a
 high aggregate accuracy could in principle reflect retention of the dominant VALUE
 class rather than genuine cross-domain retention; we report per-class F1 and per-task
-label frequencies and read ER's result as real cross-domain retention only if the
-sparse KEY class is itself retained. EWC roughly halves forgetting wherever a domain
-shift is present but not on fine-grained class-incremental learning; and LwF tracks the
-naive lower bound throughout. That the two replay variants land so close together---and
-that pure ER edges DER++ on the two hardest scenarios while DER++ is the more
-seed-stable---suggests the benefit comes from \emph{rehearsing past examples} per se
+label frequencies and read the replay result as real cross-domain retention only if the
+sparse KEY class is itself retained. The convergence training surfaces a second, sharper
+lesson: \emph{backward transfer and accuracy must be read together}. EWC trained to
+convergence achieves the \emph{lowest forgetting} on CIL-CORD and Mixed, yet its accuracy
+\emph{collapses} (CIL-CORD $0.5$, Mixed $22.0\pm7.6$)---the Fisher penalty over-protects
+the old classes and starves the new ones, so a low BWT here signals failure-to-learn, not
+success. LwF tracks the naive lower bound throughout. That the two replay variants land so
+close together suggests the benefit comes from \emph{rehearsing past examples} per se
 rather than from the logit-distillation term DER++ adds on top. The dense
 token-classification setting with a growing head is the likely reason distillation
 (LwF) fails: the old-class logits it distils decay regardless once their classes stop
