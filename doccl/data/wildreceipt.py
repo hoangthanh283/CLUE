@@ -23,7 +23,7 @@ from typing import Any
 import torch
 from datasets import load_dataset
 from torch.utils.data import Dataset
-from transformers import LayoutLMv3Processor
+from doccl.data.encoders import KIEEncoder, get_default_encoder
 
 # Upstream background classes that map to O (no entity).
 _BACKGROUND = {"Ignore", "Others"}
@@ -62,14 +62,14 @@ class WildReceiptDataset(Dataset):
     def __init__(
         self,
         split: str = "train",
-        processor: LayoutLMv3Processor | None = None,
+        encoder: KIEEncoder | None = None,
         max_length: int = 512,
         label_filter: list[str] | None = None,
         hf_name: str = "kaydee/wildreceipt",
     ):
         """Args:
         split: "train" or "test".
-        processor: LayoutLMv3Processor (created from base if None).
+        encoder: per-backbone KIEEncoder (defaults to LayoutLMv3Encoder).
         max_length: max token length.
         label_filter: keep only examples with an in-set entity, masking the rest
                       to O (class-incremental split building).
@@ -77,9 +77,7 @@ class WildReceiptDataset(Dataset):
         """
         self.split = split
         self.max_length = max_length
-        self.processor = processor or LayoutLMv3Processor.from_pretrained(
-            "microsoft/layoutlmv3-base", apply_ocr=False
-        )
+        self.encoder = encoder or get_default_encoder()
 
         if split not in _RAW_DS_CACHE:
             _RAW_DS_CACHE[split] = load_dataset(hf_name, split=split)
@@ -156,15 +154,7 @@ class WildReceiptDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         ex = self.data[idx]
-        image = self._ds[ex["row"]]["image"]  # decode on demand
-        encoding = self.processor(
-            image,
-            ex["tokens"],
-            boxes=ex["bboxes"],
-            word_labels=ex["ner_tags"],
-            truncation=True,
-            padding="max_length",
-            max_length=self.max_length,
-            return_tensors="pt",
+        image = self._ds[ex["row"]]["image"] if self.encoder.has_image else None
+        return self.encoder.encode(
+            image, ex["tokens"], ex["bboxes"], ex["ner_tags"], self.max_length
         )
-        return {k: v.squeeze(0) for k, v in encoding.items()}

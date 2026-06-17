@@ -112,8 +112,8 @@ class LayoutLMv3Wrapper(nn.Module):
             if len(old_labels) > 0:
                 new_linear.weight[: len(old_labels)] = out_linear.weight
                 new_linear.bias[: len(old_labels)] = out_linear.bias
-            nn.init.normal_(new_linear.weight[len(old_labels):], std=0.02)
-            nn.init.zeros_(new_linear.bias[len(old_labels):])
+            nn.init.normal_(new_linear.weight[len(old_labels) :], std=0.02)
+            nn.init.zeros_(new_linear.bias[len(old_labels) :])
 
         if hasattr(head, "out_proj"):
             head.out_proj = new_linear
@@ -295,6 +295,21 @@ class LayoutLMv3Wrapper(nn.Module):
         logits = self.model.classifier(self.model.dropout(text_out))
         return logits
 
+    # ─── CLS query for prompt-based methods (backbone-agnostic entry point) ────
+    @torch.no_grad()
+    def encode_query(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        """q(x) = CLS embedding from the frozen encoder. (B, D).
+
+        Lets prompt-based methods obtain the query without reaching into the
+        backbone-specific submodule, so the same ``_query`` works across backbones.
+        """
+        inputs = {
+            k: batch[k]
+            for k in ("input_ids", "bbox", "pixel_values", "attention_mask")
+            if k in batch
+        }
+        return self.model.layoutlmv3(**inputs).last_hidden_state[:, 0]
+
     # ─── CKA probe layers (depth points for representational drift) ────────────
     @property
     def cka_layers(self) -> list[str]:
@@ -368,14 +383,18 @@ class LayoutLMv3Wrapper(nn.Module):
                 continue
             orig_forward = layer.forward
 
-            def wrapped_forward(*args, _fwd=orig_forward, _mod=layer, **kwargs):  # noqa: ANN002,ANN003,ANN202
+            def wrapped_forward(
+                *args, _fwd=orig_forward, _mod=layer, **kwargs
+            ):  # noqa: ANN002,ANN003,ANN202
                 if _mod.training and torch.is_grad_enabled():
                     return checkpoint(_fwd, *args, use_reentrant=False, **kwargs)
                 return _fwd(*args, **kwargs)
 
             layer.forward = wrapped_forward
             layer._doccl_ckpt_wrapped = True
-        logger.info("Enabled per-layer gradient checkpointing on %d encoder layers", len(encoder.layer))
+        logger.info(
+            "Enabled per-layer gradient checkpointing on %d encoder layers", len(encoder.layer)
+        )
 
     def trainable_param_count(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)

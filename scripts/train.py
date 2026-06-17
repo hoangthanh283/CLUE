@@ -21,6 +21,7 @@ import wandb
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import ConcatDataset, DataLoader
 
+from doccl.data.encoders import build_encoder
 from doccl.data.scenarios import get_scenario
 from doccl.eval.metrics import CLMetricsTracker, compute_per_class_f1
 from doccl.methods.coda_prompt import CODAPrompt
@@ -33,9 +34,21 @@ from doccl.methods.l2p import L2P
 from doccl.methods.lwf import LwF
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
 from doccl.methods.o_lora import OLoRA
+from doccl.models.bros_wrapper import BROSWrapper
 from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
+from doccl.models.lilt_wrapper import LiLTWrapper
 
 log = logging.getLogger(__name__)
+
+
+# Maps ``cfg.model.family`` → backbone wrapper class. LayoutLMv3 is the primary;
+# LiLT/BROS are the vision-free secondaries for the generalization study. A new
+# backbone is registered here + a ``configs/model/<name>.yaml`` carrying ``family``.
+MODEL_REGISTRY = {
+    "layoutlmv3": LayoutLMv3Wrapper,
+    "lilt": LiLTWrapper,
+    "bros": BROSWrapper,
+}
 
 
 # Per-task dataset for each scenario (mirrors analyze_results.SCENARIO_TASK_DATASETS
@@ -201,13 +214,20 @@ def main(cfg: DictConfig) -> None:
     )
 
     # ─── Build scenario ────────────────────────────────────────────────────────
-    scenario = get_scenario(cfg.scenario.name, **(cfg.scenario.get("kwargs") or {}))
+    # The encoder (per-backbone tokenization) is set as the process default before
+    # the datasets are built so every loader tokenizes for the active backbone.
+    scenario = get_scenario(
+        cfg.scenario.name,
+        encoder=build_encoder(cfg.model),
+        **(cfg.scenario.get("kwargs") or {}),
+    )
     log.info("Scenario %s: %d tasks", scenario.name, len(scenario.tasks))
 
     # ─── Build model ───────────────────────────────────────────────────────────
     # Initial num_labels = first task's label set size
     n_init_labels = len(scenario.tasks[0].label_set)
-    model = LayoutLMv3Wrapper(
+    model_cls = MODEL_REGISTRY[cfg.model.get("family", "layoutlmv3")]
+    model = model_cls(
         model_name=cfg.model.name,
         num_labels=n_init_labels,
     )

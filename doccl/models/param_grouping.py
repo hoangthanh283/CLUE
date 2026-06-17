@@ -42,7 +42,12 @@ def classify_param(name: str) -> str:
         return "classifier"
     if "word_embeddings" in name:
         return "text_word_embed"
-    if re.search(r"[xyhw]_position_embeddings", name):
+    if (
+        re.search(r"[xyhw]_position_embeddings", name)  # LayoutLMv3 / LiLT 2D pos
+        or "box_linear_embeddings" in name  # LiLT layout box projection
+        or "bbox_sinusoid" in name  # BROS sinusoidal bbox embedding
+        or "bbox_projection" in name  # BROS bbox projection
+    ):
         return "layout_2d_pos_embed"
     if "patch_embed" in name:
         return "image_patch_embed"
@@ -56,11 +61,7 @@ def classify_param(name: str) -> str:
         return "layernorm"
     if "intermediate.dense" in name or ("output.dense" in name and "attention" not in name):
         return "ffn"  # feed-forward block (intermediate + FFN output)
-    if (
-        "position_embeddings" in name
-        or "token_type_embeddings" in name
-        or "pos_embed" in name
-    ):
+    if "position_embeddings" in name or "token_type_embeddings" in name or "pos_embed" in name:
         return "pos_1d_embed"  # 1D/absolute + token-type + vision pos embeds
     if "cls_token" in name or "pooler" in name:
         return "cls_pooler"

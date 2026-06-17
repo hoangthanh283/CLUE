@@ -1,0 +1,5 @@
+# BROS — text+layout backbone (BERT-uncased vocab), no vision, order-robust.
+name: jinho8345/bros-base-uncased
+family: bros
+hidden_size: 768
+num_layers: 12
