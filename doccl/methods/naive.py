@@ -34,6 +34,7 @@ class NaiveFineTune(ContinualMethod):
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
         stopper = self.make_early_stopper(val_loader)
+        self._amp_setup()  # opt-in mixed precision; inert unless cfg.training.amp
 
         total_loss = 0.0
         n_steps = 0
@@ -42,11 +43,10 @@ class NaiveFineTune(ContinualMethod):
             for batch in pbar:
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
                 optimizer.zero_grad()
-                outputs = self.model(**batch)
-                loss = outputs.loss
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.trainable_parameters(), max_grad_norm)
-                optimizer.step()
+                with self._amp_autocast():
+                    outputs = self.model(**batch)
+                    loss = outputs.loss
+                self._amp_backward_step(loss, optimizer, self.trainable_parameters(), max_grad_norm)
                 total_loss += float(loss.item())
                 n_steps += 1
                 pbar.set_postfix({"loss": f"{loss.item():.4f}"})
@@ -60,9 +60,7 @@ class NaiveFineTune(ContinualMethod):
             n_steps=n_steps,
         )
 
-    def evaluate(
-        self, eval_loaders: dict[int, DataLoader]
-    ) -> dict[int, EvalMetrics]:
+    def evaluate(self, eval_loaders: dict[int, DataLoader]) -> dict[int, EvalMetrics]:
         self.model.eval()
         results: dict[int, EvalMetrics] = {}
 
@@ -76,9 +74,7 @@ class NaiveFineTune(ContinualMethod):
             for tid, loader in eval_loaders.items():
                 all_preds, all_labels = [], []
                 for batch in loader:
-                    batch = {
-                        k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)
-                    }
+                    batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
                     outputs = self.model(**{k: v for k, v in batch.items() if k != "labels"})
                     preds = outputs.logits.argmax(dim=-1)  # (B, L)
                     labels = batch["labels"]

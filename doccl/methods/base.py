@@ -11,6 +11,7 @@ Subclasses override hooks they need; the rest are no-ops by default.
 """
 from __future__ import annotations
 
+import contextlib
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
@@ -61,9 +62,7 @@ class EarlyStopper:
             self.best_f1 = val_f1
             self.best_epoch = epoch
             # Snapshot on CPU to avoid holding a second model-sized copy on GPU.
-            self.best_state = {
-                k: v.detach().cpu().clone() for k, v in model.state_dict().items()
-            }
+            self.best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
             self.num_bad_epochs = 0
             return False
         self.num_bad_epochs += 1
@@ -93,6 +92,12 @@ class ContinualMethod(ABC):
         self.config = config
         self.state = TaskState()
         self.device = next(model.parameters()).device
+        # Mixed precision (opt-in; set by train.py from cfg.training.amp). Inert by
+        # default → existing runs are byte-identical. bf16 (no scaler) is preferred on
+        # Ampere+, else fp16 with a GradScaler.
+        self.amp_enabled: bool = False
+        self._amp_dtype: torch.dtype | None = None
+        self._amp_scaler: Any = None
 
     # ─── Lifecycle hooks ───────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
@@ -130,8 +135,7 @@ class ContinualMethod(ABC):
             # min_delta in F1 points (0-100 scale) — see EarlyStopper.__init__.
             patience=int(self.config.get("early_stop_patience", 2)),
             min_delta=float(self.config.get("early_stop_min_delta", 0.1)),
-            enabled=val_loader is not None
-            and bool(self.config.get("early_stopping", True)),
+            enabled=val_loader is not None and bool(self.config.get("early_stopping", True)),
         )
 
     def _early_stop_after_epoch(
@@ -152,8 +156,12 @@ class ContinualMethod(ABC):
         should_stop = stopper.step(val_f1, self.model, epoch)
         log.info(
             "T%s ep%d val_f1=%.4f best=%.4f bad=%d%s",
-            task.task_id, epoch + 1, val_f1, stopper.best_f1,
-            stopper.num_bad_epochs, " -> STOP" if should_stop else "",
+            task.task_id,
+            epoch + 1,
+            val_f1,
+            stopper.best_f1,
+            stopper.num_bad_epochs,
+            " -> STOP" if should_stop else "",
         )
         return should_stop
 
@@ -196,9 +204,7 @@ class ContinualMethod(ABC):
         pass
 
     @abstractmethod
-    def evaluate(
-        self, eval_loaders: dict[int, DataLoader]
-    ) -> dict[int, EvalMetrics]:
+    def evaluate(self, eval_loaders: dict[int, DataLoader]) -> dict[int, EvalMetrics]:
         """Evaluate on all tasks seen so far.
 
         Args:
@@ -208,6 +214,54 @@ class ContinualMethod(ABC):
             {task_id: EvalMetrics}
         """
         ...
+
+    # ─── Mixed precision (opt-in; gated by self.amp_enabled) ────────────────────
+    def _amp_setup(self) -> None:
+        """Pick the AMP dtype + scaler for the current task. Call at train start.
+
+        No-op unless ``amp_enabled`` and on CUDA. bf16 needs no loss scaling; fp16
+        uses a fresh ``GradScaler``. Leaves everything None when disabled so the
+        plain-precision path runs unchanged.
+        """
+        if not (self.amp_enabled and self.device.type == "cuda"):
+            self._amp_dtype = None
+            self._amp_scaler = None
+            return
+        if torch.cuda.is_bf16_supported():
+            self._amp_dtype = torch.bfloat16
+            self._amp_scaler = None
+        else:
+            self._amp_dtype = torch.float16
+            self._amp_scaler = torch.cuda.amp.GradScaler()
+
+    def _amp_autocast(self):
+        """Autocast context for the forward+loss; nullcontext when AMP is disabled."""
+        if self.amp_enabled and self.device.type == "cuda" and self._amp_dtype is not None:
+            return torch.autocast(device_type="cuda", dtype=self._amp_dtype)
+        return contextlib.nullcontext()
+
+    def _amp_backward_step(
+        self,
+        loss: torch.Tensor,
+        optimizer: torch.optim.Optimizer,
+        params: list[nn.Parameter],
+        max_grad_norm: float,
+    ) -> None:
+        """Backward + grad-clip + optimizer step, with fp16 loss scaling if active.
+
+        When AMP is disabled (or bf16, which needs no scaler) this is exactly the
+        plain ``loss.backward(); clip; optimizer.step()`` path.
+        """
+        if self._amp_scaler is not None:
+            self._amp_scaler.scale(loss).backward()
+            self._amp_scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(params, max_grad_norm)
+            self._amp_scaler.step(optimizer)
+            self._amp_scaler.update()
+        else:
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(params, max_grad_norm)
+            optimizer.step()
 
     # ─── Helpers ───────────────────────────────────────────────────────────────
     def trainable_parameters(self) -> list[nn.Parameter]:
