@@ -44,9 +44,12 @@ export RUN_ABLATION="${RUN_ABLATION:-0}"
 # RUN_SINGLETASK=0 to leave them here.
 export RUN_SINGLETASK="${RUN_SINGLETASK:-1}"
 
-# ── L40 (48 GB) sizing — saturate the card; the 5.8 GB watchdog cap is 2060-only ─────
+# ── L40 (~44 GB usable) sizing — fill the card WITHOUT OOM; 5.8 GB watchdog cap is 2060-only ─
 export BATCH_SIZE="${BATCH_SIZE:-16}"     # 32 also fine for non-replay methods
-export JOBS_PER_GPU="${JOBS_PER_GPU:-3}"  # ~8 GB/job at bs16 -> 3 jobs ~24 GB << 48 GB
+# MEASURED ~17 GB/job at bs16+AMP on LayoutLMv3 (the forward_with_prompts path peaks
+# highest), NOT the ~8 GB first guessed -> 3 jobs (51 GB) OOMs a 44 GB L40. 2 jobs (~34 GB)
+# fits with ~10 GB headroom. Bump back to 3 only after dropping BATCH_SIZE or adding GRAD_CKPT.
+export JOBS_PER_GPU="${JOBS_PER_GPU:-2}"
 export AMP="${AMP:-1}"                     # bf16 (L40 is Ada-class); AMP=0 for exact fp32
 
 info "Vast.ai L40 grid launcher"
