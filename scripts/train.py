@@ -52,10 +52,11 @@ MODEL_REGISTRY = {
 
 
 # Per-task dataset for each scenario (mirrors analyze_results.SCENARIO_TASK_DATASETS
-# and doccl/data/scenarios.py). Used to map single-task baselines b_i onto task slots
-# so the metrics tracker can compute a real per-run FWT.
+# and doccl/data/scenarios.py). Static fallback used only when the scenario carries no
+# per-task ``native_dataset`` metadata AND its length matches the task count.
 SCENARIO_TASK_DATASETS: dict[str, list[str]] = {
     "dil": ["funsd", "sroie", "cord"],
+    "dil_receipts": ["sroie", "cord", "wildreceipt"],
     "cil_cord": ["cord", "cord", "cord", "cord", "cord"],
     "mixed": ["funsd", "funsd", "sroie", "cord", "cord", "funsd"],
     # Cross-lingual DIL: all 5 language tasks share the single XFUND baseline (schema
@@ -64,15 +65,43 @@ SCENARIO_TASK_DATASETS: dict[str, list[str]] = {
     "cil_wildreceipt": ["wildreceipt", "wildreceipt", "wildreceipt", "wildreceipt"],
 }
 
+# Single dataset per task for CIL scenarios that carry no per-task metadata; used to
+# size the FWT baseline to *any* task count (e.g. the long-horizon variants).
+_CIL_SINGLE_DATASET = {
+    "cil_cord": "cord",
+    "cil_wildreceipt": "wildreceipt",
+    "cil_funsd": "funsd",
+}
 
-def load_fwt_baselines(scenario_name: str, baseline_csv: Path) -> list[float] | None:
+
+def _resolve_task_datasets(scenario) -> list[str] | None:
+    """Per-task single-task-baseline dataset, robust to ordering + task count.
+
+    1) per-task ``native_dataset`` metadata (DIL family — survives reordering);
+    2) the static map when its length matches the task count (mixed, base CIL);
+    3) a single CIL dataset repeated to the task count (long-horizon variants).
+    """
+    metas = [t.metadata.get("native_dataset") for t in scenario.tasks]
+    if all(m is not None for m in metas):
+        return metas
+    n = len(scenario.tasks)
+    static = SCENARIO_TASK_DATASETS.get(scenario.name)
+    if static is not None and len(static) == n:
+        return static
+    single = _CIL_SINGLE_DATASET.get(scenario.name)
+    if single is not None:
+        return [single] * n
+    return None
+
+
+def load_fwt_baselines(scenario, baseline_csv: Path) -> list[float] | None:
     """Build the per-task baseline vector b_i for FWT from the single-task CSV.
 
     Returns a list aligned to the scenario's tasks (b_i = from-scratch single-task F1
     on task i's dataset), or None if the scenario is unmapped or the CSV/datasets are
     missing — in which case FWT is left as NaN (honestly unavailable) for this run.
     """
-    datasets = SCENARIO_TASK_DATASETS.get(scenario_name)
+    datasets = _resolve_task_datasets(scenario)
     if datasets is None or not baseline_csv.exists():
         return None
     import csv
@@ -260,9 +289,7 @@ def main(cfg: DictConfig) -> None:
     # Seed the tracker with single-task baselines b_i so it can compute a real per-run
     # FWT (alongside AA/BWT/AF) once the zero-shot upper-triangular term is recorded
     # below. None if baselines aren't available yet → FWT stays NaN (honest).
-    fwt_baselines = load_fwt_baselines(
-        cfg.scenario.name, Path("results/table_single_task_baselines.csv")
-    )
+    fwt_baselines = load_fwt_baselines(scenario, Path("results/table_single_task_baselines.csv"))
     if fwt_baselines is not None:
         log.info(
             "Loaded FWT baselines b_i for %s: %s",
