@@ -11,3 +11,8 @@ output_dir: ./results
 wandb:
   project: doccl-aaai2027
   mode: online  # set to "offline" for vast.ai with no internet
+
+tensorboard:
+  # Live forgetting diagnostic (retention-matrix heatmap + per-task curves) written
+  # to results/<run>/tb. View with: tensorboard --logdir results
+  enabled: true

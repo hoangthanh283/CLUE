@@ -49,6 +49,21 @@ python scripts/train.py method=naive scenario=single_funsd wandb.mode=offline \
     training.batch_size=2 training.gradient_checkpointing=true   # expect FUNSD F1 ≈ 88–92
 ```
 
+### Live forgetting diagnostic (TensorBoard)
+
+Every run writes a TensorBoard event log to `results/<run>/tb` alongside W&B (on by
+default; disable with `tensorboard.enabled=false`). Launch a viewer over the whole
+`results/` tree and watch forgetting accrue while the grid runs:
+
+```bash
+tensorboard --logdir results --port 6006
+```
+
+Key views: **`diagnostic/forgetting_matrix`** (Images) — the T×T retention matrix
+`R[i][j]` re-rendered after each task; **`retention/task_<j>`** (Scalars) — each
+task's F1 vs. training step (its forgetting curve); **`metrics/running_AA`** and
+**`final/{AA,BWT,AF,FWT}`**. Speed runs up with `training.amp=true` (bf16/fp16).
+
 ## 1. Pilot study  → fills §6.1, Figs 6.1/6.2, Ch1 headline, abstract diagnosis
 
 ```bash
