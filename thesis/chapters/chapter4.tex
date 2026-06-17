@@ -115,6 +115,45 @@ Table~\ref{tab:software-stack} summarises the stack.
   \end{tabularx}
 \end{table}
 
+\subsection{Why a Bespoke Continual-Learning Harness}
+\label{sec:impl-why-bespoke}
+
+The stack above leaves one decision open: whether to build the continual loop on
+an established CL framework---Avalanche~\citep{lomonaco2021avalanche},
+Mammoth~\citep{boschini2022mammoth}, or PyCIL~\citep{zhou2023pycil}---or to write a
+bespoke harness. A bespoke harness was chosen, for three reasons rooted in the
+task rather than in preference.
+
+\paragraph{Task-shape mismatch.} All three frameworks are engineered for
+image classification: a sample is a single tensor with one integer label, and the
+metric is top-1 accuracy. Their training abstractions encode this directly---an
+Avalanche \texttt{SupervisedTemplate} reads its input as \texttt{mbatch[0]} and
+scores a sample-level criterion; a Mammoth model implements
+\texttt{observe(inputs, labels, \ldots)} over a single input tensor with
+integer-target task masking; PyCIL slices an image dataset by integer class sets
+and herds exemplars on pooled image features. The unit of work here is instead a
+tri-modal document---WordPiece ids, normalised boxes, and a page image---carrying
+a \emph{per-token} BIO label sequence and scored with entity-level
+\texttt{seqeval} F1, a metric absent from all three. Adopting any of them would
+require replacing their data, model, loss, and evaluation layers at once, which
+amounts to reproducing the loop described in this chapter inside a contract built
+for a different task.
+
+\paragraph{Class-incremental at the token level.} The head here is a single linear
+layer that \emph{grows} across sessions over a token label space, preserving
+trained rows and initialising new ones from $\mathcal{N}(0,0.02)$. The frameworks
+either assume a fixed output dimension or grow a head while still routing one input
+tensor and one label per sample; class-incremental \emph{token} labelling is not a
+supported mode.
+
+\paragraph{Method coverage.} The harness already implements the classical
+baselines and the 2024--2025 line---flatness-aware replay, LoRA-based and
+prompt-based methods---used in Chapter~\ref{ch:results}. The newest strategy
+shipped by Avalanche or Mammoth predates several of these, so adopting a framework
+would subtract, not add, capability. These libraries remain the reference for the
+classical baselines, whose published algorithm definitions the implementations
+follow; control is simply not inverted to them, for the reasons above.
+
 \section{Document-IE Pipeline Integration}
 \label{sec:impl-pipeline}
 
