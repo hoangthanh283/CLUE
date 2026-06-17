@@ -7,9 +7,11 @@ Extension points:
     - forward_with_prompts(...): for prompt-based methods (L2P/DualPrompt/CODA/routed)
     - param_groups: dict of named parameter groups for Fisher analysis
 """
+
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 import torch
@@ -20,6 +22,24 @@ from doccl.models import param_grouping
 from doccl.types import ModalityMask
 
 logger = logging.getLogger(__name__)
+
+# Opt-in bf16 autocast (default OFF -> exact fp32, unchanged for laptop/CPU/tests).
+# Set DOCCL_AMP=1 on a bf16-capable GPU (e.g. RTX 4090) for ~1.5-2x faster training.
+# bf16 needs no GradScaler (full fp32 exponent range), so backward() stays unchanged.
+_AMP_ENABLED = os.environ.get("DOCCL_AMP", "0") == "1"
+
+
+from contextlib import contextmanager  # noqa: E402
+
+
+@contextmanager
+def _autocast_ctx(enabled: bool):
+    """Yield True under a bf16 CUDA autocast when enabled, else False (no-op)."""
+    if enabled:
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            yield True
+    else:
+        yield False
 
 
 class LayoutLMv3Wrapper(nn.Module):
@@ -181,13 +201,34 @@ class LayoutLMv3Wrapper(nn.Module):
             input_ids, pixel_values, bbox, modality_mask
         )
 
-        return self.model(
-            input_ids=masked_input_ids,
-            bbox=masked_bbox,
-            pixel_values=masked_pixel_values,
-            attention_mask=attention_mask,
-            labels=labels,
-        )
+        with self._autocast() as amp_on:
+            out = self.model(
+                input_ids=masked_input_ids,
+                bbox=masked_bbox,
+                pixel_values=masked_pixel_values,
+                attention_mask=attention_mask,
+                labels=labels,
+            )
+        # Cast logits/loss back to fp32 at the boundary so downstream method code
+        # (DER++ MSE vs fp32 cached logits, LwF KD, EWC penalty, argmax) is unchanged
+        # and never hits a bf16-vs-fp32 dtype mismatch. The speedup is in the bf16
+        # matmuls inside the transformer; this final cast is negligible.
+        if amp_on:
+            if getattr(out, "logits", None) is not None:
+                out.logits = out.logits.float()
+            if getattr(out, "loss", None) is not None:
+                out.loss = out.loss.float()
+        return out
+
+    def _autocast(self):
+        """bf16 autocast context when DOCCL_AMP=1 on CUDA; else a no-op (exact fp32).
+
+        Centralised here so every caller (all CL methods' train loops, eval, and
+        forward_with_prompts) gets AMP without per-method changes. Forward-only;
+        backward runs outside, and bf16 needs no loss scaling. The context yields True
+        when AMP is active so callers cast outputs back to fp32 at the boundary.
+        """
+        return _autocast_ctx(_AMP_ENABLED and torch.cuda.is_available())
 
     def _apply_mask(
         self,
@@ -284,16 +325,18 @@ class LayoutLMv3Wrapper(nn.Module):
         prompt_mask = torch.ones(B, P, dtype=attention_mask.dtype, device=attention_mask.device)
         new_mask = torch.cat([prompt_mask, attention_mask], dim=1)
 
-        outputs = lm(
-            inputs_embeds=inputs_embeds,
-            bbox=new_bbox,
-            pixel_values=pixel_values,
-            attention_mask=new_mask,
-        )
-        # Text tokens come first; drop the P prompt slots → (B, L_used, D)
-        text_out = outputs[0][:, P : P + L_used]
-        logits = self.model.classifier(self.model.dropout(text_out))
-        return logits
+        with self._autocast() as amp_on:
+            outputs = lm(
+                inputs_embeds=inputs_embeds,
+                bbox=new_bbox,
+                pixel_values=pixel_values,
+                attention_mask=new_mask,
+            )
+            # Text tokens come first; drop the P prompt slots → (B, L_used, D)
+            text_out = outputs[0][:, P : P + L_used]
+            logits = self.model.classifier(self.model.dropout(text_out))
+        # fp32 at the boundary so prompt-method CE/aux losses are unchanged.
+        return logits.float() if amp_on else logits
 
     # ─── CLS query for prompt-based methods (backbone-agnostic entry point) ────
     @torch.no_grad()

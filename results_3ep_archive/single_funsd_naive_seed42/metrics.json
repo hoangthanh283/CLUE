@@ -1,0 +1,24 @@
+{
+  "method": "naive",
+  "scenario": "single_funsd",
+  "seed": 42,
+  "target_component": null,
+  "matrix": [
+    [
+      84.91890583393852
+    ]
+  ],
+  "num_tasks": 1,
+  "AA": 84.91890583393852,
+  "BWT": 0.0,
+  "AF": -0.0,
+  "FWT": 0.0,
+  "wall_time_per_task_s": [
+    103.83932647900656
+  ],
+  "total_wall_time_s": 103.83932647900656,
+  "mean_time_per_task_s": 103.83932647900656,
+  "total_params": 125332359,
+  "trainable_params": 125332359,
+  "peak_gpu_mem_mb": 2407.98974609375
+}

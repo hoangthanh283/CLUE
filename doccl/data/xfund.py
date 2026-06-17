@@ -18,10 +18,14 @@ Reference:
 
 from __future__ import annotations
 
+import io
 from typing import Any
 
 import torch
+from datasets import Image as HFImage
 from datasets import load_dataset
+from PIL import Image as PILImage
+from PIL import ImageOps
 from torch.utils.data import Dataset
 from doccl.data.encoders import KIEEncoder, get_default_encoder
 
@@ -32,6 +36,53 @@ XFUND_LANGS = ("de", "es", "fr", "it", "ja", "pt", "zh")
 # (e.g. the same lang appearing in build_dil_xlingual and a single-task baseline) shares
 # one underlying HF Arrow handle instead of re-materialising every form.
 _RAW_DS_CACHE: dict[tuple[str, str], Any] = {}
+
+
+def _open_image(raw: Any) -> PILImage.Image:
+    """Decode one image from a non-auto-decoded HF "image" cell.
+
+    With ``Image(decode=False)`` a cell is ``{"bytes": <png/jpg bytes>, "path": <str|None>}``
+    (or, defensively, an already-decoded PIL image / a path). Returns an RGB PIL image.
+
+    ``ImageOps.exif_transpose`` is applied to match HF's own ``decode_example`` (which
+    applies it): without it, an EXIF-rotated page would be fed to the model in a different
+    orientation than its bboxes were normalised against. Harmless no-op when there is no
+    EXIF orientation tag (the common case for these scanned-form bundles).
+    """
+    if isinstance(raw, PILImage.Image):
+        img = raw
+    elif isinstance(raw, dict) and raw.get("bytes") is not None:
+        img = PILImage.open(io.BytesIO(raw["bytes"]))
+    elif isinstance(raw, dict) and raw.get("path"):
+        img = PILImage.open(raw["path"])
+    else:
+        raise TypeError(f"Unexpected image cell type: {type(raw)!r}")
+    return ImageOps.exif_transpose(img).convert("RGB")
+
+
+def _read_size(raw: Any) -> tuple[int, int]:
+    """Read (width, height) WITHOUT materialising the full raster.
+
+    ``PILImage.open`` is lazy — it parses only the header, so ``.size`` is available
+    before any pixel data is decoded. This is what lets _parse_examples read every
+    row's dimensions cheaply instead of decoding all 7 languages' pages into RAM.
+
+    EXIF orientation is honoured (swapping w/h for a 90/270 rotation) so the dims used
+    to normalise bboxes match the orientation __getitem__ feeds the model. ``.size`` with
+    a non-trivial EXIF tag still needs no pixel decode — only the orientation byte.
+    """
+    if isinstance(raw, PILImage.Image):
+        img = raw
+    elif isinstance(raw, dict) and raw.get("bytes") is not None:
+        img = PILImage.open(io.BytesIO(raw["bytes"]))
+    elif isinstance(raw, dict) and raw.get("path"):
+        img = PILImage.open(raw["path"])
+    else:
+        raise TypeError(f"Unexpected image cell type: {type(raw)!r}")
+    exif = img.getexif()
+    orientation = exif.get(0x0112, 1)  # EXIF Orientation tag; 1 = normal
+    w, h = img.size
+    return (h, w) if orientation in (5, 6, 7, 8) else (w, h)
 
 
 def _normalize_box(box: list[int], width: int, height: int) -> list[int]:
@@ -102,8 +153,21 @@ class XFUNDDataset(Dataset):
             # XFUND has train + val; we expose val as our "test".
             hf_split = "val" if split == "test" else "train"
             full = load_dataset(hf_name, split=hf_split)
-            # Keep only this language's rows (id prefix is "<lang>_...").
-            full = full.filter(lambda ex, lg=lang: str(ex["id"]).startswith(f"{lg}_"))
+            # CRITICAL (host-RAM): turn OFF image auto-decode BEFORE anything touches the
+            # "image" column. The HF "image" feature defaults to decode=True, so any row
+            # access (incl. the .filter below and _parse_examples' size read) would decode
+            # full-resolution page rasters for ALL 7 languages into memory. With several
+            # xfund jobs in the grid running concurrently that exhausted 125G RAM + swap
+            # and the OOM killer sent SIGKILL (rc=137). decode=False keeps images as raw
+            # bytes; we decode exactly one image at a time, on demand, in __getitem__.
+            full = full.cast_column("image", HFImage(decode=False))
+            # Keep only this language's rows (id prefix is "<lang>_..."). keep_in_memory=
+            # False leaves the filtered table memory-mapped on disk instead of copying the
+            # kept rows into RAM.
+            full = full.filter(
+                lambda ex, lg=lang: str(ex["id"]).startswith(f"{lg}_"),
+                keep_in_memory=False,
+            )
             _RAW_DS_CACHE[cache_key] = full
         self._ds = _RAW_DS_CACHE[cache_key]
 
@@ -125,8 +189,7 @@ class XFUNDDataset(Dataset):
         data = []
         for row in range(len(ds)):
             ex = ds[row]
-            img = ex["image"]
-            w, h = img.size  # (width, height)
+            w, h = _read_size(ex["image"])  # header-only read; no full decode
             native_tags = ex["ner_tags"]
             tags = [self.label_to_id.get(self._native_names[t], 0) for t in native_tags]
             boxes = [_normalize_box(b, w, h) for b in ex["bboxes"]]
@@ -164,7 +227,9 @@ class XFUNDDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         ex = self.data[idx]
-        image = self._ds[ex["row"]]["image"] if self.encoder.has_image else None
+        # Decode one image on demand, honoring EXIF orientation (their fix); vision-free
+        # encoders skip the decode entirely.
+        image = _open_image(self._ds[ex["row"]]["image"]) if self.encoder.has_image else None
         return self.encoder.encode(
             image, ex["tokens"], ex["bboxes"], ex["ner_tags"], self.max_length
         )

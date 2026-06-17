@@ -1,0 +1,69 @@
+{
+  "method": "joint",
+  "scenario": "mixed",
+  "seed": 42,
+  "target_component": null,
+  "matrix": [
+    [
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN
+    ],
+    [
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN
+    ],
+    [
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN
+    ],
+    [
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN
+    ],
+    [
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN
+    ],
+    [
+      57.99671592775042,
+      37.088122605363985,
+      79.7864768683274,
+      84.1655996585574,
+      33.47962382445141,
+      71.01298701298701
+    ]
+  ],
+  "num_tasks": 6,
+  "AA": 60.588254316239606,
+  "BWT": 0.0,
+  "AF": -0.0,
+  "FWT": 0.0,
+  "wall_time_per_task_s": [
+    897.1861936979985
+  ],
+  "total_wall_time_s": 897.1861936979985,
+  "mean_time_per_task_s": 897.1861936979985,
+  "total_params": 125346201,
+  "trainable_params": 125346201,
+  "peak_gpu_mem_mb": 4192.59912109375
+}

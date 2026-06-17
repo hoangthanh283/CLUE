@@ -1,0 +1,56 @@
+{
+  "method": "joint",
+  "scenario": "cil_cord",
+  "seed": 7,
+  "target_component": null,
+  "matrix": [
+    [
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN
+    ],
+    [
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN
+    ],
+    [
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN
+    ],
+    [
+      NaN,
+      NaN,
+      NaN,
+      NaN,
+      NaN
+    ],
+    [
+      67.04707560627675,
+      24.759615384615387,
+      23.57080035180299,
+      23.38049143708116,
+      13.43817012151537
+    ]
+  ],
+  "num_tasks": 5,
+  "AA": 30.439230580258332,
+  "BWT": 0.0,
+  "AF": -0.0,
+  "FWT": 0.0,
+  "wall_time_per_task_s": [
+    500.12624531201436
+  ],
+  "total_wall_time_s": 500.12624531201436,
+  "mean_time_per_task_s": 500.12624531201436,
+  "total_params": 125373885,
+  "trainable_params": 125373885,
+  "peak_gpu_mem_mb": 4193.05615234375
+}

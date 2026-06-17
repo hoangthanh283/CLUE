@@ -143,9 +143,17 @@ SINGLE_SCENARIO = {
 
 # ─── Sources ────────────────────────────────────────────────────────────────────
 def load_local_runs(results_dir: Path) -> pd.DataFrame:
-    """Read every ``results/<run>/metrics.json`` into one row per run."""
+    """Read every ``results/<run>/metrics.json`` into one row per run.
+
+    Only dirs with a sibling ``.done`` marker are read: a run killed mid-write (e.g.
+    by an on-demand instance shutdown) may leave a partial ``metrics.json`` with no
+    ``.done``; skipping those avoids ingesting a half-written record. Such runs are
+    simply re-executed by the scheduler on the next instance.
+    """
     rows = []
     for mp in sorted(Path(results_dir).glob("*/metrics.json")):
+        if not (mp.parent / ".done").exists():
+            continue
         with open(mp) as f:
             d = json.load(f)
         rows.append(

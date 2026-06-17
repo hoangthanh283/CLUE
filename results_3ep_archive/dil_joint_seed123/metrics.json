@@ -1,0 +1,36 @@
+{
+  "method": "joint",
+  "scenario": "dil",
+  "seed": 123,
+  "target_component": null,
+  "matrix": [
+    [
+      NaN,
+      NaN,
+      NaN
+    ],
+    [
+      NaN,
+      NaN,
+      NaN
+    ],
+    [
+      80.95684803001876,
+      78.99621863183225,
+      95.08196721311477
+    ]
+  ],
+  "num_tasks": 3,
+  "AA": 85.01167795832193,
+  "BWT": 0.0,
+  "AF": -0.0,
+  "FWT": 0.0,
+  "wall_time_per_task_s": [
+    893.995634086983
+  ],
+  "total_wall_time_s": 893.995634086983,
+  "mean_time_per_task_s": 893.995634086983,
+  "total_params": 125333897,
+  "trainable_params": 125333897,
+  "peak_gpu_mem_mb": 4192.39599609375
+}
