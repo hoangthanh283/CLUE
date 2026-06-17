@@ -223,28 +223,44 @@ on_exit() {
 JOBS=()
 add_job() { JOBS+=("$1|$2"); }
 
-# 1) Single-task baselines FIRST (provide b_i for FWT). One dataset per single scenario.
-for sc in single_funsd single_cord single_sroie single_xfund single_wildreceipt; do
-  for s in $SEEDS; do add_job "${sc}_naive_seed${s}" "method=naive scenario=${sc} seed=${s}"; done
-done
-# 2) Core methods x scenarios x seeds
-for m in $CORE_METHODS; do for sc in $SCENARIOS; do for s in $SEEDS; do
-  add_job "${sc}_${m}_seed${s}" "method=${m} scenario=${sc} seed=${s}"
-done; done; done
-# 3) Prompt/LoRA methods
-for m in $PROMPT_METHODS; do for sc in $SCENARIOS; do for s in $SEEDS; do
-  add_job "${sc}_${m}_seed${s}" "method=${m} scenario=${sc} seed=${s}"
-done; done; done
-# 4) DocCL main (full method = target_depth 'all', the config default) across scenarios
-if [ "$RUN_DOCCL" = "1" ]; then for sc in $SCENARIOS; do for s in $SEEDS; do
-  add_job "${sc}_doccl_seed${s}" "method=doccl scenario=${sc} seed=${s}"
-done; done; fi
-# 5) DocCL depth ablation (head_only/late_only/uniform) on the ablation scenario(s)
-if [ "$RUN_ABLATION" = "1" ]; then for sc in $ABLATION_SCENARIOS; do for s in $SEEDS; do
-  for tgt in $DEPTH_TARGETS; do
-    add_job "${sc}_doccl_seed${s}_${tgt}" "method=doccl scenario=${sc} seed=${s} method.target_depth=${tgt}"
+# Job-list builders, split so the ORDER can be flipped via PRIORITY_DOCCL. Resume (.done
+# skip) makes reordering harmless — already-finished runs are skipped regardless of order.
+add_baselines() {
+  # Single-task baselines (provide b_i for FWT). One dataset per single scenario.
+  for sc in single_funsd single_cord single_sroie single_xfund single_wildreceipt; do
+    for s in $SEEDS; do add_job "${sc}_naive_seed${s}" "method=naive scenario=${sc} seed=${s}"; done
   done
-done; done; fi
+  # Core methods x scenarios x seeds
+  for m in $CORE_METHODS; do for sc in $SCENARIOS; do for s in $SEEDS; do
+    add_job "${sc}_${m}_seed${s}" "method=${m} scenario=${sc} seed=${s}"
+  done; done; done
+  # Prompt/LoRA methods
+  for m in $PROMPT_METHODS; do for sc in $SCENARIOS; do for s in $SEEDS; do
+    add_job "${sc}_${m}_seed${s}" "method=${m} scenario=${sc} seed=${s}"
+  done; done; done
+}
+add_doccl() {
+  # DocCL main (full method = target_depth 'all', the config default) across scenarios
+  if [ "$RUN_DOCCL" = "1" ]; then for sc in $SCENARIOS; do for s in $SEEDS; do
+    add_job "${sc}_doccl_seed${s}" "method=doccl scenario=${sc} seed=${s}"
+  done; done; fi
+  # DocCL depth ablation (head_only/late_only/uniform) on the ablation scenario(s)
+  if [ "$RUN_ABLATION" = "1" ]; then for sc in $ABLATION_SCENARIOS; do for s in $SEEDS; do
+    for tgt in $DEPTH_TARGETS; do
+      add_job "${sc}_doccl_seed${s}_${tgt}" "method=doccl scenario=${sc} seed=${s} method.target_depth=${tgt}"
+    done
+  done; done; fi
+}
+
+# PRIORITY_DOCCL=1 dispatches the (headline) DocCL runs BEFORE the baselines, so the most
+# important results are banked first — valuable when budget/time may cut a run short.
+if [ "${PRIORITY_DOCCL:-0}" = "1" ]; then
+  add_doccl
+  add_baselines
+else
+  add_baselines
+  add_doccl
+fi
 
 NUM_GPUS=$(echo $GPUS | wc -w)
 TOTAL_SLOTS=$(( NUM_GPUS * JOBS_PER_GPU ))
