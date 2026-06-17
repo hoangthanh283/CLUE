@@ -223,18 +223,27 @@ on_exit() {
 JOBS=()
 add_job() { JOBS+=("$1|$2"); }
 
-# Job-list builders, split so the ORDER can be flipped via PRIORITY_DOCCL. Resume (.done
-# skip) makes reordering harmless — already-finished runs are skipped regardless of order.
-add_baselines() {
+# Job-list builders, split by group so dispatch ORDER is controllable. Resume (.done skip)
+# makes reordering harmless — already-finished runs are skipped regardless of order.
+#
+# CORE_BEFORE_DOCCL = methods that should run BEFORE DocCL (the cheap/medium baselines).
+# CORE_AFTER_DOCCL  = heavy core methods to run AFTER DocCL (der_pp, the heaviest replay).
+# Both derive from CORE_METHODS so overriding CORE_METHODS still works; der_pp is split out.
+CORE_BEFORE_DOCCL="${CORE_BEFORE_DOCCL:-naive joint ewc lwf er}"
+CORE_AFTER_DOCCL="${CORE_AFTER_DOCCL:-der_pp}"
+
+add_singletask() {
   # Single-task baselines (provide b_i for FWT). One dataset per single scenario.
   for sc in single_funsd single_cord single_sroie single_xfund single_wildreceipt; do
     for s in $SEEDS; do add_job "${sc}_naive_seed${s}" "method=naive scenario=${sc} seed=${s}"; done
   done
-  # Core methods x scenarios x seeds
-  for m in $CORE_METHODS; do for sc in $SCENARIOS; do for s in $SEEDS; do
+}
+add_core_group() {  # $1 = space-separated method list
+  for m in $1; do for sc in $SCENARIOS; do for s in $SEEDS; do
     add_job "${sc}_${m}_seed${s}" "method=${m} scenario=${sc} seed=${s}"
   done; done; done
-  # Prompt/LoRA methods
+}
+add_prompt() {
   for m in $PROMPT_METHODS; do for sc in $SCENARIOS; do for s in $SEEDS; do
     add_job "${sc}_${m}_seed${s}" "method=${m} scenario=${sc} seed=${s}"
   done; done; done
@@ -252,14 +261,21 @@ add_doccl() {
   done; done; fi
 }
 
-# PRIORITY_DOCCL=1 dispatches the (headline) DocCL runs BEFORE the baselines, so the most
-# important results are banked first — valuable when budget/time may cut a run short.
+# Dispatch order: single-task + cheap/medium core -> DocCL (headline, banked before the
+# heaviest baselines) -> der_pp -> prompt/LoRA. (PRIORITY_DOCCL=1 still forces DocCL
+# absolutely first if you want even the single-task baselines after it.)
 if [ "${PRIORITY_DOCCL:-0}" = "1" ]; then
   add_doccl
-  add_baselines
+  add_singletask
+  add_core_group "$CORE_BEFORE_DOCCL"
+  add_core_group "$CORE_AFTER_DOCCL"
+  add_prompt
 else
-  add_baselines
+  add_singletask
+  add_core_group "$CORE_BEFORE_DOCCL"
   add_doccl
+  add_core_group "$CORE_AFTER_DOCCL"
+  add_prompt
 fi
 
 NUM_GPUS=$(echo $GPUS | wc -w)
