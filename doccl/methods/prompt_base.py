@@ -106,14 +106,8 @@ class PromptBasedMethod(NaiveFineTune):
 
     @torch.no_grad()
     def _query(self, batch: dict) -> torch.Tensor:
-        """q(x) = CLS embedding from the frozen backbone."""
-        inputs = {
-            k: batch[k]
-            for k in ("input_ids", "bbox", "pixel_values", "attention_mask")
-            if k in batch
-        }
-        out = self.model.model.layoutlmv3(**inputs)
-        return out.last_hidden_state[:, 0]  # (B, D)
+        """q(x) = CLS embedding from the frozen backbone (backbone-agnostic)."""
+        return self.model.encode_query(batch)  # (B, D)
 
     # ─── training / evaluation ──────────────────────────────────────────────
     def train_task(
@@ -146,7 +140,7 @@ class PromptBasedMethod(NaiveFineTune):
                 logits = self.model.forward_with_prompts(
                     input_ids=batch["input_ids"],
                     bbox=batch["bbox"],
-                    pixel_values=batch["pixel_values"],
+                    pixel_values=batch.get("pixel_values"),
                     prompt_embeds=prompt_embeds,
                     attention_mask=batch.get("attention_mask"),
                 )
@@ -184,7 +178,7 @@ class PromptBasedMethod(NaiveFineTune):
                     logits = self.model.forward_with_prompts(
                         input_ids=batch["input_ids"],
                         bbox=batch["bbox"],
-                        pixel_values=batch["pixel_values"],
+                        pixel_values=batch.get("pixel_values"),
                         prompt_embeds=prompt_embeds,
                         attention_mask=batch.get("attention_mask"),
                     )

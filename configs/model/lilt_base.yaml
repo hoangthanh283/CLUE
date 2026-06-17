@@ -1,0 +1,8 @@
+# LiLT — decoupled text+layout backbone, multilingual (XLM-R), no vision.
+# English-only scenarios may prefer the English checkpoint
+# SCUT-DLVCLab/lilt-roberta-en-base; tokenizer follows ``name`` unless
+# ``tokenizer_name`` is set.
+name: nielsr/lilt-xlm-roberta-base
+family: lilt
+hidden_size: 768
+num_layers: 12

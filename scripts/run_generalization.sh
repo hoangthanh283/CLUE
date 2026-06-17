@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Generalization study: run subset of methods on LiLT and BROS backbones.
-# Designed to overlap with paper-writing time in W12-13.
+# Study 1 — Generalization (vary backbone). Show the finding + DocCL's ranking
+# transfer across architecturally diverse encoders, without re-running everything.
 #
-# Subset: 6 methods (naive, joint, best-replay=DER++, best-prompt=CODA-P,
-#                    best-LoRA=O-LoRA, our-DocCL) × 3 scenarios × 3 seeds × 2 backbones
-# = 108 runs, ~130 GPU-hours
+# Default subset: 4 most-informative methods (naive=lower, joint=upper,
+#   der_pp=best-baseline placeholder — swap to the anchor's actual best baseline,
+#   doccl=ours) × 2 vision-free backbones (LiLT, BROS) × {cil_cord, dil} × 3 seeds,
+#   plus a LiLT-only dil_xlingual pass (cross-lingual is meaningless on English BROS).
+# ≈ 4×2×2×3 + 4×1×3 ≈ 60 runs.
 #
 # Usage:
 #   bash scripts/run_generalization.sh
@@ -12,18 +14,17 @@
 set -euo pipefail
 
 BACKBONES="${BACKBONES:-lilt_base bros_base}"
-METHODS="${METHODS:-naive joint der_pp coda_prompt o_lora doccl}"
-SCENARIOS="${SCENARIOS:-cil_cord dil mixed}"
+METHODS="${METHODS:-naive joint der_pp doccl}"
+SCENARIOS="${SCENARIOS:-cil_cord dil dil_xlingual}"
 SEEDS="${SEEDS:-42 123 7}"
+# Backbones able to run the cross-lingual XFUND scenario (multilingual vocab).
+MULTILINGUAL_BACKBONES="${MULTILINGUAL_BACKBONES:-lilt_base}"
 
-echo "=== DocCL Generalization Study ==="
+echo "=== DocCL Generalization Study (Study 1) ==="
 echo "Backbones: $BACKBONES"
 echo "Methods:   $METHODS"
 echo "Scenarios: $SCENARIOS"
 echo "Seeds:     $SEEDS"
-echo
-echo "WARNING: LiLT and BROS wrappers are stubs at the time of this script."
-echo "Implement doccl/models/lilt_wrapper.py and bros_wrapper.py before running."
 echo
 
 START_TIME=$(date +%s)
@@ -31,6 +32,11 @@ START_TIME=$(date +%s)
 for backbone in $BACKBONES; do
     for method in $METHODS; do
         for scenario in $SCENARIOS; do
+            # Cross-lingual XFUND only runs on multilingual backbones.
+            if [ "$scenario" = "dil_xlingual" ] && \
+               [[ " $MULTILINGUAL_BACKBONES " != *" $backbone "* ]]; then
+                continue
+            fi
             for seed in $SEEDS; do
                 run_name="${backbone}_${scenario}_${method}_seed${seed}"
                 done_marker="results/${run_name}/.done"

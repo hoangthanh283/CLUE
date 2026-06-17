@@ -15,7 +15,8 @@ from typing import Any
 import torch
 from datasets import load_dataset
 from torch.utils.data import Dataset
-from transformers import LayoutLMv3Processor
+
+from doccl.data.encoders import KIEEncoder, get_default_encoder
 
 # Process-wide cache keyed by ``split`` so the FUNSD splits reused across scenarios
 # (dil + mixed build FUNSD up to 3× via the CIL sessions and the revisit task) share one
@@ -48,22 +49,20 @@ class FUNSDDataset(Dataset):
     def __init__(
         self,
         split: str = "train",
-        processor: LayoutLMv3Processor | None = None,
+        encoder: KIEEncoder | None = None,
         max_length: int = 512,
         label_filter: list[str] | None = None,
     ):
         """Args:
-            split: "train" or "test"
-            processor: LayoutLMv3Processor (created from microsoft/layoutlmv3-base if None)
-            max_length: max token length (LayoutLMv3 supports up to 512)
-            label_filter: if provided, only keep examples containing labels in this set.
-                          Used for class-incremental scenario building.
+        split: "train" or "test"
+        encoder: per-backbone KIEEncoder (defaults to LayoutLMv3Encoder)
+        max_length: max token length (LayoutLMv3 supports up to 512)
+        label_filter: if provided, only keep examples containing labels in this set.
+                      Used for class-incremental scenario building.
         """
         self.split = split
         self.max_length = max_length
-        self.processor = processor or LayoutLMv3Processor.from_pretrained(
-            "microsoft/layoutlmv3-base", apply_ocr=False
-        )
+        self.encoder = encoder or get_default_encoder()
 
         if split not in _RAW_DS_CACHE:
             _RAW_DS_CACHE[split] = load_dataset(
@@ -104,9 +103,9 @@ class FUNSDDataset(Dataset):
         every out-of-session entity token as background ('O') for this session.
         """
         o_id = self.label_to_id["O"]
-        target_entity_ids = {
-            self.label_to_id[l] for l in label_filter if l in self.label_to_id
-        } - {o_id}
+        target_entity_ids = {self.label_to_id[l] for l in label_filter if l in self.label_to_id} - {
+            o_id
+        }
 
         filtered = []
         for ex in data:
@@ -121,15 +120,9 @@ class FUNSDDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         ex = self.data[idx]
-        image = self._ds[ex["row"]]["image"]  # decode on demand (not cached in self.data)
-        encoding = self.processor(
-            image,
-            ex["tokens"],
-            boxes=ex["bboxes"],
-            word_labels=ex["ner_tags"],
-            truncation=True,
-            padding="max_length",
-            max_length=self.max_length,
-            return_tensors="pt",
+        # Decode the page image only for image-bearing backbones; vision-free
+        # encoders (LiLT/BROS) ignore it.
+        image = self._ds[ex["row"]]["image"] if self.encoder.has_image else None
+        return self.encoder.encode(
+            image, ex["tokens"], ex["bboxes"], ex["ner_tags"], self.max_length
         )
-        return {k: v.squeeze(0) for k, v in encoding.items()}

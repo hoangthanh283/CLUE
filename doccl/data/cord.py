@@ -22,7 +22,7 @@ import torch
 from datasets import load_dataset
 from PIL import Image
 from torch.utils.data import Dataset
-from transformers import LayoutLMv3Processor
+from doccl.data.encoders import KIEEncoder, get_default_encoder
 
 # Process-wide caches keyed by ``split`` so that the N class-incremental sessions of a
 # scenario (e.g. cil_cord builds 10 CORDDataset instances) share ONE underlying HF Arrow
@@ -68,14 +68,38 @@ CORD_FINE_LABELS = [
 
 # Super-class mapping (for DIL scenario)
 SUPERCLASS_MAP = {
-    "menu": ["menu.cnt", "menu.discountprice", "menu.itemsubtotal", "menu.nm",
-             "menu.num", "menu.price", "menu.unitprice", "menu.vatyn",
-             "menu.sub.cnt", "menu.sub.nm", "menu.sub.price", "menu.sub.unitprice"],
-    "sub_total": ["sub_total.discount_price", "sub_total.etc", "sub_total.othersvc_price",
-                  "sub_total.service_price", "sub_total.subtotal_price", "sub_total.tax_price"],
-    "total": ["total.cashprice", "total.changeprice", "total.creditcardprice",
-              "total.emoneyprice", "total.menuqty_cnt", "total.menutype_cnt",
-              "total.total_etc", "total.total_price"],
+    "menu": [
+        "menu.cnt",
+        "menu.discountprice",
+        "menu.itemsubtotal",
+        "menu.nm",
+        "menu.num",
+        "menu.price",
+        "menu.unitprice",
+        "menu.vatyn",
+        "menu.sub.cnt",
+        "menu.sub.nm",
+        "menu.sub.price",
+        "menu.sub.unitprice",
+    ],
+    "sub_total": [
+        "sub_total.discount_price",
+        "sub_total.etc",
+        "sub_total.othersvc_price",
+        "sub_total.service_price",
+        "sub_total.subtotal_price",
+        "sub_total.tax_price",
+    ],
+    "total": [
+        "total.cashprice",
+        "total.changeprice",
+        "total.creditcardprice",
+        "total.emoneyprice",
+        "total.menuqty_cnt",
+        "total.menutype_cnt",
+        "total.total_etc",
+        "total.total_price",
+    ],
     "void_menu": ["void_menu.nm", "void_menu.price"],
     "sub": ["sub.nm", "sub.cnt"],
 }
@@ -105,7 +129,7 @@ class CORDDataset(Dataset):
         self,
         split: str = "train",
         granularity: str = "fine",
-        processor: LayoutLMv3Processor | None = None,
+        encoder: KIEEncoder | None = None,
         max_length: int = 512,
         label_filter: list[str] | None = None,
     ):
@@ -117,9 +141,7 @@ class CORDDataset(Dataset):
         self.split = split
         self.granularity = granularity
         self.max_length = max_length
-        self.processor = processor or LayoutLMv3Processor.from_pretrained(
-            "microsoft/layoutlmv3-base", apply_ocr=False
-        )
+        self.encoder = encoder or get_default_encoder()
 
         self.label_names = (
             self.LABEL_NAMES_FINE if granularity == "fine" else self.LABEL_NAMES_SUPER
@@ -176,13 +198,15 @@ class CORDDataset(Dataset):
             tokens, boxes, labels = self._flatten_gt(gt, size)
             if not tokens:
                 continue
-            parsed.append({
-                "row": row,
-                "image_size": size,
-                "tokens": tokens,
-                "bboxes": boxes,
-                "ner_tags": labels,
-            })
+            parsed.append(
+                {
+                    "row": row,
+                    "image_size": size,
+                    "tokens": tokens,
+                    "bboxes": boxes,
+                    "ner_tags": labels,
+                }
+            )
         return parsed
 
     def _flatten_gt(
@@ -265,9 +289,9 @@ class CORDDataset(Dataset):
         classes while treating the rest as context.
         """
         o_id = self.label_to_id["O"]
-        target_entity_ids = {
-            self.label_to_id[l] for l in label_filter if l in self.label_to_id
-        } - {o_id}
+        target_entity_ids = {self.label_to_id[l] for l in label_filter if l in self.label_to_id} - {
+            o_id
+        }
 
         filtered = []
         for ex in data:
@@ -282,15 +306,7 @@ class CORDDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         ex = self.data[idx]
-        image = self._ds[ex["row"]]["image"]  # decode on demand (not cached in self.data)
-        encoding = self.processor(
-            image,
-            ex["tokens"],
-            boxes=ex["bboxes"],
-            word_labels=ex["ner_tags"],
-            truncation=True,
-            padding="max_length",
-            max_length=self.max_length,
-            return_tensors="pt",
+        image = self._ds[ex["row"]]["image"] if self.encoder.has_image else None
+        return self.encoder.encode(
+            image, ex["tokens"], ex["bboxes"], ex["ner_tags"], self.max_length
         )
-        return {k: v.squeeze(0) for k, v in encoding.items()}

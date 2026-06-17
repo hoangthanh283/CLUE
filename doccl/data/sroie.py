@@ -27,7 +27,7 @@ from typing import Any
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
-from transformers import LayoutLMv3Processor
+from doccl.data.encoders import KIEEncoder, get_default_encoder
 
 # Process-wide cache keyed by (hf_name, split) so the SROIE split reused across scenarios
 # (dil + mixed) shares one HF Arrow handle instead of each materialising its own copy.
@@ -59,33 +59,31 @@ class SROIEDataset(Dataset):
         self,
         split: str = "train",
         data_root: str | Path = "data/sroie",
-        processor: LayoutLMv3Processor | None = None,
+        encoder: KIEEncoder | None = None,
         max_length: int = 512,
         label_filter: list[str] | None = None,
         source: str = "local",
         hf_name: str = "mp-02/sroie",
     ):
         """Args:
-            split: "train" or "test".
-            data_root: local dir holding ``{split}.json`` (default source).
-            source: "local" (default; reads the artifact produced by
-                ``scripts/prepare_sroie.py``, which materializes the canonical
-                626 train / 347 test split with proper BIO labels) or "hf"
-                (load a parquet mirror directly at runtime — convenient for
-                cloud runs, but ``scenarios.py`` uses the local artifact).
-            hf_name: HuggingFace dataset id used when source="hf". Default
-                ``mp-02/sroie`` is a parquet mirror with the canonical
-                626/347 split. It tags entity tokens with a flat ``S-<FIELD>``
-                scheme + ``O``; ``_load_hf`` converts those to the 9-tag BIO
-                scheme by detecting runs (first token ``B-``, rest ``I-``).
-                String-BIO mirrors (e.g. ``B_company``) are also normalised.
+        split: "train" or "test".
+        data_root: local dir holding ``{split}.json`` (default source).
+        source: "local" (default; reads the artifact produced by
+            ``scripts/prepare_sroie.py``, which materializes the canonical
+            626 train / 347 test split with proper BIO labels) or "hf"
+            (load a parquet mirror directly at runtime — convenient for
+            cloud runs, but ``scenarios.py`` uses the local artifact).
+        hf_name: HuggingFace dataset id used when source="hf". Default
+            ``mp-02/sroie`` is a parquet mirror with the canonical
+            626/347 split. It tags entity tokens with a flat ``S-<FIELD>``
+            scheme + ``O``; ``_load_hf`` converts those to the 9-tag BIO
+            scheme by detecting runs (first token ``B-``, rest ``I-``).
+            String-BIO mirrors (e.g. ``B_company``) are also normalised.
         """
         self.split = split
         self.max_length = max_length
         self.source = source
-        self.processor = processor or LayoutLMv3Processor.from_pretrained(
-            "microsoft/layoutlmv3-base", apply_ocr=False
-        )
+        self.encoder = encoder or get_default_encoder()
 
         self.label_to_id = {l: i for i, l in enumerate(self.LABEL_NAMES)}
         self.id_to_label = {i: l for l, i in self.label_to_id.items()}
@@ -233,9 +231,9 @@ class SROIEDataset(Dataset):
         every out-of-session entity token as background ('O') for this session.
         """
         o_id = self.label_to_id["O"]
-        target_entity_ids = {
-            self.label_to_id[l] for l in label_filter if l in self.label_to_id
-        } - {o_id}
+        target_entity_ids = {self.label_to_id[l] for l in label_filter if l in self.label_to_id} - {
+            o_id
+        }
 
         filtered = []
         for ex in data:
@@ -250,18 +248,12 @@ class SROIEDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         ex = self.data[idx]
-        if "row" in ex:  # HF source: decode the image on demand (not cached per example)
-            image = self._hf_ds[ex["row"]][self._image_key].convert("RGB")
-        else:  # local source: open from disk
-            image = Image.open(self._image_root / ex["image_filename"]).convert("RGB")
-        encoding = self.processor(
-            image,
-            ex["tokens"],
-            boxes=ex["bboxes"],
-            word_labels=ex["ner_tags"],
-            truncation=True,
-            padding="max_length",
-            max_length=self.max_length,
-            return_tensors="pt",
+        image = None
+        if self.encoder.has_image:  # vision-free encoders skip image decode
+            if "row" in ex:  # HF source: decode the image on demand
+                image = self._hf_ds[ex["row"]][self._image_key].convert("RGB")
+            else:  # local source: open from disk
+                image = Image.open(self._image_root / ex["image_filename"]).convert("RGB")
+        return self.encoder.encode(
+            image, ex["tokens"], ex["bboxes"], ex["ner_tags"], self.max_length
         )
-        return {k: v.squeeze(0) for k, v in encoding.items()}

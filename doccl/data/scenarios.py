@@ -20,6 +20,7 @@ from torch.utils.data import Dataset
 
 from doccl.data.cil_remapping import CIL_LabelRemapper
 from doccl.data.cord import CORDDataset
+from doccl.data.encoders import KIEEncoder, set_default_encoder
 from doccl.data.dil_remapping import DIL_LabelRemapper, DIL_UNIFIED_LABELS
 from doccl.data.funsd import FUNSDDataset
 from doccl.data.sroie import SROIEDataset
@@ -602,8 +603,13 @@ SCENARIO_REGISTRY = {
 }
 
 
-def get_scenario(name: str, **kwargs) -> CLScenario:
+def get_scenario(name: str, *, encoder: KIEEncoder | None = None, **kwargs) -> CLScenario:
+    """Build a scenario. ``encoder`` (per-backbone tokenization) is set as the
+    process-wide default before the datasets are constructed, so every loader in
+    this scenario tokenizes for the active backbone. Defaults to LayoutLMv3."""
     if name not in SCENARIO_REGISTRY:
         raise ValueError(f"Unknown scenario {name}. Available: {list(SCENARIO_REGISTRY)}")
+    if encoder is not None:
+        set_default_encoder(encoder)
     builder = SCENARIO_REGISTRY[name]
     return builder(**kwargs) if kwargs else builder()
