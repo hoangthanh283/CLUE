@@ -55,8 +55,11 @@ class SAMStep:
         self.params = [p for p in params if p.requires_grad]
         self.rho = float(rho)
         self.cflat_lambda = float(cflat_lambda)
-        # Clean-point gradient cache (only needed when cflat_lambda > 0).
-        self._g0: list[torch.Tensor | None] = []
+        # Scale used in first_step (rho/‖g‖); kept so second_step can recover the
+        # clean gradient g₀ = eps / scale WITHOUT a separate full-size clone (the eps
+        # list already holds g₀·scale). This keeps the C-Flat path memory-flat — a
+        # naive g₀ clone doubled gradient memory and OOM'd the 6 GB box.
+        self._scale: float = 0.0
 
     @torch.no_grad()
     def _grad_norm(self) -> torch.Tensor:
@@ -70,22 +73,19 @@ class SAMStep:
     def first_step(self) -> list[torch.Tensor]:
         """Ascend to the worst-case neighbour θ+ε and return the per-param ε.
 
-        Must be called right after the *clean* backward (grads = g₀). Caches g₀ when
-        the C-Flat term is active so ``second_step`` can form the curvature direction.
-        Returns the list of ε tensors (same order/shape as ``self.params``) so the
-        caller can hand them back to ``second_step``.
+        Must be called right after the *clean* backward (grads = g₀). The returned ε
+        tensors (= g₀·scale) double as the cached clean gradient: ``second_step``
+        recovers g₀ = ε/scale, so no separate g₀ buffer is allocated even when the
+        C-Flat curvature term is active.
         """
         grad_norm = self._grad_norm()
-        scale = self.rho / (grad_norm + _GRAD_NORM_EPS)
+        self._scale = float(self.rho / (grad_norm + _GRAD_NORM_EPS))
         eps_list: list[torch.Tensor] = []
-        self._g0 = []
         for p in self.params:
             if p.grad is None:
                 eps_list.append(torch.zeros_like(p))
-                self._g0.append(None)
                 continue
-            self._g0.append(p.grad.detach().clone() if self.cflat_lambda > 0 else None)
-            eps = p.grad.detach() * scale
+            eps = p.grad.detach() * self._scale
             p.add_(eps)  # θ ← θ + ε
             eps_list.append(eps)
         return eps_list
@@ -100,12 +100,13 @@ class SAMStep:
         flat regions. With ``cflat_lambda == 0`` the resulting grad is exactly g₊
         (plain SAM). The caller clips and calls ``optimizer.step()`` afterwards.
         """
-        for p, eps, g0 in zip(self.params, eps_list, self._g0, strict=True):
+        recover_g0 = self.cflat_lambda > 0 and self._scale > _GRAD_NORM_EPS
+        for p, eps in zip(self.params, eps_list, strict=True):
             p.sub_(eps)  # θ ← θ (restore)
             if p.grad is None:
                 continue
-            if self.cflat_lambda > 0 and g0 is not None:
-                # g_used = g₊ + λ·(g₊ − g₀): push along the curvature direction.
+            if recover_g0:
+                # g₀ = ε / scale (no separate clone); g_used = g₊ + λ·(g₊ − g₀).
+                g0 = eps / self._scale
                 curvature = p.grad.detach() - g0
                 p.grad.add_(curvature, alpha=self.cflat_lambda)
-        self._g0 = []
