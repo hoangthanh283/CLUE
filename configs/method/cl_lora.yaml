@@ -1,0 +1,21 @@
+# CL-LoRA (2025 currency baseline, LoRA/PEFT family) — successor to O-LoRA.
+# Dual-adapter: O-LoRA orthogonal task-specific subspaces + LwF-style shared-knowledge KD.
+# Adapted from CVPR-2025 CIL image-classification to LayoutLMv3 token-classification.
+name: cl_lora
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+# Task-specific subspace (inherited from O-LoRA)
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.1
+lambda_ortho: 0.5
+target_modules:
+  - query
+  - key
+  - value
+# Task-shared knowledge retention (KD toward frozen previous-task teacher)
+kd_alpha: 1.0
+temperature: 2.0
+shared_grad_scale: 1.0   # gradient reassignment for the shared-KD pull; 0.0 = pure O-LoRA

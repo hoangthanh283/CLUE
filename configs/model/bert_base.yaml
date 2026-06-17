@@ -1,0 +1,7 @@
+# BERT-base — unimodal text-only external comparator (no layout, no vision).
+# Genuine text-only baseline for the "text is load-bearing" finding (review C1):
+# BertForTokenClassification consuming only input_ids/attention_mask/labels.
+name: bert-base-uncased
+family: bert
+hidden_size: 768
+num_layers: 12

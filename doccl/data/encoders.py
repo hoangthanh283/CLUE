@@ -16,6 +16,7 @@ with boxes + labels re-aligned. An encoder is the per-backbone strategy for that
 
 ``build_encoder(model_cfg)`` selects the encoder from ``model_cfg.family``.
 """
+
 from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
@@ -39,8 +40,7 @@ class KIEEncoder(Protocol):
         boxes: list[list[int]],
         word_labels: list[int],
         max_length: int = 512,
-    ) -> dict[str, torch.Tensor]:
-        ...
+    ) -> dict[str, torch.Tensor]: ...
 
 
 class LayoutLMv3Encoder:
@@ -118,6 +118,17 @@ class _SubwordKIEEncoder:
         return out
 
 
+class BERTEncoder(_SubwordKIEEncoder):
+    """BERT-WordPiece text-only encoder for the unimodal baseline.
+
+    Tokenises like the other subword encoders (so labels align to first subwords)
+    and still emits a ``bbox`` for collate uniformity, but the boxes are inert:
+    ``BERTWrapper.forward`` drops them, so this is a genuine text-only stream. Kept
+    as its own class (vs reusing ``_SubwordKIEEncoder`` directly) so the encoder
+    factory reads cleanly per family.
+    """
+
+
 class LiLTEncoder(_SubwordKIEEncoder):
     """XLM-R (or RoBERTa) box-aware subword encoder for LiLT."""
 
@@ -144,6 +155,7 @@ _ENCODER_BY_FAMILY = {
     "layoutlmv3": lambda cfg: LayoutLMv3Encoder(_cfg_get(cfg, "name", _DEFAULT_LAYOUTLMV3)),
     "lilt": lambda cfg: LiLTEncoder(_cfg_get(cfg, "tokenizer_name") or _cfg_get(cfg, "name")),
     "bros": lambda cfg: BROSEncoder(_cfg_get(cfg, "tokenizer_name") or _cfg_get(cfg, "name")),
+    "bert": lambda cfg: BERTEncoder(_cfg_get(cfg, "tokenizer_name") or _cfg_get(cfg, "name")),
 }
 
 

@@ -1,0 +1,13 @@
+# ER + C-Flat++ (2025 currency baseline, optimisation / flat-minima family).
+# Sharpness-aware (SAM) two-step update bolted onto Experience Replay.
+# NOTE: ~2x forward-backward per step (the SAM ascent needs a second forward),
+# so expect roughly 2x wall-time vs plain ER.
+name: er_cflat
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+buffer_size: 200
+replay_batch_size: 8
+rho: 0.05            # SAM neighbourhood radius (epsilon = rho * g/||g||)
+cflat_lambda: 0.1   # C-Flat curvature weight; 0.0 = plain SAM

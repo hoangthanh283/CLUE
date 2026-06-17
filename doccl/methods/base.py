@@ -9,6 +9,7 @@ The lifecycle is:
 
 Subclasses override hooks they need; the rest are no-ops by default.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -98,6 +99,12 @@ class ContinualMethod(ABC):
         self.amp_enabled: bool = False
         self._amp_dtype: torch.dtype | None = None
         self._amp_scaler: Any = None
+        # Optional deep-diagnostic logger (set by train.py when
+        # cfg.tensorboard.diagnostics is on). When present, the shared per-epoch
+        # hook logs per-component / per-depth weight + grad histograms. Inert by
+        # default so existing runs are byte-identical.
+        self.tb_diag: Any = None
+        self._epoch_counter: int = 0
 
     # ─── Lifecycle hooks ───────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
@@ -149,7 +156,13 @@ class ContinualMethod(ABC):
 
         One-line tail for every method's epoch loop. No-op (returns False) when
         early stopping is disabled or no val_loader is supplied.
+
+        Doubles as the shared per-epoch diagnostic hook: when a ``tb_diag`` logger
+        is attached, log per-component and per-depth *weight* histograms here (grads
+        are method-local and already zeroed by this point). This runs once per epoch
+        for every method without touching their individual loops.
         """
+        self._log_weight_diagnostics()
         if not stopper.enabled or val_loader is None:
             return False
         val_f1 = self.current_task_val_f1(val_loader)
@@ -164,6 +177,23 @@ class ContinualMethod(ABC):
             " -> STOP" if should_stop else "",
         )
         return should_stop
+
+    def _log_weight_diagnostics(self) -> None:
+        """Per-epoch weight histograms by component + depth (no-op without tb_diag).
+
+        Reuses the model's ``param_groups`` / ``param_groups_by_depth`` so the
+        forgetting story is bucketed identically to the Fisher/displacement plots.
+        """
+        if self.tb_diag is None:
+            return
+        step = self._epoch_counter
+        self._epoch_counter += 1
+        groups = getattr(self.model, "param_groups", None)
+        depth = getattr(self.model, "param_groups_by_depth", None)
+        if groups is not None:
+            self.tb_diag.log_param_histograms(groups, "weights", step, which="weight")
+        if depth is not None:
+            self.tb_diag.log_param_histograms(depth, "weights_by_depth", step, which="weight")
 
     @torch.no_grad()
     def current_task_val_f1(self, val_loader: DataLoader) -> float:

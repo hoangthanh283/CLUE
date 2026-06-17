@@ -20,6 +20,8 @@
 #   SCENARIOS       default "cil_cord dil mixed dil_xlingual cil_wildreceipt"
 #   CORE_METHODS    default "naive joint ewc lwf er der_pp"
 #   PROMPT_METHODS  default "l2p dualprompt coda_prompt o_lora"
+#   CURRENCY_METHODS default "er_cflat cl_lora"  (2025 baselines, run AFTER DocCL)
+#   RUN_BERT        default 1 (BERT text-only external comparator, classical tier)
 #   RUN_DOCCL       default 1 (doccl across all scenarios)
 #   RUN_ABLATION    default 1 (doccl depth ablation on ABLATION_SCENARIOS)
 #   ABLATION_SCENARIOS default "cil_cord"
@@ -54,6 +56,10 @@ SEEDS="${SEEDS:-42 123 7}"
 SCENARIOS="${SCENARIOS:-cil_cord dil mixed dil_xlingual cil_wildreceipt}"
 CORE_METHODS="${CORE_METHODS:-naive joint ewc lwf er der_pp}"
 PROMPT_METHODS="${PROMPT_METHODS:-l2p dualprompt coda_prompt o_lora}"
+# 2025 "currency" baselines — run AFTER DocCL (lowest priority tier).
+CURRENCY_METHODS="${CURRENCY_METHODS:-er_cflat cl_lora}"
+# BERT text-only external comparator (model=bert_base, naive method) — classical tier.
+RUN_BERT="${RUN_BERT:-1}"
 RUN_DOCCL="${RUN_DOCCL:-1}"
 RUN_ABLATION="${RUN_ABLATION:-1}"
 ABLATION_SCENARIOS="${ABLATION_SCENARIOS:-cil_cord}"
@@ -260,22 +266,45 @@ add_doccl() {
     done
   done; done; fi
 }
+add_bert() {
+  # BERT text-only external comparator: naive method on the BERT backbone. The run
+  # name carries the _bert family suffix (train.py) so it never collides with the
+  # LayoutLMv3 naive run.
+  if [ "$RUN_BERT" = "1" ]; then for sc in $SCENARIOS; do for s in $SEEDS; do
+    add_job "${sc}_naive_seed${s}_bert" "method=naive model=bert_base scenario=${sc} seed=${s}"
+  done; done; fi
+}
+add_currency() {  # 2025 currency baselines (er_cflat, cl_lora) — lowest priority
+  for m in $CURRENCY_METHODS; do for sc in $SCENARIOS; do for s in $SEEDS; do
+    add_job "${sc}_${m}_seed${s}" "method=${m} scenario=${sc} seed=${s}"
+  done; done; done
+}
 
-# Dispatch order: single-task + cheap/medium core -> DocCL (headline, banked before the
-# heaviest baselines) -> der_pp -> prompt/LoRA. (PRIORITY_DOCCL=1 still forces DocCL
-# absolutely first if you want even the single-task baselines after it.)
+# Dispatch order (user-requested priority): CLASSICAL baselines -> DocCL (contribution)
+# -> CURRENCY (2025 baselines: er_cflat, cl_lora). The classical tier is the full
+# measured suite (single-task, core, der_pp, prompt/LoRA, BERT text-only); DocCL + its
+# ablation land next so the headline is banked; the newest baselines fill in last.
+# Resume (.done skip) makes the order purely a scheduling preference. (PRIORITY_DOCCL=1
+# still forces DocCL absolutely first, before even the classical tier.)
 if [ "${PRIORITY_DOCCL:-0}" = "1" ]; then
   add_doccl
   add_singletask
   add_core_group "$CORE_BEFORE_DOCCL"
   add_core_group "$CORE_AFTER_DOCCL"
+  add_bert
   add_prompt
+  add_currency
 else
+  # Tier 1 — classical baselines (the measured suite).
   add_singletask
   add_core_group "$CORE_BEFORE_DOCCL"
-  add_doccl
   add_core_group "$CORE_AFTER_DOCCL"
+  add_bert
   add_prompt
+  # Tier 2 — the contribution.
+  add_doccl
+  # Tier 3 — 2025 currency baselines.
+  add_currency
 fi
 
 NUM_GPUS=$(echo $GPUS | wc -w)
