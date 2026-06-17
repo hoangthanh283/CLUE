@@ -189,11 +189,15 @@ export CORE_METHODS="${CORE_METHODS:-naive joint ewc lwf er der_pp}"
 export PROMPT_METHODS="${PROMPT_METHODS:-l2p dualprompt coda_prompt o_lora}"
 export RUN_DOCCL="${RUN_DOCCL:-1}"
 export RUN_ABLATION="${RUN_ABLATION:-1}"
-export ABLATION_SCENARIOS="${ABLATION_SCENARIOS:-cil_cord dil mixed dil_xlingual cil_wildreceipt}"
 # Scenario partition: defaults to ALL 5, but a caller (e.g. setup_vastai.sh, or a
 # per-machine launch) can set SCENARIOS to a disjoint subset so several boxes split the
 # grid with zero overlap (their job lists never intersect -> no R2-race waste).
 export SCENARIOS="${SCENARIOS:-cil_cord dil mixed dil_xlingual cil_wildreceipt}"
+# Keep the DocCL depth-ablation INSIDE this box's scenario slice by default, so a
+# partitioned box doesn't run ablations for scenarios another box owns (e.g. the Ada with
+# SCENARIOS="cil_cord dil" then ablates only those, not all 5). Override to narrow further
+# (e.g. ABLATION_SCENARIOS="cil_cord" for the lighter study).
+export ABLATION_SCENARIOS="${ABLATION_SCENARIOS:-${SCENARIOS}}"
 export AMP="${AMP:-1}"   # bf16 on (RTX 4090); set AMP=0 for exact fp32
 
 # Count the planned jobs so you see the full scope before it starts.
