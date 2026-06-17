@@ -10,9 +10,13 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-RAM_LIMIT_MB=${RAM_LIMIT_MB:-11000}     # abort well before the 15 GB box OOMs (margin for spikes)
+RAM_LIMIT_MB=${RAM_LIMIT_MB:-14000}     # user's hard ceiling: total system RAM must stay <= 14 GB.
+                                        # The per-run cgroup MEM_CAP (set in the driver) is kept well
+                                        # below this so a single run is OOM-killed before the SYSTEM
+                                        # hits 14 GB — the machine itself never OOMs.
 RAM_SAFE_MB=${RAM_SAFE_MB:-6000}        # only (re)start the driver once RAM has drained below this
-VRAM_LIMIT_MB=${VRAM_LIMIT_MB:-5000}
+VRAM_LIMIT_MB=${VRAM_LIMIT_MB:-5800}    # 6 GB RTX 2060; raised from 5000 so DocCL (Fisher + GPU
+                                        # teacher + replay buffer stacked, peaks ~5.5 GB) fits.
 STALL_SAMPLES=${STALL_SAMPLES:-30}     # ~10 min of no progress + idle GPU => stall
 MAX_RESTARTS=${MAX_RESTARTS:-50}
 DRIVER="scripts/run_autonomous_grid.sh"

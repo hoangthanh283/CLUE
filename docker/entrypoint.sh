@@ -14,11 +14,18 @@ if [ -z "${WANDB_API_KEY:-}" ] && [ "${WANDB_MODE:-online}" = "online" ]; then
   echo "         Pass -e WANDB_API_KEY=... or set -e WANDB_MODE=offline."
 fi
 
-# Materialise a minimal .env if not mounted, so source .env in the scripts is harmless.
-[ -f .env ] || cat > .env <<EOF
-WANDB_API_KEY=${WANDB_API_KEY:-}
-WANDB_PROJECT=${WANDB_PROJECT:-CL4IE}
-WANDB_ENTITY=${WANDB_ENTITY:-}
-EOF
+# SECURITY: we intentionally do NOT write any secret to disk. Creds (WANDB_API_KEY,
+# R2_ACCESS_KEY_ID/SECRET/ENDPOINT) arrive as runtime `-e` env vars and are read straight
+# from the process environment by the scripts — they never persist on the (rented,
+# possibly-reused) instance disk. The training scripts `source .env 2>/dev/null || true`,
+# so an absent .env is harmless; we create only a NON-SECRET .env with the W&B project name
+# so that line is a clean no-op without leaking anything.
+[ -f .env ] || printf 'WANDB_PROJECT=%s\n' "${WANDB_PROJECT:-CL4IE}" > .env
+
+if [ -n "${R2_ACCESS_KEY_ID:-}" ]; then
+  echo "  durable-resume: R2 creds present in env (not written to disk) -> sync ON (bucket ${R2_BUCKET:-doccl-results})"
+else
+  echo "  durable-resume: no R2_* creds -> sync OFF (results on ephemeral disk only)"
+fi
 
 exec "$@"

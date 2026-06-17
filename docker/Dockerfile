@@ -21,11 +21,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
     HF_HOME=/workspace/.hf_cache
 
-# System deps: python3.12 toolchain + git (HF datasets) + libs for image/OCR handling.
+# System deps: python3.12 toolchain + git (HF datasets) + libs for image/OCR handling
+# + rclone (durable resume sync to object storage on ephemeral/on-demand instances).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3.12 python3.12-venv python3.12-dev \
         git curl ca-certificates build-essential \
-        libgl1 libglib2.0-0 \
+        libgl1 libglib2.0-0 rclone \
     && rm -rf /var/lib/apt/lists/*
 
 # uv (fast, lockfile-reproducible installs).
