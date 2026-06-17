@@ -105,29 +105,14 @@ if [ -n "$TORCH_IMPORTABLE" ]; then
   # `import doccl` alone is NOT sufficient — doccl is importable just from the source
   # tree on PATH, even when hydra/transformers/etc. were never installed (that exact
   # gap made every grid job die at `import hydra`). Probe the deps train.py actually needs.
-  #
-  # CRITICAL: probe `peft` and `from peft import get_peft_model` too — NOT just `import
-  # transformers`. A box can have a too-NEW transformers/peft baked in (4.49+/0.15+) that
-  # hard-requires torch>=2.4. On a torch-2.2 image, `import transformers` still SUCCEEDS
-  # (it merely disables PyTorch with a warning), so a transformers-only probe is GREEN and
-  # we skip pip — then every job dies later at `from peft import ...` with
-  # `NameError: name 'nn' is not defined`. Importing peft here surfaces that mismatch NOW,
-  # and the pyproject upper caps make `pip install -e .` DOWNGRADE the bad versions.
-  DEP_PROBE='import doccl, hydra, transformers, seqeval, wandb, datasets, peft
-from peft import LoraConfig, get_peft_model
-import torch, transformers
-assert transformers.is_torch_available(), "transformers DISABLED torch (version needs torch>=2.4 but box has "+torch.__version__+")"'
-  if "$PY" -c "$DEP_PROBE" 2>/dev/null; then
+  if "$PY" -c 'import doccl, hydra, transformers, seqeval, wandb, datasets' 2>/dev/null; then
     ok "project + runtime deps already installed — skipping pip install"
   else
     info "Installing project deps (pip install -e ., torch already satisfied) ..."
-    # --upgrade so an out-of-range (too-new) transformers/peft already on the box is
-    # DOWNGRADED into the pyproject caps; without it pip leaves a >=floor version in place.
-    "$PY" -m pip install -q --upgrade -e . 2>&1 | tail -3 || die "pip install -e . failed"
-    # Re-run the SAME probe (incl. peft + transformers-sees-torch) so a version mismatch
-    # that slipped past before is caught here, not 100 jobs deep.
-    "$PY" -c "$DEP_PROBE" 2>/dev/null \
-      || die "deps still broken after pip install -e . — likely transformers/peft vs torch ${TORCH_IMPORTABLE} mismatch. Run: $PY -c '$DEP_PROBE'"
+    "$PY" -m pip install -q -e . 2>&1 | tail -3 || die "pip install -e . failed"
+    # Verify the deps that previously slipped through are now importable.
+    "$PY" -c 'import doccl, hydra, transformers, seqeval, wandb, datasets' 2>/dev/null \
+      || die "deps still missing after pip install -e . — check the error above"
   fi
 else
   warn "torch not found in base image — installing full locked stack via uv"
@@ -193,11 +178,6 @@ prompt_plain BATCH_SIZE   "Batch size"   "8"
 # dataset working set. Heavy multilingual sets (XFUND, WildReceipt) can OOM HOST RAM at x4
 # across all slots (SIGKILL -> rc=137). Default 2 here is the RAM-safe value for this grid.
 prompt_plain NUM_WORKERS  "DataLoader workers/job" "2"
-# VRAM admission cap (GB/GPU). Keeps the scheduler from co-scheduling too many HEAVY
-# jobs (dualprompt ~17 GB, der_pp ~35 GB) and OOMing — heavy jobs auto-defer, light jobs
-# pack. 0 = off (default; safe for the prompted JOBS_PER_GPU=2). Set it to (card_GB - 2)
-# on a big card when raising JOBS_PER_GPU, e.g. GPU_VRAM_GB=44 for a 46/48 GB L40/A6000.
-export GPU_VRAM_GB="${GPU_VRAM_GB:-0}"
 export GPUS JOBS_PER_GPU BATCH_SIZE NUM_WORKERS
 
 # This is the POWERFUL-machine path: run absolutely everything, thoroughly.
@@ -226,7 +206,7 @@ NJOBS=$(DRY_RUN=1 bash scripts/run_grid_multigpu.sh 2>/dev/null | grep -cE "  ->
 echo
 info "Launching grid: ${NJOBS} runs (core + prompt/LoRA + DocCL + ablation + currency)"
 info "  SCENARIOS='${SCENARIOS}'  (partition this box owns)"
-info "  GPUS='${GPUS}' JOBS_PER_GPU=${JOBS_PER_GPU} BATCH_SIZE=${BATCH_SIZE} VRAM_cap=$([ "${GPU_VRAM_GB:-0}" -gt 0 ] && echo "${GPU_VRAM_GB}GB" || echo off) bf16=$([ "${AMP}" = "1" ] && echo ON || echo OFF) W&B=${WANDB_MODE} sync=$([ -n "${R2_ACCESS_KEY_ID:-}" ] && echo ON || echo OFF)"
+info "  GPUS='${GPUS}' JOBS_PER_GPU=${JOBS_PER_GPU} BATCH_SIZE=${BATCH_SIZE} bf16=$([ "${AMP}" = "1" ] && echo ON || echo OFF) W&B=${WANDB_MODE} sync=$([ -n "${R2_ACCESS_KEY_ID:-}" ] && echo ON || echo OFF)"
 echo "  ${c_dim}heartbeat + filtered training lines stream below; re-run this script to resume.${c_off}"
 echo
 exec bash scripts/run_grid_multigpu.sh

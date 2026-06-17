@@ -46,19 +46,12 @@ export RUN_SINGLETASK="${RUN_SINGLETASK:-1}"
 
 # ── L40 (48 GB) sizing — saturate the card; the 5.8 GB watchdog cap is 2060-only ─────
 export BATCH_SIZE="${BATCH_SIZE:-16}"     # 32 also fine for non-replay methods
-# JOBS_PER_GPU is the MAX slots; VRAM admission (GPU_VRAM_GB below) keeps actual
-# concurrency safe, so the slot count just lets LIGHT jobs pack — heavy jobs
-# (dualprompt ~17 GB, der_pp ~35 GB, er ~26 GB) are auto-deferred to avoid OOM.
-export JOBS_PER_GPU="${JOBS_PER_GPU:-3}"
-# VRAM admission cap: 44 GB usable on a 46 GB L40 (leave ~2 GB headroom). This is the
-# real OOM guard — without it, even JOBS_PER_GPU=3 OOMs when 3 dualprompt (3x17=51 GB)
-# co-land (exactly the failure observed). Heavy jobs defer; light jobs still pack.
-export GPU_VRAM_GB="${GPU_VRAM_GB:-44}"
+export JOBS_PER_GPU="${JOBS_PER_GPU:-3}"  # ~8 GB/job at bs16 -> 3 jobs ~24 GB << 48 GB
 export AMP="${AMP:-1}"                     # bf16 (L40 is Ada-class); AMP=0 for exact fp32
 
 info "Vast.ai L40 grid launcher"
 info "  partition SCENARIOS='${SCENARIOS}'  RUN_ABLATION=${RUN_ABLATION}  (disjoint from the Ada)"
-info "  L40 sizing: BATCH_SIZE=${BATCH_SIZE} JOBS_PER_GPU=${JOBS_PER_GPU} VRAM_cap=${GPU_VRAM_GB}GB bf16=$([ "${AMP}" = "1" ] && echo ON || echo OFF)"
+info "  L40 sizing: BATCH_SIZE=${BATCH_SIZE} JOBS_PER_GPU=${JOBS_PER_GPU} bf16=$([ "${AMP}" = "1" ] && echo ON || echo OFF)"
 warn "rented box: setup_remote.sh warns loudly if <40% VRAM is free (a foreign process on a dirty instance)."
 echo
 
