@@ -142,6 +142,16 @@ class CLLoRA(OLoRA):
     def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         """Snapshot LoRA-A matrices (O-LoRA) AND a frozen teacher (shared-KD)."""
         super().after_task(task, train_loader)  # O-LoRA: snapshot past_A_matrices
+        # Free the PREVIOUS teacher off the GPU before deepcopy'ing the new one: keeping
+        # both on-device for the duration of copy.deepcopy is a transient ~2x-model VRAM
+        # spike at every task boundary that can OOM a small card after the head has grown.
+        old_teacher = self.state.custom.get("teacher")
+        if old_teacher is not None:
+            old_teacher.to("cpu")
+            self.state.custom["teacher"] = None
+            del old_teacher
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
         teacher = copy.deepcopy(self.model)
         for p in teacher.parameters():
             p.requires_grad = False

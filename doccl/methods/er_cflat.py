@@ -34,17 +34,27 @@ class ERCFlat(ER):
         self.rho = config.get("rho", 0.05)
         self.cflat_lambda = config.get("cflat_lambda", 0.1)
 
-    def _ce_plus_replay(self, batch: dict) -> torch.Tensor:
-        """ER's per-step loss: current-task CE + (if buffer non-empty) replay CE.
+    def _sample_replay(self) -> dict | None:
+        """Sample ONE replay batch (moved to device), or None if the buffer is empty.
 
-        Factored out so the two SAM forward passes share one definition. Mirrors
-        ``ER.train_task`` (er.py) exactly — same buffer sampling, same summed loss.
+        Sampled once per optimizer step and reused across BOTH SAM forwards — SAM
+        requires the two passes to evaluate the SAME loss L(θ, batch); re-sampling a
+        different replay batch in the second forward would make the ascent ε invalid
+        and reduce er_cflat to noisy ER, silently invalidating the C-Flat comparison.
         """
-        cur_out = self.model(**batch)
-        loss = cur_out.loss
         replay_batch = self.state.buffer.sample(self.replay_batch_size)
+        if replay_batch is None:
+            return None
+        return {k: v.to(self.device) for k, v in replay_batch.items()}
+
+    def _ce_plus_replay(self, batch: dict, replay_batch: dict | None) -> torch.Tensor:
+        """ER's per-step loss: current-task CE + (if given) the SAME replay CE.
+
+        ``replay_batch`` is the per-step fixed sample from ``_sample_replay`` — shared
+        by both SAM forwards so the loss surface is identical across the two passes.
+        """
+        loss = self.model(**batch).loss
         if replay_batch is not None:
-            replay_batch = {k: v.to(self.device) for k, v in replay_batch.items()}
             loss = loss + self.model(**replay_batch).loss
         return loss
 
@@ -71,17 +81,19 @@ class ERCFlat(ER):
             for batch in pbar:
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
                 sam = SAMStep(params, rho=self.rho, cflat_lambda=self.cflat_lambda)
+                # Sample the replay batch ONCE; reuse it for both SAM forwards.
+                replay_batch = self._sample_replay()
 
                 # ─ Step 1: clean gradient g₀ at θ, then ascend to θ+ε ─
                 optimizer.zero_grad()
-                loss = self._ce_plus_replay(batch)
+                loss = self._ce_plus_replay(batch, replay_batch)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(params, max_grad_norm)
                 eps = sam.first_step()
 
                 # ─ Step 2: gradient g₊ at θ+ε, restore θ, blend curvature, step ─
                 optimizer.zero_grad()
-                loss2 = self._ce_plus_replay(batch)
+                loss2 = self._ce_plus_replay(batch, replay_batch)
                 loss2.backward()
                 sam.second_step(eps)
                 torch.nn.utils.clip_grad_norm_(params, max_grad_norm)

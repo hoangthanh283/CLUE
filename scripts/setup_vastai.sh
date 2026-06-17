@@ -38,6 +38,11 @@ export SCENARIOS="${SCENARIOS:-mixed dil_xlingual cil_wildreceipt}"
 # The DocCL depth-ablation is pinned to cil_cord, which the Ada owns — so this box does
 # NOT run it (would otherwise need cil_cord, breaking the partition).
 export RUN_ABLATION="${RUN_ABLATION:-0}"
+# Single-task baselines are scenario-INDEPENDENT — they run on exactly ONE box (this one,
+# the L40). Without this the Ada AND the L40 would BOTH run all 15, wasting compute (R2
+# resume can't dedup them: both start before the first .done syncs). The Ada launch sets
+# RUN_SINGLETASK=0 to leave them here.
+export RUN_SINGLETASK="${RUN_SINGLETASK:-1}"
 
 # ── L40 (48 GB) sizing — saturate the card; the 5.8 GB watchdog cap is 2060-only ─────
 export BATCH_SIZE="${BATCH_SIZE:-16}"     # 32 also fine for non-replay methods
