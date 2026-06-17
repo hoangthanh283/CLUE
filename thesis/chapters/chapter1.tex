@@ -171,11 +171,13 @@ depth-scaled elastic-weight consolidation, output distillation, and a small
 head-replay buffer, rather than treating the network uniformly. The three mechanisms
 are established; the contribution is the diagnosis-driven decision of \emph{where} they
 apply, isolated by a component-targeting ablation (head-only, late-only, uniform, full)
-that tests whether targeting the diagnosed locus beats uniform treatment. Evaluated
-against the strong replay baselines the benchmark establishes, DocCL is projected to
-match the best baseline on domain-incremental learning and to edge it on the mixed
-scenario at the lowest forgetting; these are anchor-derived projections from the
-convergence-trained grid, with measured confirmation in progress.
+that tests whether targeting the diagnosed locus beats uniform treatment. Measured over
+three seeds, DocCL reaches the joint oracle on domain-incremental learning (AA $84.7$ vs
+the oracle's $84.8$, backward transfer near zero) and closes the forgetting gap, but it
+does not surpass experience replay, which stays $\sim$3 points higher; on the mixed and
+class-incremental scenarios it tracks the strong baselines. The honest contribution is
+thus that diagnosis-driven head/late targeting matches the oracle and closes the
+forgetting gap, competitive with---rather than beating---data replay.
 
 \noindent\textbf{The FCS-CL benchmark and reproducible tooling.} We provide a
 unified \gls{cl} benchmark over three public document datasets with three
