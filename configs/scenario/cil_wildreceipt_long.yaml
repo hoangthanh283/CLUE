@@ -1,0 +1,5 @@
+# Long-horizon WildReceipt class-IL (Study 2): 8 sessions × 3 classes over the 24
+# entity classes. Distinct name from cil_wildreceipt so run dirs don't collide.
+name: cil_wildreceipt_long
+kwargs:
+  num_sessions: 8

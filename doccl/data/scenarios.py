@@ -23,6 +23,7 @@ from doccl.data.cord import CORDDataset
 from doccl.data.encoders import KIEEncoder, set_default_encoder
 from doccl.data.dil_remapping import DIL_LabelRemapper, DIL_UNIFIED_LABELS
 from doccl.data.funsd import FUNSDDataset
+from doccl.data.receipt_remapping import RECEIPT_UNIFIED_LABELS, Receipt_LabelRemapper
 from doccl.data.sroie import SROIEDataset
 from doccl.data.wildreceipt import WildReceiptDataset
 from doccl.data.xfund import XFUNDDataset
@@ -115,66 +116,78 @@ def build_cil_funsd() -> CLScenario:
     return CLScenario("cil_funsd", ScenarioType.CIL, tasks, train_dss, eval_dss)
 
 
-def build_cil_cord(num_sessions: int = 5) -> CLScenario:
-    """CORD class-incremental: 30 fine classes → num_sessions × (30/num_sessions) classes.
+# Canonical 5×6 CORD partition (validated). Super-class-respecting; flattening it
+# in this order and re-chunking yields the longer-horizon variants.
+_CORD_CANONICAL_SESSIONS = [
+    ["menu.cnt", "menu.discountprice", "menu.itemsubtotal", "menu.nm", "menu.num", "menu.price"],
+    [
+        "menu.unitprice",
+        "menu.vatyn",
+        "menu.sub.cnt",
+        "menu.sub.nm",
+        "menu.sub.price",
+        "menu.sub.unitprice",
+    ],
+    [
+        "sub_total.discount_price",
+        "sub_total.etc",
+        "sub_total.othersvc_price",
+        "sub_total.service_price",
+        "sub_total.subtotal_price",
+        "sub_total.tax_price",
+    ],
+    [
+        "total.cashprice",
+        "total.changeprice",
+        "total.creditcardprice",
+        "total.emoneyprice",
+        "total.menuqty_cnt",
+        "total.menutype_cnt",
+    ],
+    [
+        "total.total_etc",
+        "total.total_price",
+        "void_menu.nm",
+        "void_menu.price",
+        "sub.nm",
+        "sub.cnt",
+    ],
+]
 
-    Default: 5 sessions × 6 classes.
 
-    Partitioning strategy: respect super-class structure where possible —
-    Session 0: menu.* core (6 classes)
-    Session 1: menu.sub.* + menu.vatyn (6 classes)
-    Session 2: sub_total.* (6 classes)
-    Session 3: total.* (6 classes)
-    Session 4: void_menu.* + sub.* (6 classes)
+def _cord_class_sessions(num_sessions: int, order: list[int] | None) -> list[list[str]]:
+    """Partition CORD's 30 fine classes into ``num_sessions`` ordered sessions.
+
+    ``num_sessions=5`` returns the canonical super-class-respecting 5×6 partition
+    (validated). Other counts re-chunk the flattened 30-class list (canonical order)
+    into equal groups. ``order`` permutes the resulting session sequence.
     """
-    if num_sessions != 5:
-        raise NotImplementedError(
-            "Only 5-session CIL-CORD supported in v1. Custom splits via direct API."
-        )
+    if num_sessions == 5:
+        cls_per_session = [list(s) for s in _CORD_CANONICAL_SESSIONS]
+    else:
+        flat = [c for session in _CORD_CANONICAL_SESSIONS for c in session]  # 30, canonical order
+        if len(flat) % num_sessions != 0:
+            raise ValueError(f"num_sessions must divide {len(flat)} evenly (got {num_sessions}).")
+        per = len(flat) // num_sessions
+        cls_per_session = [flat[i : i + per] for i in range(0, len(flat), per)]
 
-    cls_per_session = [
-        [
-            "menu.cnt",
-            "menu.discountprice",
-            "menu.itemsubtotal",
-            "menu.nm",
-            "menu.num",
-            "menu.price",
-        ],
-        [
-            "menu.unitprice",
-            "menu.vatyn",
-            "menu.sub.cnt",
-            "menu.sub.nm",
-            "menu.sub.price",
-            "menu.sub.unitprice",
-        ],
-        [
-            "sub_total.discount_price",
-            "sub_total.etc",
-            "sub_total.othersvc_price",
-            "sub_total.service_price",
-            "sub_total.subtotal_price",
-            "sub_total.tax_price",
-        ],
-        [
-            "total.cashprice",
-            "total.changeprice",
-            "total.creditcardprice",
-            "total.emoneyprice",
-            "total.menuqty_cnt",
-            "total.menutype_cnt",
-        ],
-        [
-            "total.total_etc",
-            "total.total_price",
-            "void_menu.nm",
-            "void_menu.price",
-            "sub.nm",
-            "sub.cnt",
-        ],
-    ]
+    if order is not None:
+        if sorted(order) != list(range(num_sessions)):
+            raise ValueError(f"order must be a permutation of 0..{num_sessions - 1}, got {order}.")
+        cls_per_session = [cls_per_session[i] for i in order]
+    return cls_per_session
 
+
+def build_cil_cord(num_sessions: int = 5, order: list[int] | None = None) -> CLScenario:
+    """CORD class-incremental: 30 fine classes → ``num_sessions`` sessions.
+
+    ``num_sessions=5`` uses the canonical super-class-respecting 5×6 partition
+    (validated, unchanged). Other counts re-chunk the flattened 30-class list (in
+    canonical order) into equal groups — enabling longer horizons such as 10×3 for
+    the long-sequence study. ``order`` permutes the session sequence (a permutation
+    of ``0..num_sessions-1``) for the ordering-robustness study.
+    """
+    cls_per_session = _cord_class_sessions(num_sessions, order)
     bio_splits = [[f"B-{c}" for c in s] + [f"I-{c}" for c in s] for s in cls_per_session]
 
     # Cumulative head label maps per session + each session's label_set prefixed with O.
@@ -199,6 +212,12 @@ def build_cil_cord(num_sessions: int = 5) -> CLScenario:
     full_train = CORDDataset(split="train", granularity="fine")
     joint_train = [CIL_LabelRemapper(full_train, full_train.id_to_label, full_head)]
 
+    # Super-class metadata only applies to the canonical, in-order 5-session layout.
+    super_meta = (
+        ["menu", "menu", "sub_total", "total", "mixed"]
+        if num_sessions == 5 and order is None
+        else None
+    )
     tasks = [
         TaskInfo(
             task_id=i,
@@ -206,7 +225,7 @@ def build_cil_cord(num_sessions: int = 5) -> CLScenario:
             label_set=label_sets[i],
             is_first=(i == 0),
             is_last=(i == len(bio_splits) - 1),
-            metadata={"super_class": ["menu", "menu", "sub_total", "total", "mixed"][i]},
+            metadata={"super_class": super_meta[i]} if super_meta else {},
         )
         for i in range(len(bio_splits))
     ]
@@ -279,7 +298,7 @@ def build_cil_wildreceipt(num_sessions: int = 4) -> CLScenario:
 # ─── DIL scenario ──────────────────────────────────────────────────────────────
 
 
-def build_dil() -> CLScenario:
+def build_dil(order: list[int] | None = None) -> CLScenario:
     """Domain-incremental: FUNSD → SROIE → CORD-superclass with unified schema.
 
     Unified label space (4 classes + O = 9 BIO tags):
@@ -288,55 +307,86 @@ def build_dil() -> CLScenario:
         VALUE   — field values (answers, prices, dates, addresses)
         OTHER   — auxiliary entities (CORD void_menu, sub)
 
-    See docs/dil_schema_mapping.md for full mapping rationale.
+    ``order`` permutes the 3-domain sequence (default [0,1,2] = funsd→sroie→cord)
+    for the ordering-robustness study. See docs/dil_schema_mapping.md.
     """
-    # Build underlying datasets
-    funsd_train = FUNSDDataset("train")
-    funsd_test = FUNSDDataset("test")
-    sroie_train = SROIEDataset("train")
-    sroie_test = SROIEDataset("test")
-    cord_super_train = CORDDataset("train", granularity="super")
-    cord_super_test = CORDDataset("test", granularity="super")
+    # Build underlying datasets, then assemble in the requested order.
+    domains = [
+        ("funsd", FUNSDDataset("train"), FUNSDDataset("test")),
+        ("sroie", SROIEDataset("train"), SROIEDataset("test")),
+        (
+            "cord",
+            CORDDataset("train", granularity="super"),
+            CORDDataset("test", granularity="super"),
+        ),
+    ]
+    order = order or list(range(len(domains)))
+    if sorted(order) != list(range(len(domains))):
+        raise ValueError(f"order must be a permutation of 0..{len(domains) - 1}, got {order}.")
+    domains = [domains[i] for i in order]
 
-    # Wrap each with DIL_LabelRemapper
     train_dss: list[Dataset] = [
-        DIL_LabelRemapper(funsd_train, "funsd", funsd_train.id_to_label),
-        DIL_LabelRemapper(sroie_train, "sroie", sroie_train.id_to_label),
-        DIL_LabelRemapper(cord_super_train, "cord", cord_super_train.id_to_label),
+        DIL_LabelRemapper(tr, name, tr.id_to_label) for name, tr, _ in domains
     ]
     eval_dss: list[Dataset] = [
-        DIL_LabelRemapper(funsd_test, "funsd", funsd_test.id_to_label),
-        DIL_LabelRemapper(sroie_test, "sroie", sroie_test.id_to_label),
-        DIL_LabelRemapper(cord_super_test, "cord", cord_super_test.id_to_label),
+        DIL_LabelRemapper(te, name, te.id_to_label) for name, _, te in domains
     ]
-
     tasks = [
         TaskInfo(
-            task_id=0,
-            task_name="dil_funsd",
+            task_id=i,
+            task_name=f"dil_{name}",
             label_set=DIL_UNIFIED_LABELS,
-            is_first=True,
-            is_last=False,
-            metadata={"native_dataset": "funsd"},
-        ),
-        TaskInfo(
-            task_id=1,
-            task_name="dil_sroie",
-            label_set=DIL_UNIFIED_LABELS,
-            is_first=False,
-            is_last=False,
-            metadata={"native_dataset": "sroie"},
-        ),
-        TaskInfo(
-            task_id=2,
-            task_name="dil_cord",
-            label_set=DIL_UNIFIED_LABELS,
-            is_first=False,
-            is_last=True,
-            metadata={"native_dataset": "cord"},
-        ),
+            is_first=(i == 0),
+            is_last=(i == len(domains) - 1),
+            metadata={"native_dataset": name},
+        )
+        for i, (name, _, _) in enumerate(domains)
     ]
     return CLScenario("dil", ScenarioType.DIL, tasks, train_dss, eval_dss)
+
+
+def build_dil_receipts(order: list[int] | None = None) -> CLScenario:
+    """Receipt-domain DIL: SROIE → CORD-super → WildReceipt, unified receipt schema.
+
+    All three are receipts, so they share a richer, far less lossy unified space
+    than the heterogeneous form↔receipt ``dil`` (6 classes + O = 13 fixed BIO tags;
+    see ``receipt_remapping``). The domain shift is *which fields each receipt type
+    exposes*, with a constant head — a clean pure domain-IL. ``order`` permutes the
+    sequence (default [0,1,2]). Tasks are disjoint documents, so
+    ``joint_train_datasets=None`` (the Joint path concatenates correctly).
+    """
+    domains = [
+        ("sroie", SROIEDataset("train"), SROIEDataset("test")),
+        (
+            "cord",
+            CORDDataset("train", granularity="super"),
+            CORDDataset("test", granularity="super"),
+        ),
+        ("wildreceipt", WildReceiptDataset("train"), WildReceiptDataset("test")),
+    ]
+    order = order or list(range(len(domains)))
+    if sorted(order) != list(range(len(domains))):
+        raise ValueError(f"order must be a permutation of 0..{len(domains) - 1}, got {order}.")
+    domains = [domains[i] for i in order]
+
+    train_dss: list[Dataset] = [
+        Receipt_LabelRemapper(tr, name, tr.id_to_label) for name, tr, _ in domains
+    ]
+    eval_dss: list[Dataset] = [
+        Receipt_LabelRemapper(te, name, te.id_to_label) for name, _, te in domains
+    ]
+    tasks = [
+        TaskInfo(
+            task_id=i,
+            task_name=f"dilrcpt_{name}",
+            label_set=RECEIPT_UNIFIED_LABELS,
+            is_first=(i == 0),
+            is_last=(i == len(domains) - 1),
+            metadata={"native_dataset": name},
+        )
+        for i, (name, _, _) in enumerate(domains)
+    ]
+    return CLScenario("dil_receipts", ScenarioType.DIL, tasks, train_dss, eval_dss)
 
 
 def build_dil_xlingual(langs: list[str] | None = None) -> CLScenario:
@@ -596,7 +646,14 @@ SCENARIO_REGISTRY = {
     "cil_funsd": build_cil_funsd,
     "cil_cord": build_cil_cord,
     "cil_wildreceipt": build_cil_wildreceipt,
+    # Long-horizon variants (Study 2): distinct registry names so run dirs/W&B names
+    # don't collide with the base scenarios. kwargs (num_sessions/order) overridable.
+    "cil_cord_long": lambda **kw: build_cil_cord(num_sessions=kw.pop("num_sessions", 10), **kw),
+    "cil_wildreceipt_long": lambda **kw: build_cil_wildreceipt(
+        num_sessions=kw.pop("num_sessions", 8), **kw
+    ),
     "dil": build_dil,
+    "dil_receipts": build_dil_receipts,
     "dil_xlingual": build_dil_xlingual,
     "mixed": build_mixed,
     "pilot": build_pilot,

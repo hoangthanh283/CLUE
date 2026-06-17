@@ -1,0 +1,5 @@
+# Long-horizon CORD class-IL (Study 2): 10 sessions × 3 classes over the 30 fine
+# classes. Distinct name from cil_cord so run dirs/W&B names don't collide.
+name: cil_cord_long
+kwargs:
+  num_sessions: 10
