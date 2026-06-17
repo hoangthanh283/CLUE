@@ -115,7 +115,14 @@
 % \setmathrm[ExternalLocation=fonts/]{MinionPro-Regular}
 
 % use Arno Pro instead of standard LaTeX fonts for math display
-\setmainfont{Times New Roman}
+% Body font: Times New Roman where available (Overleaf, Windows). On Linux boxes
+% that lack it, fall back to Tinos — a metric-compatible TNR clone shipped with
+% the croscore/Liberation packages — so XeLaTeX still compiles identically.
+\IfFontExistsTF{Times New Roman}{%
+  \setmainfont{Times New Roman}%
+}{%
+  \setmainfont{Tinos}%
+}
 
 % Fonts for titles
 \newfontfamily{\arnosubhead}[Path=./fonts/]{Arno Pro Subhead}
