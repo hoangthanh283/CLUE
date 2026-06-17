@@ -85,8 +85,11 @@ LOG=results/logs/multigpu_grid.log
 mkdir -p results/logs
 say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
-# Only the tiny resume markers travel to/from durable storage (~700 B/run).
+# The tiny resume markers + TensorBoard event logs travel to/from durable storage.
+# TB logs are small (~a few hundred KB/run, <~40 MB for the whole grid) but let the
+# analysis be done LOCALLY after pulling from R2 (no need to keep a remote box alive).
 SYNC_INCLUDES=(--include "*/.done" --include "*/metrics.json" --include "*/matrix.npy"
+               --include "*/tb/**" --include "*/per_class_f1.json"
                --include "table_single_task_baselines.csv")
 
 EXTRA="training.batch_size=${BATCH_SIZE} training.gradient_checkpointing=${GRAD_CKPT} \

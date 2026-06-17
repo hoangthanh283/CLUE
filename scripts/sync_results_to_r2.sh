@@ -37,8 +37,11 @@ prompt_plain  R2_BUCKET            "R2 Bucket" "doccl-results"
   || { echo "ERROR: R2 Access Key ID, Secret, and Endpoint are all required."; exit 1; }
 
 SYNC_REMOTE="obj:${R2_BUCKET}/results"
-# Only the tiny resume markers travel (mirrors run_grid_multigpu.sh SYNC_INCLUDES).
+# Resume markers + TensorBoard logs + diagnostics (mirrors run_grid_multigpu.sh
+# SYNC_INCLUDES). TB logs let you pull a remote box's runs and visualise/analyse them
+# locally (e.g. `bash scripts/sync_results_to_r2.sh --pull` then `tensorboard --logdir results`).
 INCLUDES=(--include "*/.done" --include "*/metrics.json" --include "*/matrix.npy"
+          --include "*/tb/**" --include "*/per_class_f1.json"
           --include "table_single_task_baselines.csv")
 
 # In-process rclone 'obj' remote (no config file on disk) — identical to the grid's.
