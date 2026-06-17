@@ -375,19 +375,32 @@ run_one_bg() {  # <slot> <run_name> <overrides...>
   local gpu="${GPU_ARR[$(( slot % NUM_GPUS ))]}"
   local marker="results/${run}/.done"
   if [ -f "$marker" ]; then echo "skip"; return 0; fi
+  # Heavy prompt methods (dualprompt/l2p/coda_prompt) hold ~17 GiB/process at bs16 with NO
+  # grad-checkpointing — three co-resident exceed a 44 GiB card and OOM (rc=1). Force
+  # gradient_checkpointing=true for ONLY those run-names so they drop to ~9-10 GiB and pack
+  # JOBS_PER_GPU=4 safely; everything else keeps the global GRAD_CKPT (speed). The override
+  # is appended AFTER $EXTRA so Hydra's last-wins makes it authoritative. HEAVY_GRAD_CKPT=0
+  # disables this (e.g. a single-job-per-GPU box where the speed matters more).
+  local heavy_ckpt=""
+  if [ "${HEAVY_GRAD_CKPT:-1}" = "1" ]; then
+    case "$run" in
+      *_dualprompt_*|*_l2p_*|*_coda_prompt_*)
+        heavy_ckpt="training.gradient_checkpointing=true" ;;
+    esac
+  fi
   (
     local rc
     if [ "$TEE_TRAIN" = "1" ]; then
       # Full log -> per-run file; a filtered view -> the main log (visible via `docker logs`).
       # CRITICAL: .done must gate on train.py's exit (PIPESTATUS[0]), NOT the pipeline's last
       # element (sed always exits 0), or a failed run would be falsely marked done.
-      CUDA_VISIBLE_DEVICES="$gpu" "$PYBIN" scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA 2>&1 \
+      CUDA_VISIBLE_DEVICES="$gpu" "$PYBIN" scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA $heavy_ckpt 2>&1 \
         | tee "results/logs/${run}.log" \
         | grep --line-buffered -E '=== Task|val_f1|STOP|Final: AA|Zero-shot' \
         | sed -u "s#^#    [${run} gpu${gpu}] #" >> "$LOG"
       rc=${PIPESTATUS[0]}
     else
-      CUDA_VISIBLE_DEVICES="$gpu" "$PYBIN" scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA \
+      CUDA_VISIBLE_DEVICES="$gpu" "$PYBIN" scripts/train.py "$@" "wandb.mode=${WANDB_MODE}" $EXTRA $heavy_ckpt \
         >> "results/logs/${run}.log" 2>&1
       rc=$?
     fi
