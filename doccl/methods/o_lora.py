@@ -10,6 +10,7 @@ i.e., new task's LoRA learns in subspace orthogonal to previous tasks.
 This eliminates interference between tasks at the cost of capacity:
 rank exhaustion limits the number of tasks supported.
 """
+
 from __future__ import annotations
 
 import torch
@@ -56,6 +57,47 @@ class OLoRA(NaiveFineTune):
         # Storage for past tasks' LoRA A matrices (for orthogonality constraint)
         self.state.custom["past_A_matrices"] = []  # list[dict[layer_name → tensor]]
 
+    def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
+        """Re-sync PEFT's saved classifier copy after a class-IL head expansion.
+
+        PEFT auto-registers the classifier in ``modules_to_save``, replacing it with a
+        ``ModulesToSaveWrapper`` whose ``modules_to_save[active_adapter]`` copy is the
+        head the forward actually uses. The wrapper's ``expand_classifier`` widens the
+        ``ModulesToSaveWrapper`` reference it sees, but leaves that internal copy (and
+        the ``original_module``) at the old, narrower width---so after a CIL boundary a
+        new-class label index overflows the stale head and the CUDA cross-entropy kernel
+        asserts ``t < n_classes``. We re-point both internal copies at the freshly
+        expanded Linear so PEFT's forward uses the correct width. No-op when the
+        classifier is a plain Linear (non-PEFT / non-growing head).
+        """
+        super().before_task(task, train_loader)
+        base = getattr(self.model.model, "base_model", None)
+        inner = getattr(base, "model", None) if base is not None else None
+        wrapper = getattr(inner, "classifier", None) if inner is not None else None
+        saved = getattr(wrapper, "modules_to_save", None)
+        if saved is None:
+            return  # not a ModulesToSaveWrapper → nothing to sync
+        # The freshly expanded Linear is what the wrapper now exposes as .classifier.
+        new_head = self.model.model.classifier
+        if not isinstance(new_head, nn.Linear):
+            new_head = getattr(wrapper, "original_module", new_head)
+        new_n = new_head.out_features
+        for adapter in list(saved.keys()):
+            if saved[adapter].out_features != new_n:
+                saved[adapter] = new_head
+        if getattr(wrapper, "original_module", None) is not None and (
+            wrapper.original_module.out_features != new_n
+        ):
+            wrapper.original_module = new_head
+        # The wrapper set num_labels on the OUTER PeftModel, but the inner HF model
+        # computes the CE loss with ITS cached ``self.num_labels`` (and config). Sync
+        # both on the inner model, or the loss reshape uses the stale (narrower) width
+        # and raises ``shape '[-1, old_n]' is invalid``.
+        if inner is not None:
+            inner.num_labels = new_n
+            if getattr(inner, "config", None) is not None:
+                inner.config.num_labels = new_n
+
     def _ortho_loss(self) -> torch.Tensor:
         """Penalty: ||A_t^T · A_past||_F^2 summed across layers and past tasks."""
         if not self.state.custom["past_A_matrices"]:
@@ -71,7 +113,7 @@ class OLoRA(NaiveFineTune):
                     A_past = past_A_dict[layer_name].to(self.device)
                     # Penalty: ||A_curr^T · A_past||_F^2
                     inner = A_curr.T @ A_past  # (r, r)
-                    penalty = penalty + (inner ** 2).sum()
+                    penalty = penalty + (inner**2).sum()
         return penalty
 
     def _get_current_A_matrices(self) -> dict[str, torch.Tensor]:
@@ -102,7 +144,9 @@ class OLoRA(NaiveFineTune):
         total_loss = 0.0
         n_steps = 0
         for epoch in range(epochs):
-            pbar = tqdm(train_loader, desc=f"OLoRA T{task.task_id} ep{epoch+1}/{epochs}", leave=False)
+            pbar = tqdm(
+                train_loader, desc=f"OLoRA T{task.task_id} ep{epoch+1}/{epochs}", leave=False
+            )
             for batch in pbar:
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
                 optimizer.zero_grad()
@@ -117,7 +161,9 @@ class OLoRA(NaiveFineTune):
                 optimizer.step()
                 total_loss += float(loss.item())
                 n_steps += 1
-                pbar.set_postfix({"ce": f"{ce_loss.item():.3f}", "ortho": f"{ortho_loss.item():.4f}"})
+                pbar.set_postfix(
+                    {"ce": f"{ce_loss.item():.3f}", "ortho": f"{ortho_loss.item():.4f}"}
+                )
             if self._early_stop_after_epoch(stopper, val_loader, task, epoch):
                 break
 
@@ -131,7 +177,6 @@ class OLoRA(NaiveFineTune):
     def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         """Snapshot current task's LoRA A matrices for future orthogonality constraint."""
         snapshot = {
-            name: A.detach().cpu().clone()
-            for name, A in self._get_current_A_matrices().items()
+            name: A.detach().cpu().clone() for name, A in self._get_current_A_matrices().items()
         }
         self.state.custom["past_A_matrices"].append(snapshot)
