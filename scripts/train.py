@@ -37,6 +37,7 @@ from doccl.methods.o_lora import OLoRA
 from doccl.models.bros_wrapper import BROSWrapper
 from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
 from doccl.models.lilt_wrapper import LiLTWrapper
+from doccl.utils.tb_logger import TBLogger
 
 log = logging.getLogger(__name__)
 
@@ -306,6 +307,12 @@ def main(cfg: DictConfig) -> None:
     eval_loaders_seen: dict[int, DataLoader] = {}
     out_dir = Path(cfg.output_dir) / run.name
 
+    # TensorBoard: live forgetting diagnostic alongside W&B. Writes per-run event
+    # files under results/<run>/tb so `tensorboard --logdir results` aggregates all runs.
+    tb = TBLogger(out_dir / "tb", enabled=bool(cfg.get("tensorboard", {}).get("enabled", True)))
+    task_names = [t.task_name for t in scenario.tasks]
+    last_step = len(scenario.tasks) - 1
+
     # Special path for Joint: concatenate all train datasets and treat as 1 task
     if cfg.method.name == "joint":
         log.info("Joint training mode: concatenating all train datasets")
@@ -355,6 +362,16 @@ def main(cfg: DictConfig) -> None:
         wandb.log({f"final/eval/task_{tid}/f1": r.f1 for tid, r in results.items()})
         wandb.log({"final/AA": tracker.average_accuracy()})
         log.info("Joint final AA: %.2f", tracker.average_accuracy())
+
+        tb.log_scalars(
+            {
+                "final/AA": tracker.average_accuracy(),
+                **{f"final/eval/task_{tid}/f1": r.f1 for tid, r in results.items()},
+            },
+            step=last_step,
+        )
+        tb.log_forgetting_matrix(tracker.matrix, step=last_step, task_names=task_names)
+        tb.close()
 
         out_dir.mkdir(parents=True, exist_ok=True)
         np.save(out_dir / "matrix.npy", tracker.matrix)
@@ -421,6 +438,17 @@ def main(cfg: DictConfig) -> None:
                 **{f"eval/task_{tid}/f1": r.f1 for tid, r in results.items()},
             }
         )
+        # TensorBoard: the live forgetting diagnostic — retention curves + the matrix
+        # heatmap re-rendered each task so it fills in as forgetting accrues.
+        tb.log_scalars(
+            {
+                "train/loss": train_metrics.loss,
+                **{f"eval/task_{tid}/f1": r.f1 for tid, r in results.items()},
+            },
+            step=task_idx,
+        )
+        tb.log_retention(tracker.matrix, task_idx)
+        tb.log_forgetting_matrix(tracker.matrix, step=task_idx, task_names=task_names)
         log.info(
             "After task %d: %s",
             task_idx,
@@ -431,6 +459,12 @@ def main(cfg: DictConfig) -> None:
     summary = tracker.summary()
     log.info("Final: AA=%.2f BWT=%.2f AF=%.2f", summary["AA"], summary["BWT"], summary["AF"])
     wandb.log({"final/" + k: v for k, v in summary.items()})
+    tb.log_scalars({f"final/{k}": v for k, v in summary.items()}, step=last_step)
+    tb.log_scalars(
+        {f"forgetting/task_{i}": v for i, v in tracker.per_task_forgetting().items()},
+        step=last_step,
+    )
+    tb.close()
 
     # Save tracker matrix + structured metrics for offline ingestion
     out_dir.mkdir(parents=True, exist_ok=True)
