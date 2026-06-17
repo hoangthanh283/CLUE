@@ -142,13 +142,19 @@ sync_setup() {
   # ungated jobs. Run with -vv so the REAL error (403/Signature/skew/no-host) always prints.
   local tmp; tmp=$(mktemp -d)
   echo "ok $(date +%s)" > "$tmp/.synccheck"
+  # The WRITE's exit code is the authoritative signal: rclone returns non-zero on a real
+  # auth/network/permission failure and 0 on a real upload. We do NOT gate on an immediate
+  # post-write `lsf` — S3/R2 is read-after-write *eventually* consistent, so a sub-second
+  # list lag (seen on a fresh R2 region) made a SUCCESSFUL write (Transferred 1/1, rc=0)
+  # falsely report PREFLIGHT FAILED. Trust rc; only flag failure on rc!=0 or an error line.
   local pf_err pf_rc
   pf_err=$(rclone copy "$tmp" "$SYNC_REMOTE" --include ".synccheck" -vv 2>&1); pf_rc=$?
   echo "$pf_err" >> "$LOG"
-  if [ "$pf_rc" -eq 0 ] && rclone lsf "$SYNC_REMOTE" 2>/dev/null | grep -q ".synccheck"; then
+  if [ "$pf_rc" -eq 0 ] \
+     && ! echo "$pf_err" | grep -qiE "fatal|forbidden|denied|signature|no such host|refused|AccessDenied|InvalidAccessKey"; then
     rclone delete "$SYNC_REMOTE/.synccheck" >> "$LOG" 2>&1 || true
     rm -rf "$tmp"
-    say "[sync] preflight OK — durable resume ON -> ${SYNC_REMOTE}"
+    say "[sync] preflight OK (write rc=0) — durable resume ON -> ${SYNC_REMOTE}"
   else
     rm -rf "$tmp"
     say "[sync] PREFLIGHT FAILED (rclone rc=${pf_rc}) on ${SYNC_REMOTE} — check bucket/token/endpoint."
