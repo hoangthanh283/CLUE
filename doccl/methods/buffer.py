@@ -2,6 +2,7 @@
 
 Used by ER (stores raw samples) and DER++ (also stores logits).
 """
+
 from __future__ import annotations
 
 import random
@@ -37,11 +38,19 @@ class ReservoirBuffer:
         """
         B = next(iter(batch.values())).shape[0]
         for i in range(B):
-            example = {k: v[i].detach().cpu().clone() for k, v in batch.items() if torch.is_tensor(v)}
+            example = {
+                k: v[i].detach().cpu().clone() for k, v in batch.items() if torch.is_tensor(v)
+            }
             if self.store_logits:
                 if logits is None:
                     raise ValueError("store_logits=True requires logits argument")
                 example["_logits"] = logits[i].detach().cpu().clone()
+                # Record the ORIGINAL logit width (number of classes) for this example.
+                # The head grows across CIL tasks, so sampled batches mix widths and
+                # get zero-padded to the max in sample(); DER++ must MSE only over each
+                # example's true width, NOT against the padding zeros (which would
+                # spuriously suppress new-class logits on replayed old-task inputs).
+                example["_logit_width"] = torch.tensor(logits[i].shape[-1], dtype=torch.long)
 
             if len(self.buffer) < self.capacity:
                 self.buffer.append(example)
@@ -68,14 +77,17 @@ class ReservoirBuffer:
             # DER++ caches per-example "_logits" of shape (L, C). The classifier head
             # grows across class-incremental tasks, so the buffer can hold logits of
             # different widths C (e.g. 13 from task 0, 25 from task 1). Right-pad each
-            # to the max C with zeros before stacking so they form one tensor; the
-            # DER++ MSE later truncates to the shared width (der.py), and zero columns
-            # for never-seen classes are neutral.
+            # to the max C with zeros before stacking so they form one tensor. The pad
+            # columns are NOT neutral, so der.py masks the MSE per example using the
+            # stored "_logit_width" (never distilling against the padding zeros).
             if k == "_logits" and len({t.shape[-1] for t in tensors}) > 1:
                 max_c = max(t.shape[-1] for t in tensors)
                 tensors = [
-                    t if t.shape[-1] == max_c
-                    else torch.nn.functional.pad(t, (0, max_c - t.shape[-1]))
+                    (
+                        t
+                        if t.shape[-1] == max_c
+                        else torch.nn.functional.pad(t, (0, max_c - t.shape[-1]))
+                    )
                     for t in tensors
                 ]
             out[k] = torch.stack(tensors, dim=0)

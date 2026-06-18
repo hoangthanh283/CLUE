@@ -10,17 +10,16 @@ Definitions (matrix R[i][j] = perf on task j after training task i):
     FWT (Forward Transfer)      = (1/(T-1)) Σ_{i>0} (R[i-1, i] - b_i)
         where b_i is random/baseline init performance on task i
 """
+
 from __future__ import annotations
 
 from collections import Counter
 
 import numpy as np
-from seqeval.metrics import (
-    classification_report as seq_report,
-    f1_score as seq_f1,
-    precision_score as seq_precision,
-    recall_score as seq_recall,
-)
+from seqeval.metrics import classification_report as seq_report
+from seqeval.metrics import f1_score as seq_f1
+from seqeval.metrics import precision_score as seq_precision
+from seqeval.metrics import recall_score as seq_recall
 
 
 def compute_token_f1(
@@ -106,8 +105,8 @@ class CLMetricsTracker:
 
     def update(self, task_idx_after: int, results: dict[int, dict[str, float]]) -> None:
         """Args:
-            task_idx_after: index of the task just trained (0-indexed)
-            results: {task_id: {"f1": value, ...}}
+        task_idx_after: index of the task just trained (0-indexed)
+        results: {task_id: {"f1": value, ...}}
         """
         for tid, metrics in results.items():
             self.matrix[task_idx_after, tid] = metrics["f1"]
@@ -123,7 +122,11 @@ class CLMetricsTracker:
         for i in range(T - 1):
             if not np.isnan(self.matrix[T - 1, i]) and not np.isnan(self.matrix[i, i]):
                 diffs.append(self.matrix[T - 1, i] - self.matrix[i, i])
-        return float(np.mean(diffs)) if diffs else 0.0
+        # NaN (not 0.0) when no valid pair exists — e.g. the Joint oracle fills only
+        # the last matrix row, so the diagonal R[i,i] for i<T-1 is NaN and BWT is
+        # undefined. 0.0 is a real "no forgetting" value and must not be conflated
+        # with "undefined"; downstream aggregation/rendering treats NaN honestly.
+        return float(np.mean(diffs)) if diffs else float("nan")
 
     def forgetting(self) -> float:
         """AF = -BWT (positive = magnitude of forgetting)."""

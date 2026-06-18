@@ -65,11 +65,13 @@ class CLLoRA(OLoRA):
         T = self.temperature
         n_old = teacher_logits.shape[-1]
         student_old = student_logits[..., :n_old]
-        valid = mask.unsqueeze(-1).expand_as(student_old)
         student_log = F.log_softmax(student_old / T, dim=-1)
         teacher_prob = F.softmax(teacher_logits / T, dim=-1)
-        kd = F.kl_div(student_log, teacher_prob, reduction="none") * (T**2)
-        return (kd * valid).sum() / valid.sum().clamp(min=1)
+        # Per-token KL (sum over classes), then mean over valid tokens — NOT over
+        # (token, class) pairs (would deflate by n_old). See LwF._kd_loss rationale.
+        per_token_kl = F.kl_div(student_log, teacher_prob, reduction="none").sum(-1)
+        per_token_kl = per_token_kl * (T**2)
+        return (per_token_kl * mask).sum() / mask.sum().clamp(min=1)
 
     def train_task(
         self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None

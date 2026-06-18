@@ -133,7 +133,9 @@ def grouped(metric, out, ylabel, title, zero_line=False, methods=None, scenarios
     width = 0.8 / max(len(methods), 1)
     x = range(len(scenarios))
     for i, m in enumerate(methods):
-        vals = [val(m, s, metric) or 0.0 for s in scenarios]
+        # NaN (not 0.0) for an unmeasured cell: matplotlib draws no bar, leaving an
+        # honest gap rather than a 0-height bar that reads as "scored 0".
+        vals = [v if (v := val(m, s, metric)) is not None else float("nan") for s in scenarios]
         offs = [xi - 0.4 + (i + 0.5) * width for xi in x]
         ax.bar(offs, vals, width, label=MN[m], color=COL[m], edgecolor="black", linewidth=0.4)
     ax.set_xticks(list(x))
@@ -160,10 +162,12 @@ def doccl_vs_replay():
     width = 0.8 / len(groups)
     x = range(len(SC))
     for i, (g, k) in enumerate(groups):
-        vals = [val(k, s, "AA") or 0.0 for s in SC]
+        vals = [v if (v := val(k, s, "AA")) is not None else float("nan") for s in SC]
         offs = [xi - 0.4 + (i + 0.5) * width for xi in x]
         bars = ax.bar(offs, vals, width, label=g, color=COL[k], edgecolor="black", linewidth=0.4)
         for b, v in zip(bars, vals):
+            if v != v:  # NaN — unmeasured cell, no bar, no label
+                continue
             ax.text(
                 b.get_x() + b.get_width() / 2,
                 v + 0.6,
@@ -186,10 +190,14 @@ def doccl_vs_replay():
 
 
 def dil_closeup():
-    """DIL-only close-up: AA bars with the joint-oracle line, showing DocCL reaches it."""
+    """DIL-only close-up: AA bars with the joint-oracle line. DocCL closes most of
+    the gap; replay (ER/DER++) sits closest to the oracle."""
     fig, ax = plt.subplots(figsize=(6.8, 4.0))
     order = ["naive", "lwf", "ewc", "doccl", "er", "der_pp"]
-    vals = [val(m, "dil", "AA") or 0.0 for m in order]
+    # Drop methods with no measured DIL cell rather than rendering them as 0-height
+    # bars (a 0 bar reads as "scored 0%", not "not run").
+    order = [m for m in order if val(m, "dil", "AA") is not None]
+    vals = [val(m, "dil", "AA") for m in order]
     bars = ax.bar(
         [MN[m] for m in order],
         vals,
@@ -210,7 +218,7 @@ def dil_closeup():
         label=f"Joint oracle ({oracle:.1f})",
     )
     ax.set_ylabel("Average accuracy (entity-F1)")
-    ax.set_title("Domain-incremental (DIL): DocCL reaches the oracle, replay leads")
+    ax.set_title("Domain-incremental (DIL): replay near-oracle; DocCL closes most of the gap")
     ax.set_ylim(0, 100)
     ax.legend(fontsize=8, frameon=False, loc="upper left")
     ax.grid(axis="y", alpha=0.3)
@@ -232,7 +240,7 @@ def new_scenarios():
         width = 0.8 / max(len(methods), 1)
         x = range(len(SC_NEW))
         for i, m in enumerate(methods):
-            vals = [val(m, s, metric) or 0.0 for s in SC_NEW]
+            vals = [v if (v := val(m, s, metric)) is not None else float("nan") for s in SC_NEW]
             offs = [xi - 0.4 + (i + 0.5) * width for xi in x]
             ax.bar(offs, vals, width, label=MN[m], color=COL[m], edgecolor="black", linewidth=0.4)
         ax.set_xticks(list(x))

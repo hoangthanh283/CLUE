@@ -248,7 +248,13 @@ def _finished(df: pd.DataFrame, metric: str = "AA") -> pd.DataFrame:
 
 
 def _cell(mean: float, std: float, bold: bool = False, dagger: bool = False) -> str:
-    val = f"{mean:.2f}\\;{{\\scriptsize $\\pm$ {std:.2f}}}"
+    # std is None/NaN for single-seed cells: show the mean with an explicit
+    # "(1 seed)" marker instead of a misleading "$\pm$ 0.00" (which reads as zero
+    # variance rather than "no spread available").
+    if std is None or std != std:  # None or NaN
+        val = f"{mean:.2f}\\;{{\\scriptsize (1 seed)}}"
+    else:
+        val = f"{mean:.2f}\\;{{\\scriptsize $\\pm$ {std:.2f}}}"
     if dagger:
         val += "$^{\\dagger}$"
     return f"\\textbf{{{val}}}" if bold else val
@@ -339,7 +345,9 @@ def write_main_table(
                 sd_raw = std.loc[m, s]
             except KeyError:
                 sd_raw = np.nan
-            sd = float(sd_raw) if not pd.isna(sd_raw) else 0.0
+            # NaN (not 0.0) when no std is available (single-seed cell): _cell renders
+            # it as "(1 seed)" rather than a misleading "$\pm$ 0.00".
+            sd = float(sd_raw) if not pd.isna(sd_raw) else float("nan")
             is_best = abs(mu - best[s]) < 1e-9 and m != "joint"
             cells.append(
                 _cell(mu, sd, bold=is_best, dagger=(m == proposed and daggers.get(s, False)))
@@ -388,11 +396,9 @@ def write_ablation_table(
         comps = [c for c in TARGET_ORDER if c in set(df["target"])]
         for c in comps:
             sub = df[df["target"] == c]
-            aa, aa_s = sub["AA"].mean(), sub["AA"].std(ddof=0)
-            bw, bw_s = sub["BWT"].mean(), sub["BWT"].std(ddof=0)
-            lines.append(
-                f"{TARGET_DISPLAY.get(c, c)} & {_cell(aa, aa_s or 0.0)} & {_cell(bw, bw_s or 0.0)} \\\\"
-            )
+            aa, aa_s = sub["AA"].mean(), sub["AA"].std(ddof=1)
+            bw, bw_s = sub["BWT"].mean(), sub["BWT"].std(ddof=1)
+            lines.append(f"{TARGET_DISPLAY.get(c, c)} & {_cell(aa, aa_s)} & {_cell(bw, bw_s)} \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(lines))
@@ -521,7 +527,7 @@ def compute_single_task_baselines(df: pd.DataFrame) -> dict[str, dict[str, float
         vals = runs["AA"].astype(float)
         out[dataset] = {
             "mean": float(vals.mean()),
-            "std": float(vals.std(ddof=0)) if len(vals) > 1 else 0.0,
+            "std": float(vals.std(ddof=1)) if len(vals) > 1 else 0.0,
             "count": int(len(vals)),
         }
     return out

@@ -8,6 +8,7 @@ tokens share the same Q/K/V projections, so those are not separable parameter
 groups. ``misc`` is a diagnostic safety net that should be empty for stock
 backbones (assert this in tests).
 """
+
 from __future__ import annotations
 
 import re
@@ -53,6 +54,14 @@ def classify_param(name: str) -> str:
         return "image_patch_embed"
     if "rel_pos" in name:  # relative 1D/2D position attention biases
         return "rel_pos_bias"
+    # LiLT has a decoupled layout attention stream (layout_query/key/value). Route it
+    # to the layout group BEFORE the generic q/k/v check, otherwise the substring
+    # "layout_query" matches "query" and the layout stream is silently merged into the
+    # text attn_qkv bucket — double-counting it in the Fisher/depth analysis.
+    if "attention" in name and (
+        "layout_query" in name or "layout_key" in name or "layout_value" in name
+    ):
+        return "layout_2d_pos_embed"
     if "attention" in name and ("query" in name or "key" in name or "value" in name):
         return "attn_qkv"  # shared text+visual self-attention projections
     if "attention.output.dense" in name:

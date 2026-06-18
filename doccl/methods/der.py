@@ -9,6 +9,7 @@ Loss: L = L_CE(current) + α * MSE(student_logits_replay, cached_logits_replay)
 The MSE term distills the dark knowledge (full output distribution) from the
 moment a sample was observed; the CE term keeps replay grounded in true labels.
 """
+
 from __future__ import annotations
 
 import torch
@@ -50,7 +51,9 @@ class DERpp(NaiveFineTune):
         total_loss = 0.0
         n_steps = 0
         for epoch in range(epochs):
-            pbar = tqdm(train_loader, desc=f"DER++ T{task.task_id} ep{epoch+1}/{epochs}", leave=False)
+            pbar = tqdm(
+                train_loader, desc=f"DER++ T{task.task_id} ep{epoch+1}/{epochs}", leave=False
+            )
             for batch in pbar:
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
 
@@ -70,12 +73,26 @@ class DERpp(NaiveFineTune):
                 if replay1 is not None:
                     replay1 = {k: v.to(self.device) for k, v in replay1.items()}
                     cached_logits = replay1.pop("_logits")
+                    # Per-example original logit width (head grows across CIL tasks, so
+                    # cached_logits is zero-padded to the batch max). DER++ must distil
+                    # ONLY over each example's real classes — never against the padding
+                    # zeros, which would wrongly push new-class logits to zero on replay.
+                    widths = replay1.pop("_logit_width", None)
                     r_out = self.model(**{k: v for k, v in replay1.items() if k != "labels"})
-                    # MSE — only on shared output dims (handle classifier expansion)
                     n_shared = min(r_out.logits.shape[-1], cached_logits.shape[-1])
-                    mse_loss = F.mse_loss(
-                        r_out.logits[..., :n_shared], cached_logits[..., :n_shared]
-                    )
+                    student = r_out.logits[..., :n_shared]
+                    teacher = cached_logits[..., :n_shared]
+                    if widths is None:
+                        # No per-example widths (uniform head) — plain MSE over n_shared.
+                        mse_loss = F.mse_loss(student, teacher)
+                    else:
+                        # Build a (B, 1, n_shared) class mask: True for columns < width.
+                        cols = torch.arange(n_shared, device=student.device)
+                        col_mask = (cols.unsqueeze(0) < widths.unsqueeze(1)).unsqueeze(1)
+                        col_mask = col_mask.to(student.dtype)
+                        sq = (student - teacher) ** 2 * col_mask
+                        denom = col_mask.expand_as(sq).sum().clamp(min=1)
+                        mse_loss = sq.sum() / denom
 
                 if replay2 is not None:
                     replay2 = {k: v.to(self.device) for k, v in replay2.items()}
@@ -96,11 +113,13 @@ class DERpp(NaiveFineTune):
 
                 total_loss += float(loss.item())
                 n_steps += 1
-                pbar.set_postfix({
-                    "ce": f"{ce_loss.item():.3f}",
-                    "mse": f"{mse_loss.item():.3f}",
-                    "rce": f"{replay_ce_loss.item():.3f}",
-                })
+                pbar.set_postfix(
+                    {
+                        "ce": f"{ce_loss.item():.3f}",
+                        "mse": f"{mse_loss.item():.3f}",
+                        "rce": f"{replay_ce_loss.item():.3f}",
+                    }
+                )
             if self._early_stop_after_epoch(stopper, val_loader, task, epoch):
                 break
 
