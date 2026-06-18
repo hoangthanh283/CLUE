@@ -20,6 +20,7 @@ can subclass and set ``_has_image = True`` + override ``forward`` /
 ``LayoutLMv3Wrapper`` deliberately does **not** inherit this — it predates the base
 and its 54 validated runs must stay reproducible.
 """
+
 from __future__ import annotations
 
 import logging
@@ -93,10 +94,21 @@ class TokenClassificationWrapper(nn.Module):
     def expand_classifier(self, new_labels: list[str]) -> None:
         """Widen the final output Linear, preserving old logits + label maps."""
         old_labels = list(self.id_to_label.values())
-        all_labels = old_labels + [l for l in new_labels if l not in self.label_to_id]
+        all_labels = old_labels + [lbl for lbl in new_labels if lbl not in self.label_to_id]
         new_n = len(all_labels)
 
         head = self.model.classifier
+        # A PEFT LoRA wrapper replaces the head with a ModulesToSaveWrapper, which has
+        # neither out_proj nor in_features — the naive path below would crash with an
+        # opaque AttributeError mid-CIL. Only LayoutLMv3Wrapper implements the PEFT
+        # unwrap/re-sync; fail fast and loud for secondary backbones + LoRA + CIL.
+        if type(head).__name__ == "ModulesToSaveWrapper":
+            raise NotImplementedError(
+                f"{type(self).__name__}.expand_classifier does not support a PEFT "
+                "ModulesToSaveWrapper head (LoRA/O-LoRA/CL-LoRA on a secondary "
+                "backbone in a class-incremental scenario). Use LayoutLMv3Wrapper, "
+                "which implements the PEFT head unwrap, for these runs."
+            )
         out_linear = head.out_proj if hasattr(head, "out_proj") else head
         new_linear = nn.Linear(out_linear.in_features, new_n).to(out_linear.weight.device)
         with torch.no_grad():
@@ -112,8 +124,8 @@ class TokenClassificationWrapper(nn.Module):
             self.model.classifier = new_linear
         self.model.config.num_labels = new_n
         self.model.num_labels = new_n
-        self.id_to_label = {i: l for i, l in enumerate(all_labels)}
-        self.label_to_id = {l: i for i, l in enumerate(all_labels)}
+        self.id_to_label = {i: lbl for i, lbl in enumerate(all_labels)}
+        self.label_to_id = {lbl: i for i, lbl in enumerate(all_labels)}
 
     # ─── layout signature (shared, backbone-agnostic — operates on bboxes) ───────
     @staticmethod

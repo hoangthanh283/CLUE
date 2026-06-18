@@ -5,6 +5,7 @@ Reference: Li & Hoiem, "Learning without Forgetting", ECCV 2016, TPAMI 2017.
 Knowledge distillation from a frozen teacher (snapshot of model after previous task).
 Loss: L_total = L_CE(current task) + α * KL(σ(z_student/T) || σ(z_teacher/T))
 """
+
 from __future__ import annotations
 
 import copy
@@ -41,13 +42,17 @@ class LwF(NaiveFineTune):
         n_old = teacher_logits.shape[-1]
         student_logits_old = student_logits[..., :n_old]
 
-        # Mask out -100 positions
-        valid = mask.unsqueeze(-1).expand_as(student_logits_old)
         student_log = F.log_softmax(student_logits_old / T, dim=-1)
         teacher_log = F.softmax(teacher_logits / T, dim=-1)
 
-        kd = F.kl_div(student_log, teacher_log, reduction="none") * (T ** 2)
-        kd = (kd * valid).sum() / valid.sum().clamp(min=1)
+        # Per-token KL: sum over the class dim, THEN average over valid tokens only.
+        # Dividing by valid.sum() over (token, class) pairs (as a naive expand+mean
+        # does) would deflate the KD by a factor of n_old and shrink it further as the
+        # head grows across CIL tasks — silently weakening distillation late in a
+        # sequence. The correct denominator is the number of valid token positions.
+        per_token_kl = F.kl_div(student_log, teacher_log, reduction="none").sum(-1)
+        per_token_kl = per_token_kl * (T**2)
+        kd = (per_token_kl * mask).sum() / mask.sum().clamp(min=1)
         return kd
 
     def train_task(
@@ -85,9 +90,7 @@ class LwF(NaiveFineTune):
 
                 if teacher is not None:
                     with torch.no_grad():
-                        teacher_out = teacher(
-                            **{k: v for k, v in batch.items() if k != "labels"}
-                        )
+                        teacher_out = teacher(**{k: v for k, v in batch.items() if k != "labels"})
                     mask = batch["labels"] != -100
                     kd_loss = self._kd_loss(outputs.logits, teacher_out.logits, mask)
 

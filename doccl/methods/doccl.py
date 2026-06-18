@@ -11,6 +11,7 @@ budget where forgetting actually lives. It is the registry's ``doccl``.
 for the NeurIPS extension; the abandoned fusion-dominant / per-modality-visual
 decision branches they served are removed from the thesis decision rule (M4).
 """
+
 from __future__ import annotations
 
 import copy
@@ -20,12 +21,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from doccl.eval.fisher import empirical_fisher_diagonal
 from doccl.methods.buffer import ReservoirBuffer
 from doccl.methods.ewc import EWC
 from doccl.methods.naive import NaiveFineTune
 from doccl.methods.o_lora import OLoRA
 from doccl.methods.prompt_base import PromptBasedMethod, PromptPool
-from doccl.eval.fisher import empirical_fisher_diagonal
 from doccl.types import TaskInfo, TrainMetrics
 
 log = logging.getLogger(__name__)
@@ -146,9 +147,7 @@ class _Router(nn.Module):
 
     def __init__(self, in_dim: int, n_pools: int, hidden: int = 128):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, hidden), nn.ReLU(), nn.Linear(hidden, n_pools)
-        )
+        self.net = nn.Sequential(nn.Linear(in_dim, hidden), nn.ReLU(), nn.Linear(hidden, n_pools))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return F.softmax(self.net(x), dim=-1)  # (B, n_pools)
@@ -306,14 +305,18 @@ class DocCL(NaiveFineTune):
         T = self.temperature
         n_old = teacher_logits.shape[-1]
         student_old = student_logits[..., :n_old]
-        valid = mask.unsqueeze(-1).expand_as(student_old)
         student_log = F.log_softmax(student_old / T, dim=-1)
         teacher_prob = F.softmax(teacher_logits / T, dim=-1)
-        kd = F.kl_div(student_log, teacher_prob, reduction="none") * (T ** 2)
-        return (kd * valid).sum() / valid.sum().clamp(min=1)
+        # Per-token KL (sum over classes), then mean over valid tokens — NOT over
+        # (token, class) pairs, which would deflate KD by n_old and weaken it as the
+        # head grows. See LwF._kd_loss for the full rationale.
+        per_token_kl = F.kl_div(student_log, teacher_prob, reduction="none").sum(-1)
+        per_token_kl = per_token_kl * (T**2)
+        return (per_token_kl * mask).sum() / mask.sum().clamp(min=1)
 
     def train_task(self, task: TaskInfo, train_loader, val_loader=None) -> TrainMetrics:
         from tqdm import tqdm
+
         self.model.train()
         teacher = self.state.custom.get("teacher")
         if teacher is not None:
@@ -330,7 +333,9 @@ class DocCL(NaiveFineTune):
 
         total_loss, n_steps = 0.0, 0
         for epoch in range(epochs):
-            pbar = tqdm(train_loader, desc=f"DocCL T{task.task_id} ep{epoch+1}/{epochs}", leave=False)
+            pbar = tqdm(
+                train_loader, desc=f"DocCL T{task.task_id} ep{epoch+1}/{epochs}", leave=False
+            )
             for batch in pbar:
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
                 optimizer.zero_grad()
@@ -360,27 +365,31 @@ class DocCL(NaiveFineTune):
                 optimizer.step()
 
                 if self.use_replay:
-                    self.state.buffer.add_batch({k: v for k, v in batch.items() if torch.is_tensor(v)})
+                    self.state.buffer.add_batch(
+                        {k: v for k, v in batch.items() if torch.is_tensor(v)}
+                    )
 
                 total_loss += float(loss.item())
                 n_steps += 1
-                pbar.set_postfix({
-                    "ce": f"{ce_loss.item():.3f}",
-                    "reg": f"{float(reg_loss):.3f}",
-                    "kd": f"{float(kd_loss):.3f}",
-                })
+                pbar.set_postfix(
+                    {
+                        "ce": f"{ce_loss.item():.3f}",
+                        "reg": f"{float(reg_loss):.3f}",
+                        "kd": f"{float(kd_loss):.3f}",
+                    }
+                )
             if self._early_stop_after_epoch(stopper, val_loader, task, epoch):
                 break
 
         stopper.restore_best(self.model)
-        return TrainMetrics(task_id=task.task_id, loss=total_loss / max(n_steps, 1), n_steps=n_steps)
+        return TrainMetrics(
+            task_id=task.task_id, loss=total_loss / max(n_steps, 1), n_steps=n_steps
+        )
 
     def after_task(self, task: TaskInfo, train_loader) -> None:
         """Snapshot θ*, accumulate Fisher, and snapshot the teacher."""
         self.state.custom["theta_star"] = {
-            name: p.detach().clone()
-            for name, p in self.model.named_parameters()
-            if p.requires_grad
+            name: p.detach().clone() for name, p in self.model.named_parameters() if p.requires_grad
         }
         new_fisher = empirical_fisher_diagonal(
             self.model, train_loader, n_samples=self.fisher_n_samples, device=self.device

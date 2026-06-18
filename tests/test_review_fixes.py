@@ -320,3 +320,111 @@ def test_apply_mask_text_only_keeps_input_ids():
     ii2, pv2, bb2 = model._apply_mask(ids, px, bbox, ModalityMask.IMAGE_LAYOUT)
     assert not torch.equal(ii2, ids)  # text masked to PAD
     assert torch.equal(bb2, bbox)  # layout kept
+
+
+# ═══ Board-review fixes (2026-06-18): H1 DER++ padding, H2 KD norm, H5 LiLT, H7 NaN ═══
+def test_lwf_kd_normalizes_per_token_not_per_token_class():
+    """H2: KD must average per-token KL (sum over classes, mean over valid tokens),
+    NOT over (token, class) pairs — the latter deflates KD by a factor of n_old and
+    weakens it as the head grows across CIL tasks."""
+    import torch.nn.functional as F
+
+    from doccl.methods.lwf import LwF
+
+    torch.manual_seed(0)
+    B, L, n_old = 2, 4, 5
+    student = torch.randn(B, L, n_old + 3)  # head grew by 3
+    teacher = torch.randn(B, L, n_old)
+    mask = torch.ones(B, L)
+    mask[0, 3] = 0.0  # one invalid token
+
+    # _kd_loss only reads self.temperature — call it unbound with a tiny stub self.
+    stub = type("Stub", (), {"temperature": 2.0})()
+    kd = LwF._kd_loss(stub, student, teacher, mask)
+
+    # Reference: per-token KL summed over classes, mean over valid tokens.
+    T = 2.0
+    s_log = F.log_softmax(student[..., :n_old] / T, dim=-1)
+    t_prob = F.softmax(teacher / T, dim=-1)
+    per_tok = F.kl_div(s_log, t_prob, reduction="none").sum(-1) * (T**2)
+    ref = (per_tok * mask).sum() / mask.sum().clamp(min=1)
+    assert torch.allclose(kd, ref, atol=1e-6)
+    # And it must NOT equal the buggy /(tokens*classes) version.
+    valid = mask.unsqueeze(-1).expand_as(student[..., :n_old])
+    buggy = (F.kl_div(s_log, t_prob, reduction="none") * (T**2) * valid).sum() / valid.sum()
+    assert not torch.allclose(kd, buggy, atol=1e-4)
+
+
+def test_derpp_buffer_records_logit_width():
+    """H1: the replay buffer must record each example's original logit width so DER++
+    can mask the MSE to real classes and not distil against padding zeros."""
+    from doccl.methods.buffer import ReservoirBuffer
+
+    buf = ReservoirBuffer(capacity=10, store_logits=True)
+    batch = {
+        "input_ids": torch.zeros(2, 4, dtype=torch.long),
+        "labels": torch.zeros(2, 4, dtype=torch.long),
+    }
+    logits = torch.randn(2, 4, 13)  # task-0 width 13
+    buf.add_batch(batch, logits=logits)
+    assert "_logit_width" in buf.buffer[0]
+    assert int(buf.buffer[0]["_logit_width"]) == 13
+
+
+def test_derpp_mse_ignores_padding_columns():
+    """H1: with mixed-width buffered logits, the per-example column mask must zero out
+    the padded columns so they contribute nothing to the MSE."""
+    import torch.nn.functional as F
+
+    # Simulate sample() output: 2 examples, widths 13 and 25, padded to 25.
+    widths = torch.tensor([13, 25])
+    n_shared = 25
+    student = torch.randn(2, 4, 25)
+    teacher = torch.randn(2, 4, 25)
+    teacher[0, :, 13:] = 0.0  # padding zeros on the width-13 example
+
+    cols = torch.arange(n_shared)
+    col_mask = (cols.unsqueeze(0) < widths.unsqueeze(1)).unsqueeze(1).to(student.dtype)
+    sq = (student - teacher) ** 2 * col_mask
+    masked_mse = sq.sum() / col_mask.expand_as(sq).sum().clamp(min=1)
+
+    # The naive full MSE differs because it includes the padding columns of example 0.
+    naive = F.mse_loss(student, teacher)
+    assert not torch.allclose(masked_mse, naive, atol=1e-4)
+    # Editing a padded column of example 0 must not change the masked MSE.
+    teacher2 = teacher.clone()
+    teacher2[0, :, 20] = 999.0
+    sq2 = (student - teacher2) ** 2 * col_mask
+    masked_mse2 = sq2.sum() / col_mask.expand_as(sq2).sum().clamp(min=1)
+    assert torch.allclose(masked_mse, masked_mse2, atol=1e-6)
+
+
+def test_lilt_layout_qkv_not_merged_into_text_attn():
+    """H5: LiLT's layout-stream Q/K/V must not fall into the text attn_qkv group."""
+    assert (
+        pg.classify_param("lilt.encoder.layer.0.attention.self.layout_query.weight") != "attn_qkv"
+    )
+    assert (
+        pg.classify_param("lilt.encoder.layer.0.attention.self.query.weight") == "attn_qkv"
+    )  # the text stream still routes here
+
+
+def test_backward_transfer_nan_when_no_valid_pairs():
+    """H7: BWT is NaN (not 0.0) when no (R[T-1,i], R[i,i]) pair exists — e.g. the Joint
+    oracle fills only the last row, so forgetting is undefined, not zero."""
+    import numpy as np
+
+    from doccl.eval.metrics import CLMetricsTracker
+
+    tr = CLMetricsTracker(num_tasks=3)
+    # Fill ONLY the last row (the joint-oracle pattern); diagonal R[i,i] stays NaN.
+    for j in range(3):
+        tr.matrix[2, j] = 80.0
+    assert np.isnan(tr.backward_transfer())
+    assert np.isnan(tr.forgetting())
+    # A normal full matrix still yields a real BWT.
+    tr2 = CLMetricsTracker(num_tasks=2)
+    tr2.matrix[0, 0] = 90.0
+    tr2.matrix[1, 0] = 80.0
+    tr2.matrix[1, 1] = 85.0
+    assert tr2.backward_transfer() == pytest.approx(-10.0)

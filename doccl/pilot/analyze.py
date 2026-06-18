@@ -558,13 +558,25 @@ def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: P
     for r in results:
         by_cond.setdefault(r["condition"], []).append(r["cl_metrics"])
 
+    def _fmt(v: float) -> str:
+        return "--" if v != v else f"{v:.2f}"  # v != v is True only for NaN
+
     for cond in sorted(by_cond.keys()):
         metrics_list = by_cond[cond]
-        means = {k: np.mean([m[k] for m in metrics_list]) for k in ["AA", "BWT", "AF", "FWT"]}
-        stds = {k: np.std([m[k] for m in metrics_list]) for k in ["AA", "BWT", "AF", "FWT"]}
+        # nan-aware mean/std (an unavailable FWT must render as "--", never nan±nan or a
+        # fabricated 0); ddof=1 sample std to match analyze_results.py result tables.
+        means = {k: np.nanmean([m[k] for m in metrics_list]) for k in ["AA", "BWT", "AF", "FWT"]}
+        stds = {
+            k: (
+                np.nanstd([m[k] for m in metrics_list], ddof=1)
+                if len(metrics_list) > 1
+                else float("nan")
+            )
+            for k in ["AA", "BWT", "AF", "FWT"]
+        }
         lines.append(
             f"| {cond} | "
-            + " | ".join(f"{means[k]:.2f}±{stds[k]:.2f}" for k in ["AA", "BWT", "AF", "FWT"])
+            + " | ".join(f"{_fmt(means[k])}±{_fmt(stds[k])}" for k in ["AA", "BWT", "AF", "FWT"])
             + " |"
         )
 
