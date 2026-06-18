@@ -11,6 +11,7 @@ Pure-logic tests (no GPU, no network) cover the instrument corrections:
 
 Tests needing transformers/seqeval are skipped when those deps are absent.
 """
+
 from __future__ import annotations
 
 from math import comb
@@ -20,11 +21,8 @@ import torch
 import torch.nn as nn
 
 from doccl.eval.cka import _select_vectors, linear_cka
-from doccl.eval.fisher import (
-    fisher_drop,
-    fisher_weighted_displacement,
-    snapshot_params,
-)
+from doccl.eval.fisher import (empirical_fisher_diagonal, fisher_drop,
+                               fisher_weighted_displacement, snapshot_params)
 from doccl.models import param_grouping as pg
 
 
@@ -111,8 +109,12 @@ def test_fisher_weighted_displacement_localizes_movement():
     }
     groups = {"input": [w_in], "head": [w_head]}
     disp = fisher_weighted_displacement(
-        fisher_old=fisher_old, params_before=before, params_after=after,
-        param_groups=groups, model=model, reduction="sum",
+        fisher_old=fisher_old,
+        params_before=before,
+        params_after=after,
+        param_groups=groups,
+        model=model,
+        reduction="sum",
     )
     assert disp["input"] == pytest.approx(0.0)
     # 3 old rows × (2^2) × Fisher(1) = 12; the new grown row is cropped out.
@@ -123,6 +125,95 @@ def test_fisher_drop_sign():
     fd = fisher_drop({"a": 1.0, "b": 2.0}, {"a": 0.5, "b": 2.0})
     assert fd["a"] == pytest.approx(-0.5)  # importance halved
     assert fd["b"] == pytest.approx(0.0)
+
+
+# ─── empirical Fisher: per-sample squaring, NOT batch-sum-then-square ─────────
+class _TinyTokenClassifier(nn.Module):
+    """Minimal token classifier (embedding → linear head) for Fisher tests."""
+
+    def __init__(self):
+        super().__init__()
+        self.emb = nn.Embedding(20, 8)
+        self.head = nn.Linear(8, 3)
+
+    def forward(self, input_ids, **_kw):  # noqa: ANN001
+        class _Out:
+            pass
+
+        out = _Out()
+        out.logits = self.head(self.emb(input_ids))
+        return out
+
+
+def _fisher_collate(batch):
+    return {
+        "input_ids": torch.stack([b["input_ids"] for b in batch]),
+        "labels": torch.stack([b["labels"] for b in batch]),
+    }
+
+
+def test_empirical_fisher_is_mean_of_squared_per_sample_grads():
+    """The empirical Fisher must average *individually-squared* per-document
+    gradients: F = (1/N) Σ_s g_s². It must NOT square a batch-summed gradient
+    (Σ_s g_s)², which injects cross-terms 2Σ_{i<j} g_i g_j and inflates the
+    head/backbone importance ratio. We pin the implementation to the textbook
+    definition by comparing it to a hand-computed per-document reference, run
+    through a DataLoader with batch_size>1 so the within-batch per-sample loop
+    is exercised (a batch-sum bug would only show up with batch_size>1).
+    """
+    from torch.utils.data import DataLoader, Dataset
+
+    torch.manual_seed(0)
+
+    class _DS(Dataset):
+        def __init__(self, n=4):
+            self.x = [
+                {
+                    "input_ids": torch.randint(0, 20, (5,)),
+                    "labels": torch.tensor([0, 1, 2, -100, 1]),
+                }
+                for _ in range(n)
+            ]
+
+        def __len__(self):
+            return len(self.x)
+
+        def __getitem__(self, i):
+            return self.x[i]
+
+    model = _TinyTokenClassifier()
+    ds = _DS(4)
+
+    # Reference: explicit sum of squared per-document gradients, /N.
+    ref = {n: torch.zeros_like(p) for n, p in model.named_parameters()}
+    for i in range(len(ds)):
+        ex = ds[i]
+        model.zero_grad()
+        logits = model(ex["input_ids"].unsqueeze(0)).logits
+        lbl = ex["labels"].unsqueeze(0)
+        valid = lbl != -100
+        log_probs = torch.log_softmax(logits, dim=-1)
+        safe = lbl.clone()
+        safe[~valid] = 0
+        nll = -log_probs.gather(-1, safe.unsqueeze(-1)).squeeze(-1)
+        nll[valid].sum().backward()
+        for n, p in model.named_parameters():
+            ref[n] += p.grad.detach() ** 2
+    for n in ref:
+        ref[n] /= len(ds)
+
+    model.zero_grad()
+    dl = DataLoader(ds, batch_size=2, collate_fn=_fisher_collate)  # >1 on purpose
+    got = empirical_fisher_diagonal(model, dl, n_samples=len(ds), device="cpu")
+
+    for n in ref:
+        assert torch.allclose(got[n], ref[n], atol=1e-6), f"Fisher mismatch on {n}"
+    # The head must NOT be pathologically larger than the backbone the way a
+    # batch-summed (Σg)² estimator would make it: sanity-bound the ratio.
+    head_mean = float(got["head.weight"].mean())
+    emb_mean = float(got["emb.weight"].mean())
+    assert head_mean >= emb_mean  # head is genuinely more important
+    assert head_mean / max(emb_mean, 1e-12) < 1e4  # but not absurdly inflated
 
 
 # ─── M2 — per-token CKA ───────────────────────────────────────────────────────

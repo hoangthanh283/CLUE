@@ -7,6 +7,7 @@ Used for:
     - Pilot study: per-component importance, Fisher drop = forgetting signal
     - EWC: regularization weights for elastic weight consolidation
 """
+
 from __future__ import annotations
 
 import torch
@@ -30,19 +31,38 @@ def empirical_fisher_diagonal(
     device: str | torch.device = "cuda",
     modality_mask=None,
 ) -> dict[str, torch.Tensor]:
-    """Compute diagonal of empirical Fisher information matrix.
+    r"""Compute the diagonal of the empirical Fisher information matrix.
+
+    The empirical diagonal Fisher is the *sample mean of squared per-sample
+    score-function gradients*:
+
+    .. math::
+        F_i \;=\; \frac{1}{N}\sum_{s=1}^{N}
+            \Big(\frac{\partial\,\big(-\log p(y_s \mid x_s;\theta)\big)}
+                      {\partial \theta_i}\Big)^{2}.
+
+    Each \emph{document} :math:`x_s` is one Fisher sample, and the per-sample
+    gradient is squared **individually** before averaging. This must NOT be
+    short-cut by squaring a batch-summed gradient: because
+    :math:`(\sum_s g_s)^2 = \sum_s g_s^2 + 2\sum_{i<j} g_i g_j`, batch-summing
+    injects spurious cross-terms :math:`2\sum_{i<j} g_i g_j`. Those cross-terms
+    are systematically larger for highly-correlated parameter groups (the
+    classifier head, whose per-token gradients share the same logit weights)
+    than for the backbone, so a batch-summed estimator inflates head/backbone
+    importance ratios by roughly an order of magnitude. We therefore run one
+    backward pass **per document** (within-document tokens are still summed,
+    which is correct: a document's score is the sum of its tokens' log-likes).
 
     Args:
-        model: model with classifier head producing logits
-        dataloader: provides labeled batches (input_ids, bbox, pixel_values, labels)
-        n_samples: number of samples to use (more = more accurate, slower)
-        device: forward pass device
-        modality_mask: optional ``ModalityMask`` for the pilot conditions. When
-            given, it is forwarded to the model so the Fisher estimate is taken
-            under the **same** masked inputs the condition trained on (fixes the
-            mask-agnostic per-condition Fisher flagged in review m3). Models
-            whose ``forward`` does not accept ``modality_mask`` (e.g. the BERT
-            baseline) should pass ``None``.
+        model: model with a classifier head producing token logits.
+        dataloader: labelled batches (input_ids, bbox, pixel_values, labels).
+        n_samples: number of *documents* to average over (more = more accurate,
+            slower). One backward per document.
+        device: forward/backward device.
+        modality_mask: optional ``ModalityMask`` for the pilot conditions,
+            forwarded so the Fisher is taken under the same masked inputs the
+            condition trained on. Pass ``None`` for models (e.g. the BERT
+            baseline) whose ``forward`` does not accept it.
 
     Returns:
         {param_name: Fisher diagonal tensor (same shape as param)}
@@ -58,37 +78,48 @@ def empirical_fisher_diagonal(
     for batch in pbar:
         batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}
         labels = batch["labels"]
-
-        _zero_grads(model)
-        outputs = model(
-            **{k: v for k, v in batch.items() if k != "labels"}, **extra_kwargs
-        )
-        logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
-
-        # Compute log-likelihood of (input, predicted-label) under the model.
-        # Using empirical Fisher: condition on observed labels rather than sampling.
-        # Mask out -100 (ignored) tokens.
-        valid_mask = labels != -100
-        log_probs = F.log_softmax(logits, dim=-1)
-        # Gather log-probs at observed labels
-        safe_labels = labels.clone()
-        safe_labels[~valid_mask] = 0  # avoid index error; will mask out below
-        nll = -log_probs.gather(-1, safe_labels.unsqueeze(-1)).squeeze(-1)
-        nll = nll[valid_mask].sum()
-
-        nll.backward()
-
-        # Accumulate squared gradients
         batch_size = batch["input_ids"].shape[0]
-        for name, p in model.named_parameters():
-            if p.requires_grad and p.grad is not None:
-                fisher[name] += (p.grad.detach() ** 2) * batch_size
 
-        seen += batch_size
+        # One backward pass PER DOCUMENT so each per-sample gradient is squared
+        # individually (the correct empirical Fisher; see the docstring). Slicing a
+        # single document keeps every modality input (input_ids/bbox/pixel_values/
+        # attention_mask) aligned at the same batch index.
+        for s in range(batch_size):
+            single = {
+                k: v[s : s + 1] for k, v in batch.items() if k != "labels" and torch.is_tensor(v)
+            }
+            labels_s = labels[s : s + 1]
+            valid_s = labels_s != -100
+            if not bool(valid_s.any()):
+                # Document with no scored tokens contributes a zero gradient.
+                seen += 1
+                if seen >= n_samples:
+                    break
+                continue
+
+            _zero_grads(model)
+            outputs = model(**single, **extra_kwargs)
+            logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
+            log_probs = F.log_softmax(logits, dim=-1)
+            safe_labels = labels_s.clone()
+            safe_labels[~valid_s] = 0  # avoid gather index error; masked out below
+            nll = -log_probs.gather(-1, safe_labels.unsqueeze(-1)).squeeze(-1)
+            # Sum over this document's tokens: the document score is the sum of its
+            # token log-likelihoods, so its score gradient is the gradient of that sum.
+            nll = nll[valid_s].sum()
+            nll.backward()
+
+            for name, p in model.named_parameters():
+                if p.requires_grad and p.grad is not None:
+                    fisher[name] += p.grad.detach() ** 2
+
+            seen += 1
+            if seen >= n_samples:
+                break
         if seen >= n_samples:
             break
 
-    # Normalize by number of samples
+    # Sample mean over the documents actually seen.
     for name in fisher:
         fisher[name] /= max(seen, 1)
 
@@ -155,9 +186,7 @@ def snapshot_params(model: nn.Module) -> dict[str, torch.Tensor]:
     displacement can be measured (see ``fisher_weighted_displacement``).
     """
     return {
-        name: p.detach().clone().cpu()
-        for name, p in model.named_parameters()
-        if p.requires_grad
+        name: p.detach().clone().cpu() for name, p in model.named_parameters() if p.requires_grad
     }
 
 
