@@ -182,7 +182,7 @@ not the gradient itself but a \emph{comparison}: we run BERT-base (Cb) through t
 identical instrument and contrast its depth gradient with LayoutLMv3's
 (Table~\ref{tab:bert-contrast}). The contrast is now available, and it is
 clarifying. BERT-base shows the \emph{same} monotonic late$+$head drift gradient
-(CKA falling from $0.997$ at the embeddings to $0.267$ at the last layer and $0.164$
+(CKA falling from $0.999$ at the embeddings to $0.292$ at the last layer and $0.195$
 at the head) \emph{and} the same head-dominant displacement (head
 $\sim$$1.8\times10^{-5}$ versus late $\sim$$4\times10^{-9}$, a four-order-of-magnitude
 gap mirroring LayoutLMv3's). The head/late forgetting locus is therefore \emph{not}
@@ -242,11 +242,11 @@ quantifies the head dominance directly.
     \toprule
     \textbf{Depth point} & \textbf{C4 (LayoutLMv3)} & \textbf{Cb (BERT)} \\
     \midrule
-    Embeddings        & 1.000 & 0.997 \\
-    Encoder early (L0) & 0.777 & 0.967 \\
-    Encoder mid (L6)   & 0.344 & 0.706 \\
-    Encoder late (L11) & 0.245 & 0.267 \\
-    Classifier head    & 0.215 & 0.164 \\
+    Embeddings        & 1.000 & 0.999 \\
+    Encoder early (L0) & 0.777 & 0.987 \\
+    Encoder mid (L6)   & 0.344 & 0.751 \\
+    Encoder late (L11) & 0.245 & 0.292 \\
+    Classifier head    & 0.215 & 0.195 \\
     Layout / vision input & 1.000 & \emph{n/a (text-only)} \\
     \bottomrule
   \end{tabular}
@@ -291,20 +291,23 @@ common to all three.
 \begin{table}[!htbp]
   \centering
   \caption[Forgetting by diagnostic condition]{Continual-learning metrics by
-  condition (mean\,$\pm$\,std), naive sequential
+  condition (mean\,$\pm$\,std over three seeds), naive sequential
   FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE. C1 is the corrected real text-only
-  LayoutLMv3 (image and layout zeroed), averaged over its two non-degenerate seeds (one
-  seed collapsed to an all-background predictor and is excluded). The external BERT
-  baseline (Cb, BERT-base, text only) now has real data and forgets comparably to the
-  within-architecture conditions.}
+  LayoutLMv3 (image and layout zeroed); Cb is the external BERT-base unimodal text
+  baseline. Both reach an accuracy close to the full multimodal model (C4) under naive
+  sequential fine-tuning---$27.3$ and $33.1$ versus $31.6$---confirming that the heavy
+  forgetting is not produced by any one input stream. $^{\ddagger}$C2 (text removed,
+  layout$+$vision retained) is reported from its single non-degenerate seed: the other two
+  collapsed to an all-background predictor, which is itself the finding---without text,
+  optimisation is unstable, so text is the stream that supports usable learning at all.}
   \label{tab:condition-metrics}
   \begin{tabular}{llccc}
     \toprule
     \textbf{Cond.} & \textbf{Model / inputs} & \textbf{AA} & \textbf{BWT} & \textbf{AF} \\
     \midrule
-    Cb & BERT-base, text only        & $29.91 \pm 0.70$ & $-69.95 \pm 1.61$ & $69.95 \pm 1.61$ \\
-    C1 & LayoutLMv3, text only       & $27.32 \pm 0.33$ & $-78.57 \pm 0.00$ & $78.57 \pm 0.00$ \\
-    C2 & layout+vision  & $7.21 \pm 10.20$ & $-18.79 \pm 26.57$ & $18.79 \pm 26.57$ \\
+    Cb & BERT-base, text only        & $33.13 \pm 0.12$ & $-65.32 \pm 0.64$ & $65.32 \pm 0.64$ \\
+    C1 & LayoutLMv3, text only       & $27.29 \pm 0.27$ & $-79.08 \pm 0.73$ & $79.08 \pm 0.73$ \\
+    C2 & layout+vision$^{\ddagger}$  & $21.64$ & $-56.36$ & $56.36$ \\
     C3 & text+layout    & $27.72 \pm 0.44$ & $-87.62 \pm 0.62$  & $87.62 \pm 0.62$ \\
     C4 & full           & $31.63 \pm 3.51$ & $-81.26 \pm 6.41$  & $81.26 \pm 6.41$ \\
     \bottomrule
@@ -316,15 +319,19 @@ common to all three.
 \emph{null-input} condition (no usable input at all), so its $0$ score was a
 tautology, not evidence about text. We retract that inference as stated. The honest
 evidence for the role of text is twofold. (i) C2 (text removed, image$+$layout retained)
-is both far less accurate and highly unstable across seeds ($7.2\pm10.2$ AA), whereas
+is both far less accurate and highly unstable across seeds---only one of three seeds even
+converged (to $21.6$ AA); the other two collapsed to an all-background predictor---whereas
 C3 (text$+$layout) and C4 (full) are stable, isolating text as the stream that supports
 usable optimisation. (ii) The now-genuine text-only C1 (text kept, image and layout
 zeroed) reaches $27.3$ AA with the \emph{same} near-total forgetting profile as the full
 model---direct evidence that the text-and-head path carries both the learning signal and
 the forgetting. The external BERT contrast (Cb) now corroborates this directly: the
-text-only BERT baseline forgets comparably (AA $29.9$, BWT $-70.0$) and through the same
-head-concentrated locus (Table~\ref{tab:bert-contrast}), so the within-architecture
-finding generalises beyond LayoutLMv3. Optimisation instability in text-deprived
+text-only BERT baseline reaches a comparable accuracy (AA $33.1$ vs the full model's
+$31.6$) and forgets heavily (BWT $-65.3$) through the same head-concentrated locus, so the
+within-architecture finding generalises beyond LayoutLMv3 to a different unimodal encoder.
+That BERT forgets somewhat \emph{less} than the full model ($-65.3$ vs $-81.3$) is
+consistent with the diagnosis: a unimodal encoder has a smaller head/late surface for the
+forgetting to concentrate on, but the qualitative collapse is the same. Optimisation instability in text-deprived
 conditions (C2) is reported here as a training-stability observation, separate from the
 forgetting analysis.
 
