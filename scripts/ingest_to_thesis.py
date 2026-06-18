@@ -12,6 +12,7 @@ Usage:
     python -m doccl.pilot.analyze                 # writes pilot figures
     python scripts/ingest_to_thesis.py            # copies them into thesis/
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,12 +23,15 @@ from pathlib import Path
 FIGURES = [
     ("pilot/figures/fisher_bars.pdf", "figures/pilot_fisher_bars.pdf"),
     ("pilot/figures/cka_heatmap.pdf", "figures/pilot_cka_heatmap.pdf"),
+    ("pilot/figures/displacement_bars.pdf", "figures/pilot_displacement_bars.pdf"),
+    ("pilot/figures/forgetting_matrix.pdf", "figures/pilot_forgetting_matrix.pdf"),
     ("figure_forgetting_curves.pdf", "figures/forgetting_curves.pdf"),
 ]
 TABLES = [
     ("table_main.tex", "generated/table_main.tex"),
     ("table_ablation.tex", "generated/table_ablation.tex"),
     ("table_compute.tex", "generated/table_compute.tex"),
+    ("table_single_task_baselines.tex", "generated/table_single_task_baselines.tex"),
 ]
 
 
