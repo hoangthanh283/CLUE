@@ -1,10 +1,31 @@
 # STATE
 
 ## Active Work
-**Converged grid re-running** with val-F1 early stopping (patience=2, cap=100ep) — replaces the
-earlier fixed 3-epoch budget that under-trained EWC. Order: single-task baselines (9, DONE) →
-DocCL (running) → Core(54)+Prompt(36) as local fallback (offload to powerful machine via docker/).
-Per-run **FWT now real** (zero-shot future-task term recorded + tracker seeded with b_i).
+**Grid harvested (167 runs) → thesis updated (2026-06-18).** Full R2 pull = 167 completed runs
+across **9 scenarios** (incl. new `cil_wildreceipt`, `dil_xlingual`) × ~15 methods × 3 seeds.
+Regenerated the whole analysis pipeline and updated thesis Ch.1/6/7 with measured numbers,
+new figures, and a new Extended-Scenarios section. Thesis builds clean (113 pp).
+
+### Key measured findings (now in thesis)
+- DIL oracle = **88.7** (was 85.1). DocCL DIL 84.7 **closes most of the gap but does NOT reach
+  the oracle**; replay (ER 87.9 / DER++ 88.0) matches it. DocCL competitive-with-but-below replay.
+- Pilot: head displacement ~1e-4 vs late ~1e-8 (≈4 orders); **BERT (cb_bert) shows the same
+  head-dominant pattern** → output-side forgetting is NOT vision-specific (BERT contrast now
+  real: AA 29.9, BWT -70; previously thought degenerate/excluded).
+- **XFUND cross-lingual = headline new result**: near-ZERO forgetting under pure language shift
+  (naive BWT only -6.6) — fixed label space ⇒ head needn't relearn ⇒ minimal forgetting.
+  Strong corroboration of the output-side/head-locus thesis.
+- **WildReceipt (scale)**: severe forgetting (BWT ≈-85), replay can't rescue the growing head.
+
+### Genuinely unmeasured (flagged honestly, NOT fabricated)
+- `er_cflat` / C-Flat++ runs FAILED (no metrics.json) → "not available".
+- DocCL ablation variants (head_only/late_only/uniform) did NOT complete → future work.
+- DocCL / 2025 / prompt-LoRA NOT run on the two new scenarios (compute) → classical + oracle only.
+
+### Generators widened (committed)
+analyze_results (5 scenarios + full method set + per-scenario ablation/compute), build_result_figures
+(full method set + bench_newscenarios_aa), pilot/analyze (drops all-zero dead runs), ingest_to_thesis
+(new pilot figs + single-task baselines incl WildReceipt/XFUND).
 
 **NEW datasets added (infrastructure only — grid runs LATER on the powerful machine):**
 - **XFUND** (`nnul/xfund-multilingual`) → cross-lingual **domain-IL** scenario `dil_xlingual`
