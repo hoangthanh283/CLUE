@@ -405,24 +405,33 @@ run_one_bg() {  # <slot> <run_name> <overrides...>
   local gpu="${GPU_ARR[$(( slot % NUM_GPUS ))]}"
   local marker="results/${run}/.done"
   if [ -f "$marker" ]; then echo "skip"; return 0; fi
-  # Heavy prompt methods (dualprompt/l2p/coda_prompt) get two run-name-targeted overrides,
-  # both appended AFTER $EXTRA so Hydra's last-wins makes them authoritative:
-  #   1. gradient_checkpointing=true — they hold ~17 GiB/process at bs16 with NO ckpt; three
-  #      co-resident exceed a 44 GiB card and OOM (rc=1). Ckpt drops them to ~9-10 GiB so
-  #      JOBS_PER_GPU=4 packs safely. HEAVY_GRAD_CKPT=0 disables.
-  #   2. epochs=PROMPT_EPOCHS_CAP (default 30) — the global EPOCHS_CAP (100) is wasteful here:
-  #      prompt baselines top out at AA 0-30 on this task and dualprompt was still inching up
-  #      at ep28 (~25->30 AA, diminishing). 30 captures ~all realistic gain while bounding
-  #      VRAM residency (long residency was what made 3-way overlap likely). A fair, standard
-  #      budget for cited prompt baselines. PROMPT_EPOCHS_CAP= (empty) keeps the global cap.
+  # Two run-name-targeted overrides, appended AFTER $EXTRA so Hydra's last-wins makes them
+  # authoritative:
+  #
+  #   1. gradient_checkpointing=true for ALL HEAVY methods — every method that runs the FULL
+  #      LayoutLMv3 backbone forward holds ~17 GiB/process at bs16 with no ckpt, so 3 co-resident
+  #      exceed a 44-48 GiB card and OOM (rc=1). Confirmed on cil_cord: two o_lora @17.55 GiB +
+  #      a doccl-ablation @11 GiB = 47.2/47.4 GiB -> next alloc OOMs. The heavy set is the prompt
+  #      methods (dualprompt/l2p/coda_prompt), the LoRA methods (o_lora/cl_lora), doccl + its
+  #      depth-ablation variants, and er_cflat (SAM does 2 backbone forwards). Ckpt drops each to
+  #      ~9-11 GiB so JOBS_PER_GPU=4 packs safely. Cheap classical methods (naive/ewc/lwf/er/
+  #      der_pp/joint/bert) are NOT checkpointed — they're light and we keep their speed.
+  #      HEAVY_GRAD_CKPT=0 disables.
+  #   2. epochs=PROMPT_EPOCHS_CAP (default 30) for PROMPT methods ONLY — the global EPOCHS_CAP
+  #      (100) is wasteful for them: they top out at AA 0-30 and dualprompt was still inching up
+  #      at ep28 (~25->30, diminishing). 30 captures ~all realistic gain. This cap must NOT apply
+  #      to o_lora/cl_lora/doccl — those need full convergence (they're LoRA baselines / the
+  #      contribution). PROMPT_EPOCHS_CAP= (empty) keeps the global cap.
   local heavy_ckpt="" prompt_epochs=""
   case "$run" in
+    *_dualprompt_*|*_l2p_*|*_coda_prompt_*|*_o_lora_*|*_cl_lora_*|*_doccl_*|*_er_cflat_*)
+      [ "${HEAVY_GRAD_CKPT:-1}" = "1" ] && heavy_ckpt="training.gradient_checkpointing=true" ;;
+  esac
+  case "$run" in
     *_dualprompt_*|*_l2p_*|*_coda_prompt_*)
-      [ "${HEAVY_GRAD_CKPT:-1}" = "1" ] && heavy_ckpt="training.gradient_checkpointing=true"
       # ${VAR-30}: 30 only when UNSET; an explicit PROMPT_EPOCHS_CAP= (empty) keeps the global cap.
       local _pe="${PROMPT_EPOCHS_CAP-30}"
-      [ -n "$_pe" ] && prompt_epochs="method.epochs=${_pe}"
-      ;;
+      [ -n "$_pe" ] && prompt_epochs="method.epochs=${_pe}" ;;
   esac
   (
     local rc
