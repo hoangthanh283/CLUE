@@ -265,8 +265,18 @@ def _build_datasets(scenario, model, is_bert: bool) -> tuple[list[Dataset], list
     if not is_bert:
         return list(scenario.train_datasets), list(scenario.eval_datasets)
     tok = model.tokenizer
-    train = [BertKIEAdapter(ds, tok) for ds in scenario.train_datasets]
-    eval_ = [BertKIEAdapter(ds, tok) for ds in scenario.eval_datasets]
+
+    def _remap_of(ds: Dataset) -> dict[int, int] | None:
+        # DIL/CIL scenarios wrap each task dataset in a *_LabelRemapper that holds the
+        # native_id -> unified_id table on ``_id_translation``. The BERT adapter reads
+        # RAW native ner_tags, so it must apply that same translation to land in the
+        # head's (unified) label space. Plain (non-remapped) datasets -> None (identity).
+        return getattr(ds, "_id_translation", None)
+
+    train = [BertKIEAdapter(ds, tok, label_remap=_remap_of(ds))
+             for ds in scenario.train_datasets]
+    eval_ = [BertKIEAdapter(ds, tok, label_remap=_remap_of(ds))
+             for ds in scenario.eval_datasets]
     return train, eval_
 
 
