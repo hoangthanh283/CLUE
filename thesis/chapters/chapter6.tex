@@ -107,11 +107,14 @@ table is consistent with but, on its own, cannot establish.
 \begin{figure}[!htbp]
   \centering
   \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{diag_forgetting_matrix.pdf}
-  \caption[Forgetting-matrix heatmap]{Heatmap of the performance matrix $R[i,j]$ (entity-F1
-  on task $j$ after training task $i$; C4, seed 42). The diagonal (just-learned) stays high
-  while the sub-diagonal (retention of an earlier task after later training) collapses to
-  $\sim$2--4 F1 --- forgetting is near-total within a single task step.
-  \textbf{Preliminary} pilot result.}
+  \caption[Forgetting-matrix heatmap]{Heatmap of the performance matrix $R[i,j]$: entity-F1
+  on evaluated task $j$ after the model has been trained through task $i$ (full multimodal
+  model C4, seed 42, naive sequential fine-tuning over FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE).
+  Colour encodes absolute F1 on a fixed $0$--$100$ scale; the dashed-outlined \emph{diagonal}
+  is the just-learned task and stays high ($88.0$, $93.0$, $80.5$), whereas every
+  \emph{sub-diagonal} cell---an earlier task re-evaluated after later training---collapses to
+  $\sim$2--4 F1. The arrow marks the canonical case: FUNSD falls from $88.0$ to $1.8$ after a
+  single further task. Hatched cells are tasks not yet seen at that training step.}
   \label{fig:forgetting-matrix-viz}
 \end{figure}
 
