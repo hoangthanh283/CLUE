@@ -226,6 +226,19 @@ heartbeat_loop() {  # <total>
     else
       done_ct=$(ls results/*/.done 2>/dev/null | wc -l)   # fallback (manifest absent)
     fi
+    # Disk guard: online W&B buffers every run to wandb/, and on a small-disk rented box
+    # (e.g. a 30 GB vast.ai volume) that fills the disk and WEDGES Docker ("No space left on
+    # device" -> the container can't even restart). When free space on / drops below
+    # DISK_GUARD_GB (default 5), prune the W&B run dirs (results live in results/<run>/ and
+    # R2, never in wandb/) and warn loudly. Set DISK_GUARD_GB=0 to disable.
+    local guard="${DISK_GUARD_GB:-5}" free_gb
+    if [ "$guard" != "0" ]; then
+      free_gb=$(df -BG --output=avail / 2>/dev/null | tail -1 | tr -dc '0-9')
+      if [ -n "$free_gb" ] && [ "$free_gb" -lt "$guard" ]; then
+        rm -rf wandb/run-* wandb/offline-run-* wandb/latest-run 2>/dev/null
+        echo "[$(date '+%m-%d %H:%M:%S')] [disk] FREE ${free_gb}G < ${guard}G — pruned wandb/ run dirs (results unaffected; set WANDB_MODE=offline to avoid the bloat)" | tee -a "$LOG" 2>/dev/null || true
+      fi
+    fi
     # Count [FAIL only AFTER this launch's session marker (not stale failures from
     # prior relaunches appended to the same persistent log).
     fail_ct=$(awk -v m="$SESSION_MARKER" 'index($0,m){c=0;seen=1;next} seen&&/\[FAIL/{c++} END{print c+0}' "$LOG" 2>/dev/null || echo 0)
