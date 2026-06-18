@@ -148,7 +148,16 @@ prompt_plain(){ local var="$1" label="$2" def="${3:-}"; [ -n "${!1:-}" ] && { ok
 info "Weights & Biases (Enter to log OFFLINE):"
 prompt_secret WANDB_API_KEY "W&B API key"
 prompt_plain  WANDB_PROJECT "W&B project" "CL4IE"
-[ -n "${WANDB_API_KEY:-}" ] && export WANDB_MODE="${WANDB_MODE:-online}" || { export WANDB_MODE=offline; warn "no key -> offline"; }
+# Default to OFFLINE on rented boxes: online W&B buffers every run to wandb/ and has
+# repeatedly filled small instance disks (30 GB) until Docker itself wedged. Offline loses
+# nothing measured (metrics.json + R2 still capture everything); `wandb sync` backfills the
+# dashboard later. Explicit WANDB_MODE=online opts back in; no key always forces offline.
+if [ -z "${WANDB_API_KEY:-}" ]; then
+  export WANDB_MODE=offline; warn "no W&B key -> offline"
+else
+  export WANDB_MODE="${WANDB_MODE:-offline}"
+  [ "$WANDB_MODE" = "online" ] && warn "W&B ONLINE — buffers to wandb/; on a small-disk box prefer WANDB_MODE=offline"
+fi
 export WANDB_API_KEY WANDB_PROJECT
 
 info "Cloudflare R2 durable resume (Enter at all to DISABLE):"
