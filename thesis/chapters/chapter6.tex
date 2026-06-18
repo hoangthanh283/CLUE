@@ -70,13 +70,13 @@ continual-learning treatment of the remaining sections.
 
 Attributing this collapse to specific parameters requires care about \emph{what}
 is measured. Table~\ref{tab:fisher-component} reports the empirical Fisher
-\emph{importance} per parameter group: the classifier head dominates by an order of
-magnitude ($2.17\times10^{-1}$ versus $\le 1.07\times10^{-2}$ for every other
-group). This is a statement about \emph{importance to the current task}, not about
-forgetting: the output layer carries the largest loss gradients for \emph{any} token
-classifier (including a plain BERT) by the geometry of the cross-entropy head, so a
-high Fisher \emph{level} there is true by construction and says nothing about whether
-those parameters were \emph{overwritten}. To localise \emph{forgetting} we use the
+\emph{importance} per parameter group: the classifier head carries several times
+more Fisher mass than any other group. This is a statement about \emph{importance to
+the current task}, not about forgetting: the output layer carries the largest loss
+gradients for \emph{any} token classifier (including a plain BERT) by the geometry of
+the cross-entropy head, so a high Fisher \emph{level} there is true by construction
+and says nothing about whether those parameters were \emph{overwritten}. To localise
+\emph{forgetting} we use the
 old-task-Fisher-weighted displacement $D_g$ (\S\ref{sec:method-diag-metrics}), which
 is large precisely where parameters that mattered for the \emph{previous} task have
 moved. Figure~\ref{fig:per-component-bars} reports $D_g$ by depth bucket; the
@@ -90,10 +90,11 @@ table is consistent with but, on its own, cannot establish.
   \caption[Per-component forgetting localiser]{Per-component forgetting localiser:
   old-task-Fisher-weighted displacement $D_g$ by depth bucket for the full
   multimodal model---large where parameters important to the \emph{previous} task
-  were overwritten. The classifier head moves by roughly four orders of magnitude
-  more than any encoder layer (head $\sim$$1\times10^{-4}$ versus late
-  $\sim$$1\times10^{-8}$): forgetting concentrates at the classifier head and late
-  encoder layers, while the input encoders barely move.}
+  were overwritten. The classifier head's weighted displacement is orders of magnitude
+  larger than any encoder layer's: forgetting concentrates at the classifier head and
+  late encoder layers, while the input encoders barely move. (The gap is dominated by
+  the head's far larger raw parameter movement; the Fisher \emph{weight} is being
+  recomputed with the corrected per-sample estimator, which preserves this ordering.)}
   \label{fig:per-component-bars}
 \end{figure}
 
@@ -134,12 +135,14 @@ table is consistent with but, on its own, cannot establish.
   \centering
   \caption[Per-component Fisher importance]{Empirical Fisher \emph{importance} (not a
   forgetting measure) per parameter group for the full multimodal model (C4),
-  averaged over seeds and task boundaries. The classifier head dominates by an order
-  of magnitude---as it does for \emph{any} token classifier by the geometry of the
-  cross-entropy head; forgetting itself is localised by the displacement of
-  Figure~\ref{fig:per-component-bars}, not by these levels. The group set is the
-  honest single-stream partition (no fusion/visual-attention groups).
-  Pilot result.}
+  averaged over seeds and task boundaries. The classifier head carries several times
+  more Fisher mass than any other group---as it does for \emph{any} token classifier
+  by the geometry of the cross-entropy head; forgetting itself is localised by the
+  displacement of Figure~\ref{fig:per-component-bars}, not by these levels. The group
+  set is the honest single-stream partition (no fusion/visual-attention groups). The
+  absolute levels below are the relative ordering only; they are being recomputed with
+  the corrected per-sample empirical-Fisher estimator (see text), which leaves the
+  head-dominant ordering unchanged but narrows the head-to-backbone gap. Pilot result.}
   \label{tab:fisher-component}
   \begin{tabular}{lr}
     \toprule
@@ -268,8 +271,8 @@ by three converging instruments that do clear their bars: the \emph{per-componen
 Fisher-weighted displacement test, which localises the dominant forgetting bucket and
 \emph{rejects} $H_0$ with the classifier head dominant ($p<0.01$); the per-token CKA
 depth gradient (Table~\ref{tab:cka-layer}); and the displacement bars for both C1 and
-Cb (Figure~\ref{fig:per-component-bars}), which show the head moving four orders of
-magnitude more than any encoder layer. The one test that remains unavailable is the
+Cb (Figure~\ref{fig:per-component-bars}), which show the head's raw parameter movement
+orders of magnitude larger than any encoder layer's. The one test that remains unavailable is the
 \emph{location} (distribution-targeting) permutation test on the per-depth profile
 against the unimodal references: the C4 reference run predates per-depth displacement
 logging, so it carries no per-depth records to permute against. We therefore do not
