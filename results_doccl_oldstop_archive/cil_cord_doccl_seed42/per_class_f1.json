@@ -1,0 +1,480 @@
+{
+  "0": {
+    "menu.cnt": {
+      "precision": 100.0,
+      "recall": 1.3636363636363635,
+      "f1": 2.6905829596412554,
+      "support": 220.0
+    },
+    "menu.discountprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 10.0
+    },
+    "menu.itemsubtotal": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 6.0
+    },
+    "menu.nm": {
+      "precision": 100.0,
+      "recall": 0.796812749003984,
+      "f1": 1.5810276679841897,
+      "support": 251.0
+    },
+    "menu.num": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 11.0
+    },
+    "menu.price": {
+      "precision": 100.0,
+      "recall": 0.8130081300813009,
+      "f1": 1.612903225806452,
+      "support": 246.0
+    },
+    "menu.unitprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "sub_total.discount_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "sub_total.subtotal_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "sub_total.tax_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.cashprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.changeprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.total_etc": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.total_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "micro avg": {
+      "precision": 6.25,
+      "recall": 0.9408602150537635,
+      "f1": 1.6355140186915886,
+      "support": 744.0
+    },
+    "macro avg": {
+      "precision": 21.428571428571427,
+      "recall": 0.21238980305154634,
+      "f1": 0.4203224181022784,
+      "support": 744.0
+    },
+    "weighted avg": {
+      "precision": 96.37096774193549,
+      "recall": 0.9408602150537635,
+      "f1": 1.8622854695342674,
+      "support": 744.0
+    }
+  },
+  "1": {
+    "menu.cnt": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.nm": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.sub.cnt": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 17.0
+    },
+    "menu.sub.nm": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 36.0
+    },
+    "menu.sub.price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 20.0
+    },
+    "menu.unitprice": {
+      "precision": 100.0,
+      "recall": 1.4925373134328357,
+      "f1": 2.941176470588235,
+      "support": 67.0
+    },
+    "sub_total.tax_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.total_etc": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.total_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "micro avg": {
+      "precision": 1.7857142857142856,
+      "recall": 0.7142857142857143,
+      "f1": 1.0204081632653061,
+      "support": 140.0
+    },
+    "macro avg": {
+      "precision": 10.0,
+      "recall": 0.1492537313432836,
+      "f1": 0.29411764705882354,
+      "support": 140.0
+    },
+    "weighted avg": {
+      "precision": 47.85714285714286,
+      "recall": 0.7142857142857143,
+      "f1": 1.407563025210084,
+      "support": 140.0
+    }
+  },
+  "2": {
+    "menu.cnt": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.nm": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.unitprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "sub_total.discount_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 7.0
+    },
+    "sub_total.etc": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 13.0
+    },
+    "sub_total.service_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 12.0
+    },
+    "sub_total.subtotal_price": {
+      "precision": 100.0,
+      "recall": 1.5151515151515151,
+      "f1": 2.985074626865672,
+      "support": 66.0
+    },
+    "sub_total.tax_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 45.0
+    },
+    "total.cashprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.changeprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.total_etc": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.total_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "micro avg": {
+      "precision": 1.25,
+      "recall": 0.6993006993006993,
+      "f1": 0.8968609865470852,
+      "support": 143.0
+    },
+    "macro avg": {
+      "precision": 7.6923076923076925,
+      "recall": 0.11655011655011654,
+      "f1": 0.2296211251435132,
+      "support": 143.0
+    },
+    "weighted avg": {
+      "precision": 46.15384615384615,
+      "recall": 0.6993006993006993,
+      "f1": 1.3777267508610793,
+      "support": 143.0
+    }
+  },
+  "3": {
+    "menu.cnt": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.nm": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.unitprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "sub_total.discount_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "sub_total.subtotal_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "sub_total.tax_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.cashprice": {
+      "precision": 100.0,
+      "recall": 2.898550724637681,
+      "f1": 5.633802816901409,
+      "support": 69.0
+    },
+    "total.changeprice": {
+      "precision": 100.0,
+      "recall": 1.7857142857142856,
+      "f1": 3.508771929824561,
+      "support": 56.0
+    },
+    "total.creditcardprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 17.0
+    },
+    "total.emoneyprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 2.0
+    },
+    "total.menuqty_cnt": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 29.0
+    },
+    "total.menutype_cnt": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 7.0
+    },
+    "total.total_etc": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.total_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "micro avg": {
+      "precision": 3.0,
+      "recall": 1.6666666666666667,
+      "f1": 2.1428571428571432,
+      "support": 180.0
+    },
+    "macro avg": {
+      "precision": 13.333333333333334,
+      "recall": 0.31228433402346445,
+      "f1": 0.6095049831150647,
+      "support": 180.0
+    },
+    "weighted avg": {
+      "precision": 69.44444444444444,
+      "recall": 1.6666666666666667,
+      "f1": 3.2512423468687373,
+      "support": 180.0
+    }
+  },
+  "4": {
+    "menu.cnt": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.nm": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "menu.unitprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "sub_total.discount_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "sub_total.subtotal_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "sub_total.tax_price": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.cashprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.changeprice": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0.0
+    },
+    "total.total_etc": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 3.0
+    },
+    "total.total_price": {
+      "precision": 93.6842105263158,
+      "recall": 92.70833333333334,
+      "f1": 93.19371727748693,
+      "support": 96.0
+    },
+    "micro avg": {
+      "precision": 81.65137614678899,
+      "recall": 89.8989898989899,
+      "f1": 85.57692307692307,
+      "support": 99.0
+    },
+    "macro avg": {
+      "precision": 8.516746411483254,
+      "recall": 8.428030303030305,
+      "f1": 8.472156116135174,
+      "support": 99.0
+    },
+    "weighted avg": {
+      "precision": 90.84529505582138,
+      "recall": 89.8989898989899,
+      "f1": 90.3696652387752,
+      "support": 99.0
+    }
+  }
+}
