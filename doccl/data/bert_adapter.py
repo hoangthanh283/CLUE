@@ -34,18 +34,37 @@ class BertKIEAdapter(Dataset):
         max_length: padded/truncated sequence length.
     """
 
-    def __init__(self, underlying: Dataset, tokenizer: Any, max_length: int = 512):
-        if not hasattr(underlying, "data"):
+    def __init__(
+        self,
+        underlying: Dataset,
+        tokenizer: Any,
+        max_length: int = 512,
+        label_remap: dict[int, int] | None = None,
+    ):
+        # Unwrap label-remapping scenario wrappers (DIL_LabelRemapper / CIL_LabelRemapper):
+        # they hold the per-document words+ner_tags on their wrapped `.underlying.data`,
+        # not on themselves. We need the RAW words/ner_tags here to re-tokenise with BERT
+        # WordPiece, and a `label_remap` (native_id -> unified_id) to translate the tags
+        # into the SAME label space the model head is sized to. Without this, the BERT
+        # baseline was trained on native ids that don't match the (remapped) head and
+        # collapsed to all-O (0 entity-F1) — the cause of the degenerate Cb runs.
+        base = underlying
+        while not hasattr(base, "data") and hasattr(base, "underlying"):
+            base = base.underlying
+        if not hasattr(base, "data"):
             raise TypeError(
-                "BertKIEAdapter expects a doccl dataset exposing `.data`; got "
-                f"{type(underlying).__name__}"
+                "BertKIEAdapter expects a doccl dataset exposing `.data` (directly or via "
+                f"a remapper's `.underlying`); got {type(underlying).__name__}"
             )
-        self.underlying = underlying
+        self.underlying = base
         self.tokenizer = tokenizer
         self.max_length = max_length
-        # Expose the underlying label maps so run_pilot can size/expand the head.
-        self.id_to_label = getattr(underlying, "id_to_label", {})
-        self.label_to_id = getattr(underlying, "label_to_id", {})
+        # native_id -> target(unified)_id translation for ner_tags. Identity when None.
+        self.label_remap = label_remap or {}
+        # Expose the BASE dataset's label maps (run_pilot overrides the head sizing
+        # from scenario.tasks[0].label_set, so these are only informational here).
+        self.id_to_label = getattr(base, "id_to_label", {})
+        self.label_to_id = getattr(base, "label_to_id", {})
 
     def __len__(self) -> int:
         return len(self.underlying.data)
@@ -53,7 +72,9 @@ class BertKIEAdapter(Dataset):
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         ex = self.underlying.data[idx]
         words = list(ex["tokens"])
-        word_labels = list(ex["ner_tags"])
+        # Translate native ner_tag ids into the model's (unified) label space; tags with
+        # no mapping fall back to their native id (identity remap leaves them unchanged).
+        word_labels = [self.label_remap.get(t, t) for t in ex["ner_tags"]]
 
         enc = self.tokenizer(
             words,
