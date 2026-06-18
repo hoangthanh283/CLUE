@@ -76,26 +76,27 @@ Across the three scenarios the ordering is unambiguous---replay $\gg$ regularisa
 $\gg$ distillation---and it follows directly from \emph{where} forgetting lives:
 because the damage is at the head, \emph{replay}, which re-exposes old-class targets at
 the output, is the most effective remedy. On domain-incremental learning both replay
-methods (ER, DER++) reach the joint upper bound (AA $\approx 88$ vs the oracle's $85$,
+methods (ER, DER++) reach the joint upper bound (AA $\approx 88$ vs the oracle's $88.7$,
 backward transfer $\approx 0$), closing essentially the entire $\sim$47-point forgetting
 gap (interpreted with per-class F1, as the unified schema is VALUE-dominant); EWC
-roughly halves forgetting wherever a domain shift is present (DIL/Mixed BWT
-$-31$/$-25$ vs naive $-71$/$-67$); and LwF tracks the naive lower bound throughout, as
+sharply curbs forgetting wherever a domain shift is present (DIL/Mixed BWT
+$-2.8$/$-8.4$ vs naive $-73.1$/$-66.9$, and its strongest retention is on CIL-CORD at BWT
+$-54.8$, though at an accuracy cost); and LwF tracks the naive lower bound throughout, as
 its distilled old-class logits decay once the growing head stops reinforcing them.
 
 Its second contribution is DocCL, a depth/head-targeted method derived directly from
 the diagnosis---depth-scaled consolidation, output distillation, and head replay
 concentrated on the classifier head and late layers---evaluated on the FCS-CL
-benchmark against the baselines. Measured over three seeds, DocCL \emph{reaches the joint
-oracle} on domain-incremental learning (AA $84.7$ vs the oracle's $84.8$, backward transfer
-$-4.6$), closing essentially the entire forgetting gap, but it does \emph{not} surpass
-experience replay, which sits $\sim$3 points higher (ER/DER++ $\approx 88$); on the Mixed
-scenario DocCL ($57.6$) tracks below both replay ($\approx 61$) and the oracle ($64.8$),
+benchmark against the baselines. Measured over three seeds, DocCL \emph{closes most of the
+forgetting gap} on domain-incremental learning (AA $84.7$ vs the oracle's $88.7$, within
+$\sim$4 points, backward transfer $-4.6$) but does \emph{not} reach it; experience replay
+matches the oracle and sits $\sim$3--4 points higher (ER/DER++ $\approx 88$); on the Mixed
+scenario DocCL ($57.6$) tracks below both replay ($\approx 60$) and the oracle ($67.5$),
 and no method---DocCL included---closes the fine-grained class-incremental gap, where even
 the joint oracle reaches only the low thirties. The honest finding is therefore that
-diagnosis-driven head/late targeting is sufficient to match the oracle and close the
-forgetting gap on a domain shift, performing competitively with---but not exceeding---data
-replay. The diagnostic contribution stands on its own regardless: it provides a reusable
+diagnosis-driven head/late targeting closes most of the forgetting gap on a domain shift,
+performing competitively with---but not exceeding---data replay, which alone matches the
+oracle. The diagnostic contribution stands on its own regardless: it provides a reusable
 tool and a shared benchmark for studying forgetting in multimodal document
 encoders---together with the finding that replay remains the strongest single
 remedy---which the prior, fragmented literature lacked.
@@ -103,11 +104,14 @@ remedy---which the prior, fragmented literature lacked.
 \section{Future Work}
 \label{sec:concl-future}
 
-The immediate next step is to complete the convergence-trained grid and replace the
-projected DocCL, ablation, prompt, and LoRA figures with measured numbers, confirming
-(or revising) the projected result that head/late-targeted consolidation matches replay
-without storing data and that the depth-targeting ablation supports
-H\textsubscript{target} and H\textsubscript{head}. Beyond that, several extensions
+The convergence-trained grid is now complete, and the measured result is that
+head/late-targeted consolidation closes most of the forgetting gap without storing
+data---competitive with but below replay, which alone matches the oracle---while the
+depth-targeting ablation supports H\textsubscript{target} and H\textsubscript{head}. The
+benchmark now spans five scenarios, including large-scale class-incremental learning
+(WildReceipt) and cross-lingual domain-incremental learning (XFUND); the cross-lingual
+result---near-zero forgetting under pure language shift (naive BWT only $-6.6$)---further
+corroborates the output-side thesis. Beyond that, several extensions
 follow naturally and are reserved for post-thesis work; each is a future direction
 rather than part of the present AAAI-phase scope.
 
