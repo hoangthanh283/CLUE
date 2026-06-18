@@ -40,6 +40,22 @@ def _build(method_cls):
     return model, method
 
 
+def _head_out_features(model) -> int:
+    """Effective classifier width, unwrapping PEFT's ModulesToSaveWrapper.
+
+    Under PEFT the ``classifier`` is a ``ModulesToSaveWrapper`` (no ``.out_features``);
+    the head the forward actually uses is ``modules_to_save[active]`` (or, post-expand,
+    the widened Linear we re-pointed it at). Read width from the inner Linear.
+    """
+    head = model.model.classifier
+    saved = getattr(head, "modules_to_save", None)
+    if saved is not None:
+        keys = list(saved.keys())
+        head = saved[keys[0]] if keys else getattr(head, "original_module", head)
+    head = head.out_proj if hasattr(head, "out_proj") else head
+    return head.out_features
+
+
 def _forward_with_new_class(model) -> float:
     """A forward whose every label is the last (newly added) class index."""
     n = len(model.id_to_label)
@@ -64,7 +80,7 @@ def test_olora_survives_cil_head_expansion():
     method.before_task(TaskInfo(task_id=1, task_name="t1", label_set=["O"] + _T1_NEW), None)
     loss = _forward_with_new_class(model)  # would assert/crash pre-fix
     assert loss == loss  # not NaN
-    assert model.model.classifier.out_features == len(_T0_LABELS) + len(_T1_NEW)
+    assert _head_out_features(model) == len(_T0_LABELS) + len(_T1_NEW)
 
 
 def test_cl_lora_survives_cil_head_expansion():
@@ -86,4 +102,4 @@ def test_olora_survives_repeated_cil_expansions():
         )
         loss = _forward_with_new_class(model)  # label = newest class each round
         assert loss == loss
-    assert model.model.classifier.out_features == len(_T0_LABELS) + 6
+    assert _head_out_features(model) == len(_T0_LABELS) + 6
