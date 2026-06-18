@@ -408,15 +408,16 @@ run_one_bg() {  # <slot> <run_name> <overrides...>
   # Two run-name-targeted overrides, appended AFTER $EXTRA so Hydra's last-wins makes them
   # authoritative:
   #
-  #   1. gradient_checkpointing=true for ALL HEAVY methods — every method that runs the FULL
-  #      LayoutLMv3 backbone forward holds ~17 GiB/process at bs16 with no ckpt, so 3 co-resident
-  #      exceed a 44-48 GiB card and OOM (rc=1). Confirmed on cil_cord: two o_lora @17.55 GiB +
-  #      a doccl-ablation @11 GiB = 47.2/47.4 GiB -> next alloc OOMs. The heavy set is the prompt
-  #      methods (dualprompt/l2p/coda_prompt), the LoRA methods (o_lora/cl_lora), doccl + its
-  #      depth-ablation variants, and er_cflat (SAM does 2 backbone forwards). Ckpt drops each to
-  #      ~9-11 GiB so JOBS_PER_GPU=4 packs safely. Cheap classical methods (naive/ewc/lwf/er/
-  #      der_pp/joint/bert) are NOT checkpointed — they're light and we keep their speed.
-  #      HEAVY_GRAD_CKPT=0 disables.
+  #   1. gradient_checkpointing=true for the FULL-FINETUNE heavy methods ONLY — the LoRA
+  #      methods (o_lora/cl_lora), doccl + its depth-ablation variants, and er_cflat (SAM does
+  #      2 backbone forwards). These train the full backbone and hold ~17-19 GiB/process at
+  #      bs16 with no ckpt, so 2-3 co-resident OOM a 44-48 GiB card. Ckpt drops them enough to
+  #      pack safely. The PROMPT methods (dualprompt/l2p/coda_prompt) are deliberately EXCLUDED:
+  #      they FREEZE the backbone (only the prompt pool + classifier train), so measured peak is
+  #      ~3.6 GiB — they never approach the VRAM ceiling, and checkpointing them was pure ~20-30%
+  #      slowdown for zero benefit (a real regression: ~26 epochs/task x slow epochs on big
+  #      datasets like cil_wildreceipt = hours/task). Classical methods (naive/ewc/lwf/er/der_pp/
+  #      joint/bert) are also un-checkpointed (light). HEAVY_GRAD_CKPT=0 disables entirely.
   #   2. epochs=PROMPT_EPOCHS_CAP (default 30) for PROMPT methods ONLY — the global EPOCHS_CAP
   #      (100) is wasteful for them: they top out at AA 0-30 and dualprompt was still inching up
   #      at ep28 (~25->30, diminishing). 30 captures ~all realistic gain. This cap must NOT apply
@@ -424,7 +425,7 @@ run_one_bg() {  # <slot> <run_name> <overrides...>
   #      contribution). PROMPT_EPOCHS_CAP= (empty) keeps the global cap.
   local heavy_ckpt="" prompt_epochs=""
   case "$run" in
-    *_dualprompt_*|*_l2p_*|*_coda_prompt_*|*_o_lora_*|*_cl_lora_*|*_doccl_*|*_er_cflat_*)
+    *_o_lora_*|*_cl_lora_*|*_doccl_*|*_er_cflat_*)
       [ "${HEAVY_GRAD_CKPT:-1}" = "1" ] && heavy_ckpt="training.gradient_checkpointing=true" ;;
   esac
   case "$run" in
