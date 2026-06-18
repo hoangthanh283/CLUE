@@ -123,8 +123,33 @@ class LayoutLMv3Wrapper(nn.Module):
         all_labels = old_labels + [l for l in new_labels if l not in self.label_to_id]
         new_n = len(all_labels)
 
-        # Locate the final output Linear regardless of head type.
+        # Under PEFT (O-LoRA / CL-LoRA) the classifier is auto-registered in
+        # ``modules_to_save`` and REPLACED with a ``ModulesToSaveWrapper`` — which has
+        # neither ``.out_proj`` nor ``.in_features``, so reading dims off it raises
+        # ``AttributeError: 'ModulesToSaveWrapper' object has no attribute 'in_features'``.
+        # Unwrap to the real head it holds: the active-adapter copy is what the forward
+        # uses (fall back to ``original_module``). We expand that Linear and write the
+        # widened copy back into EVERY internal reference the wrapper keeps, so PEFT's
+        # forward sees the new width immediately (this subsumes the post-hoc re-sync in
+        # OLoRA.before_task, which previously never ran because expansion crashed first).
         head = self.model.classifier
+        saved = getattr(head, "modules_to_save", None)
+        if saved is not None:  # ModulesToSaveWrapper
+            # ``modules_to_save`` is an nn.ModuleDict (no ``.get``); index by key after a
+            # membership check. active_adapter may be a str or (some PEFT versions) a list.
+            active = getattr(head, "active_adapter", None)
+            if isinstance(active, (list, tuple)):
+                active = active[0] if active else None
+            keys = list(saved.keys())
+            if active is not None and active in keys:
+                inner = saved[active]
+            elif keys:
+                inner = saved[keys[0]]
+            else:
+                inner = getattr(head, "original_module", head)
+            head = inner
+
+        # Locate the final output Linear regardless of head type.
         out_linear = head.out_proj if hasattr(head, "out_proj") else head
 
         new_linear = nn.Linear(out_linear.in_features, new_n).to(out_linear.weight.device)
@@ -137,6 +162,13 @@ class LayoutLMv3Wrapper(nn.Module):
 
         if hasattr(head, "out_proj"):
             head.out_proj = new_linear
+        elif saved is not None:
+            # Re-point the PEFT wrapper's copies at the widened Linear so the forward
+            # (which reads modules_to_save[active] / original_module) uses the new width.
+            for adapter in list(saved.keys()):
+                saved[adapter] = new_linear
+            if getattr(self.model.classifier, "original_module", None) is not None:
+                self.model.classifier.original_module = new_linear
         else:
             self.model.classifier = new_linear
 
