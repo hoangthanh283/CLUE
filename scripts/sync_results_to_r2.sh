@@ -42,7 +42,11 @@ SYNC_REMOTE="obj:${R2_BUCKET}/results"
 # locally (e.g. `bash scripts/sync_results_to_r2.sh --pull` then `tensorboard --logdir results`).
 INCLUDES=(--include "*/.done" --include "*/metrics.json" --include "*/matrix.npy"
           --include "*/tb/**" --include "*/per_class_f1.json"
-          --include "table_single_task_baselines.csv")
+          --include "table_single_task_baselines.csv"
+          # Pilot diagnostic study: flat per-condition JSONs (results/pilot/<cond>_<seed>.json)
+          # + its aggregated outputs. Synced so the BERT/C1 re-run on a remote GPU box can be
+          # pulled here for `python -m doccl.pilot.analyze`. These are tiny (~250 KB total).
+          --include "pilot/**")
 
 # In-process rclone 'obj' remote (no config file on disk) — identical to the grid's.
 export RCLONE_CONFIG_OBJ_TYPE=s3
@@ -64,16 +68,24 @@ case "$MODE" in
   pull)
     echo "==> Pulling R2 -> local results/ (refresh this box with what the remotes finished) ..."
     rclone copy "$SYNC_REMOTE" results/ "${INCLUDES[@]}" -P
-    # Partial-write safety: drop metrics/matrix in any dir lacking .done.
-    for d in results/*/; do [ -f "${d}.done" ] || rm -f "${d}metrics.json" "${d}matrix.npy" 2>/dev/null; done
-    echo "==> Local now has $(ls results/*/.done 2>/dev/null | wc -l) completed run(s)."
+    # Partial-write safety: drop metrics/matrix in any GRID dir lacking .done. (Pilot files
+    # are flat single-shot JSONs with no .done, so they are never touched by this guard.)
+    for d in results/*/; do
+      [ "$d" = "results/pilot/" ] && continue
+      [ -f "${d}.done" ] || rm -f "${d}metrics.json" "${d}matrix.npy" 2>/dev/null
+    done
+    echo "==> Local now has $(ls results/*/.done 2>/dev/null | wc -l) completed grid run(s)"\
+         "+ $(ls results/pilot/*.json 2>/dev/null | wc -l) pilot file(s)."
     ;;
   push)
     LOCAL_DONE=$(ls results/*/.done 2>/dev/null | wc -l)
-    echo "==> Priming R2 (${SYNC_REMOTE}) from ${LOCAL_DONE} local completed run(s) ..."
-    [ "$LOCAL_DONE" -gt 0 ] || { echo "    (no local .done markers — nothing to seed)"; exit 0; }
+    LOCAL_PILOT=$(ls results/pilot/*.json 2>/dev/null | wc -l)
+    echo "==> Priming R2 (${SYNC_REMOTE}) from ${LOCAL_DONE} completed grid run(s) + ${LOCAL_PILOT} pilot file(s) ..."
+    # Push if there is ANYTHING to seed: grid .done markers OR pilot JSONs (the pilot has
+    # no .done markers, so don't gate the whole push on grid completions).
+    [ "$LOCAL_DONE" -gt 0 ] || [ "$LOCAL_PILOT" -gt 0 ] || { echo "    (nothing to seed)"; exit 0; }
     rclone copy results/ "$SYNC_REMOTE" "${INCLUDES[@]}" -P
-    echo "==> Done. Remote boxes' sync_pull will now skip these ${LOCAL_DONE} run(s)."
+    echo "==> Done. Remote boxes' sync_pull will see these grid run(s) + pilot file(s)."
     echo "    Verify: bash scripts/sync_results_to_r2.sh --list"
     ;;
   *)
