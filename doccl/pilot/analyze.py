@@ -9,6 +9,7 @@ Outputs:
     - results/pilot/figures/forgetting_matrix.pdf : per-condition forgetting matrix
     - results/pilot/findings_summary.md : Markdown summary of patterns
 """
+
 from __future__ import annotations
 
 import json
@@ -36,12 +37,30 @@ def min_achievable_p(n1: int, n2: int) -> float:
     return 2.0 / comb(n1 + n2, n2)
 
 
+def _is_dead_run(r: dict) -> bool:
+    """A pilot run is dead/degenerate if its CL metrics are all-zero.
+
+    The legacy ``c1_bert`` prototype (June-11) and a handful of seeds collapsed to
+    F1=0 on every task (AA=BWT=AF=0). These pollute the cross-condition tables and
+    must be dropped, not aggregated. A genuine run always has AA>0 on at least the
+    last (current) task. We keep the honest minimum: drop only when *all* of
+    AA/BWT/AF are exactly zero.
+    """
+    m = r.get("cl_metrics", {})
+    aa, bwt, af = m.get("AA", 0.0) or 0.0, m.get("BWT", 0.0) or 0.0, m.get("AF", 0.0) or 0.0
+    return abs(aa) < 1e-9 and abs(bwt) < 1e-9 and abs(af) < 1e-9
+
+
 def load_pilot_results(pilot_dir: Path) -> list[dict]:
-    """Load all pilot result JSONs."""
+    """Load all pilot result JSONs, dropping dead/degenerate (all-zero-metric) runs."""
     results = []
     for fp in sorted(pilot_dir.glob("*_seed*.json")):
         with open(fp) as f:
-            results.append(json.load(f))
+            r = json.load(f)
+        if _is_dead_run(r):
+            print(f"[pilot-analyze] dropping dead run (all-zero metrics): {fp.name}")
+            continue
+        results.append(r)
     return results
 
 
@@ -59,54 +78,72 @@ def to_long_dataframe(results: list[dict]) -> pd.DataFrame:
         for cka_rec in r["cka_records"]:
             boundary = cka_rec["task_boundary"]
             for layer, cka_val in cka_rec["cka"].items():
-                rows.append({
-                    "condition": cond,
-                    "seed": seed,
-                    "metric": "cka",
-                    "boundary": boundary,
-                    "layer": layer,
-                    "value": cka_val,
-                })
+                rows.append(
+                    {
+                        "condition": cond,
+                        "seed": seed,
+                        "metric": "cka",
+                        "boundary": boundary,
+                        "layer": layer,
+                        "value": cka_val,
+                    }
+                )
 
         # Fisher records (importance level to the current task)
         for fisher_rec in r["fisher_records"]:
             tidx = fisher_rec["task_idx"]
             for group, val in fisher_rec["fisher_per_group"].items():
-                rows.append({
-                    "condition": cond,
-                    "seed": seed,
-                    "metric": "fisher",
-                    "task_idx": tidx,
-                    "group": group,
-                    "value": val,
-                })
+                rows.append(
+                    {
+                        "condition": cond,
+                        "seed": seed,
+                        "metric": "fisher",
+                        "task_idx": tidx,
+                        "group": group,
+                        "value": val,
+                    }
+                )
 
         # Displacement records (old-task-Fisher-weighted movement = forgetting)
         for disp_rec in r.get("displacement_records", []):
             boundary = disp_rec["task_boundary"]
             for group, val in disp_rec.get("by_group", {}).items():
-                rows.append({
-                    "condition": cond, "seed": seed, "metric": "displacement",
-                    "boundary": boundary, "group": group, "value": val,
-                })
+                rows.append(
+                    {
+                        "condition": cond,
+                        "seed": seed,
+                        "metric": "displacement",
+                        "boundary": boundary,
+                        "group": group,
+                        "value": val,
+                    }
+                )
             for bucket, val in disp_rec.get("by_depth", {}).items():
-                rows.append({
-                    "condition": cond, "seed": seed, "metric": "displacement_depth",
-                    "boundary": boundary, "group": bucket, "value": val,
-                })
+                rows.append(
+                    {
+                        "condition": cond,
+                        "seed": seed,
+                        "metric": "displacement_depth",
+                        "boundary": boundary,
+                        "group": bucket,
+                        "value": val,
+                    }
+                )
 
         # Accuracy records
         for acc_rec in r["accuracy_records"]:
             tidx = acc_rec["task_idx"]
             for tid, m in acc_rec["results"].items():
-                rows.append({
-                    "condition": cond,
-                    "seed": seed,
-                    "metric": "f1",
-                    "task_idx": tidx,
-                    "evaluated_task": int(tid),
-                    "value": m["f1"],
-                })
+                rows.append(
+                    {
+                        "condition": cond,
+                        "seed": seed,
+                        "metric": "f1",
+                        "task_idx": tidx,
+                        "evaluated_task": int(tid),
+                        "value": m["f1"],
+                    }
+                )
 
     return pd.DataFrame(rows)
 
@@ -128,8 +165,16 @@ def plot_cka_heatmap(df: pd.DataFrame, output_path: Path) -> None:
     for ax, cond in zip(axes, conditions):
         sub = pivot[pivot["condition"] == cond]
         mat = sub.pivot(index="layer", columns="boundary", values="value")
-        sns.heatmap(mat, annot=True, fmt=".2f", cmap="viridis", vmin=0, vmax=1, ax=ax,
-                    cbar_kws={"label": "CKA"})
+        sns.heatmap(
+            mat,
+            annot=True,
+            fmt=".2f",
+            cmap="viridis",
+            vmin=0,
+            vmax=1,
+            ax=ax,
+            cbar_kws={"label": "CKA"},
+        )
         ax.set_title(cond)
         ax.set_xlabel("Task boundary")
         ax.set_ylabel("Layer")
@@ -198,8 +243,16 @@ def plot_forgetting_matrix(df: pd.DataFrame, output_path: Path) -> None:
     for ax, cond in zip(axes, conditions):
         sub = agg[agg["condition"] == cond]
         mat = sub.pivot(index="task_idx", columns="evaluated_task", values="value")
-        sns.heatmap(mat, annot=True, fmt=".1f", cmap="RdYlGn", vmin=0, vmax=100, ax=ax,
-                    cbar_kws={"label": "F1"})
+        sns.heatmap(
+            mat,
+            annot=True,
+            fmt=".1f",
+            cmap="RdYlGn",
+            vmin=0,
+            vmax=100,
+            ax=ax,
+            cbar_kws={"label": "F1"},
+        )
         ax.set_title(cond)
         ax.set_xlabel("Evaluated task")
         ax.set_ylabel("After training task")
@@ -227,7 +280,9 @@ def _mannwhitney(a: list[float], b: list[float]) -> float:
         return float("nan")
 
 
-def condition_bwt_test(results: list[dict], reference: str = "c4_full", alpha: float = 0.05) -> dict | None:
+def condition_bwt_test(
+    results: list[dict], reference: str = "c4_full", alpha: float = 0.05
+) -> dict | None:
     """H0/H1 across conditions: is the full-multimodal model's forgetting (|BWT|)
     distinguishable from each unimodal/ablated condition?
 
@@ -341,7 +396,9 @@ def component_profile_test(
     }
 
 
-def component_hypothesis_test(df: pd.DataFrame, condition: str = "c4_full", alpha: float = 0.05) -> dict | None:
+def component_hypothesis_test(
+    df: pd.DataFrame, condition: str = "c4_full", alpha: float = 0.05
+) -> dict | None:
     """H0 (forgetting uniform across components) vs H1 (one component dominates),
     within ``condition``, on the per-group Fisher signal at the final task.
 
@@ -466,8 +523,14 @@ def plot_displacement_bars(df: pd.DataFrame, output_path: Path) -> None:
     width = 0.8 / max(len(conditions), 1)
     for i, cond in enumerate(conditions):
         sub_c = agg[agg["condition"] == cond].set_index("group").reindex(groups)
-        ax.bar(x + i * width - 0.4, sub_c["mean"].fillna(0), width,
-               yerr=sub_c["std"].fillna(0), label=cond, capsize=2)
+        ax.bar(
+            x + i * width - 0.4,
+            sub_c["mean"].fillna(0),
+            width,
+            yerr=sub_c["std"].fillna(0),
+            label=cond,
+            capsize=2,
+        )
     ax.set_xticks(x)
     ax.set_xticklabels(groups)
     ax.set_ylabel("Fisher-weighted displacement (forgetting)")
@@ -541,8 +604,10 @@ def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: P
         if cond_test["reject_H0"]:
             verdict = "**reject H0**"
         elif cond_test["any_underpowered"]:
-            verdict = ("**inconclusive (underpowered)** — at least one comparison's "
-                       "minimum achievable p exceeds α'; add seeds before reading this as H0")
+            verdict = (
+                "**inconclusive (underpowered)** — at least one comparison's "
+                "minimum achievable p exceeds α'; add seeds before reading this as H0"
+            )
         else:
             verdict = "fail to reject H0"
         lines += ["", f"Verdict: {verdict}."]
@@ -632,6 +697,7 @@ def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: P
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--pilot_dir", type=Path, default=Path("results/pilot"))
     parser.add_argument("--figures_dir", type=Path, default=Path("results/pilot/figures"))
