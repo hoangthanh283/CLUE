@@ -22,8 +22,8 @@ representational drift (linear CKA), per-group Fisher information, and standard
 forgetting metrics across the FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE task
 sequence. The diagnosis returns a clear, somewhat counter-intuitive result: forgetting
 is \emph{not} fusion-specific but \emph{output-side}---it concentrates in the
-classifier head and the late encoder layers (the head dominates Fisher importance by
-roughly an order of magnitude and CKA drift rises monotonically with depth, from
+classifier head and the late encoder layers (the head carries several times more
+Fisher importance than any other group and CKA drift rises monotonically with depth, from
 $1.00$ at the input encoders to $0.22$ at the head), while the input encoders remain
 comparatively stable; a controlled cross-condition test cannot distinguish the full
 multimodal model's forgetting from its unimodal ablations.
