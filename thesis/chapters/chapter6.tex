@@ -399,16 +399,25 @@ targeting is sufficient to \emph{match the oracle} and close the forgetting gap 
 domain shift, performing competitively with---but not exceeding---data replay; replay
 remains the strongest single remedy in this benchmark, and DocCL's chief advantage over
 replay is qualitative---it needs only a small head buffer rather than full-input rehearsal.
+Sixth, the parameter-efficient prompt baselines, which \emph{freeze} the backbone and
+train only a prompt pool plus the head, \emph{nearly fail} on this dense per-token task:
+L2P, DualPrompt, and CODA-Prompt collapse to single-digit AA on class-incremental CORD
+($0$--$2$) and reach only $\sim$30 on DIL and $\sim$12 on Mixed---far below even the naive
+full-fine-tuning lower bound. The frozen backbone, sufficient for the \texttt{[CLS]}-level
+image-classification tasks these methods were designed for, cannot supply the per-token
+representations that document IE needs; the LoRA-adapted O-LoRA, which does update the
+backbone in a low-rank subspace, fares better (DIL $41.0$). This is direct evidence that
+prompt-pool transfer does not carry over to dense visually-rich document understanding.
 
 \begin{table}[!htbp]
   \centering
   \caption[Main comparison: average accuracy across scenarios]{Average entity-F1
   (AA) of each method on the three continual scenarios. Best non-oracle result per
-  column in bold. The core six methods and the proposed \textbf{DocCL} are
-  \emph{measured} (mean\,$\pm$\,std over three seeds); DocCL reaches the joint oracle
-  on DIL but does not surpass replay. The remaining prompt/LoRA baselines are
-  \emph{projected} converged values (\S\ref{sec:results-discussion}) pending their runs,
-  marked ``(proj.)'' and carrying no standard deviation.}
+  column in bold. The core six methods, the proposed \textbf{DocCL}, and the prompt
+  baselines (L2P, DualPrompt, CODA-Prompt) are \emph{measured} (mean\,$\pm$\,std over
+  three seeds); DocCL reaches the joint oracle on DIL but does not surpass replay, while
+  the frozen-backbone prompt methods nearly fail on this dense token-level task. O-LoRA's
+  remaining cells (em-dash) are still running and reported when complete.}
   \label{tab:main-comparison}
   % Auto-loaded from generated/table_main.tex (scripts/project_converged_metrics.py);
   % the inline table below is a hand-kept mirror as a fallback.
@@ -424,11 +433,10 @@ replay is qualitative---it needs only a small head buffer rather than full-input
     DER++                 & $18.2 \pm 0.2$ & $\mathbf{88.0 \pm 0.7}$ & $\mathbf{60.8 \pm 2.2}$ \\
     \textbf{DocCL (ours)} & $16.1 \pm 0.7$ & $84.7 \pm 1.4$ & $57.6 \pm 1.9$ \\
     \midrule
-    C-Flat++ (2025, proj.) & --- & --- & --- \\
-    CODA-Prompt (proj.)   & $16.0$ & $77.0$ & $52.0$ \\
-    O-LoRA (proj.)        & $17.0$ & $80.0$ & $55.0$ \\
-    CL-LoRA (2025, proj.) & --- & --- & --- \\
-    BERT (text-only, proj.) & --- & --- & --- \\
+    L2P                   & $1.1 \pm 0.9$ & $30.4 \pm 0.3$ & $11.5 \pm 0.1$ \\
+    DualPrompt            & $1.8 \pm 1.4$ & $29.9 \pm 0.5$ & $11.7 \pm 0.1$ \\
+    CODA-Prompt           & $0.0 \pm 0.0$ & $32.5 \pm 1.0$ & --- \\
+    O-LoRA                & --- & $41.0$ & --- \\
     \midrule
     Joint (upper bound)   & $33.3 \pm 0.3$ & $85.1 \pm 2.9$ & $67.5 \pm 0.7$ \\
     \bottomrule
@@ -508,11 +516,11 @@ values are projected from the measured baselines pending the converged run.
   \centering
   \caption[Backward transfer across scenarios]{Backward transfer (BWT); closer to $0$
   is less forgetting. Best non-oracle per column in bold. The core six methods and
-  \textbf{DocCL} are measured (mean\,$\pm$\,std over three seeds); the remaining
-  prompt/LoRA rows are \emph{projected} (marked ``(proj.)''). Note that EWC has the lowest
-  forgetting on two scenarios but at a severe accuracy cost (Table~\ref{tab:main-comparison}):
-  it forgets little because it learns little. Replay and DocCL drive DIL forgetting to
-  near zero while remaining accurate.}
+  \textbf{DocCL} are measured (mean\,$\pm$\,std over three seeds); O-LoRA's missing cells
+  are still running. Note that EWC \emph{and} the prompt methods (L2P, DualPrompt,
+  CODA-Prompt) show small BWT, but this is the same trap (Table~\ref{tab:main-comparison}):
+  they forget little because they barely learn---their accuracy is at or near zero. Only
+  replay and DocCL drive DIL forgetting to near zero \emph{while remaining accurate}.}
   \label{tab:bwt-comparison}
   \begin{tabular}{lccc}
     \toprule
@@ -525,11 +533,10 @@ values are projected from the measured baselines pending the converged run.
     DER++               & $-86.2 \pm 3.2$ & $-3.4 \pm 1.4$ & $-34.8 \pm 2.0$ \\
     \textbf{DocCL (ours)} & $-79.3 \pm 5.9$ & $-4.6 \pm 1.6$ & $-27.1 \pm 8.1$ \\
     \midrule
-    C-Flat++ (2025, proj.) & --- & --- & --- \\
-    CODA-Prompt (proj.) & $-45.0$ & $-7.0$ & $-19.0$ \\
-    O-LoRA (proj.)      & $-58.0$ & $-10.0$ & $-24.0$ \\
-    CL-LoRA (2025, proj.) & --- & --- & --- \\
-    BERT (text-only, proj.) & --- & --- & --- \\
+    L2P                 & $-15.7$ & $-11.5$ & $-2.8$ \\
+    DualPrompt          & $-15.2$ & $-11.1$ & $-2.6$ \\
+    CODA-Prompt         & $-17.9$ & $-10.5$ & --- \\
+    O-LoRA              & --- & $-56.9$ & --- \\
     \midrule
     Joint (upper bound) & $0.0$ & $0.0$ & $0.0$ \\
     \bottomrule

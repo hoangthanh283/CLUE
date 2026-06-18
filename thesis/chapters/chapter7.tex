@@ -37,11 +37,11 @@ native validation split, so for those datasets the task's evaluation set serves 
 the stopping signal and the reporting set---a mild optimistic selection bias, bounded by
 the short patience and the same rule applied to every method, and disclosed in
 \S\ref{sec:exp-checkpointing}; a held-out split carved from training data would remove it
-and is a camera-ready refinement. Seventh, the proposed DocCL remedy, its depth-targeting
-ablation, and the prompt/LoRA baselines are reported as \emph{projected} converged values
-pending their measured runs; the projections are anchored on the measured single-task
-convergence gain and each method's mechanism, are labelled throughout, and do not affect
-the measured core comparison or the diagnostic findings. Finally, results rest on three
+and is a camera-ready refinement. Seventh, the depth-targeting ablation
+of DocCL and O-LoRA's remaining cells are still in progress and the few affected cells are
+reported as \emph{projected} or left as em-dash, labelled throughout; the core six methods,
+DocCL, and the prompt baselines (L2P, DualPrompt, CODA-Prompt) are all measured, and the
+qualitative conclusions do not depend on the few pending cells. Finally, results rest on three
 seeds; more seeds would tighten the confidence intervals around the smaller
 effects.
 
