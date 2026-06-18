@@ -27,6 +27,20 @@ analyze_results (5 scenarios + full method set + per-scenario ablation/compute),
 (full method set + bench_newscenarios_aa), pilot/analyze (drops all-zero dead runs), ingest_to_thesis
 (new pilot figs + single-task baselines incl WildReceipt/XFUND).
 
+### bd tracker BLOCKED (environment, not work)
+A `dolt sql-server` (PID 942698, up 8+ days) on 127.0.0.1:46149 holds the exclusive lock on
+`.beads/embeddeddolt`, while bd is configured `dolt_mode: embedded` → every mutating bd command
+(close/create) hangs then errors "another process holds the exclusive lock". `bd close`/`bd create`
+processes also hang uninterruptibly (had to SIGKILL several). **Did NOT kill the 8-day dolt server**
+(may be intentional infra). TODO for user: either stop that server or switch bd to server mode
+(`bd init --server`), then:
+  - close **CLUE-4ry** (this task — DONE: analysis regenerated, thesis Ch1/6/7 updated, builds 113pp)
+  - file LiLT bug: `LiLTWrapper` padding_idx IndexError in tests/test_backbones.py forward/expand +
+    prompt-injection cases ('index out of range in self'; embedding padding_idx > num_embeddings).
+    Pre-existing, unrelated to this session; fix before LiLT secondary-backbone runs.
+All CODE + THESIS work is committed and **git pushed** (origin/doccl up to date); only the beads
+metadata sync is blocked.
+
 **NEW datasets added (infrastructure only — grid runs LATER on the powerful machine):**
 - **XFUND** (`nnul/xfund-multilingual`) → cross-lingual **domain-IL** scenario `dil_xlingual`
   (de→es→fr→it→zh, fixed label space → pure language-shift drift). The headline new experiment:
