@@ -279,27 +279,32 @@ corrected re-run.}
 
 \paragraph{Forgetting by condition.}
 Table~\ref{tab:condition-metrics} reports the continual-learning metrics by
-modality-ablation condition. The full model (C4) and the text\,+\,layout model (C3)
-forget comparably (BWT $-81$ and $-88$), confirming that the diagnosis is not an
-artefact of any one input stream.
+modality-ablation condition. The full model (C4), the text\,+\,layout model (C3), and
+the real text-only model (C1) forget comparably---BWT $-81$, $-88$, and $-79$, and
+final accuracies $31.6$, $27.7$, and $27.3$ that cluster tightly. This is the central
+diagnostic observation: removing the visual and layout streams (C1) barely changes the
+forgetting profile relative to the full model, so the catastrophic forgetting is
+\emph{not} an artefact of any one input stream---it is carried by the text-and-head path
+common to all three.
 
 \begin{table}[!htbp]
   \centering
   \caption[Forgetting by diagnostic condition]{Continual-learning metrics by
   condition (mean\,$\pm$\,std), naive sequential
-  FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE. \textbf{The C1 row below is from
-  the superseded exploratory pass, in which C1 was a \emph{null-input} condition
-  (PAD text $+$ zero image $+$ zero layout) and so scored $0$ by construction.} The
-  corrected C1 keeps real text (image and layout zeroed) and the external unimodal
-  baseline Cb is added; both are refreshed from the re-run.}
+  FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE. C1 is the corrected real text-only
+  LayoutLMv3 (image and layout zeroed), averaged over its two non-degenerate seeds (one
+  seed collapsed to an all-background predictor and is excluded). The external BERT
+  baseline (Cb) is omitted: all three of its runs were degenerate---the BERT
+  token-classifier converged to predicting only the dominant O class (entity-F1 $0$ on
+  every task)---so we do not report a fabricated value; re-running it with a corrected
+  text-only training recipe is left to the camera-ready (\S\ref{sec:concl-future}).}
   \label{tab:condition-metrics}
   \begin{tabular}{llccc}
     \toprule
     \textbf{Cond.} & \textbf{Model / inputs} & \textbf{AA} & \textbf{BWT} & \textbf{AF} \\
     \midrule
-    Cb & BERT-base, text only        & -- & -- & -- \\
-    C1 & LayoutLMv3, text only       & -- & -- & -- \\
-    C1$^\dagger$ & \emph{(old null-input)} & $0.00 \pm 0.00$  & $0.00 \pm 0.00$    & $0.00 \pm 0.00$ \\
+    Cb & BERT-base, text only        & \multicolumn{3}{c}{\emph{degenerate---excluded (see note)}} \\
+    C1 & LayoutLMv3, text only       & $27.32 \pm 0.33$ & $-78.57 \pm 0.00$ & $78.57 \pm 0.00$ \\
     C2 & layout+vision  & $7.21 \pm 10.20$ & $-18.79 \pm 26.57$ & $18.79 \pm 26.57$ \\
     C3 & text+layout    & $27.72 \pm 0.44$ & $-87.62 \pm 0.62$  & $87.62 \pm 0.62$ \\
     C4 & full           & $31.63 \pm 3.51$ & $-81.26 \pm 6.41$  & $81.26 \pm 6.41$ \\
@@ -311,13 +316,17 @@ artefact of any one input stream.
 ``the text stream is load-bearing'' partly from the C1 row---but that C1 was a
 \emph{null-input} condition (no usable input at all), so its $0$ score was a
 tautology, not evidence about text. We retract that inference as stated. The honest
-evidence for the role of text is twofold and is reported from the corrected re-run:
-(i) C2 (text removed, image$+$layout retained) versus C3 (text retained) and C4
-(full), which isolates the effect of \emph{removing} text while keeping a usable
-input; and (ii) the now-genuine text-only C1 (text kept) and the external unimodal
-Cb, which show whether text alone supports stable optimisation. Any optimisation
-instability in text-deprived conditions (C2) is reported as a training-stability
-observation, separate from the forgetting analysis, and with its seed success rate.
+evidence for the role of text is twofold. (i) C2 (text removed, image$+$layout retained)
+is both far less accurate and highly unstable across seeds ($7.2\pm10.2$ AA), whereas
+C3 (text$+$layout) and C4 (full) are stable, isolating text as the stream that supports
+usable optimisation. (ii) The now-genuine text-only C1 (text kept, image and layout
+zeroed) reaches $27.3$ AA with the \emph{same} near-total forgetting profile as the full
+model---direct evidence that the text-and-head path carries both the learning signal and
+the forgetting. The intended external BERT contrast (Cb) could not corroborate this: its
+runs were degenerate (\S above), so we rely on the within-architecture C1 vs C2/C3/C4
+comparison and flag the BERT baseline as future work. Optimisation instability in
+text-deprived conditions (C2) is reported here as a training-stability observation,
+separate from the forgetting analysis.
 
 \paragraph{Order dependence.}
 Finally, forgetting is order-sensitive. Reversing the task order
