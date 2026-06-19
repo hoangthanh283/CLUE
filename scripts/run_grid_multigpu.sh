@@ -43,6 +43,26 @@ GPUS="${GPUS:-0 1}"; GPUS="${GPUS//,/ }"
 JOBS_PER_GPU="${JOBS_PER_GPU:-2}"
 BATCH_SIZE="${BATCH_SIZE:-16}"
 EPOCHS_CAP="${EPOCHS_CAP:-100}"
+# Optional VRAM-aware dispatch: when GPU_VRAM_BUDGET_GB>0, a job is dispatched only while the
+# sum of running jobs' per-method estimates + the new job's estimate fits the budget (PER GPU),
+# letting light methods (doccl ~5 GiB) pack 8-up while heavy ones (der_pp ~35) stay 1-2 — on the
+# SAME card, no OOM. 0 (default) = pure slot scheduler (TOTAL_SLOTS workers), byte-identical to
+# before. JOBS_PER_GPU still caps the hard concurrency ceiling per GPU. Estimates are measured
+# peak_gpu_mem_mb maxima at bs16 (see metrics.json); override an entry via VRAM_EST_<method>=N.
+GPU_VRAM_BUDGET_GB="${GPU_VRAM_BUDGET_GB:-0}"
+declare -A VRAM_EST=(
+  [der_pp]=35 [er]=27 [ewc]=20 [lwf]=20 [joint]=19 [cl_lora]=19 [o_lora]=18 [er_cflat]=19
+  [l2p]=17 [dualprompt]=17 [naive]=11 [bert]=7 [doccl]=5 [coda_prompt]=4
+)
+# A job's estimate keyed off its run-name's method token (longest-match for *_cl_lora_*, etc.).
+vram_est_for() {  # <run_name> -> GiB estimate (default 18 = conservative full-FT)
+  local run="$1" m est=18
+  for m in cl_lora o_lora er_cflat der_pp coda_prompt dualprompt l2p doccl joint ewc lwf er naive bert; do
+    case "$run" in *_${m}_*) est="${VRAM_EST[$m]:-18}"; break ;; esac
+  done
+  local ov="VRAM_EST_${m}"; [ -n "${!ov:-}" ] && est="${!ov}"
+  echo "$est"
+}
 # DataLoader workers PER JOB. Total worker procs = NUM_WORKERS x JOBS_PER_GPU x NGPU,
 # and each worker forks a copy of the dataset working set. Heavy datasets (XFUND's 7
 # languages, WildReceipt) can exhaust HOST RAM at the default x4 across all slots and
@@ -460,36 +480,75 @@ run_one_bg() {  # <slot> <run_name> <overrides...>
 
 ji=0
 DONE_CT=0; SKIP_CT=0; FAIL_CT=0
-# Prime each slot 0..TOTAL_SLOTS-1 with the next not-yet-done job.
+declare -A SLOT_VRAM   # slot -> GiB estimate of the job it holds (budget mode)
+# Per-GPU live VRAM tally (budget mode). budget_ok <gpu> <est>: would this job still fit?
+declare -A GPU_VRAM
+budget_ok() {  # <gpu> <est> -> 0 (fits) / 1 (would overflow)
+  [ "$GPU_VRAM_BUDGET_GB" = "0" ] && return 0          # budget disabled -> always "fits"
+  local gpu="$1" est="$2" used="${GPU_VRAM[$gpu]:-0}"
+  # Always allow at least one job per GPU even if its est alone exceeds the budget (never deadlock).
+  [ "$used" = "0" ] && return 0
+  [ $(( used + est )) -le "$GPU_VRAM_BUDGET_GB" ] && return 0 || return 1
+}
+# Find the next not-yet-done job that FITS gpu's remaining budget; dispatch into slot. Sets a
+# global LAST_DISPATCHED=1 on success, 0 if none fit / queue drained (budget mode scans ahead).
+dispatch_into() {  # <slot> <gpu>
+  local slot="$1" gpu="$2" k rn ov est
+  LAST_DISPATCHED=0
+  for (( k=ji; k<${#JOBS[@]}; k++ )); do
+    IFS='|' read -r rn ov <<< "${JOBS[$k]}"
+    [ -f "results/${rn}/.done" ] && continue
+    est=$(vram_est_for "$rn")
+    if [ "$GPU_VRAM_BUDGET_GB" != "0" ] && ! budget_ok "$gpu" "$est"; then
+      [ "$k" -eq "$ji" ] && return 0   # head doesn't fit now; wait for a slot to free (don't reorder past it greedily beyond budget)
+      continue                          # try a lighter job further down the queue
+    fi
+    # consume queue entries up to k (mark the skipped-done ones)
+    while [ $ji -le $k ]; do
+      IFS='|' read -r _rn _ov <<< "${JOBS[$ji]}"; ji=$((ji+1))
+      [ "$_rn" = "$rn" ] && break
+      [ -f "results/${_rn}/.done" ] && SKIP_CT=$((SKIP_CT+1))
+    done
+    # shellcheck disable=SC2086
+    run_one_bg "$slot" "$rn" $ov >/dev/null
+    SLOT_VRAM[$slot]=$est; GPU_VRAM[$gpu]=$(( ${GPU_VRAM[$gpu]:-0} + est ))
+    say "[run] ${SLOT_RUN[$slot]} (${est}G; gpu${gpu} ${GPU_VRAM[$gpu]}/${GPU_VRAM_BUDGET_GB}G; $ji/${#JOBS[@]})"
+    LAST_DISPATCHED=1; return 0
+  done
+  return 0
+}
+# Prime each slot 0..TOTAL_SLOTS-1 with the next fitting job.
 slot=0
 while [ $slot -lt $TOTAL_SLOTS ] && [ $ji -lt ${#JOBS[@]} ]; do
-  IFS='|' read -r rn ov <<< "${JOBS[$ji]}"; ji=$((ji+1))
-  if [ -f "results/${rn}/.done" ]; then SKIP_CT=$((SKIP_CT+1)); say "[skip] $rn"; continue; fi
-  # shellcheck disable=SC2086
-  run_one_bg "$slot" "$rn" $ov >/dev/null
-  say "[run] ${SLOT_RUN[$slot]} ($ji/${#JOBS[@]} dispatched)"
+  gpu="${GPU_ARR[$(( slot % NUM_GPUS ))]}"
+  dispatch_into "$slot" "$gpu"
+  [ "$LAST_DISPATCHED" = "1" ] || break   # budget full or queue drained
   slot=$((slot+1))
 done
 
-# Main loop: wait for any slot to free, then refill from the queue.
-while [ ${#SLOT_PID[@]} -gt 0 ]; do
+# Main loop: wait for any slot to free, then refill from the queue (budget-aware).
+# In budget mode a freed slot may dispatch MULTIPLE light jobs (if VRAM freed allows) or none
+# (if the queue head still doesn't fit) — so after each completion we re-scan every free slot.
+while [ ${#SLOT_PID[@]} -gt 0 ] || [ $ji -lt ${#JOBS[@]} ]; do
   for slot in "${!SLOT_PID[@]}"; do
     pid=${SLOT_PID[$slot]}
     if ! kill -0 "$pid" 2>/dev/null; then
       wait "$pid"; rc=$?
       if [ $rc -eq 0 ]; then DONE_CT=$((DONE_CT+1)); say "[done] ${SLOT_RUN[$slot]}"; \
         else FAIL_CT=$((FAIL_CT+1)); say "[FAIL rc=$rc] ${SLOT_RUN[$slot]}"; fi
-      unset 'SLOT_PID[$slot]'; unset 'SLOT_RUN[$slot]'
-      # refill this slot from the queue (skipping already-done)
-      while [ $ji -lt ${#JOBS[@]} ]; do
-        IFS='|' read -r rn ov <<< "${JOBS[$ji]}"; ji=$((ji+1))
-        if [ -f "results/${rn}/.done" ]; then SKIP_CT=$((SKIP_CT+1)); continue; fi
-        # shellcheck disable=SC2086
-        run_one_bg "$slot" "$rn" $ov >/dev/null
-        say "[run] ${SLOT_RUN[$slot]} ($ji/${#JOBS[@]} dispatched)"
-        break
-      done
+      # release this slot's VRAM reservation back to its GPU
+      fgpu="${GPU_ARR[$(( slot % NUM_GPUS ))]}"
+      GPU_VRAM[$fgpu]=$(( ${GPU_VRAM[$fgpu]:-0} - ${SLOT_VRAM[$slot]:-0} ))
+      [ "${GPU_VRAM[$fgpu]}" -lt 0 ] && GPU_VRAM[$fgpu]=0
+      unset 'SLOT_PID[$slot]'; unset 'SLOT_RUN[$slot]'; unset 'SLOT_VRAM[$slot]'
     fi
+  done
+  # (Re)fill every currently-free slot with any job that fits its GPU's remaining budget.
+  for (( slot=0; slot<TOTAL_SLOTS; slot++ )); do
+    [ -n "${SLOT_PID[$slot]:-}" ] && continue
+    [ $ji -lt ${#JOBS[@]} ] || break
+    gpu="${GPU_ARR[$(( slot % NUM_GPUS ))]}"
+    dispatch_into "$slot" "$gpu"
   done
   sleep 5
 done
