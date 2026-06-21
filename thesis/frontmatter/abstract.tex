@@ -33,21 +33,24 @@ regularisation (EWC), distillation (LwF), and replay (ER, DER++)---across three
 scenarios (class-, domain-, and mixed-incremental) over three seeds. The empirical
 ordering follows directly from the diagnosis: because forgetting is at the head,
 \emph{replay}---which re-exposes old-class targets at the output---is the strongest
-remedy, with both ER and DER++ reaching the joint upper bound on domain-incremental
-learning (average entity-F1 $\approx 89$ versus the oracle's $86$, with backward
+remedy, with ER and DER++ reaching the joint upper bound on domain-incremental
+learning (average entity-F1 $\approx 88$ versus the oracle's $88.7$, with backward
 transfer near zero) and closing essentially the entire forgetting gap; regularisation
 (EWC) roughly halves forgetting where a domain shift is present, and distillation (LwF)
 gives little benefit in this dense token-classification setting. Guided by the same
 measurement we design \textbf{DocCL}, a mechanism-targeted method that concentrates
 continual-learning effort on the dominant-forgetting head and late layers by combining
 depth-scaled consolidation, output distillation, and head replay. Measured over three
-seeds, DocCL \emph{reaches the joint oracle} on domain-incremental learning (average
-entity-F1 $84.7$ versus the oracle's $84.8$, backward transfer near zero), closing
-essentially the entire forgetting gap, but it does \emph{not} surpass experience replay,
+seeds, DocCL \emph{closes most of} the domain-incremental forgetting gap (average
+entity-F1 $84.7$ versus the oracle's $88.7$, within $\sim$4 points, backward transfer
+near zero) but does \emph{not} reach it, and does not surpass experience replay,
 which remains $\sim$3 points higher; on the mixed and class-incremental scenarios DocCL
-tracks the strong baselines without exceeding them. The honest finding is therefore that
-diagnosis-driven head/late targeting suffices to match the oracle and close the forgetting
-gap, performing competitively with---though not beating---data replay. These
+tracks the strong baselines without exceeding them. A depth-targeting ablation confirms
+the diagnosis: spending the same stability budget \emph{uniformly} across depth collapses
+($42.6$ AA), whereas concentrating it on the diagnosed head/late locus recovers the full
+result. The honest finding is therefore that diagnosis-driven head/late targeting closes
+most of the forgetting gap on a domain shift, performing competitively with---though not
+beating---data replay. These
 results establish the per-component diagnostic protocol, together with a controlled
 benchmark and per-component tooling that we release, as a practical instrument for
 designing continual-learning methods for multimodal document
