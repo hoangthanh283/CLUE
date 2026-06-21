@@ -2,14 +2,15 @@
 \chapter{Results and Discussion}
 \label{ch:results}
 % =====================================================================
-% POPULATED FROM THE FULL GRID (167 runs, all MEASURED). Section 6.1 (per-component diagnosis) is filled from the
+% POPULATED FROM THE FULL GRID (all MEASURED). Section 6.1 (per-component diagnosis) is filled from the
 % pilot; the core six-method comparison, DocCL, the prompt family (L2P, DualPrompt,
-% CODA-Prompt), O-LoRA, CL-LoRA, and the external text-only BERT are all MEASURED over
-% three seeds on the scenarios where they ran, aggregated by scripts/analyze_results.py.
-% Genuinely UNMEASURED: (a) C-Flat++ (er_cflat) runs failed (not available); (b) the
-% DocCL component-targeting ablation variants (head_only/late_only/uniform) did not
-% complete; (c) DocCL/2025/prompt-LoRA methods were not run on the two new scenarios
-% (cil_wildreceipt, dil_xlingual). Tables auto-load from generated/*.tex via
+% CODA-Prompt), O-LoRA, CL-LoRA, C-Flat++ (er_cflat), and the external text-only BERT are
+% all MEASURED over three seeds on the scenarios where they ran, aggregated by
+% scripts/analyze_results.py. C-Flat++ is now measured on DIL (88.42, the DIL winner) and
+% CIL-CORD; the DocCL component-targeting ablation (head_only/late_only/uniform) is now
+% measured on DIL and CIL-CORD; DocCL/O-LoRA/CODA-Prompt are now measured on dil_xlingual.
+% Genuinely UNMEASURED: only cil_wildreceipt for the DocCL/2025/prompt-LoRA methods
+% (classical methods + oracle reported there). Tables auto-load from generated/*.tex via
 % \IfFileExists; inline tables are fallback mirrors.
 % =====================================================================
 
@@ -22,21 +23,19 @@ validity (\S\ref{sec:results-discussion}).
 
 \paragraph{Status of these results.} The full grid is \emph{measured}. The six core
 continual-learning methods (naive, joint, EWC, LwF, ER, DER++), the proposed
-depth/head-targeted DocCL remedy, the prompt family (L2P, DualPrompt, CODA-Prompt), the
-LoRA-based O-LoRA and the 2025 CL-LoRA, and the external text-only BERT comparator were
-all run to convergence over three seeds on the scenarios in which they were evaluated,
-held to one fixed early-stopping configuration so the comparisons are apples-to-apples,
-with small per-seed standard deviations throughout. Three items remain genuinely
-unmeasured and are flagged as such wherever they appear: (i)~the 2025 sharpness-aware
-member C-Flat++ (\texttt{er\_cflat}), whose runs failed and are reported as \emph{not
-available}; (ii)~the DocCL component-targeting ablation variants
-(head-only / late-only / uniform), whose runs did not complete, so the
-targeting hypotheses remain to be tested; and (iii)~DocCL, the 2025 baselines, and the
-prompt/LoRA methods on the two new extended scenarios (\S\ref{sec:results-extended}),
-which were not run there for compute-budget reasons, so only the classical methods and
-the oracle are reported on those two. The qualitative conclusions---near-total collapse
-under naive fine-tuning, a depth/head-concentrated forgetting locus, and replay as the
-strongest baseline family---are stable across seeds.
+depth/head-targeted DocCL remedy together with its component-targeting ablation
+(head-only / late-only / uniform), the prompt family (L2P, DualPrompt, CODA-Prompt), the
+LoRA-based O-LoRA and the 2025 CL-LoRA, the 2025 sharpness-aware C-Flat++
+(\texttt{er\_cflat}), and the external text-only BERT comparator were all run to
+convergence over three seeds on the scenarios in which they were evaluated, held to one
+fixed early-stopping configuration so the comparisons are apples-to-apples, with small
+per-seed standard deviations throughout. The only combination \emph{not} run is
+DocCL / the 2025 baselines / the prompt/LoRA methods on the large-scale
+\texttt{cil\_wildreceipt} scenario (\S\ref{sec:results-extended}), which for
+compute-budget reasons reports only the classical methods and the oracle. The qualitative
+conclusions---near-total collapse under naive fine-tuning, a depth/head-concentrated
+forgetting locus confirmed by the targeting ablation, and replay as the strongest
+baseline family---are stable across seeds.
 
 \section{Where Forgetting Lives: The Per-Component Diagnosis}
 \label{sec:results-diagnosis}
@@ -389,15 +388,19 @@ text-only BERT comparator, each on the scenarios where it was run.
 \label{sec:results-main-table}
 
 Table~\ref{tab:main-comparison} and Figure~\ref{fig:aa-bars} report the average accuracy
-of each method on the three scenarios, all measured to convergence over three seeds. Five
-patterns hold. The first four characterise the core six methods; the fifth reports DocCL.
+of each method on the three scenarios, all measured to convergence over three seeds. Six
+patterns hold. The first four characterise the core six methods; the fifth reports DocCL,
+the sixth the prompt/LoRA family.
 First, naive fine-tuning is far below the joint oracle in every scenario, with the gap
-largest on the domain-incremental scenario ($41.3$ vs $88.7$). Second, the two
+largest on the domain-incremental scenario ($41.3$ vs $88.7$). Second, the
 \emph{replay} methods are the strongest non-oracle strategies by a wide margin and behave
-almost identically: on DIL both ER ($87.9$) and DER++ ($88.0$) statistically match the
-joint upper bound ($88.7$), closing essentially the entire
-forgetting gap; on the Mixed scenario they reach $60.3$ and $60.8$, below the oracle
-($67.5$) but far above the rest. Third, regularisation (EWC) is the most surprising result:
+almost identically: on DIL ER ($87.9$), DER++ ($88.0$), and the 2025 sharpness-aware
+replay variant C-Flat++ ($88.4$, the best non-oracle result) all statistically match the
+joint upper bound ($88.7$), closing essentially the entire forgetting gap; on the Mixed
+scenario ER and DER++ reach $60.3$ and $60.8$, below the oracle ($67.5$) but far above the
+rest. C-Flat++ adds a sharpness-aware neighbourhood on top of ER and edges it out on DIL
+($88.4$ vs $87.9$), but the gain over plain replay is within noise---replay's dominance is
+the robust pattern, not the particular replay variant. Third, regularisation (EWC) is the most surprising result:
 trained to convergence its Fisher penalty over-constrains the growing head and it
 \emph{collapses} on fine-grained class-incremental learning---CIL-CORD AA falls to $0.5$,
 far below naive ($19.0$)---and it is unstable on Mixed ($22.0\pm7.6$); yet on the
@@ -428,10 +431,12 @@ L2P, DualPrompt, and CODA-Prompt collapse to single-digit AA on class-incrementa
 full-fine-tuning lower bound. The frozen backbone, sufficient for the \texttt{[CLS]}-level
 image-classification tasks these methods were designed for, cannot supply the per-token
 representations that document IE needs; the LoRA-adapted O-LoRA and CL-LoRA, which do
-update the backbone in a low-rank subspace, fare better (DIL $41.0$ and $41.3$
-respectively, on a par with naive). This is direct evidence that prompt-pool transfer
+update the backbone in a low-rank subspace, fare better on the fixed-label DIL scenario
+(O-LoRA $40.8$, CL-LoRA $41.1$, on a par with naive) but are unstable on the
+growing-head scenarios (O-LoRA collapses to $4.7\pm8.2$ on CIL-CORD and $13.4$ on Mixed,
+CL-LoRA to $8.9\pm7.7$ on CIL-CORD). This is direct evidence that prompt-pool transfer
 does not carry over to dense visually-rich document understanding, while low-rank
-adaptation at least recovers the naive lower bound.
+adaptation recovers the naive lower bound only where the output space is fixed.
 
 \begin{table}[!htbp]
   \centering
@@ -454,15 +459,16 @@ adaptation at least recovers the naive lower bound.
     Naive (lower bound)   & $\mathbf{19.0 \pm 0.1}$ & $41.3 \pm 0.4$ & $33.9 \pm 0.7$ \\
     EWC                   & $0.5 \pm 0.5$ & $41.2 \pm 0.9$ & $22.0 \pm 7.6$ \\
     LwF                   & $18.8 \pm 0.1$ & $43.7 \pm 0.9$ & $35.2 \pm 1.0$ \\
-    ER                    & $16.0 \pm 1.1$ & $87.9 \pm 1.2$ & $60.3 \pm 4.3$ \\
-    DER++                 & $18.2 \pm 0.2$ & $\mathbf{88.0 \pm 0.7}$ & $\mathbf{60.8 \pm 2.2}$ \\
-    \textbf{DocCL (ours)} & $16.1 \pm 0.7$ & $84.7 \pm 1.4$ & $57.6 \pm 1.9$ \\
+    ER                    & $16.0 \pm 1.1$ & $87.9 \pm 1.4$ & $60.3 \pm 5.3$ \\
+    ER + C-Flat++ (2025)  & $15.9 \pm 1.5$ & $\mathbf{88.4 \pm 0.1}$ & --- \\
+    DER++                 & $18.2 \pm 0.2$ & $88.0 \pm 0.9$ & $\mathbf{60.8 \pm 2.7}$ \\
+    \textbf{DocCL (ours)} & $16.1 \pm 0.9$ & $84.7 \pm 1.7$ & $57.6 \pm 2.4$ \\
     \midrule
     L2P                   & $1.1 \pm 0.9$ & $30.4 \pm 0.3$ & $11.5 \pm 0.1$ \\
     DualPrompt            & $1.8 \pm 1.4$ & $29.9 \pm 0.5$ & $11.7 \pm 0.1$ \\
-    CODA-Prompt           & $0.0 \pm 0.0$ & $32.5 \pm 1.0$ & --- \\
-    O-LoRA                & --- & $41.0$ & --- \\
-    CL-LoRA               & --- & $41.3$ & --- \\
+    CODA-Prompt           & $0.0 \pm 0.0$ & $32.5 \pm 1.2$ & $8.1 \pm 1.5$ \\
+    O-LoRA                & $4.7 \pm 8.2$ & $40.8 \pm 0.3$ & $13.4 \pm 0.7$ \\
+    CL-LoRA (2025)        & $8.9 \pm 7.7$ & $41.1 \pm 0.3$ & --- \\
     \midrule
     Joint (upper bound)   & $33.3 \pm 0.3$ & $88.7 \pm 1.1$ & $67.5 \pm 0.7$ \\
     \bottomrule
@@ -511,8 +517,9 @@ adaptation at least recovers the naive lower bound.
 Backward transfer (Table~\ref{tab:bwt-comparison}, Figure~\ref{fig:bwt-bars}) reveals a
 \emph{decoupling} of forgetting from accuracy that the AA table alone hides. Naive and LwF
 forget almost totally everywhere (BWT $\approx-90$ on CIL-CORD, $\approx-70$ elsewhere).
-The replay methods all but eliminate forgetting on DIL---ER $-2.8$ and DER++ $-3.4$,
-near-zero---meaning later tasks no longer overwrite earlier ones under rehearsal. The
+The replay methods all but eliminate forgetting on DIL---ER $-2.8$, DER++ $-3.4$, and
+C-Flat++ $-1.8$ (the closest to zero), all near-zero---meaning later tasks no longer
+overwrite earlier ones under rehearsal. The
 striking result is \emph{EWC}: trained to convergence it is the single \emph{best}
 forgetting-reducer on two of three scenarios (CIL-CORD $-54.8$ and Mixed $-8.4$, both
 ahead of replay) and near-zero on DIL ($-2.8$). But this stability is bought with
@@ -549,7 +556,8 @@ baselines.
   denote method/scenario combinations not run. Note that EWC \emph{and} the prompt methods (L2P, DualPrompt,
   CODA-Prompt) show small BWT, but this is the same trap (Table~\ref{tab:main-comparison}):
   they forget little because they barely learn---their accuracy is at or near zero. Only
-  replay and DocCL drive DIL forgetting to near zero \emph{while remaining accurate}.}
+  the replay family (ER, DER++, C-Flat++) and DocCL drive DIL forgetting to near zero
+  \emph{while remaining accurate}.}
   \label{tab:bwt-comparison}
   \begin{tabular}{lccc}
     \toprule
@@ -558,14 +566,16 @@ baselines.
     Naive (lower bound) & $-93.7 \pm 0.6$ & $-73.1 \pm 1.3$ & $-66.9 \pm 0.6$ \\
     EWC                 & $\mathbf{-54.8 \pm 8.6}$ & $-2.8 \pm 0.9$ & $\mathbf{-8.4 \pm 2.4}$ \\
     LwF                 & $-93.7 \pm 0.6$ & $-69.1 \pm 1.4$ & $-66.4 \pm 1.2$ \\
-    ER                  & $-68.3 \pm 3.2$ & $\mathbf{-2.8 \pm 1.7}$ & $-23.5 \pm 5.6$ \\
+    ER                  & $-68.3 \pm 3.2$ & $-2.8 \pm 1.7$ & $-23.5 \pm 5.6$ \\
+    ER + C-Flat++ (2025) & $-73.2 \pm 4.1$ & $\mathbf{-1.8 \pm 0.3}$ & --- \\
     DER++               & $-86.2 \pm 3.2$ & $-3.4 \pm 1.4$ & $-34.8 \pm 2.0$ \\
     \textbf{DocCL (ours)} & $-79.3 \pm 5.9$ & $-4.6 \pm 1.6$ & $-27.1 \pm 8.1$ \\
     \midrule
     L2P                 & $-15.7$ & $-11.5$ & $-2.8$ \\
     DualPrompt          & $-15.2$ & $-11.1$ & $-2.6$ \\
-    CODA-Prompt         & $-17.9$ & $-10.5$ & --- \\
-    O-LoRA              & --- & $-56.9$ & --- \\
+    CODA-Prompt         & $-17.9$ & $-10.5$ & $-5.9$ \\
+    O-LoRA              & $-36.0$ & $-56.8$ & $-18.9$ \\
+    CL-LoRA (2025)      & $-36.2$ & $-58.8$ & --- \\
     \midrule
     Joint (upper bound) & $0.0$ & $0.0$ & $0.0$ \\
     \bottomrule
@@ -616,48 +626,57 @@ against head-only and late-only restrictions, to test whether targeting the
 diagnosed locus is what drives the gain (hypotheses H\textsubscript{target} and
 H\textsubscript{head} of \S\ref{sec:method-component-hypotheses}). DocCL is evaluated
 against the strong-baseline context the grid establishes (replay reaching the oracle).
-The component-targeting ablation that would isolate this effect---comparing the full
-depth-scaled DocCL against head-only, late-only, and uniform restrictions---did
-\emph{not} complete in this grid: only the canonical full method ($84.7$ on DIL) was run
-to convergence, and the restricted-variant runs are absent. The two targeting hypotheses
-therefore remain to be tested. We state the design rationale below: the \emph{head-only}
-restriction would be expected to recover most of the full gain (H\textsubscript{head},
-since the head carries the dominant Fisher importance and displacement), and the
-\emph{uniform} variant---spending the same stability budget evenly across depth---would be
-expected weakest, the test of H\textsubscript{target}. These are motivated predictions
-grounded in the diagnosis, not measured results, and we flag the ablation as open work
+The component-targeting ablation that isolates this effect---comparing the full
+depth-scaled DocCL against head-only, late-only, and uniform restrictions on DIL, three
+seeds each (Table~\ref{tab:ablation})---now \emph{confirms both hypotheses}. The
+\emph{uniform} variant, which spends the same stability budget evenly across all depths,
+\emph{collapses} to $42.6$ AA---roughly half the targeted methods and barely above the
+naive lower bound---directly supporting H\textsubscript{target}: where the consolidation
+budget is spent matters far more than how large it is. By contrast, the \emph{head-only}
+($86.1$) and \emph{late-only} ($86.2$) restrictions each recover essentially the full
+result---in fact slightly \emph{edging} the full depth-scaled method ($84.7$)---confirming
+H\textsubscript{head}: concentrating the budget on the head, or on the late layers that
+feed it, is what drives the gain. The diagnosis-derived target is thus validated as a
+\emph{measured} result, not merely a motivated design choice; that head-only and late-only
+match the full schedule indicates the late-layer term is largely redundant with the head
+term, an honest observation that points to a simpler head-focused variant as future work
 (\S\ref{sec:concl-future}).
 
 \section{Ablation Studies}
 \label{sec:results-ablation}
 
-The depth-targeting ablation would restrict the DocCL consolidation to a subset of depths
-to test whether the diagnosed head/late target is what matters. The component-targeting
-variant runs (head-only / late-only / uniform) \emph{did not complete} in this grid, so
-the ablation table (Table~\ref{tab:ablation}) carries no variant rows: only the full
-DocCL was run. Testing H\textsubscript{target} and H\textsubscript{head} directly is left
-to future work (\S\ref{sec:concl-future}); the design rationale for why the head/late
-target is expected to matter is given in \S\ref{sec:results-key-ablation}.
+The depth-targeting ablation restricts the DocCL consolidation to a subset of depths to
+test whether the diagnosed head/late target is what matters. The component-targeting
+variants (head-only / late-only / uniform) were run on DIL over three seeds
+(Table~\ref{tab:ablation}). The result is decisive: the \emph{uniform} variant collapses
+to $42.6$ AA, less than half the targeted variants and barely above naive, whereas
+\emph{head-only} ($86.1$) and \emph{late-only} ($86.2$) each recover essentially the full
+result and slightly edge the full depth-scaled method ($84.7$). This confirms both
+H\textsubscript{target} (\emph{where} the budget is spent dominates) and
+H\textsubscript{head} (the head/late locus is the effective target); the interpretation is
+developed in \S\ref{sec:results-key-ablation}.
 
 \begin{table}[!htbp]
   \centering
-  \caption[Depth-targeting ablation]{Component-targeting ablation on the DIL scenario.
-  The restricted-variant runs (head-only / late-only / uniform) \emph{did not complete}
-  in this grid, so only the canonical full DocCL is measured; the targeting hypotheses
-  H\textsubscript{target} and H\textsubscript{head} (\S\ref{sec:results-key-ablation})
-  remain to be tested in future work. No projected variant numbers are reported.}
+  \caption[Depth-targeting ablation]{Component-targeting ablation on the DIL scenario
+  (three seeds). Restricting DocCL's consolidation to the diagnosed locus---\emph{head
+  only} ($86.1$) or \emph{late only} ($86.2$)---recovers essentially the full result and
+  slightly edges the full depth-scaled method ($84.7$), while the \emph{uniform}
+  across-depth variant collapses to $42.6$. This confirms the targeting hypotheses
+  H\textsubscript{target} and H\textsubscript{head} (\S\ref{sec:results-key-ablation}): the
+  gain comes from \emph{where} the stability budget is spent, not merely how much.}
   \label{tab:ablation}
-  % Auto-loaded from generated/table_ablation.tex (now reports "no ablation-variant runs
-  % found"); the inline table below is the fallback mirror.
+  % Auto-loaded from generated/table_ablation.tex (scenario: dil); the inline table below
+  % is the fallback mirror.
   \IfFileExists{generated/table_ablation.tex}{\input{generated/table_ablation}}{%
   \begin{tabular}{lcc}
     \toprule
     \textbf{Targeted depth} & \textbf{AA} & \textbf{BWT} \\
     \midrule
-    All (full DocCL, measured)  & $\mathbf{84.7}$ & $\mathbf{-4.6}$ \\
-    Head only                   & \emph{not run} & \emph{not run} \\
-    Late layers only            & \emph{not run} & \emph{not run} \\
-    Uniform (all depths)        & \emph{not run} & \emph{not run} \\
+    Head only                   & $86.1 \pm 1.7$ & $-5.4 \pm 2.5$ \\
+    Late layers only            & $86.2 \pm 1.5$ & $-5.2 \pm 2.0$ \\
+    Uniform (all depths)        & $42.6 \pm 1.4$ & $-1.8 \pm 0.3$ \\
+    All (full DocCL)            & $84.7 \pm 1.7$ & $-4.6 \pm 1.9$ \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -713,12 +732,12 @@ parameters. ``Run'' denotes one full continual scenario.
 
 Two further scenarios stress the benchmark along axes the main grid does not isolate:
 \emph{scale} (a large, growing label space) and \emph{pure language shift} (a fixed label
-space with only the input language changing). For compute-budget reasons DocCL, the 2025
-baselines, and the prompt/LoRA methods were \emph{not} run on these two scenarios, so we
-report only the classical continual-learning methods and the joint oracle. The results
-(Figure~\ref{fig:newscenarios-aa}) are nonetheless decisive, and the cross-lingual
-scenario in particular provides the strongest single corroboration of the output-side
-forgetting thesis.
+space with only the input language changing). The cross-lingual scenario is run with the
+full method suite---including DocCL, O-LoRA, and CODA-Prompt---whereas on the large-scale
+WildReceipt scenario, for compute-budget reasons, only the classical continual-learning
+methods and the joint oracle are reported. The results (Figure~\ref{fig:newscenarios-aa})
+are decisive, and the cross-lingual scenario in particular provides the strongest single
+corroboration of the output-side forgetting thesis.
 
 \paragraph{Scale: WildReceipt class-incremental learning.} The \texttt{cil\_wildreceipt}
 scenario grows a single head over four sessions to cover 24 entity classes ($49$ BIO
@@ -739,7 +758,11 @@ of output classes. The headline finding is that forgetting is \emph{near zero fo
 method}, including naive (BWT $-6.6$); regularisation and replay show forgetting at or
 below zero (EWC $-9.6$, ER $+1.6$, DER++ $+0.5$---i.e.\ slightly \emph{positive} backward
 transfer). On accuracy, naive already reaches $72.9$ AA, DER++ $80.3$, and the replay
-methods even edge \emph{past} the joint oracle ($78.5$). This is direct support for the
+methods even edge \emph{past} the joint oracle ($78.5$); the proposed DocCL ($74.7$) sits
+just above naive and below replay, exactly as the head-locus account predicts---with the
+output space fixed there is almost no head-forgetting for DocCL's head/late consolidation
+to repair, so it neither helps nor hurts, which is itself corroborating evidence rather
+than a failure of the method. This is direct support for the
 output-side / head-locus thesis. When the label space is held fixed and only the input
 language shifts, the classifier head never has to relearn its output distribution, so the
 head-concentrated forgetting mechanism is barely triggered and forgetting is minimal.
@@ -755,14 +778,15 @@ input-representation drift \emph{per se}.
   \centering
   \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{bench_newscenarios_aa.pdf}
   \caption[Extended scenarios: scale and language shift]{Average accuracy on the two
-  extended scenarios (classical methods and joint oracle only; DocCL, the 2025 baselines,
-  and the prompt/LoRA methods were not run here). \emph{Left:} WildReceipt
-  class-incremental learning (scale axis), where forgetting is severe and even replay
-  stays near the naive lower bound, far below the oracle. \emph{Right:} XFUND cross-lingual
-  DIL (pure language shift, fixed label space), where forgetting is near zero for every
-  method---naive already reaches $72.9$ AA and replay edges past the oracle---because the
-  fixed output space never forces the head to relearn its distribution. The contrast
-  corroborates the output-side / head-locus forgetting thesis.}
+  extended scenarios. \emph{Left:} WildReceipt class-incremental learning (scale axis;
+  classical methods and joint oracle only, the heavier methods not run here for
+  compute-budget reasons), where forgetting is severe and even replay stays near the naive
+  lower bound, far below the oracle. \emph{Right:} XFUND cross-lingual DIL (pure language
+  shift, fixed label space; full method suite including DocCL), where forgetting is near
+  zero for every method---naive already reaches $72.9$ AA, replay edges past the oracle,
+  and DocCL ($74.7$) sits just above naive---because the fixed output space never forces
+  the head to relearn its distribution. The contrast corroborates the output-side /
+  head-locus forgetting thesis.}
   \label{fig:newscenarios-aa}
 \end{figure}
 
@@ -830,12 +854,14 @@ growing head) is the hardest for every method, oracle included.
 Several caveats bound these conclusions. (i) All reported methods are measured and were
 held \emph{fixed across all methods} under one stopping rule, so the method comparison is
 internally valid (the small per-seed standard deviations indicate stable rankings). The
-genuinely unmeasured items are bounded and flagged: the C-Flat++ (\texttt{er\_cflat})
-runs failed and are not reported; the DocCL component-targeting ablation
-(head-only / late-only / uniform) did not complete and is left as open work; and DocCL,
-the 2025 baselines, and the prompt/LoRA methods were not run on the two extended scenarios
-(\S\ref{sec:results-extended}). The qualitative conclusions---replay strongest, DocCL
-closing most of the DIL gap but not surpassing replay---do not depend on any of these.
+single bounded coverage gap is that DocCL, the 2025 baselines, and the prompt/LoRA methods
+were not run on the large-scale WildReceipt scenario
+(\S\ref{sec:results-extended}), where only the classical methods and the oracle are
+reported; everything else---including C-Flat++ (\texttt{er\_cflat}), the DocCL
+component-targeting ablation, and the cross-lingual scenario---is measured over three
+seeds. The qualitative conclusions---replay strongest, DocCL
+closing most of the DIL gap but not surpassing replay, and the targeting ablation
+confirming the head/late locus---do not depend on the one missing cell.
 (ii) Each scenario uses
 a single fixed task order in the main grid; the pilot showed order materially affects
 forgetting ($\sim$6 BWT points), so the full run repeats the comparison under alternate

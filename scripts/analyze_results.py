@@ -656,6 +656,13 @@ def main():
     parser.add_argument("--entity", default=None)
     parser.add_argument("--output_dir", type=Path, default=Path("results"))
     parser.add_argument("--proposed", default="doccl")
+    parser.add_argument(
+        "--ablation_scenario",
+        default=None,
+        help="Scope the component-targeting ablation table to one scenario "
+        "(default: the scenario with the most variant runs). DIL is the "
+        "meaningful contrast — it is where DocCL works and uniform collapses.",
+    )
     parser.add_argument("--metrics", nargs="+", default=["AA", "BWT", "AF", "FWT"])
     args = parser.parse_args()
 
@@ -694,7 +701,12 @@ def main():
         write_pivot_csv(df, args.output_dir / f"pivot_{metric}.csv", metric=metric)
 
     write_main_table(df, args.output_dir / "table_main.tex", metric="AA", proposed=args.proposed)
-    write_ablation_table(df, args.output_dir / "table_ablation.tex", proposed=args.proposed)
+    write_ablation_table(
+        df,
+        args.output_dir / "table_ablation.tex",
+        proposed=args.proposed,
+        scenario=args.ablation_scenario,
+    )
     write_compute_table(df, args.output_dir / "table_compute.tex")
     plot_forgetting_curves(df, args.output_dir / "figure_forgetting_curves.pdf")
 
