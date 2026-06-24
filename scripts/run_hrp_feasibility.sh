@@ -72,10 +72,12 @@ fi
 ok "interpreter: $PY"
 
 run(){  # run <method> <router-or-none> <out_subdir>
-  local method="$1" router="$2" sub="$3" out="results/$sub"
+  local method="$1" router="$2" sub="$3"
+  local out="results/$sub"
   if [ -f "$out/.done" ]; then ok "skip $sub (.done exists)"; return; fi
-  local extra=""; [ "$router" != "none" ] && extra="method.router=$router"
-  info "RUN $sub  (method=$method ${router#none} epochs=$EPOCHS bs=$BATCH_SIZE)"
+  local extra="" rtag=""
+  [ "$router" != "none" ] && { extra="method.router=$router"; rtag="router=$router "; }
+  info "RUN $sub  (method=$method ${rtag}epochs=$EPOCHS bs=$BATCH_SIZE)"
   "$PY" scripts/train.py method="$method" scenario="$SCENARIO" seed="$SEED" \
     training.epochs="$EPOCHS" training.batch_size="$BATCH_SIZE" \
     wandb.mode="$WANDB_MODE" output_dir="$out" $extra \
