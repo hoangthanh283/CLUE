@@ -27,6 +27,9 @@ BATCH_SIZE="${BATCH_SIZE:-8}"
 SCENARIO="${SCENARIO:-dil}"
 ROUTERS="${ROUTERS:-dense sparse hybrid}"
 BASELINES="${BASELINES:-der_pp doccl}"
+# Small-VRAM recipe (e.g. local RTX 2060 6GB): GRAD_CKPT=1 BATCH_SIZE=2 NUM_WORKERS=0.
+GRAD_CKPT="${GRAD_CKPT:-0}"
+NUM_WORKERS="${NUM_WORKERS:-}"
 export WANDB_MODE="${WANDB_MODE:-offline}"
 
 # ── 0. Minimal-image tools ───────────────────────────────────────────────────────
@@ -77,7 +80,9 @@ run(){  # run <method> <router-or-none> <out_subdir>
   if [ -f "$out/.done" ]; then ok "skip $sub (.done exists)"; return; fi
   local extra="" rtag=""
   [ "$router" != "none" ] && { extra="method.router=$router"; rtag="router=$router "; }
-  info "RUN $sub  (method=$method ${rtag}epochs=$EPOCHS bs=$BATCH_SIZE)"
+  [ "$GRAD_CKPT" = "1" ] && extra="$extra training.gradient_checkpointing=true"
+  [ -n "$NUM_WORKERS" ] && extra="$extra training.num_workers=$NUM_WORKERS"
+  info "RUN $sub  (method=$method ${rtag}epochs=$EPOCHS bs=$BATCH_SIZE ckpt=$GRAD_CKPT)"
   "$PY" scripts/train.py method="$method" scenario="$SCENARIO" seed="$SEED" \
     method.epochs="$EPOCHS" training.batch_size="$BATCH_SIZE" \
     wandb.mode="$WANDB_MODE" output_dir="$out" $extra \
