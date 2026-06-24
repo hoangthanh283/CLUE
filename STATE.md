@@ -10,12 +10,16 @@ prompt pool with a **hybrid dense+sparse router** — sparse = BM25/TF-IDF over 
 tests + 2 e2e lifecycle tests pass. **Reframed the user's idea**: NOT "no forgetting" (it
 moves into the router) and NOT acceleration (≤40 slots) — the contribution is *measured
 routing accuracy*. Spec: `docs/superpowers/specs/2026-06-24-hybrid-routed-prompt-design.md`.
-- **DEFERRED — feasibility comparison NOT yet run.** Local box is mid-grid (`er_cflat
-  scenario=mixed seed=7`, ~2 days in, RAM 4G free) → cannot fit a 2nd dataset builder.
-  Run on a FREE GPU: `for R in dense sparse hybrid; do uv run python scripts/train.py
-  method=hrp scenario=dil seed=42 method.router=$R training.epochs=3 wandb.mode=offline;
-  done` + `der_pp` + `doccl`; then `analyze_results.py`. Go/no-go: hybrid hit-rate ≥ dense
-  hit-rate. (bd was hung on the dolt lock — issue tracked here instead.)
+- **One-command runner:** `scripts/run_hrp_feasibility.sh` (GPU/dep check + 3-router
+  ablation + der_pp/doccl + prints routing hit-rate & AA/BWT). Small-VRAM recipe:
+  `GRAD_CKPT=1 BATCH_SIZE=2 NUM_WORKERS=0`.
+- **BUG FOUND + FIXED (commit 518e5bb).** First L40 run gave AA~18 on dil (diagonal
+  [8,0,47]): free top-k routing while keys were random → the active task's own block was
+  rarely selected → its prompts never trained (L2P cold-start collapse). Fix: **task-pin
+  every doc to the active block during TRAINING** (DualPrompt recipe; trains the block +
+  pulls its dense key toward the task's queries); route freely only at EVAL where the
+  hit-rate is measured. routing.json now writes (added writer regression test). 8 tests
+  pass. Re-running feasibility on the LOCAL 2060 (now idle; L40 out of credit).
 
 ---
 
