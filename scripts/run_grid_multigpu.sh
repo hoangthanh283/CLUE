@@ -80,6 +80,15 @@ PROMPT_METHODS="${PROMPT_METHODS:-l2p dualprompt coda_prompt o_lora}"
 CURRENCY_METHODS="${CURRENCY_METHODS:-er_cflat cl_lora}"
 # BERT text-only external comparator (model=bert_base, naive method) — classical tier.
 RUN_BERT="${RUN_BERT:-1}"
+# Secondary-backbone GENERALIZATION study. The main grid runs LayoutLMv3 (the implicit
+# default model). To test whether the findings transfer, run a representative method
+# subset on the other backbones too. BACKBONES = the families to add (config <family>_base
+# must exist); BACKBONE_METHODS = which methods to run on each. Empty BACKBONES (default)
+# = LayoutLMv3-only, byte-identical to before. Run-names get the train.py "_<family>"
+# suffix so they never collide with the LayoutLMv3 run of the same scenario/method/seed.
+# (BERT-naive is still covered by RUN_BERT above; listing 'bert' here adds the rest.)
+BACKBONES="${BACKBONES:-}"
+BACKBONE_METHODS="${BACKBONE_METHODS:-naive ewc er der_pp doccl}"
 RUN_DOCCL="${RUN_DOCCL:-1}"
 RUN_ABLATION="${RUN_ABLATION:-1}"
 ABLATION_SCENARIOS="${ABLATION_SCENARIOS:-cil_cord}"
@@ -346,6 +355,22 @@ add_bert() {
     add_job "${sc}_naive_seed${s}_bert" "method=naive model=bert_base scenario=${sc} seed=${s}"
   done; done; fi
 }
+
+add_backbones() {
+  # Secondary-backbone generalization study: BACKBONE_METHODS on each family in BACKBONES.
+  # Run-name suffix "_<family>" mirrors train.py so the .done resume + analysis dedup work.
+  # Skips the (bert, naive) combo since add_bert already covers it (no double-run).
+  [ -n "$BACKBONES" ] || return 0
+  for fam in $BACKBONES; do
+    for m in $BACKBONE_METHODS; do
+      [ "$fam" = "bert" ] && [ "$m" = "naive" ] && [ "$RUN_BERT" = "1" ] && continue
+      for sc in $SCENARIOS; do for s in $SEEDS; do
+        add_job "${sc}_${m}_seed${s}_${fam}" \
+          "method=${m} model=${fam}_base scenario=${sc} seed=${s}"
+      done; done
+    done
+  done
+}
 add_currency() {  # 2025 currency baselines (er_cflat, cl_lora) — lowest priority
   for m in $CURRENCY_METHODS; do for sc in $SCENARIOS; do for s in $SEEDS; do
     # er_cflat with the config default (cflat_lambda=0.0) is plain ER+SAM. To run the
@@ -375,6 +400,7 @@ if [ "${PRIORITY_DOCCL:-0}" = "1" ]; then
   add_bert
   add_prompt
   add_currency
+  add_backbones   # Tier 4 — secondary-backbone generalization (LiLT/BROS/BERT-rest)
 else
   # Tier 1 — classical baselines (the measured suite).
   add_singletask
@@ -386,6 +412,8 @@ else
   add_doccl
   # Tier 3 — 2025 currency baselines.
   add_currency
+  # Tier 4 — secondary-backbone generalization study (empty BACKBONES = no-op).
+  add_backbones
 fi
 
 # This launch's run-names, one per line. The heartbeat counts ONLY these .done markers as
