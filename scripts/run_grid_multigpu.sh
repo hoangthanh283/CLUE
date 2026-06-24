@@ -360,11 +360,15 @@ add_backbones() {
   # Secondary-backbone generalization study: BACKBONE_METHODS on each family in BACKBONES.
   # Run-name suffix "_<family>" mirrors train.py so the .done resume + analysis dedup work.
   # Skips the (bert, naive) combo since add_bert already covers it (no double-run).
+  # BACKBONE_SCENARIOS lets the generalization block use a DIFFERENT scenario list than the
+  # main grid (default: the same $SCENARIOS) — e.g. run backbones only on dil+mixed while the
+  # main re-runs cover all 3 core scenarios, so one launch can do both without over-running.
   [ -n "$BACKBONES" ] || return 0
+  local bb_scen="${BACKBONE_SCENARIOS:-$SCENARIOS}"
   for fam in $BACKBONES; do
     for m in $BACKBONE_METHODS; do
       [ "$fam" = "bert" ] && [ "$m" = "naive" ] && [ "$RUN_BERT" = "1" ] && continue
-      for sc in $SCENARIOS; do for s in $SEEDS; do
+      for sc in $bb_scen; do for s in $SEEDS; do
         add_job "${sc}_${m}_seed${s}_${fam}" \
           "method=${m} model=${fam}_base scenario=${sc} seed=${s}"
       done; done
