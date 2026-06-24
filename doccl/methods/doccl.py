@@ -135,7 +135,15 @@ class DocCL_B(EWC):
             lam = self.lambda_high if name in self._high_param_names else self.lambda_low
             p = params[name]
             theta_star = self.state.custom["theta_star"][name]
-            penalty = penalty + lam * (fisher_val * (p - theta_star) ** 2).sum()
+            # CIL head growth makes p / theta_star / fisher_val differ on the class
+            # dimension; penalise only rows present in all three (the old classes with a
+            # prior), as EWC._ewc_penalty does — else the broadcast subtraction crashes
+            # with a shape mismatch at the first CIL task boundary.
+            min_shape = tuple(
+                min(a, b, c) for a, b, c in zip(p.shape, theta_star.shape, fisher_val.shape)
+            )
+            idx = tuple(slice(0, s) for s in min_shape)
+            penalty = penalty + lam * (fisher_val[idx] * (p[idx] - theta_star[idx]) ** 2).sum()
         return penalty
 
 
@@ -406,6 +414,18 @@ class DocCL(NaiveFineTune):
                 self.state.custom["fisher"][name] = f if old is None else gamma * old + f
             else:
                 self.state.custom["fisher"][name] = gamma * old + f
+
+        # Free the PREVIOUS teacher off the GPU before deepcopy'ing the new one: keeping
+        # both on-device through copy.deepcopy is a transient ~2x-model VRAM spike at every
+        # task boundary that OOMs a small card once the head has grown (DocCL already peaks
+        # near the 6 GB ceiling). Mirrors the eviction cl_lora.after_task already does.
+        old_teacher = self.state.custom.get("teacher")
+        if old_teacher is not None:
+            old_teacher.to("cpu")
+            self.state.custom["teacher"] = None
+            del old_teacher
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         teacher = copy.deepcopy(self.model)
         for p in teacher.parameters():
