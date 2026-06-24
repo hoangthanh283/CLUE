@@ -285,10 +285,36 @@ class HybridRoutedPrompt(PromptBasedMethod):
     def _select_prompts(
         self, query: torch.Tensor, batch: dict
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Task-pinned at TRAIN time, freely routed at EVAL time.
+
+        During training we pin every document to the *active* task's block (DualPrompt
+        recipe): this is what actually trains the router — the block's prompts learn the
+        task, and its dense key is pulled toward the task's queries so that at eval the
+        router can recognise the task. If we routed freely while the keys are still
+        random, the active task's prompts would rarely be selected and never learn
+        (the cold-start collapse that gave AA~18). At eval (``model.eval()``) we use the
+        learned hybrid router and *measure* whether it routes each doc to the right
+        block — that routing hit-rate is the method's claim.
+        """
         sparse_q = self._sparse_query(batch)
-        slot_idx, key_pull = self.prompt_pool.route(query, sparse_q, self.top_k, self.router_mode)
+        if self.model.training:
+            slot_idx = self._active_block_slots(query.shape[0])
+            # Still pull the active block's dense keys toward the query (router training).
+            sel_keys = F.normalize(self.prompt_pool.keys[slot_idx], dim=-1)  # (B, S, D)
+            q = F.normalize(query, dim=-1).unsqueeze(1)  # (B, 1, D)
+            key_pull = (1.0 - (sel_keys * q).sum(-1)).mean()
+        else:
+            slot_idx, key_pull = self.prompt_pool.route(
+                query, sparse_q, self.top_k, self.router_mode
+            )
         prompt_embeds = self.prompt_pool.gather_prompts(slot_idx)
         return prompt_embeds, self.lambda_key * key_pull
+
+    def _active_block_slots(self, batch_size: int) -> torch.Tensor:
+        """(B, slots_per_task) slot ids for the active task's block, one row per doc."""
+        sl = self.prompt_pool.block_slots(self._active_task)
+        row = torch.arange(sl.start, sl.stop, device=self.device)
+        return row.unsqueeze(0).expand(batch_size, -1)
 
     # ─── evaluate (inherited prediction + routing-accuracy log) ──────────────────
     def evaluate(self, eval_loaders: dict[int, DataLoader]) -> dict[int, EvalMetrics]:
