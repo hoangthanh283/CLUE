@@ -79,7 +79,7 @@ run(){  # run <method> <router-or-none> <out_subdir>
   [ "$router" != "none" ] && { extra="method.router=$router"; rtag="router=$router "; }
   info "RUN $sub  (method=$method ${rtag}epochs=$EPOCHS bs=$BATCH_SIZE)"
   "$PY" scripts/train.py method="$method" scenario="$SCENARIO" seed="$SEED" \
-    training.epochs="$EPOCHS" training.batch_size="$BATCH_SIZE" \
+    method.epochs="$EPOCHS" training.batch_size="$BATCH_SIZE" \
     wandb.mode="$WANDB_MODE" output_dir="$out" $extra \
     || { warn "$sub FAILED (continuing)"; return; }
   touch "$out/.done"
