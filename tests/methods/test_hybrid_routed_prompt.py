@@ -115,3 +115,30 @@ def test_idf_none_before_any_task_then_populated():
     pool.accumulate_signature(0, torch.randint(0, 10, (4, 8)))
     idf = pool.idf
     assert idf is not None and idf.shape == (V,) and torch.isfinite(idf).all()
+
+
+def test_write_routing_log_emits_json_when_out_dir_set(tmp_path):
+    """_write_routing_log must produce routing.json with a correct overall hit-rate.
+
+    Regression: the first feasibility runs produced no routing.json. This pins the
+    writer in isolation (no model) — given hits/totals it writes the file and computes
+    overall = sum(hits)/sum(totals).
+    """
+    from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
+
+    # Build a method shell without running __init__ (no model needed for the writer).
+    m = HybridRoutedPrompt.__new__(HybridRoutedPrompt)
+    m.router_mode = "hybrid"
+    m.out_dir = str(tmp_path)
+    m.prompt_pool = _pool(n_tasks=2, slots_per_task=2)
+
+    m._write_routing_log(hits={0: 3, 1: 1}, totals={0: 4, 1: 4}, confusion={0: [3, 1], 1: [3, 1]})
+
+    f = tmp_path / "routing.json"
+    assert f.exists(), "routing.json was not written"
+    import json
+
+    d = json.loads(f.read_text())
+    assert d["router"] == "hybrid"
+    assert abs(d["overall_hit_rate"] - 0.5) < 1e-9  # (3+1)/(4+4)
+    assert d["per_task_hit_rate"]["0"] == 0.75
