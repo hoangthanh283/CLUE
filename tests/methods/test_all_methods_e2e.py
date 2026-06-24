@@ -38,6 +38,7 @@ from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.l2p import L2P
 from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.coda_prompt import CODAPrompt
+from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.doccl import DocCL
 
 pytestmark = pytest.mark.slow
@@ -64,6 +65,8 @@ _METHOD_CFG = {
     "dualprompt": {"n_experts": 4, "g_prompt_length": 2, "e_prompt_length": 2,
                    "lambda_key": 0.5},
     "coda_prompt": {"n_components": 4, "prompt_length": 2, "lambda_ortho": 0.1},
+    "hrp": {"router": "hybrid", "n_tasks": 3, "slots_per_task": 2, "prompt_length": 2,
+            "top_k": 2, "lambda_key": 0.5, "rrf_k": 60},
     "doccl": {"lambda_": 2000.0, "kd_alpha": 1.0, "temperature": 2.0,
               "fisher_n_samples": 4, "buffer_size": 20, "replay_batch_size": 2,
               "use_replay": True, "target_depth": "all"},
@@ -72,7 +75,8 @@ _METHOD_CFG = {
 _METHOD_CLS = {
     "naive": NaiveFineTune, "joint": JointMultiTask, "ewc": EWC, "lwf": LwF, "er": ER,
     "der_pp": DERpp, "er_cflat": ERCFlat, "o_lora": OLoRA, "cl_lora": CLLoRA,
-    "l2p": L2P, "dualprompt": DualPrompt, "coda_prompt": CODAPrompt, "doccl": DocCL,
+    "l2p": L2P, "dualprompt": DualPrompt, "coda_prompt": CODAPrompt,
+    "hrp": HybridRoutedPrompt, "doccl": DocCL,
 }
 
 
