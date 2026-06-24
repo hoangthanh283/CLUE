@@ -160,6 +160,31 @@ def set_seed(seed: int) -> None:
     torch.backends.cudnn.benchmark = False
 
 
+def _resolve_hparams(method_cfg) -> dict:
+    """Flatten a method's Hydra config to a plain JSON-safe dict of its real values.
+
+    Excludes the ``name`` key (already recorded). Captures every method knob as it
+    was actually resolved (defaults included) so a run's exact configuration —
+    cflat_lambda, use_replay, lambda_ortho, buffer_size, kd_alpha, target_depth,
+    rho, etc. — is permanently recoverable from metrics.json.
+    """
+    from omegaconf import OmegaConf
+
+    try:
+        raw = OmegaConf.to_container(method_cfg, resolve=True)
+    except Exception:
+        raw = dict(method_cfg)
+    out = {}
+    for k, v in (raw or {}).items():
+        if k == "name":
+            continue
+        if isinstance(v, (int, float, bool, str)) or v is None:
+            out[k] = v
+        else:
+            out[k] = str(v)  # nested/sequence -> stringified, never lost
+    return out
+
+
 def save_run_metrics(
     out_dir: Path,
     cfg: DictConfig,
@@ -194,6 +219,17 @@ def save_run_metrics(
         "total_params": int(method.total_param_count()),
         "trainable_params": int(method.trainable_param_count()),
         "peak_gpu_mem_mb": peak_mem_mb,
+        # Full method hyper-parameters as actually resolved at run time. Records the
+        # real value of every knob (e.g. cflat_lambda, use_replay, lambda_ortho,
+        # buffer_size) so a run's configuration is always recoverable from its
+        # metrics.json — closing the silent-default trap where e.g. er_cflat ran with
+        # cflat_lambda=0.0 (plain SAM) but nothing recorded it.
+        "method_hparams": _resolve_hparams(cfg.method),
+        "training_hparams": {
+            k: cfg.training.get(k)
+            for k in ("batch_size", "epochs", "gradient_checkpointing", "amp", "fp16", "lr")
+            if cfg.training.get(k) is not None
+        },
     }
     out_dir.mkdir(parents=True, exist_ok=True)
     with open(out_dir / "metrics.json", "w") as f:
