@@ -16,7 +16,9 @@ import torch
 from doccl.data import encoders
 from doccl.data.encoders import BROSEncoder, LiLTEncoder, build_encoder
 from doccl.models import param_grouping
+from doccl.models.bert_family_wrapper import BERTWrapper
 from doccl.models.bros_wrapper import BROSWrapper
+from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
 from doccl.models.lilt_wrapper import LiLTWrapper
 
 # ─────────────────────────────── param grouping ────────────────────────────────
@@ -139,21 +141,43 @@ def test_build_encoder_unknown_family_raises():
 
 def _synthetic_batch(wrapper, batch_size=2, seq_len=16):
     n = wrapper.model.config.num_labels
-    bbox = torch.randint(0, 1000, (batch_size, seq_len, 4))
+    # VALID boxes: x0<=x1, y0<=y1 (real KIE datasets always emit ordered corners).
+    # LiLT derives width/height embeddings from x1-x0 / y1-y0 and indexes an embedding
+    # table with them, so an unordered (negative) box raises IndexError. Sort each pair.
+    xy = torch.randint(0, 1000, (batch_size, seq_len, 4))
+    x = xy[..., [0, 2]].sort(dim=-1).values  # x0 <= x1
+    y = xy[..., [1, 3]].sort(dim=-1).values  # y0 <= y1
+    bbox = torch.stack([x[..., 0], y[..., 0], x[..., 1], y[..., 1]], dim=-1)
     if getattr(wrapper, "_inner_attr", "") == "bros":
         bbox = bbox.float() / 1000.0  # BROS expects normalized [0,1] floats
-    return {
+    out = {
         "input_ids": torch.randint(0, 100, (batch_size, seq_len)),
         "bbox": bbox,
         "attention_mask": torch.ones(batch_size, seq_len, dtype=torch.long),
         "labels": torch.randint(0, n, (batch_size, seq_len)),
     }
+    # LayoutLMv3 (the only vision backbone here) also needs pixel_values.
+    if getattr(wrapper, "_has_image", False) or "layoutlmv3" in type(wrapper).__name__.lower():
+        out["pixel_values"] = torch.zeros(batch_size, 3, 224, 224)
+    return out
+
+
+def _make_wrapper(wrapper_cls):
+    """Construct a wrapper; LayoutLMv3/BERT need an explicit model_name, LiLT/BROS default."""
+    name = wrapper_cls.__name__.lower()
+    if "layoutlmv3" in name:
+        return wrapper_cls(model_name="microsoft/layoutlmv3-base", num_labels=7)
+    if "bert" in name:
+        return wrapper_cls(model_name="bert-base-uncased", num_labels=7)
+    return wrapper_cls(num_labels=7)
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("wrapper_cls", [LiLTWrapper, BROSWrapper])
+@pytest.mark.parametrize(
+    "wrapper_cls", [LayoutLMv3Wrapper, LiLTWrapper, BROSWrapper, BERTWrapper]
+)
 def test_wrapper_forward_expand_and_groups(wrapper_cls):
-    model = wrapper_cls(num_labels=7)
+    model = _make_wrapper(wrapper_cls)
     model.label_to_id = {f"L{i}": i for i in range(7)}
     model.id_to_label = {i: f"L{i}" for i in range(7)}
     batch = _synthetic_batch(model)
@@ -171,19 +195,26 @@ def test_wrapper_forward_expand_and_groups(wrapper_cls):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("wrapper_cls", [LiLTWrapper, BROSWrapper])
+@pytest.mark.parametrize(
+    "wrapper_cls", [LayoutLMv3Wrapper, LiLTWrapper, BROSWrapper, BERTWrapper]
+)
 def test_wrapper_prompt_injection_shapes(wrapper_cls):
-    model = wrapper_cls(num_labels=7)
+    model = _make_wrapper(wrapper_cls)
     batch = _synthetic_batch(model)
     query = model.encode_query(batch)
     assert query.shape == (2, model.hidden_size)
 
     prompts = torch.randn(2, 4, model.hidden_size)
-    logits = model.forward_with_prompts(
+    fwp_kwargs = dict(
         input_ids=batch["input_ids"],
         bbox=batch["bbox"],
         prompt_embeds=prompts,
         attention_mask=batch["attention_mask"],
     )
+    # LayoutLMv3's prompt forward requires the vision stream (pixel_values); the
+    # vision-free backbones do not take it. Pass it only when the batch carries it.
+    if "pixel_values" in batch:
+        fwp_kwargs["pixel_values"] = batch["pixel_values"]
+    logits = model.forward_with_prompts(**fwp_kwargs)
     assert logits.shape[0] == 2
     assert logits.shape[-1] == model.model.config.num_labels

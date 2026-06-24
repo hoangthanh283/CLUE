@@ -64,8 +64,13 @@ def classify_param(name: str) -> str:
         return "layout_2d_pos_embed"
     if "attention" in name and ("query" in name or "key" in name or "value" in name):
         return "attn_qkv"  # shared text+visual self-attention projections
-    if "attention.output.dense" in name:
-        return "attn_out"  # attention output projection (kept out of ffn)
+    # Attention OUTPUT projection (kept out of ffn). LiLT has TWO: the text stream's
+    # "attention.output.dense" and the decoupled layout stream's
+    # "attention.layout_output.dense" — both are attention-output projections and must
+    # land in attn_out, else the layout one falls through to "misc" (24 LiLT params),
+    # leaving them unclassified for the Fisher/depth analysis.
+    if "attention.output.dense" in name or "attention.layout_output.dense" in name:
+        return "attn_out"
     if "LayerNorm" in name or name.endswith(".norm.weight") or name.endswith(".norm.bias"):
         return "layernorm"
     if "intermediate.dense" in name or ("output.dense" in name and "attention" not in name):
