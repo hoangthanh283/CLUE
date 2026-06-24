@@ -78,7 +78,11 @@ class DERpp(NaiveFineTune):
                     # ONLY over each example's real classes — never against the padding
                     # zeros, which would wrongly push new-class logits to zero on replay.
                     widths = replay1.pop("_logit_width", None)
-                    r_out = self.model(**{k: v for k, v in replay1.items() if k != "labels"})
+                    # Forward over inputs only: drop labels and any "_"-prefixed buffer keys.
+                    fwd_in = {
+                        k: v for k, v in replay1.items() if k != "labels" and not k.startswith("_")
+                    }
+                    r_out = self.model(**fwd_in)
                     n_shared = min(r_out.logits.shape[-1], cached_logits.shape[-1])
                     student = r_out.logits[..., :n_shared]
                     teacher = cached_logits[..., :n_shared]
@@ -96,7 +100,12 @@ class DERpp(NaiveFineTune):
 
                 if replay2 is not None:
                     replay2 = {k: v.to(self.device) for k, v in replay2.items()}
-                    replay2.pop("_logits", None)  # don't need logits for CE replay
+                    # Strip ALL buffer-internal bookkeeping keys (_logits, _logit_width,
+                    # any future "_"-prefixed field): the wrapper.forward signature is
+                    # fixed (no **kwargs), so leaving _logit_width in here raised
+                    # ``TypeError: forward() got an unexpected keyword argument
+                    # '_logit_width'`` at the first replay step — a hard crash.
+                    replay2 = {k: v for k, v in replay2.items() if not k.startswith("_")}
                     r_out2 = self.model(**replay2)
                     replay_ce_loss = r_out2.loss
 

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from peft import LoraConfig, get_peft_model
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -99,7 +98,17 @@ class OLoRA(NaiveFineTune):
                 inner.config.num_labels = new_n
 
     def _ortho_loss(self) -> torch.Tensor:
-        """Penalty: ||A_t^T · A_past||_F^2 summed across layers and past tasks."""
+        """O-LoRA subspace-orthogonality penalty: ``sum ||A_t A_past^T||_F^2``.
+
+        Wang et al. (2023) constrain successive LoRA adapters to occupy MUTUALLY
+        ORTHOGONAL r-dimensional subspaces. With ``A`` of shape ``(r, in_features)``
+        (PEFT's lora_A weight), the row space is the relevant subspace, so the cross-
+        Gram is ``A_curr @ A_past.T`` of shape ``(r, r)`` — it is zero exactly when the
+        two row subspaces are orthogonal. (The previous code computed ``A_curr.T @
+        A_past`` of shape ``(in_features, in_features)``, which measures input-feature
+        co-activation, NOT subspace orthogonality, and does not vanish for orthogonal
+        adapters — a real bug that disabled the O-LoRA constraint.)
+        """
         if not self.state.custom["past_A_matrices"]:
             return torch.zeros((), device=self.device)
 
@@ -111,8 +120,8 @@ class OLoRA(NaiveFineTune):
             for layer_name, A_curr in current_A.items():
                 if layer_name in past_A_dict:
                     A_past = past_A_dict[layer_name].to(self.device)
-                    # Penalty: ||A_curr^T · A_past||_F^2
-                    inner = A_curr.T @ A_past  # (r, r)
+                    # (r, in) @ (in, r) -> (r, r); zero iff the row subspaces are orthogonal.
+                    inner = A_curr @ A_past.T  # (r, r)
                     penalty = penalty + (inner**2).sum()
         return penalty
 

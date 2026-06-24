@@ -348,7 +348,16 @@ add_bert() {
 }
 add_currency() {  # 2025 currency baselines (er_cflat, cl_lora) — lowest priority
   for m in $CURRENCY_METHODS; do for sc in $SCENARIOS; do for s in $SEEDS; do
-    add_job "${sc}_${m}_seed${s}" "method=${m} scenario=${sc} seed=${s}"
+    # er_cflat with the config default (cflat_lambda=0.0) is plain ER+SAM. To run the
+    # GENUINE C-Flat++ curvature variant, set CFLAT_LAMBDA>0 (needs >=16 GB VRAM): it
+    # adds a distinct "_curv" run so the two never collide, and overrides the leaf key.
+    if [ "$m" = "er_cflat" ] && [ -n "${CFLAT_LAMBDA:-}" ] && [ "${CFLAT_LAMBDA}" != "0" ] \
+       && [ "${CFLAT_LAMBDA}" != "0.0" ]; then
+      add_job "${sc}_${m}_seed${s}_curv" \
+        "method=${m} scenario=${sc} seed=${s} +method.cflat_lambda=${CFLAT_LAMBDA}"
+    else
+      add_job "${sc}_${m}_seed${s}" "method=${m} scenario=${sc} seed=${s}"
+    fi
   done; done; done
 }
 
