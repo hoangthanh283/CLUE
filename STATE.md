@@ -19,7 +19,23 @@ routing accuracy*. Spec: `docs/superpowers/specs/2026-06-24-hybrid-routed-prompt
   every doc to the active block during TRAINING** (DualPrompt recipe; trains the block +
   pulls its dense key toward the task's queries); route freely only at EVAL where the
   hit-rate is measured. routing.json now writes (added writer regression test). 8 tests
-  pass. Re-running feasibility on the LOCAL 2060 (now idle; L40 out of credit).
+  pass.
+- **FEASIBILITY RESULT (dil, seed42, 3ep, local 2060) — IDEA VALIDATED + reframed.**
+  Final per-task routing hit-rate (router sends doc to its own task's block):
+  | router | task0 | task1 | task2 | overall | AA |
+  | dense  | 0.00  | 0.13  | 1.00  | **0.294** | 20.81 |
+  | sparse | 0.74  | 0.92  | 1.00  | **0.915** | 20.87 |
+  **Sparse OCR-token routing = 3.1× better than dense (0.29→0.92).** Dense suffers total
+  recency collapse (routes everything to the last-trained block); sparse signatures are
+  accumulated+frozen per task → no recency bias → recovers task0/task1. The core idea
+  works. **BUT AA is flat (~20.8) for both** — better routing did NOT lift accuracy
+  because the bottleneck is **head drift** ([[clue-prompt-family-head-drift]]), not
+  routing: correct prompts feed an already-drifted shared classifier head. Routing is
+  necessary but not sufficient.
+- **NEXT (the real A* path):** add **head protection** to HRP (per-task head masking or a
+  small head-replay buffer) so the validated router actually translates to AA — fuses the
+  routing idea with the thesis's head-locus finding. That is a stronger novelty than a
+  router alone (which can't beat replay: ER/DER++ ~88 vs prompt family ~30 on dil).
 
 ---
 
