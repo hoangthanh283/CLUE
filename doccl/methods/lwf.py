@@ -114,6 +114,16 @@ class LwF(NaiveFineTune):
 
     def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         """Snapshot current model as teacher for the next task."""
+        # Evict the previous teacher from the GPU before deepcopy'ing the new one — holding
+        # both on-device through copy.deepcopy is a transient ~2x-model VRAM spike each task
+        # boundary that can OOM a small card after the head has grown (cl_lora does the same).
+        old_teacher = self.state.custom.get("teacher")
+        if old_teacher is not None:
+            old_teacher.to("cpu")
+            self.state.custom["teacher"] = None
+            del old_teacher
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
         teacher = copy.deepcopy(self.model)
         for p in teacher.parameters():
             p.requires_grad = False
