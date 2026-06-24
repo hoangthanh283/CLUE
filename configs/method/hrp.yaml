@@ -1,0 +1,14 @@
+name: hrp
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+# Router engine: dense (== L2P) | sparse (BM25-over-OCR only) | hybrid (RRF fusion).
+router: hybrid
+# Pool = n_tasks blocks of slots_per_task slots each (task-pinned).
+n_tasks: 10
+slots_per_task: 2
+prompt_length: 5
+top_k: 2
+lambda_key: 0.5
+rrf_k: 60

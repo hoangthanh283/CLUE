@@ -32,6 +32,7 @@ from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.er import ER
 from doccl.methods.er_cflat import ERCFlat
 from doccl.methods.ewc import EWC
+from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
 from doccl.methods.lwf import LwF
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
@@ -139,6 +140,10 @@ METHOD_REGISTRY = {
     "l2p": L2P,
     "dualprompt": DualPrompt,
     "coda_prompt": CODAPrompt,
+    # Hybrid dense+sparse task router over a task-pinned prompt pool (feasibility
+    # prototype). ``method.router`` ∈ {dense, sparse, hybrid} toggles the routing
+    # ablation; writes results/<run>/routing.json with the per-task routing hit-rate.
+    "hrp": HybridRoutedPrompt,
     # Proposed method: depth/head-targeted DocCL, derived from the corrected
     # diagnosis (forgetting concentrates in the classifier head + late layers).
     # ``method.target_depth`` ∈ {all, head_only, late_only, uniform} drives the
@@ -388,6 +393,8 @@ def main(cfg: DictConfig) -> None:
     tracker = CLMetricsTracker(num_tasks=len(scenario.tasks), baseline_perf=fwt_baselines)
     eval_loaders_seen: dict[int, DataLoader] = {}
     out_dir = Path(cfg.output_dir) / run.name
+    # Let methods that emit side artifacts (e.g. hrp's routing.json) know the run dir.
+    method.out_dir = str(out_dir)
 
     # TensorBoard: live forgetting diagnostic alongside W&B. Writes per-run event
     # files under results/<run>/tb so `tensorboard --logdir results` aggregates all runs.
