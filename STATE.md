@@ -25,6 +25,7 @@ routing accuracy*. Spec: `docs/superpowers/specs/2026-06-24-hybrid-routed-prompt
   | router | task0 | task1 | task2 | overall | AA |
   | dense  | 0.00  | 0.13  | 1.00  | **0.294** | 20.81 |
   | sparse | 0.74  | 0.92  | 1.00  | **0.915** | 20.87 |
+  | hybrid | 0.00  | 0.91  | 1.00  | **0.839** | 20.82 |
   **Sparse OCR-token routing = 3.1× better than dense (0.29→0.92).** Dense suffers total
   recency collapse (routes everything to the last-trained block); sparse signatures are
   accumulated+frozen per task → no recency bias → recovers task0/task1. The core idea
@@ -32,6 +33,11 @@ routing accuracy*. Spec: `docs/superpowers/specs/2026-06-24-hybrid-routed-prompt
   because the bottleneck is **head drift** ([[clue-prompt-family-head-drift]]), not
   routing: correct prompts feed an already-drifted shared classifier head. Routing is
   necessary but not sufficient.
+- **SECOND FINDING — naive RRF hybrid (0.839) < pure sparse (0.915), task0 back to 0.00.**
+  Fixed 50/50 Reciprocal Rank Fusion lets the *recency-collapsed* dense signal drag the
+  strong sparse signal down. RRF assumes both rankers are individually useful; here dense
+  is actively harmful. Full method should use **confidence-weighted / learned fusion**
+  (down-weight dense when its keys collapse), not fixed RRF — or just use sparse routing.
 - **NEXT (the real A* path):** add **head protection** to HRP (per-task head masking or a
   small head-replay buffer) so the validated router actually translates to AA — fuses the
   routing idea with the thesis's head-locus finding. That is a stronger novelty than a
