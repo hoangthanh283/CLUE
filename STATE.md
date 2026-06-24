@@ -1,6 +1,24 @@
 # STATE
 
 ## Active Work
+**HRP feasibility method implemented (2026-06-24, commit b047672).** New CL method
+`hrp` (`doccl/methods/hybrid_routed_prompt.py`): L2P-family, frozen backbone, task-pinned
+prompt pool with a **hybrid dense+sparse router** — sparse = BM25/TF-IDF over OCR tokens
+(`batch["input_ids"]`), fused with the dense CLS query by RRF. `method.router ∈
+{dense,sparse,hybrid}` is the routing ablation in one method; emits
+`results/<run>/routing.json` (per-task routing hit-rate = the diagnostic claim). 6 unit
+tests + 2 e2e lifecycle tests pass. **Reframed the user's idea**: NOT "no forgetting" (it
+moves into the router) and NOT acceleration (≤40 slots) — the contribution is *measured
+routing accuracy*. Spec: `docs/superpowers/specs/2026-06-24-hybrid-routed-prompt-design.md`.
+- **DEFERRED — feasibility comparison NOT yet run.** Local box is mid-grid (`er_cflat
+  scenario=mixed seed=7`, ~2 days in, RAM 4G free) → cannot fit a 2nd dataset builder.
+  Run on a FREE GPU: `for R in dense sparse hybrid; do uv run python scripts/train.py
+  method=hrp scenario=dil seed=42 method.router=$R training.epochs=3 wandb.mode=offline;
+  done` + `der_pp` + `doccl`; then `analyze_results.py`. Go/no-go: hybrid hit-rate ≥ dense
+  hit-rate. (bd was hung on the dolt lock — issue tracked here instead.)
+
+---
+
 **Grid harvested (167 runs) → thesis updated (2026-06-18).** Full R2 pull = 167 completed runs
 across **9 scenarios** (incl. new `cil_wildreceipt`, `dil_xlingual`) × ~15 methods × 3 seeds.
 Regenerated the whole analysis pipeline and updated thesis Ch.1/6/7 with measured numbers,
