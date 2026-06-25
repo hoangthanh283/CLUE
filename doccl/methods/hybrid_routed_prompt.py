@@ -39,8 +39,9 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from doccl.eval.metrics import compute_token_f1
+from doccl.methods.buffer import ReservoirBuffer
 from doccl.methods.prompt_base import PromptBasedMethod
-from doccl.types import EvalMetrics, TaskInfo
+from doccl.types import EvalMetrics, TaskInfo, TrainMetrics
 
 log = logging.getLogger(__name__)
 
@@ -237,6 +238,19 @@ class HybridRoutedPrompt(PromptBasedMethod):
         # set by train.py (results/<run> dir); None in unit tests → routing log skipped.
         self.out_dir = config.get("output_dir")
 
+        # Head protection via replay. Routing alone keeps the right *prompts* firing for
+        # old tasks, but the SHARED classifier head still drifts as new tasks train,
+        # which is the real forgetting channel (feasibility: routing 0.92 yet AA flat at
+        # ~21). A small reservoir of past examples — each tagged with its task_id and at
+        # replay PINNED to its own frozen block — keeps the head grounded on old tasks
+        # without coupling head-protection to router quality. weight 0 disables it (so
+        # router-only ablations are reproducible).
+        self.head_replay_weight = float(config.get("head_replay_weight", 1.0))
+        self.replay_batch_size = int(config.get("replay_batch_size", 8))
+        self.head_buffer = ReservoirBuffer(
+            capacity=int(config.get("head_buffer_size", 200)), store_logits=False
+        )
+
         # Block freezing via grad hooks: zero the gradient rows of already-finished
         # blocks so the inherited optimizer step leaves old tasks' prompts/keys intact.
         def _freeze_rows(grad: torch.Tensor) -> torch.Tensor:
@@ -266,14 +280,117 @@ class HybridRoutedPrompt(PromptBasedMethod):
             ids = batch["input_ids"]
             if torch.is_tensor(ids):
                 self.prompt_pool.accumulate_signature(task.task_id, ids.to(self.device))
+            # Stash this task's examples for head replay, tagged with the task id so a
+            # replayed doc can be pinned to its OWN block (not the current task's).
+            if self.head_replay_weight > 0:
+                B = ids.shape[0] if torch.is_tensor(ids) else 0
+                tagged = {**{k: v for k, v in batch.items() if torch.is_tensor(v)}}
+                tagged["_task_id"] = torch.full((B,), task.task_id, dtype=torch.long)
+                self.head_buffer.add_batch(tagged)
         self._frozen_until = (task.task_id + 1) * self.prompt_pool.slots_per_task
         sl = self.prompt_pool.block_slots(task.task_id)
         log.info(
-            "hrp: task %d signature accumulated; slots [%d,%d) frozen",
+            "hrp: task %d signature accumulated; slots [%d,%d) frozen; head-buffer=%d",
             task.task_id,
             sl.start,
             sl.stop,
+            len(self.head_buffer.buffer),
         )
+
+    # ─── training (prompt loop + head replay) ────────────────────────────────────
+    def train_task(
+        self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None
+    ) -> TrainMetrics:
+        """Prompt training loop with an added head-replay loss.
+
+        Mirrors ``PromptBasedMethod.train_task`` (frozen backbone, task-pinned prompts,
+        prompt-aware early stopping) but adds, per step, a CE loss on a replay batch of
+        past examples — each routed to ITS OWN frozen block — to keep the shared head
+        from drifting. With ``head_replay_weight == 0`` this reduces exactly to the
+        parent loop (router-only ablation).
+        """
+        if self.head_replay_weight <= 0 or not self.head_buffer.buffer:
+            return super().train_task(task, train_loader, val_loader)
+
+        self.model.train()
+        optimizer = torch.optim.AdamW(
+            self.trainable_parameters(),
+            lr=self.config.get("lr", 5e-5),
+            weight_decay=self.config.get("weight_decay", 0.01),
+        )
+        epochs = self.config.get("epochs", 10)
+        max_grad_norm = self.config.get("max_grad_norm", 1.0)
+        stopper = self.make_early_stopper(val_loader)
+
+        total_loss, n_steps = 0.0, 0
+        for epoch in range(epochs):
+            self.model.train()
+            for batch in train_loader:
+                batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
+                optimizer.zero_grad()
+                # Current task (task-pinned prompts).
+                query = self._query(batch)
+                prompt_embeds, aux = self._select_prompts(query, batch)
+                logits = self.model.forward_with_prompts(
+                    input_ids=batch["input_ids"],
+                    bbox=batch["bbox"],
+                    pixel_values=batch.get("pixel_values"),
+                    prompt_embeds=prompt_embeds,
+                    attention_mask=batch.get("attention_mask"),
+                )
+                labels = batch["labels"][:, : logits.shape[1]]
+                ce = F.cross_entropy(
+                    logits.reshape(-1, logits.shape[-1]), labels.reshape(-1), ignore_index=-100
+                )
+                # Head replay: past examples, each pinned to its own block.
+                replay_loss = self._head_replay_loss()
+                loss = ce + aux + self.head_replay_weight * replay_loss
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.trainable_parameters(), max_grad_norm)
+                optimizer.step()
+                total_loss += float(loss.item())
+                n_steps += 1
+
+            if stopper.enabled and val_loader is not None:
+                val_f1 = self._prompt_val_f1(val_loader)
+                if stopper.step(val_f1, self.model, epoch):
+                    log.info("hrp T%s ep%d val_f1=%.4f -> STOP", task.task_id, epoch + 1, val_f1)
+                    break
+
+        stopper.restore_best(self.model)
+        return TrainMetrics(
+            task_id=task.task_id, loss=total_loss / max(n_steps, 1), n_steps=n_steps
+        )
+
+    def _head_replay_loss(self) -> torch.Tensor:
+        """CE on a replay batch, each example routed to its OWN task's block."""
+        replay = self.head_buffer.sample(self.replay_batch_size)
+        if replay is None:
+            return torch.zeros((), device=self.device)
+        task_ids = replay.pop("_task_id")  # (B,) owning task per example
+        replay = {k: v.to(self.device) for k, v in replay.items() if torch.is_tensor(v)}
+        # Pin each replayed doc to its own frozen block (not the active task's).
+        slot_idx = self._block_slots_for_tasks(task_ids.to(self.device))
+        prompt_embeds = self.prompt_pool.gather_prompts(slot_idx)
+        logits = self.model.forward_with_prompts(
+            input_ids=replay["input_ids"],
+            bbox=replay["bbox"],
+            pixel_values=replay.get("pixel_values"),
+            prompt_embeds=prompt_embeds,
+            attention_mask=replay.get("attention_mask"),
+        )
+        labels = replay["labels"][:, : logits.shape[1]]
+        return F.cross_entropy(
+            logits.reshape(-1, logits.shape[-1]), labels.reshape(-1), ignore_index=-100
+        )
+
+    def _block_slots_for_tasks(self, task_ids: torch.Tensor) -> torch.Tensor:
+        """(B,) task ids → (B, slots_per_task) slot ids of each task's own block."""
+        spt = self.prompt_pool.slots_per_task
+        task_ids = task_ids.clamp(0, self.prompt_pool.n_tasks - 1)
+        base = (task_ids * spt).unsqueeze(1)  # (B, 1)
+        offsets = torch.arange(spt, device=task_ids.device).unsqueeze(0)  # (1, S)
+        return base + offsets  # (B, S)
 
     # ─── routing ────────────────────────────────────────────────────────────────
     def _sparse_query(self, batch: dict) -> torch.Tensor:

@@ -12,3 +12,8 @@ prompt_length: 5
 top_k: 2
 lambda_key: 0.5
 rrf_k: 60
+# Head protection: replay past examples (pinned to their own block) to keep the shared
+# classifier head from drifting. weight 0 disables it (router-only ablation).
+head_replay_weight: 1.0
+head_buffer_size: 200
+replay_batch_size: 8
