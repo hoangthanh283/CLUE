@@ -82,29 +82,31 @@ head-dominant. Pilot-analyze location test: cl_lilt p=0.38, cr_bros p=0.51 vs c4
 (NOT different → same locus). Head/depth-dominant forgetting REPRODUCES on LiLT+BROS =
 diagnosis is NOT architecture-specific. Pilot figures regenerated (7 conditions, 22:09).
 
-**BROS GRID — messy but recovering (DO NOT re-launch run_grid_multigpu for BROS!):**
-- ⚠️ `run_grid_multigpu.sh` with BACKBONES=bros plans 111 jobs (24 BROS + 87 LayoutLMv3/
-  single_* defaults) — env knobs do NOT trim it to BROS-only. I launched it, saw 111, and
-  killed the scheduler — but it had already spawned ONE child, `dil_naive_seed42_bros`,
-  which is running fine (the job we want). Scheduler wrappers now DEAD (won't spawn the 87).
-- ⚠️ The other session's **docmerge watcher is self-deadlocked**: its loop condition
-  `while pgrep -f "doccl.pilot.run_pilot"` matches its OWN cmdline (which contains that
-  literal string) → never exits → docmerge feasibility will NEVER fire. Harmless to me now
-  but the other session must fix it (use a PID file or `pgrep -f "[d]occl.pilot"`).
-- ✅ CORRECT WAY to finish BROS: `scratchpad/run_bros_only.sh` — runs the 24 jobs DIRECTLY
-  via `train.py method=<m> model=bros_base scenario=<sc> seed=<s>` (validated: dil naive
-  reaches T0 val_f1=87.6), writes `.done` itself (train.py does NOT; grid wrapper normally
-  does). Resume-safe via `.done`. After the orphan `dil_naive_seed42_bros` finishes, touch
-  its `.done` then run this script for the other 23. NEVER use run_bros_grid.sh (=111 jobs).
-- ⚠️ When monitoring, NEVER run a command whose cmdline contains the literal
-  `doccl.pilot.run_pilot` or `scripts/train.py` — it transiently feeds the other session's
-  pgrep loops. Use nvidia-smi + run-dir file checks, or split the string at runtime.
+**SCOPE (corrected): this session = forgetting ANALYSIS + PLOTS across backbones to
+confirm the head-locus hypothesis. NOT baselines.** Baseline metric grids (AA/BWT
+comparison runs for LiLT/BROS) belong on the A6000/L40 — NOT the local box. A BROS
+baseline grid was mistakenly started here, then STOPPED and its partial dir removed.
 
-**NEXT (after BROS grid lands):**
-- `uv run python scripts/analyze_results.py --source local` (backbone table picks up BROS)
-  + `uv run python -m doccl.pilot.analyze` (already regenerated for pilot; re-run after grid).
-- Update thesis Ch6 limitation (vi) — currently scopes claims to LayoutLMv3 & calls
-  LiLT/BROS "planned"; reframe as DONE generalization result.
+**DONE — forgetting analysis is COMPLETE for all backbones:**
+- 6/6 pilot localizer runs (LiLT + BROS × 3 seeds) finished.
+- 4 diagnostic figures regenerated with all 7 conditions (LayoutLMv3×4 masks + BERT +
+  LiLT + BROS): displacement_bars / cka_heatmap / fisher_bars / forgetting_matrix.
+- Hypothesis CONFIRMED: Fisher-weighted displacement head-dominant on every backbone
+  (head ≫ input/early/mid/late≈0); location test p=0.38 (LiLT), 0.51 (BROS) vs c4_full
+  (same locus). BROS CKA depth-gradient 0.99 emb → 0.11 head. Architecture-agnostic.
+
+**Note:** `analyze_results.py` backbone-table fix (model_family column + table_backbone_*)
+is committed and will surface LiLT/BROS metrics WHEN those baseline runs land on the
+A6000/L40 — but running those baselines is a LATER, off-box task, not this session.
+The other session's docmerge watcher is self-deadlocked (`while pgrep -f
+"doccl.pilot.run_pilot"` matches its own cmdline) — their bug to fix, harmless here.
+
+**NEXT (off-box / later):**
+- Run LiLT+BROS baseline metric grids on A6000/L40 → then re-run analyze_results so
+  table_backbone_*.tex gains the BROS column (LiLT already there).
+- Update thesis Ch6 limitation (vi): reframe LiLT/BROS forgetting-localization from
+  "planned" to DONE (the analysis/plots in this session); keep baseline-table cells
+  pending until the off-box runs land.
 
 ## Prior Active Work
 **HRP feasibility method implemented (2026-06-24, commit b047672).** New CL method
