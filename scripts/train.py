@@ -27,6 +27,7 @@ from doccl.eval.metrics import CLMetricsTracker, compute_per_class_f1
 from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.der import DERpp
+from doccl.methods.doc_merge import DocMerge
 from doccl.methods.doccl import DocCL, DocCL_A, DocCL_B, DocCL_C
 from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.er import ER
@@ -144,6 +145,7 @@ METHOD_REGISTRY = {
     # prototype). ``method.router`` ∈ {dense, sparse, hybrid} toggles the routing
     # ablation; writes results/<run>/routing.json with the per-task routing hit-rate.
     "hrp": HybridRoutedPrompt,
+    "doc_merge": DocMerge,
     # Proposed method: depth/head-targeted DocCL, derived from the corrected
     # diagnosis (forgetting concentrates in the classifier head + late layers).
     # ``method.target_depth`` ∈ {all, head_only, late_only, uniform} drives the

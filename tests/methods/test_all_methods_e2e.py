@@ -39,6 +39,7 @@ from doccl.methods.l2p import L2P
 from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
+from doccl.methods.doc_merge import DocMerge
 from doccl.methods.doccl import DocCL
 
 pytestmark = pytest.mark.slow
@@ -67,6 +68,16 @@ _METHOD_CFG = {
     "coda_prompt": {"n_components": 4, "prompt_length": 2, "lambda_ortho": 0.1},
     "hrp": {"router": "hybrid", "n_tasks": 3, "slots_per_task": 2, "prompt_length": 2,
             "top_k": 2, "lambda_key": 0.5, "rrf_k": 60},
+    # DocMERGE: one entry per consolidate mode so each branch (merge / memory / both)
+    # gets full lifecycle coverage. fisher_n_samples tiny to keep the Fisher pass fast.
+    "doc_merge": {"consolidate": "both", "merge_rule": "fisher", "router": "sparse",
+                  "n_tasks": 3, "slots_per_task": 2, "prompt_length": 2, "top_k": 2,
+                  "lambda_key": 0.5, "fisher_n_samples": 2},
+    "doc_merge_merge": {"consolidate": "merge", "merge_rule": "plain", "n_tasks": 3,
+                        "slots_per_task": 2, "prompt_length": 2, "fisher_n_samples": 2},
+    "doc_merge_memory": {"consolidate": "memory", "router": "sparse", "n_tasks": 3,
+                         "slots_per_task": 2, "prompt_length": 2, "top_k": 2,
+                         "lambda_key": 0.5, "fisher_n_samples": 2},
     "doccl": {"lambda_": 2000.0, "kd_alpha": 1.0, "temperature": 2.0,
               "fisher_n_samples": 4, "buffer_size": 20, "replay_batch_size": 2,
               "use_replay": True, "target_depth": "all"},
@@ -77,6 +88,7 @@ _METHOD_CLS = {
     "der_pp": DERpp, "er_cflat": ERCFlat, "o_lora": OLoRA, "cl_lora": CLLoRA,
     "l2p": L2P, "dualprompt": DualPrompt, "coda_prompt": CODAPrompt,
     "hrp": HybridRoutedPrompt, "doccl": DocCL,
+    "doc_merge": DocMerge, "doc_merge_merge": DocMerge, "doc_merge_memory": DocMerge,
 }
 
 
