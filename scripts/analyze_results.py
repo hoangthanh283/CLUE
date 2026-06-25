@@ -185,13 +185,21 @@ def load_local_runs(results_dir: Path) -> pd.DataFrame:
         # external text-only comparator, not the LayoutLMv3 lower bound — surface it
         # as its own "bert_textonly" row so the two never merge.
         method = d.get("method", "?")
-        if d.get("model_family") == "bert":
+        # ``model_family`` is None for the primary LayoutLMv3 runs (the implicit
+        # default) and carries the family tag ("bert"/"lilt"/"bros") for secondary
+        # backbones — surface it as a real column so the secondary-backbone study can
+        # be tabulated separately instead of silently merging into LayoutLMv3 rows.
+        family = d.get("model_family") or "layoutlmv3"
+        if family == "bert":
+            # BERT-naive is the external text-only comparator in the MAIN table; keep
+            # the legacy method rename so it renders as its own baseline row there.
             method = "bert_textonly"
         rows.append(
             {
                 "name": mp.parent.name,
                 "state": "finished",
                 "method": method,
+                "model_family": family,
                 "scenario": d.get("scenario", "?"),
                 "seed": d.get("seed", -1),
                 "target_component": d.get("target_component"),
@@ -224,6 +232,7 @@ def pull_runs(project: str, entity: str | None = None) -> pd.DataFrame:
                 "name": r.name,
                 "state": r.state,
                 "method": cfg.get("method", {}).get("name", "?"),
+                "model_family": cfg.get("model", {}).get("family") or "layoutlmv3",
                 "scenario": cfg.get("scenario", {}).get("name", "?"),
                 "seed": cfg.get("seed", -1),
                 "target_component": cfg.get("method", {}).get("target_component"),
@@ -243,6 +252,35 @@ def pull_runs(project: str, entity: str | None = None) -> pd.DataFrame:
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────────
+# Secondary backbones are reported in their OWN table; only LayoutLMv3 (the primary)
+# feeds the main/ablation/compute/forgetting tables. ``bert_textonly`` is the one
+# exception — it is the external comparator with its own method row, so it is kept
+# even though its family is "bert".
+PRIMARY_FAMILY = "layoutlmv3"
+SECONDARY_FAMILIES = [
+    "lilt",
+    "bros",
+]  # backbone-generalization study (text-only BERT excluded — own row)
+BACKBONE_DISPLAY = {
+    "layoutlmv3": "LayoutLMv3",
+    "lilt": "LiLT",
+    "bros": "BROS",
+    "bert": "BERT",
+}
+
+
+def _primary_only(df: pd.DataFrame) -> pd.DataFrame:
+    """Rows that belong in the main LayoutLMv3 tables.
+
+    Keeps every primary-backbone run plus the ``bert_textonly`` comparator (which has
+    its own method row); drops the LiLT/BROS secondary-backbone runs so they do not
+    silently average into the LayoutLMv3 method cells.
+    """
+    if "model_family" not in df.columns:
+        return df
+    return df[(df["model_family"] == PRIMARY_FAMILY) | (df["method"] == "bert_textonly")]
+
+
 def _finished(df: pd.DataFrame, metric: str = "AA") -> pd.DataFrame:
     return df[df["state"] == "finished"].dropna(subset=[metric])
 
@@ -363,6 +401,83 @@ def write_main_table(
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(lines))
     print(f"Wrote {output}")
+
+
+# ─── Secondary-backbone generalization table ────────────────────────────────────
+def write_backbone_table(df: pd.DataFrame, output: Path, metric: str = "AA") -> None:
+    """One row per (backbone, method), columns = scenarios — the generalization study.
+
+    Tests whether the depth/head concentration and replay-dominant ordering transfer
+    from LayoutLMv3 to LiLT and BROS. Only scenarios/methods with at least one
+    secondary-backbone run are shown; LayoutLMv3 is included as the reference so the
+    transfer is read at a glance. Returns silently (no file) when no secondary runs
+    exist, so the analysis stays valid on a LayoutLMv3-only result tree.
+    """
+    df = _finished(df, metric)
+    if "model_family" not in df.columns:
+        return
+    df = df[(df["method"] != "doccl") | _is_full_method(df["target"])]
+    secondary = df[df["model_family"].isin(SECONDARY_FAMILIES)]
+    if secondary.empty:
+        print(f"No secondary-backbone (LiLT/BROS) runs for {metric}; skipping backbone table.")
+        return
+
+    # Restrict to the methods/scenarios that the secondary backbones actually cover,
+    # then include the LayoutLMv3 reference for exactly those cells.
+    methods = [m for m in METHOD_ORDER if m in set(secondary["method"])]
+    scenarios = [s for s in SCENARIO_ORDER if s in set(secondary["scenario"])]
+    families = [PRIMARY_FAMILY] + [
+        f for f in SECONDARY_FAMILIES if f in set(secondary["model_family"])
+    ]
+    keep = df[df["method"].isin(methods) & df["scenario"].isin(scenarios)]
+
+    mean = keep.pivot_table(
+        values=metric, index=["model_family", "method"], columns="scenario", aggfunc="mean"
+    )
+    std = keep.pivot_table(
+        values=metric, index=["model_family", "method"], columns="scenario", aggfunc="std"
+    )
+
+    col_spec = "ll" + "c" * len(scenarios)
+    lines = [
+        f"% Auto-generated by scripts/analyze_results.py — secondary-backbone study ({metric}).",
+        f"% Metric: {metric} (mean $\\pm$ std over seeds). Tests cross-backbone generalization.",
+        f"\\begin{{tabular}}{{{col_spec}}}",
+        "\\toprule",
+        "\\textbf{Backbone} & \\textbf{Method} & "
+        + " & ".join(f"\\textbf{{{SCENARIO_DISPLAY[s]}}}" for s in scenarios)
+        + " \\\\",
+        "\\midrule",
+    ]
+    for fi, fam in enumerate(families):
+        for m in methods:
+            key = (fam, m)
+            if key not in mean.index:
+                continue
+            cells = []
+            for s in scenarios:
+                if s not in mean.columns or pd.isna(mean.loc[key, s]):
+                    cells.append("--")
+                    continue
+                mu = float(mean.loc[key, s])
+                try:
+                    sd_raw = std.loc[key, s]
+                except KeyError:
+                    sd_raw = np.nan
+                sd = float(sd_raw) if not pd.isna(sd_raw) else float("nan")
+                cells.append(_cell(mu, sd))
+            lines.append(
+                f"{BACKBONE_DISPLAY.get(fam, fam)} & {METHOD_DISPLAY.get(m, m)} & "
+                + " & ".join(cells)
+                + " \\\\"
+            )
+        if fi < len(families) - 1:
+            lines.append("\\midrule")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text("\n".join(lines))
+    print(f"Wrote {output}  (backbones: {', '.join(families)}; methods: {', '.join(methods)})")
 
 
 # ─── Table 6.2 — component-targeting ablation ───────────────────────────────────
@@ -682,13 +797,19 @@ def main():
     # the zero-shot upper-triangular term R[i-1, i] (now recorded by train.py) minus
     # b_i. Runs whose matrix lacks the zero-shot term (legacy lower-triangular) get
     # FWT=NaN and are simply excluded from the FWT aggregate — never fabricated.
-    baselines = compute_single_task_baselines(df)
+    # FWT baselines are the LayoutLMv3 single-task references; computing them on the
+    # primary subset keeps a secondary-backbone single-task run from skewing b_i.
+    baselines = compute_single_task_baselines(_primary_only(df))
     df = add_fwt_column(df, baselines)
     df = _add_target_column(df)  # unify target_depth / target_component → "target"
 
+    # all_runs.csv keeps EVERY run (incl. secondary backbones) with the model_family
+    # column, so the full result tree is inspectable. The LayoutLMv3-scoped tables
+    # below use ``prim`` so LiLT/BROS never average into the primary method cells.
     df.drop(columns=["matrix"], errors="ignore").to_csv(
         args.output_dir / "all_runs.csv", index=False
     )
+    prim = _primary_only(df)
 
     for metric in args.metrics:
         if metric == "FWT" and df["FWT"].isna().all():
@@ -696,24 +817,25 @@ def main():
                 "\n=== FWT === unavailable (no run has the zero-shot term; " "see docs/FWT_NOTE.md)"
             )
             continue
-        agg = aggregate(df, metric=metric)
-        print(f"\n=== {metric} ===\n{agg.to_string(index=False)}")
-        write_pivot_csv(df, args.output_dir / f"pivot_{metric}.csv", metric=metric)
+        agg = aggregate(prim, metric=metric)
+        print(f"\n=== {metric} (LayoutLMv3) ===\n{agg.to_string(index=False)}")
+        write_pivot_csv(prim, args.output_dir / f"pivot_{metric}.csv", metric=metric)
+        write_backbone_table(df, args.output_dir / f"table_backbone_{metric}.tex", metric=metric)
 
-    write_main_table(df, args.output_dir / "table_main.tex", metric="AA", proposed=args.proposed)
+    write_main_table(prim, args.output_dir / "table_main.tex", metric="AA", proposed=args.proposed)
     write_ablation_table(
-        df,
+        prim,
         args.output_dir / "table_ablation.tex",
         proposed=args.proposed,
         scenario=args.ablation_scenario,
     )
-    write_compute_table(df, args.output_dir / "table_compute.tex")
-    plot_forgetting_curves(df, args.output_dir / "figure_forgetting_curves.pdf")
+    write_compute_table(prim, args.output_dir / "table_compute.tex")
+    plot_forgetting_curves(prim, args.output_dir / "figure_forgetting_curves.pdf")
 
     # Single-task baseline reference (the b_i term of FWT). FWT itself is now computed
     # as a real column above when the zero-shot term is present (see add_fwt_column).
-    write_baseline_table(df, args.output_dir / "table_single_task_baselines.tex")
-    report_fwt_status(df, baselines)
+    write_baseline_table(prim, args.output_dir / "table_single_task_baselines.tex")
+    report_fwt_status(prim, baselines)
 
 
 if __name__ == "__main__":
