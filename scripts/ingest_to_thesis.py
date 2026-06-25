@@ -26,6 +26,10 @@ FIGURES = [
     ("pilot/figures/displacement_bars.pdf", "figures/pilot_displacement_bars.pdf"),
     ("pilot/figures/forgetting_matrix.pdf", "figures/pilot_forgetting_matrix.pdf"),
     ("figure_forgetting_curves.pdf", "figures/forgetting_curves.pdf"),
+    # Cross-backbone comparison figures (scripts/build_backbone_figures.py).
+    ("pilot/figures/backbone_cka_gradient.pdf", "figures/backbone_cka_gradient.pdf"),
+    ("pilot/figures/backbone_head_dominance.pdf", "figures/backbone_head_dominance.pdf"),
+    ("pilot/figures/backbone_metrics.pdf", "figures/backbone_metrics.pdf"),
 ]
 TABLES = [
     ("table_main.tex", "generated/table_main.tex"),
