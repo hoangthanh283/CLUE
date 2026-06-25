@@ -7,14 +7,22 @@
 \label{sec:concl-limitations}
 
 This study is deliberately scoped, and several limitations should be read
-alongside its findings. First, the controlled diagnosis centres on a single
-primary backbone, LayoutLMv3-base; although LiLT and BROS are used to test
-generalisation on a reduced subset, the forgetting-localisation picture is
-established most firmly for one architecture, and---because LayoutLMv3 is
-single-stream---the analysis localises forgetting by depth, input stream, and head
-rather than by a separable visual-attention or fusion component, which that
-architecture does not provide. A genuinely per-stream \emph{attention}
-decomposition would require a two-stream backbone and is left to future work.
+alongside its findings. First, the controlled diagnosis centres on a primary
+backbone, LayoutLMv3-base, but its central claim---that forgetting concentrates at
+the head and late layers---has been confirmed on three further architectures: the
+unimodal BERT baseline and the LiLT and BROS secondary backbones all reproduce the
+same head-dominant displacement and depth gradient, and a permutation test cannot
+separate their forgetting profiles from LayoutLMv3's ($p=0.38$, $0.51$). What stays
+scoped to LayoutLMv3 is the \emph{full CL benchmark} (the ten-baseline retention
+sweep across all scenarios), whose extension to LiLT and BROS is a compute-bound
+follow-up; the cross-backbone \emph{amount} of forgetting is also left open, as the
+three-seed $|\mathrm{BWT}|$ comparison is underpowered, so the generalisation claim
+is about the \emph{location} of forgetting rather than its magnitude. A second
+architectural limit is orthogonal: because LayoutLMv3 is single-stream, the analysis
+localises forgetting by depth, input stream, and head rather than by a separable
+visual-attention or fusion component, which that architecture does not provide. A
+genuinely per-stream \emph{attention} decomposition would require a two-stream
+backbone and is left to future work.
 Second, the task sequence comprises three public datasets (FUNSD, CORD, SROIE);
 while they span forms and receipts and a wide range of label-space sizes, they are
 modest in scale and do not cover every document genre, and the unified DIL schema

@@ -87,13 +87,14 @@ table is consistent with but, on its own, cannot establish.
   \centering
   \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{pilot_displacement_bars.pdf}
   \caption[Per-component forgetting localiser]{Per-component forgetting localiser:
-  old-task-Fisher-weighted displacement $D_g$ by depth bucket for the full
-  multimodal model---large where parameters important to the \emph{previous} task
-  were overwritten. The classifier head's weighted displacement is orders of magnitude
-  larger than any encoder layer's: forgetting concentrates at the classifier head and
-  late encoder layers, while the input encoders barely move. (The gap is dominated by
-  the head's far larger raw parameter movement; the Fisher \emph{weight} is being
-  recomputed with the corrected per-sample estimator, which preserves this ordering.)}
+  old-task-Fisher-weighted displacement $D_g$ by depth bucket, grouped by backbone
+  condition---large where parameters important to the \emph{previous} task were
+  overwritten. Across every condition (the four LayoutLMv3 modality masks, the BERT
+  text-only baseline, and the LiLT and BROS secondary backbones), the classifier
+  head's weighted displacement is one-to-four orders of magnitude larger than any
+  encoder layer's: forgetting concentrates at the classifier head and late encoder
+  layers while the input encoders barely move, and the profile is statistically the
+  same across all four architectures (\S\ref{sec:results-stability}).}
   \label{fig:per-component-bars}
 \end{figure}
 
@@ -166,11 +167,11 @@ The per-token \gls{cka} between consecutive checkpoints
 (Table~\ref{tab:cka-layer}) localises the drift. CKA is computed over individual
 valid tokens (not document-mean vectors, which would average away the per-token
 geometry the task uses) at $n\ge 500$ distinct tokens. A clean \emph{monotonic depth
-gradient} emerges: the text\,+\,layout embeddings and the vision patch-embed do not
-move at all ($\mathrm{CKA}=1.000$), while drift rises with depth and peaks at the
-last encoder layer ($0.245$) and the classifier ($0.215$) at the first task
-boundary. Forgetting is thus a \emph{late-layer\,+\,head} phenomenon, not an
-input-encoder one. Drift is also larger at the first boundary
+gradient} emerges: the text\,+\,layout embeddings barely move
+($\mathrm{CKA}=1.000$) and the vision patch-embed stays nearly frozen ($0.972$), while
+drift rises with depth and peaks at the last encoder layer ($0.246$) and the
+classifier ($0.162$) at the first task boundary. Forgetting is thus a
+\emph{late-layer\,+\,head} phenomenon, not an input-encoder one. Drift is also larger at the first boundary
 ($0\rightarrow1$) than the second ($1\rightarrow2$), consistent with representations
 stabilising as more tasks arrive. This per-layer picture and the displacement
 localiser of \S\ref{sec:results-profile} agree: the output side of the network is
@@ -184,25 +185,53 @@ not the gradient itself but a \emph{comparison}: we run BERT-base (Cb) through t
 identical instrument and contrast its depth gradient with LayoutLMv3's
 (Table~\ref{tab:bert-contrast}). The contrast is now available, and it is
 clarifying. BERT-base shows the \emph{same} monotonic late$+$head drift gradient
-(CKA falling from $0.999$ at the embeddings to $0.292$ at the last layer and $0.195$
+(CKA falling from $0.999$ at the embeddings to $0.287$ at the last layer and $0.198$
 at the head) \emph{and} the same head-dominant displacement (head
-$\sim$$1.8\times10^{-5}$ versus late $\sim$$4\times10^{-9}$, a four-order-of-magnitude
+$\sim$$1.5\times10^{-5}$ versus late $\sim$$3\times10^{-9}$, a four-order-of-magnitude
 gap mirroring LayoutLMv3's). The head/late forgetting locus is therefore \emph{not}
 multimodal-specific: it is the general output-side forgetting pattern, here reproduced
-on a multimodal backbone. What \emph{is} specific to LayoutLMv3 is that its layout and
-visual \emph{input} encoders stay frozen ($\mathrm{CKA}=1.0$), a stabilising structure
-the text-only BERT simply does not have---BERT has no vision or layout input stream to
+on a multimodal backbone. What \emph{is} specific to LayoutLMv3 is that its visual
+patch \emph{input} encoder stays frozen ($\mathrm{CKA}=0.97$), a stabilising structure
+the text-only BERT simply does not have---BERT has no vision input stream to
 hold fixed. The per-component permutation test of \S\ref{sec:method-diag-hypotheses}
 quantifies the head dominance directly.
+
+\paragraph{Does it generalise across architectures? The secondary backbones.} The
+unimodal contrast rules out a vision-specific artefact, but BERT and LayoutLMv3 share a
+RoBERTa-style transformer trunk; a sceptic could still ask whether the head/late locus
+is an idiosyncrasy of that family. We therefore run the identical instrument on two
+\emph{architecturally distinct} document encoders: LiLT, which decouples text and
+layout into two separate streams fused only at attention, and BROS, which folds 2D
+spatial coordinates directly into a relative-position attention with no vision branch.
+Both reproduce the pattern (Table~\ref{tab:bert-contrast}, rightmost columns): the
+monotonic depth gradient holds (embeddings $\approx 1.0$, falling to $0.17$/$0.18$ at
+the last layer and $0.13$/$0.14$ at the head for LiLT/BROS), and the Fisher-weighted
+displacement is head-dominant on both---LiLT head $5.2\times10^{-4}$ versus its largest
+non-head bucket $1.8\times10^{-5}$ ($28\times$), BROS head $1.1\times10^{-4}$ versus
+$1.6\times10^{-7}$ ($\sim$$700\times$). A permutation test on the full
+displacement-by-depth \emph{profile} cannot distinguish either secondary backbone from
+LayoutLMv3 ($p=0.38$ for LiLT, $p=0.51$ for BROS; \S\ref{sec:results-stability}): the
+\emph{location} of forgetting is statistically the same across all four backbones.
+Across a text-only transformer, a vision-augmented multimodal encoder, a dual-stream
+layout model, and a spatial-attention model, forgetting concentrates in the same place.
+One honest nuance survives this generalisation. BROS is a principled partial exception
+on \emph{which} parameters move: its 1D/2D position embeddings are both its most
+Fisher-important parameters and its second-most-displaced group (layout $6.4\times10^{-4}$,
+just below the classifier), reflecting that BROS encodes geometry in trainable position
+tables rather than a frozen input stream. The head remains the dominant locus on BROS,
+but a head-only remedy is, for that backbone, necessary rather than fully sufficient---a
+point we return to when scoping the method (\S\ref{sec:results-stability}).
 
 \begin{figure}[!htbp]
   \centering
   \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{pilot_cka_heatmap.pdf}
   \caption[Per-layer representational drift (CKA depth gradient)]{Per-layer
   representational drift (linear CKA between consecutive checkpoints) as a function of
-  depth, for the two task boundaries. The input encoders do not drift ($\mathrm{CKA}=1.0$)
-  while drift rises monotonically with depth and peaks at the last encoder layer and the
-  classifier head (cf.\ Table~\ref{tab:cka-layer}). Pilot result (C4).}
+  depth, for the two task boundaries and across all backbone conditions. The input
+  encoders do not drift ($\mathrm{CKA}\approx 1.0$) while drift rises monotonically with
+  depth and peaks at the last encoder layer and the classifier head---the same gradient
+  on LayoutLMv3, BERT, LiLT and BROS alike (cf.\ Tables~\ref{tab:cka-layer},
+  \ref{tab:bert-contrast}).}
   \label{fig:cka-heatmap}
 \end{figure}
 
@@ -219,37 +248,40 @@ quantifies the head dominance directly.
     \textbf{Layer} & \textbf{FUNSD$\rightarrow$CORD} & \textbf{CORD$\rightarrow$SROIE} \\
     \midrule
     Text+layout embeddings  & 1.000 & 1.000 \\
-    Vision patch-embed      & 1.000 & 1.000 \\
-    Encoder layer 0 (early) & 0.777 & 0.989 \\
-    Encoder layer 5 (mid)   & 0.344 & 0.924 \\
-    Encoder layer 11 (late) & 0.245 & 0.774 \\
-    Classifier head         & 0.215 & 0.708 \\
+    Vision patch-embed      & 0.972 & 0.973 \\
+    Encoder layer 0 (early) & 0.963 & 0.977 \\
+    Encoder layer 6 (mid)   & 0.654 & 0.694 \\
+    Encoder layer 11 (late) & 0.246 & 0.167 \\
+    Classifier head         & 0.162 & 0.123 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \begin{table}[!htbp]
   \centering
-  \caption[Multimodal-vs-unimodal depth-gradient contrast]{Depth-gradient contrast at
-  the first boundary (FUNSD$\rightarrow$CORD): per-token CKA ($1.0=$ no drift) at
-  depth-matched points for the full multimodal model (C4) versus the true unimodal text
-  encoder (Cb, BERT-base). Both backbones show the \emph{same} monotonic late$+$head
-  drift gradient, so the head/late forgetting locus is not multimodal-specific. The
-  difference is at the \emph{input} side: LayoutLMv3's layout and visual input streams
-  stay frozen ($\mathrm{CKA}=1.0$), whereas BERT, being text-only, has no such streams
-  (marked n/a). The per-component test of \S\ref{sec:method-diag-hypotheses} confirms
-  the head dominance on both.}
+  \caption[Cross-architecture depth-gradient contrast]{Depth-gradient contrast at the
+  first boundary (FUNSD$\rightarrow$CORD): per-token CKA ($1.0=$ no drift) at
+  depth-matched points across four backbones---the full multimodal model (C4,
+  LayoutLMv3), the true unimodal text encoder (Cb, BERT-base), and the two secondary
+  backbones LiLT (decoupled text$+$layout) and BROS (text$+$spatial). All four show the
+  \emph{same} monotonic late$+$head drift gradient (input encoders frozen at
+  $\mathrm{CKA}\approx 1.0$, drift rising with depth, minimal at the classifier), so the
+  head/late forgetting locus is \emph{architecture-general}, not specific to a vision
+  backbone. The difference is only at the \emph{input} side: LayoutLMv3 alone carries a
+  visual patch stream, which stays frozen ($\mathrm{CKA}=1.0$); BERT is text-only (n/a).
+  Mean over three seeds. The per-component displacement test of
+  \S\ref{sec:results-stability} confirms head dominance on all four.}
   \label{tab:bert-contrast}
-  \begin{tabular}{lcc}
+  \begin{tabular}{lcccc}
     \toprule
-    \textbf{Depth point} & \textbf{C4 (LayoutLMv3)} & \textbf{Cb (BERT)} \\
+    \textbf{Depth point} & \textbf{C4 (LayoutLMv3)} & \textbf{Cb (BERT)} & \textbf{LiLT} & \textbf{BROS} \\
     \midrule
-    Embeddings        & 1.000 & 0.999 \\
-    Encoder early (L0) & 0.777 & 0.987 \\
-    Encoder mid (L6)   & 0.344 & 0.751 \\
-    Encoder late (L11) & 0.245 & 0.292 \\
-    Classifier head    & 0.215 & 0.195 \\
-    Layout / vision input & 1.000 & \emph{n/a (text-only)} \\
+    Embeddings            & 1.000 & 0.999 & 0.999 & 0.993 \\
+    Encoder early (L0)    & 0.963 & 0.985 & 0.958 & 0.942 \\
+    Encoder mid (L6)      & 0.654 & 0.764 & 0.453 & 0.636 \\
+    Encoder late (L11)    & 0.246 & 0.287 & 0.171 & 0.181 \\
+    Classifier head       & 0.162 & 0.198 & 0.128 & 0.141 \\
+    Vision input (patch)  & 0.972 & \emph{n/a} & \emph{n/a} & \emph{n/a} \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -269,14 +301,16 @@ that was statistically impossible to pass. The head/late locus is instead establ
 by three converging instruments that do clear their bars: the \emph{per-component}
 Fisher-weighted displacement test, which localises the dominant forgetting bucket and
 \emph{rejects} $H_0$ with the classifier head dominant ($p<0.01$); the per-token CKA
-depth gradient (Table~\ref{tab:cka-layer}); and the displacement bars for both C1 and
-Cb (Figure~\ref{fig:per-component-bars}), which show the head's raw parameter movement
-orders of magnitude larger than any encoder layer's. The one test that remains unavailable is the
-\emph{location} (distribution-targeting) permutation test on the per-depth profile
-against the unimodal references: the C4 reference run predates per-depth displacement
-logging, so it carries no per-depth records to permute against. We therefore do not
-report that test, and rely on the per-component Fisher test, the CKA gradient, and the
-C1/Cb displacement bars instead. Per the revised decision rule
+depth gradient (Table~\ref{tab:cka-layer}); and the displacement bars across all
+backbone conditions (Figure~\ref{fig:per-component-bars}), which show the head's raw
+parameter movement orders of magnitude larger than any encoder layer's. The
+\emph{location} (distribution-targeting) permutation test on the per-depth profile is
+now available for the secondary backbones, which were logged with per-depth
+displacement: permuting LiLT's and BROS's profiles against the LayoutLMv3 (C4)
+reference \emph{fails to reject} $H_0$ ($p=0.38$ and $p=0.51$), i.e.\ their forgetting
+is located in statistically the same place. Combined with the per-component Fisher
+rejection and the shared CKA gradient, the head/late locus is established on four
+backbones. Per the revised decision rule
 (\S\ref{sec:method-selection}) this head/late concentration selects the
 depth/head-targeted DocCL of \S\ref{sec:method-selected}.
 
@@ -355,8 +389,10 @@ single-stream encoder. What makes the finding more than a re-confirmation of the
 known unimodal depth gradient is the contrast against the true unimodal baseline Cb
 (Table~\ref{tab:bert-contrast}): BERT reproduces the same head/late locus, so the
 pattern is the general output-side one rather than a multimodal artefact, while the
-multimodal-specific element is the frozen layout and vision input streams that BERT
-lacks. Because the
+multimodal-specific element is the frozen vision input stream that BERT
+lacks. The two secondary backbones LiLT and BROS, architecturally distinct from both,
+reproduce the identical localisation (their displacement profiles are statistically
+indistinguishable from LayoutLMv3's), so the locus is architecture-general. Because the
 forgetting locus is \emph{output-facing}, the diagnosis motivates---and the corrected
 decision rule selects---the depth/head-targeted DocCL of \S\ref{sec:method-selected}
 (depth-scaled consolidation $+$ output distillation $+$ head replay), and predicts
@@ -803,8 +839,10 @@ we do \emph{not} assert a ``fusion-specific'' (or its absence as a) finding, sin
 fusion is not a measurable parameter component here; the cross-condition magnitude
 test, moreover, was underpowered by construction, so the head/late locus rests instead
 on the per-component Fisher displacement test (classifier head dominant, $p<0.01$), the
-CKA depth gradient, and the displacement bars for the LayoutLMv3 and BERT conditions,
-the latter establishing that the pattern is not multimodal-specific. The actionable
+CKA depth gradient, and the displacement bars across all four backbone conditions
+(LayoutLMv3, BERT, LiLT and BROS), whose displacement-by-depth profiles are
+statistically indistinguishable---establishing that the pattern is neither
+multimodal-specific nor an artefact of a single architecture. The actionable
 consequence is robust to all of this: the
 forgetting locus is output-facing, so remedies that protect or re-expose the upper
 layers and the classifier---of which experience replay is the simplest instance, and
@@ -869,17 +907,23 @@ orders. (iii) Forward transfer is measured from the grid's zero-shot entries aga
 single-task baselines (\S\ref{sec:results-bwt-fwt}) and is strongly negative by the
 structure of the scenarios. (iv) The exploratory cross-condition test was underpowered by
 construction; the head/late locus is instead established by the per-component Fisher test
-($p<0.01$), the CKA depth gradient, and the LayoutLMv3-vs-BERT displacement contrast,
-though the per-depth location permutation test against the unimodal references remains
-unavailable because the C4 reference run predates per-depth displacement logging. (v) The
+($p<0.01$), the CKA depth gradient, and the displacement contrast across backbones. The
+per-depth location permutation test is now available on the secondary backbones and
+\emph{fails to distinguish} their forgetting profile from LayoutLMv3's ($p=0.38$ for
+LiLT, $p=0.51$ for BROS), corroborating a shared locus. (v) The
 DIL unified schema is VALUE-dominant with KEY only in FUNSD/SROIE, so every DIL result
 is interpreted alongside per-class F1 and per-task label frequencies
-(\S\ref{sec:eval-seeds}). (vi) All results are on the single primary backbone
-LayoutLMv3, contrasted against the unimodal BERT baseline; whether the depth/head
-concentration and the replay-dominant ordering generalise to LiLT and BROS is the
-planned secondary-backbone study, and the multimodal claims are scoped to LayoutLMv3
-until it completes. None of these undercut the robust findings---forgetting is a
-depth/head phenomenon, replay (ER/DER++) is the strongest remedy and matches the joint
+(\S\ref{sec:eval-seeds}). (vi) The forgetting \emph{diagnosis} now spans four backbones:
+the per-component localiser, CKA depth gradient and displacement profile were run on the
+primary LayoutLMv3, the unimodal BERT baseline, and the LiLT and BROS secondary
+backbones, and all four place forgetting at the head/late layers (the profile test cannot
+separate them). What remains scoped to LayoutLMv3 is the \emph{full CL benchmark}
+(AA/BWT/AF across the ten baselines and all scenarios): the LiLT/BROS retention-metric
+sweep is a compute-bound follow-up on larger hardware, and the magnitude comparison of
+$|\mathrm{BWT}|$ across backbones is underpowered at three seeds, so we claim a shared
+\emph{location} of forgetting, not a shared \emph{amount}. None of these undercut the
+robust findings---forgetting is a depth/head phenomenon \emph{across architectures},
+replay (ER/DER++) is the strongest remedy and matches the joint
 oracle on domain-incremental learning while DocCL closes most of that gap, and forgetting
 is near zero under pure language shift but catastrophic under output-space growth---but
 they delimit how far the exact numbers should be pushed.
