@@ -1,5 +1,31 @@
 # STATE
 
+## Active Work (2026-06-25) — DocMERGE method (NEW, implemented + queued to run)
+**New CL method `doc_merge`** (committed 7185a6b + 35f5376 on `doccl`): diagnosis-guided
+head-merging + drift-immune lexical memory. Born from a scientific-brainstorm + brutal
+lit-check (NOVEL: head-only-merge-by-diagnosis, merge+KV-memory, BM25/TF-IDF-over-OCR
+addressing, positive-BWT-via-LMC; framing rules + must-cite baselines MagMax/AMD-Proj
+recorded in plan `~/.claude/plans/zazzy-brewing-popcorn.md`).
+- **Files:** `doccl/methods/doc_merge.py` (method), `doccl/methods/head_merge.py`
+  (plain/ties/fisher merge), `configs/method/doc_merge.yaml`, registered in
+  `scripts/train.py`. Reuses HRP's `HybridPromptPool`/`sparse_doc_vectors`/routing.json
+  + the Fisher displacement API (re-validates head-locus per run → `diag.json`).
+- **Ablation axis:** `consolidate ∈ {merge, memory, both}` × `merge_rule ∈ {plain, ties,
+  fisher}` — one method, config-toggled. `merge`=head-merge only (no memory read);
+  `memory`=HRP-without-replay; `both`=full method. Backbone FROZEN (LMC holds → merge safe).
+- **Tests GREEN:** 9 unit (`tests/methods/test_doc_merge.py`) + 6 e2e (3 modes × CIL/DIL).
+  ruff + black clean. Fixed one real bug: CIL head-growth made the Fisher-displacement
+  diagnostic mismatch widths (5 vs 7); fix = paired same-moment (fisher_old, params_old)
+  snapshots per boundary.
+- **Feasibility QUEUED (not yet run):** `scripts/run_docmerge_feasibility.sh` on `dil`
+  (Step A: confirm head-locus via diag.json; Step B: the bake-off vs der_pp). A
+  wait-and-launch watcher is armed (background) — it blocks on the LiLT pilot PID 1890344
+  and auto-starts the feasibility run when the pilot frees the GPU (local box fits ONE
+  dataset builder). Output → `results/docmerge_feas/feasibility.log`. **Go/no-go:** `both`
+  AA ≥ memory-only AND ≥ merge-only, AND BWT > 0; fisher>plain = bonus.
+- **Next after results:** confirm on `cil_cord` (routing stress test); if AA-capped, sweep
+  backbone trainability (LMC-failure curve); position for A* on positive-BWT + buffer-free.
+
 ## Active Work (2026-06-25) — backbone-generalization of the forgetting analysis
 **Task: make the forgetting analysis comprehensive across ALL 4 backbones**
 (LayoutLMv3 primary + BERT + LiLT + BROS). Found it was NOT: the pilot localizer
