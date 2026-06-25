@@ -73,22 +73,36 @@ analyze_results silently merged LiLT runs into LayoutLMv3 rows. All three fixed:
 | cl_lilt | 7   | 27.2 | -86.8 | head leads (seed7 non-head higher) |
 | cr_bros | 42  | 28.5 | -89.6 | 33x |
 | cr_bros | 123 | 29.2 | -88.5 | 201x |
-| cr_bros | 7   | running |
-BROS CKA depth-gradient (seed42, FUNSD→CORD): 0.99 emb → 0.95 L0 → 0.61 L6 → 0.15
-L11 → 0.11 head — clean monotonic drift-with-depth, max at head. Head/depth-dominant
-forgetting REPRODUCES on both LiLT and BROS = the diagnosis is NOT architecture-specific.
+| cr_bros | 7   | 28.4 | -88.6 | 104x |
+**ALL 6/6 PILOT DONE.** BROS CKA depth-gradient (seed42, FUNSD→CORD): 0.99 emb → 0.95 L0
+→ 0.61 L6 → 0.15 L11 → 0.11 head — clean monotonic drift-with-depth, max at head.
+Cross-backbone displacement-by-depth (mean over seeds, head vs max-non-head):
+c4_full 1.6e-5/1e-7, cb_bert 7e-6/0, cl_lilt 2.6e-4/9.2e-6, cr_bros 5.4e-5/1e-7 — ALL
+head-dominant. Pilot-analyze location test: cl_lilt p=0.38, cr_bros p=0.51 vs c4_full
+(NOT different → same locus). Head/depth-dominant forgetting REPRODUCES on LiLT+BROS =
+diagnosis is NOT architecture-specific. Pilot figures regenerated (7 conditions, 22:09).
 
-**BROS GRID auto-launch ARMED (guard PID, background):**
-`scratchpad/launch_bros_grid_when_idle.sh` waits until the box is idle for ~2min (no
-pilot/train.py/docmerge/grid proc) THEN runs `scratchpad/run_bros_grid.sh` (24 runs:
-naive/ewc/er/der_pp × dil+mixed × 3 seeds, fills BROS=0). The ~2min idle requirement lets
-the parallel docmerge feasibility run claim the GPU FIRST after the pilot ends (avoids the
-single-dataset-builder collision). Guard log: `scratchpad/pilot_full/bros_guard.log`.
+**BROS GRID — messy but recovering (DO NOT re-launch run_grid_multigpu for BROS!):**
+- ⚠️ `run_grid_multigpu.sh` with BACKBONES=bros plans 111 jobs (24 BROS + 87 LayoutLMv3/
+  single_* defaults) — env knobs do NOT trim it to BROS-only. I launched it, saw 111, and
+  killed the scheduler — but it had already spawned ONE child, `dil_naive_seed42_bros`,
+  which is running fine (the job we want). Scheduler wrappers now DEAD (won't spawn the 87).
+- ⚠️ The other session's **docmerge watcher is self-deadlocked**: its loop condition
+  `while pgrep -f "doccl.pilot.run_pilot"` matches its OWN cmdline (which contains that
+  literal string) → never exits → docmerge feasibility will NEVER fire. Harmless to me now
+  but the other session must fix it (use a PID file or `pgrep -f "[d]occl.pilot"`).
+- ✅ CORRECT WAY to finish BROS: `scratchpad/run_bros_only.sh` — runs the 24 jobs DIRECTLY
+  via `train.py method=<m> model=bros_base scenario=<sc> seed=<s>` (validated: dil naive
+  reaches T0 val_f1=87.6), writes `.done` itself (train.py does NOT; grid wrapper normally
+  does). Resume-safe via `.done`. After the orphan `dil_naive_seed42_bros` finishes, touch
+  its `.done` then run this script for the other 23. NEVER use run_bros_grid.sh (=111 jobs).
+- ⚠️ When monitoring, NEVER run a command whose cmdline contains the literal
+  `doccl.pilot.run_pilot` or `scripts/train.py` — it transiently feeds the other session's
+  pgrep loops. Use nvidia-smi + run-dir file checks, or split the string at runtime.
 
 **NEXT (after BROS grid lands):**
 - `uv run python scripts/analyze_results.py --source local` (backbone table picks up BROS)
-  + `uv run python -m doccl.pilot.analyze` (auto-discovers cl_lilt/cr_bros conditions →
-  cka_heatmap/fisher_bars/displacement_bars/forgetting_matrix now 7-condition).
+  + `uv run python -m doccl.pilot.analyze` (already regenerated for pilot; re-run after grid).
 - Update thesis Ch6 limitation (vi) — currently scopes claims to LayoutLMv3 & calls
   LiLT/BROS "planned"; reframe as DONE generalization result.
 
