@@ -203,7 +203,8 @@ is an idiosyncrasy of that family. We therefore run the identical instrument on 
 \emph{architecturally distinct} document encoders: LiLT, which decouples text and
 layout into two separate streams fused only at attention, and BROS, which folds 2D
 spatial coordinates directly into a relative-position attention with no vision branch.
-Both reproduce the pattern (Table~\ref{tab:bert-contrast}, rightmost columns): the
+Both reproduce the pattern (Table~\ref{tab:bert-contrast}, rightmost columns, and
+Figure~\ref{fig:backbone-signature}): the
 monotonic depth gradient holds (embeddings $\approx 1.0$, falling to $0.17$/$0.18$ at
 the last layer and $0.13$/$0.14$ at the head for LiLT/BROS), and the Fisher-weighted
 displacement is head-dominant on both---LiLT head $5.2\times10^{-4}$ versus its largest
@@ -221,6 +222,23 @@ just below the classifier), reflecting that BROS encodes geometry in trainable p
 tables rather than a frozen input stream. The head remains the dominant locus on BROS,
 but a head-only remedy is, for that backbone, necessary rather than fully sufficient---a
 point we return to when scoping the method (\S\ref{sec:results-stability}).
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=0.49\linewidth]{backbone_cka_gradient.pdf}\hfill
+  \includegraphics[width=0.49\linewidth]{backbone_head_dominance.pdf}
+  \caption[Cross-backbone forgetting signature]{The forgetting signature is the same
+  across four architectures. \textbf{Left:} per-layer representational drift (linear
+  CKA, FUNSD$\rightarrow$CORD) collapses onto one monotonic curve for LayoutLMv3, BERT,
+  LiLT and BROS---input encoders frozen near $1.0$, drift rising with depth, minimal at
+  the classifier head. \textbf{Right:} old-task-Fisher-weighted parameter displacement,
+  head versus largest non-head bucket (log scale); the classifier head dominates on
+  every backbone (annotated head:non-head ratio). A permutation test cannot separate the
+  LiLT or BROS displacement-by-depth profile from LayoutLMv3's ($p=0.38$, $p=0.51$;
+  \S\ref{sec:results-stability}), so the \emph{location} of forgetting is
+  architecture-general. Mean over three seeds.}
+  \label{fig:backbone-signature}
+\end{figure}
 
 \begin{figure}[!htbp]
   \centering
@@ -349,6 +367,30 @@ common to all three.
     \bottomrule
   \end{tabular}
 \end{table}
+
+\paragraph{Forgetting by backbone.} The secondary backbones sit in the same regime as
+the primary one under naive fine-tuning (Figure~\ref{fig:backbone-metrics}): LiLT and
+BROS reach final accuracies of $27.1$ and $28.7$ against LayoutLMv3's $28.3$, with
+backward transfer of $-86.7$ and $-88.9$ against $-89.8$---all three multimodal/layout
+backbones forget heavily and comparably, while the text-only BERT baseline forgets
+somewhat less ($\mathrm{BWT}=-66.7$). We do \emph{not} read the small accuracy and
+$|\mathrm{BWT}|$ differences between backbones as significant: at three seeds the
+cross-backbone magnitude comparison is underpowered (\S\ref{sec:results-stability}), so
+the claim here is only that the \emph{amount} of forgetting is of the same severe order
+on every multimodal backbone, consistent with its shared head/late \emph{location}.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{backbone_metrics.pdf}
+  \caption[Continual-learning metrics by backbone]{Continual-learning metrics by
+  backbone under naive sequential FUNSD$\rightarrow$CORD$\rightarrow$SROIE (mean\,$\pm$\,std
+  over three seeds). \textbf{Left:} final average accuracy. \textbf{Right:} backward
+  transfer (more negative $=$ more forgetting). The three multimodal/layout backbones
+  (LayoutLMv3, LiLT, BROS) forget heavily and comparably; the text-only BERT baseline
+  forgets somewhat less. Differences between backbones are within the regime expected at
+  this seed count and are not over-interpreted.}
+  \label{fig:backbone-metrics}
+\end{figure}
 
 \paragraph{On the role of the text stream.} The exploratory pass concluded that
 ``the text stream is load-bearing'' partly from the C1 row---but that C1 was a
