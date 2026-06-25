@@ -77,6 +77,10 @@ class DocMerge(PromptBasedMethod):
             raise ValueError(f"consolidate must be merge|memory|both, got {self.consolidate!r}")
         self.merge_rule = config.get("merge_rule", "fisher")
         self.ties_density = float(config.get("ties_density", 0.2))
+        # Count-aware merge (default True): divide each coordinate by the number of tasks
+        # that wrote a non-zero delta there, not by T — preserves full magnitude on a
+        # task's own (disjoint/CIL) rows. False = classic Model-Soups mean (pre-RCA).
+        self.merge_count_aware = bool(config.get("merge_count_aware", True))
         self.headspace_constraint = bool(config.get("headspace_constraint", False))
         self.router_mode = config.get("router", "sparse")  # lexical address by default
         self.top_k = config.get("top_k", 2)
@@ -221,6 +225,7 @@ class DocMerge(PromptBasedMethod):
                 rule=self.merge_rule,
                 weights=weights,
                 density=self.ties_density,
+                count_aware=self.merge_count_aware,
             )
             # Pad base to the merged-delta width (CIL growth) before adding.
             if base.shape != merged_delta.shape:
