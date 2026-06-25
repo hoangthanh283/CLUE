@@ -17,16 +17,22 @@ recorded in plan `~/.claude/plans/zazzy-brewing-popcorn.md`).
   ruff + black clean. Fixed one real bug: CIL head-growth made the Fisher-displacement
   diagnostic mismatch widths (5 vs 7); fix = paired same-moment (fisher_old, params_old)
   snapshots per boundary.
-- **Feasibility QUEUED (runner FIXED, not yet successfully run):**
-  `scripts/run_docmerge_feasibility.sh` on `dil` (Step A: head-locus via diag.json; Step
-  B: bake-off vs der_pp). **First watcher launch (18:47) CRASHED** on a Hydra struct error
-  (`training.epochs` invalid → must be `method.epochs`; same bug class as the HRP runner) —
-  died before any GPU use, NO collision with the pilot. **Fixed in commit c33d899**
-  (method.epochs; dry-resolved der_pp+doc_merge clean). **Watcher RE-ARMED (background)** —
-  now waits for the ENTIRE pilot sweep (any `doccl.pilot.run_pilot` proc; the sweep spawns
-  a fresh PID per seed, so tracking one PID was the near-miss) and guards against a running
-  train.py before launching. Output → `results/docmerge_feas/feasibility.log`. **Go/no-go:**
+- **Feasibility RUNNING NOW (≈22:40, local 2060):** `scripts/run_docmerge_feasibility.sh`
+  on `dil` — der_pp (training, Task 1/3) + 7 doc_merge variants
+  (memory / merge×{plain,ties,fisher} / both×{...}). 8 runs × 3 tasks × 3ep, ~2–4h.
+  Output → `results/docmerge_feas/feasibility.log`; per-variant dirs
+  `results/docmerge_feas/<tag>/dil_*_seed42/{metrics,routing,diag}.json`. **Go/no-go:**
   `both` AA ≥ memory-only AND ≥ merge-only, AND BWT > 0; fisher>plain = bonus.
+  - Saga: first watcher launch (18:47) crashed on `training.epochs` Hydra error (fixed
+    c33d899 → `method.epochs`). Re-armed watcher had a SELF-MATCH bug: its `pgrep -f
+    "doccl.pilot.run_pilot"` matched its OWN bash body (that literal string is in the
+    script) → it would never detect pilot-done. Moot: user stopped the BROS grid (which had
+    won the GPU race, 0/24 done, resume-safe) and I LAUNCHED the bake-off DIRECTLY after
+    confirming GPU idle (15 MiB) + retiring the broken watcher. der_pp at 4.7GB VRAM,
+    loss decreasing; `trust_remote_code` ERROR lines in the log are NON-fatal (loader
+    fallback; scenario built `dil: 3 tasks` fine).
+  - ⚠️ BROS grid (`scratchpad/run_bros_grid.sh`, 24 runs, BROS=0 backbone-gen gap) was
+    STOPPED by user to free the GPU — needs re-launch after this bake-off (resume-safe).
 - **Next after results:** confirm on `cil_cord` (routing stress test); if AA-capped, sweep
   backbone trainability (LMC-failure curve); position for A* on positive-BWT + buffer-free.
 
@@ -87,13 +93,22 @@ confirm the head-locus hypothesis. NOT baselines.** Baseline metric grids (AA/BW
 comparison runs for LiLT/BROS) belong on the A6000/L40 — NOT the local box. A BROS
 baseline grid was mistakenly started here, then STOPPED and its partial dir removed.
 
-**DONE — forgetting analysis is COMPLETE for all backbones:**
+**DONE — forgetting analysis COMPLETE for all backbones + FOLDED INTO THESIS:**
 - 6/6 pilot localizer runs (LiLT + BROS × 3 seeds) finished.
-- 4 diagnostic figures regenerated with all 7 conditions (LayoutLMv3×4 masks + BERT +
-  LiLT + BROS): displacement_bars / cka_heatmap / fisher_bars / forgetting_matrix.
+- 4 diagnostic figures regenerated with all 7 conditions, ingested into thesis/figures/.
 - Hypothesis CONFIRMED: Fisher-weighted displacement head-dominant on every backbone
-  (head ≫ input/early/mid/late≈0); location test p=0.38 (LiLT), 0.51 (BROS) vs c4_full
-  (same locus). BROS CKA depth-gradient 0.99 emb → 0.11 head. Architecture-agnostic.
+  (head/non-head ratio: BERT 1589×, LayoutLMv3 masks 246–9368×, LiLT 28×, BROS 699×);
+  CKA monotonic depth-gradient max at head on all 4; location permutation test p=0.38
+  (LiLT), 0.51 (BROS) vs c4_full → SAME locus. Architecture-general.
+- Honest caveats recorded: |BWT| magnitude test underpowered at n=3 (claim shared
+  LOCATION not amount); BROS position-embeddings are a 2nd mobility/importance locus
+  (head-only necessary-but-not-fully-sufficient on BROS); use canonical-order n=3
+  c4_full (AA 28.3 / BWT −89.8), NOT the n=6 pool that mixes _ord210 reverse-order runs.
+- THESIS UPDATED (commits d93ecbd + acda6d4, pushed): Ch6 sec:results-layer new
+  'across architectures' paragraph + 4-backbone tab:bert-contrast + refreshed
+  tab:cka-layer/captions; Ch6 limitations (iv)/(vi) reframed (perm test now reported,
+  diagnosis on 4 backbones, only full CL benchmark stays LayoutLMv3-scoped); Ch7
+  limitation reframed. Builds clean (XeLaTeX, 115pp, no undefined refs).
 
 **Note:** `analyze_results.py` backbone-table fix (model_family column + table_backbone_*)
 is committed and will surface LiLT/BROS metrics WHEN those baseline runs land on the
