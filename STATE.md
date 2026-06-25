@@ -17,12 +17,16 @@ recorded in plan `~/.claude/plans/zazzy-brewing-popcorn.md`).
   ruff + black clean. Fixed one real bug: CIL head-growth made the Fisher-displacement
   diagnostic mismatch widths (5 vs 7); fix = paired same-moment (fisher_old, params_old)
   snapshots per boundary.
-- **Feasibility QUEUED (not yet run):** `scripts/run_docmerge_feasibility.sh` on `dil`
-  (Step A: confirm head-locus via diag.json; Step B: the bake-off vs der_pp). A
-  wait-and-launch watcher is armed (background) — it blocks on the LiLT pilot PID 1890344
-  and auto-starts the feasibility run when the pilot frees the GPU (local box fits ONE
-  dataset builder). Output → `results/docmerge_feas/feasibility.log`. **Go/no-go:** `both`
-  AA ≥ memory-only AND ≥ merge-only, AND BWT > 0; fisher>plain = bonus.
+- **Feasibility QUEUED (runner FIXED, not yet successfully run):**
+  `scripts/run_docmerge_feasibility.sh` on `dil` (Step A: head-locus via diag.json; Step
+  B: bake-off vs der_pp). **First watcher launch (18:47) CRASHED** on a Hydra struct error
+  (`training.epochs` invalid → must be `method.epochs`; same bug class as the HRP runner) —
+  died before any GPU use, NO collision with the pilot. **Fixed in commit c33d899**
+  (method.epochs; dry-resolved der_pp+doc_merge clean). **Watcher RE-ARMED (background)** —
+  now waits for the ENTIRE pilot sweep (any `doccl.pilot.run_pilot` proc; the sweep spawns
+  a fresh PID per seed, so tracking one PID was the near-miss) and guards against a running
+  train.py before launching. Output → `results/docmerge_feas/feasibility.log`. **Go/no-go:**
+  `both` AA ≥ memory-only AND ≥ merge-only, AND BWT > 0; fisher>plain = bonus.
 - **Next after results:** confirm on `cil_cord` (routing stress test); if AA-capped, sweep
   backbone trainability (LMC-failure curve); position for A* on positive-BWT + buffer-free.
 
