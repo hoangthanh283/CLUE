@@ -240,6 +240,123 @@ def plot_metrics(out: Path) -> None:
     print(f"Wrote {out}")
 
 
+def _load_matrices() -> dict[str, np.ndarray]:
+    """Per-backbone retention matrix R[i,j] (F1 on task j after training i), mean/seeds."""
+    acc: dict[str, list[np.ndarray]] = defaultdict(list)
+    for f in glob.glob("results/pilot/*_seed*.json"):
+        if "ord210" in f:
+            continue
+        with open(f) as fh:
+            d = json.load(fh)
+        c = d["condition"]
+        if c not in BACKBONES or d["cl_metrics"]["AA"] == 0:
+            continue
+        acc[c].append(np.array(d["matrix"], dtype=float))
+    return {c: np.nanmean(np.stack(m), axis=0) for c, m in acc.items() if m}
+
+
+def plot_forgetting_matrices(out: Path) -> None:
+    """2x2 grid of forgetting-matrix heatmaps, one per backbone (mean over seeds).
+
+    R[i,j] = F1 on task j after training through task i; diagonal = just-learned,
+    sub-diagonal = retention. Shared 0-100 colour scale + one colorbar."""
+    from matplotlib.colors import LinearSegmentedColormap
+
+    mats = _load_matrices()
+    conds = [c for c in BACKBONES if c in mats]
+    tasks = ["FUNSD", "CORD", "SROIE"]
+    cmap = LinearSegmentedColormap.from_list("rg", ["#b2182b", "#f7f7b0", "#1a9850"])
+    fig, axes = plt.subplots(2, 2, figsize=(9, 8))
+    axes = axes.ravel()
+    im = None
+    for ax, c in zip(axes, conds, strict=False):
+        R = mats[c]
+        masked = np.ma.masked_invalid(R)
+        im = ax.imshow(masked, cmap=cmap, vmin=0, vmax=100, aspect="equal")
+        ax.set_title(BACKBONES[c], fontsize=12, fontweight="bold")
+        ax.set_xticks(range(3))
+        ax.set_xticklabels([f"eval {t}" for t in tasks], fontsize=9)
+        ax.set_yticks(range(3))
+        ax.set_yticklabels([f"after {t}" for t in tasks], fontsize=9)
+        for i in range(3):
+            for j in range(3):
+                if not np.isnan(R[i, j]):
+                    v = R[i, j]
+                    ax.text(
+                        j,
+                        i,
+                        f"{v:.1f}",
+                        ha="center",
+                        va="center",
+                        color="white" if (v < 25 or v > 75) else "black",
+                        fontsize=10,
+                    )
+    for k in range(len(conds), 4):
+        axes[k].axis("off")
+    fig.suptitle(
+        "Forgetting matrix per backbone: F1 on task $j$ after training task $i$", fontsize=13
+    )
+    fig.subplots_adjust(right=0.88, hspace=0.3, wspace=0.25)
+    cax = fig.add_axes([0.91, 0.15, 0.025, 0.7])
+    fig.colorbar(im, cax=cax, label="entity-F1")
+    fig.savefig(out, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Wrote {out}")
+
+
+def plot_cka_grid(df: pd.DataFrame, out: Path) -> None:
+    """Reorganised CKA heatmap: 2x4 grid (one panel per backbone), depth x boundary,
+    shared colorbar and correct per-panel depth labels. Replaces the cramped 7-in-a-row
+    strip that mislabelled every panel with one backbone's layer names."""
+    cka = _canonical(df[df["metric"] == "cka"]).copy()
+    cka["depth"] = cka["layer"].map(_depth_of)
+    cka = cka.dropna(subset=["depth"])
+    boundaries = ["0_to_1", "1_to_2"]
+    bcols = ["FUNSD$\\rightarrow$CORD", "CORD$\\rightarrow$SROIE"]
+    fig, axes = plt.subplots(2, 2, figsize=(9, 8))
+    axes = axes.ravel()
+    conds = [c for c in BACKBONES if c in set(cka["condition"])]
+    im = None
+    for ax, c in zip(axes, conds, strict=False):
+        sub = cka[cka["condition"] == c]
+        grid = np.full((len(DEPTH_ORDER), len(boundaries)), np.nan)
+        for di, dep in enumerate(DEPTH_ORDER):
+            for bi, b in enumerate(boundaries):
+                vals = sub[(sub["depth"] == dep) & (sub["boundary"] == b)]["value"]
+                if len(vals):
+                    grid[di, bi] = vals.mean()
+        im = ax.imshow(grid, cmap="viridis", vmin=0, vmax=1, aspect="auto")
+        ax.set_title(BACKBONES[c], fontsize=12, fontweight="bold")
+        ax.set_xticks(range(len(boundaries)))
+        ax.set_xticklabels(bcols, fontsize=8)
+        ax.set_yticks(range(len(DEPTH_ORDER)))
+        ax.set_yticklabels(DEPTH_ORDER, fontsize=9)
+        for di in range(len(DEPTH_ORDER)):
+            for bi in range(len(boundaries)):
+                if not np.isnan(grid[di, bi]):
+                    v = grid[di, bi]
+                    ax.text(
+                        bi,
+                        di,
+                        f"{v:.2f}",
+                        ha="center",
+                        va="center",
+                        color="white" if v < 0.5 else "black",
+                        fontsize=9,
+                    )
+    for k in range(len(conds), 4):
+        axes[k].axis("off")
+    fig.suptitle(
+        "Representational drift (CKA) by depth and task boundary, per backbone", fontsize=13
+    )
+    fig.subplots_adjust(right=0.88, hspace=0.3, wspace=0.3)
+    cax = fig.add_axes([0.91, 0.15, 0.025, 0.7])
+    fig.colorbar(im, cax=cax, label="linear CKA (1.0 = no drift)")
+    fig.savefig(out, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Wrote {out}")
+
+
 def main() -> None:
     df = load_canonical()
     if df.empty:
@@ -249,6 +366,8 @@ def main() -> None:
     plot_cka_gradient(df, figdir / "backbone_cka_gradient.pdf")
     plot_head_dominance(df, figdir / "backbone_head_dominance.pdf")
     plot_metrics(figdir / "backbone_metrics.pdf")
+    plot_forgetting_matrices(figdir / "backbone_forgetting_matrices.pdf")
+    plot_cka_grid(df, figdir / "backbone_cka_grid.pdf")
     print("Done. Cross-backbone figures in results/pilot/figures/.")
 
 
