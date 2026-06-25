@@ -39,8 +39,10 @@ def test_merge_identical_deltas_is_identity():
 
 
 def test_fisher_equal_weights_equals_plain_average():
-    d0 = torch.tensor([2.0, 0.0, -4.0])
-    d1 = torch.tensor([0.0, 6.0, 2.0])
+    # All coords non-zero for both tasks → count-aware divisor is 2 everywhere, so plain
+    # == fisher(equal) == the classic mean. (Disjoint-coord behaviour is tested below.)
+    d0 = torch.tensor([2.0, 1.0, -4.0])
+    d1 = torch.tensor([3.0, 6.0, 2.0])
     plain = merge_head_deltas([d0, d1], rule="plain")
     fisher = merge_head_deltas([d0, d1], rule="fisher", weights=[1.0, 1.0])
     assert torch.allclose(plain, fisher, atol=1e-6)
@@ -48,19 +50,42 @@ def test_fisher_equal_weights_equals_plain_average():
 
 
 def test_fisher_weights_concentrate_on_important_task():
-    """A dominant Fisher weight pulls the merge toward that task's delta."""
+    """A dominant Fisher weight pulls the merge toward that task's delta (both non-zero)."""
     d0 = torch.tensor([10.0, 10.0])
-    d1 = torch.tensor([0.0, 0.0])
+    d1 = torch.tensor([2.0, 2.0])  # non-zero so count-aware divisor is the full weight sum
     merged = merge_head_deltas([d0, d1], rule="fisher", weights=[9.0, 1.0])
-    # 0.9 * d0 + 0.1 * d1
-    assert torch.allclose(merged, torch.tensor([9.0, 9.0]), atol=1e-6)
+    # (9*d0 + 1*d1) / (9+1) = 0.9*d0 + 0.1*d1
+    assert torch.allclose(merged, torch.tensor([9.2, 9.2]), atol=1e-6)
 
 
-def test_fisher_zero_total_falls_back_to_plain():
+def test_fisher_zero_total_falls_back_to_uniform():
     d0 = torch.tensor([2.0, 4.0])
     d1 = torch.tensor([6.0, 8.0])
     merged = merge_head_deltas([d0, d1], rule="fisher", weights=[0.0, 0.0])
     assert torch.allclose(merged, (d0 + d1) / 2, atol=1e-6)
+
+
+def test_count_aware_preserves_full_magnitude_on_disjoint_rows():
+    """THE 1/T-SHRINKAGE FIX: a coordinate written by only ONE task keeps its full value,
+    not value/T. This is the RCA fix — disjoint (CIL) rows must not be diluted by tasks
+    that never touched them."""
+    # coord 0: both wrote → averaged; coord 1: only d0; coord 2: only d1.
+    d0 = torch.tensor([4.0, 6.0, 0.0])
+    d1 = torch.tensor([8.0, 0.0, 10.0])
+    aware = merge_head_deltas([d0, d1], rule="plain", count_aware=True)
+    assert torch.allclose(aware, torch.tensor([6.0, 6.0, 10.0]), atol=1e-6)  # (4+8)/2, 6/1, 10/1
+    # classic mean still divides by T everywhere (the pre-RCA behaviour, kept for ablation).
+    classic = merge_head_deltas([d0, d1], rule="plain", count_aware=False)
+    assert torch.allclose(classic, torch.tensor([6.0, 3.0, 5.0]), atol=1e-6)  # /2 everywhere
+
+
+def test_count_aware_fisher_on_disjoint_rows():
+    """fisher merge is also count-aware: a single-writer coord uses that task's weight only."""
+    d0 = torch.tensor([2.0, 5.0, 0.0])
+    d1 = torch.tensor([2.0, 0.0, 7.0])
+    aware = merge_head_deltas([d0, d1], rule="fisher", weights=[3.0, 1.0], count_aware=True)
+    # coord0 both: (3*2+1*2)/(3+1)=2 ; coord1 only d0: 3*5/3=5 ; coord2 only d1: 1*7/1=7
+    assert torch.allclose(aware, torch.tensor([2.0, 5.0, 7.0]), atol=1e-6)
 
 
 def test_ties_zeroes_sign_conflicting_low_magnitude_coordinate():
@@ -86,22 +111,24 @@ def test_ties_density_trims_small_coordinates_per_task():
 
 
 def test_merge_pads_differently_sized_cil_grown_deltas():
-    """A task whose head was narrower contributes zero delta in the new rows."""
+    """A task whose head was narrower contributes zero delta in the new rows — and those
+    rows keep the wider task's FULL value (count-aware), not value/T."""
     narrow = torch.tensor([1.0, 1.0])  # task 0 head had 2 logit rows
     wide = torch.tensor([2.0, 2.0, 4.0, 4.0])  # task 1 head grew to 4 rows
     merged = merge_head_deltas([narrow, wide], rule="plain")
-    # rows 0-1: mean(1,2)=1.5 ; rows 2-3: mean(0,4)=2.0 (narrow padded with 0)
-    assert torch.allclose(merged, torch.tensor([1.5, 1.5, 2.0, 2.0]), atol=1e-6)
+    # rows 0-1: both wrote → (1+2)/2=1.5 ; rows 2-3: only wide wrote → 4/1=4.0 (NOT 2.0).
+    assert torch.allclose(merged, torch.tensor([1.5, 1.5, 4.0, 4.0]), atol=1e-6)
 
 
 def test_merge_pads_2d_weight_deltas():
-    """Weight (2-D) deltas of differing label-count merge by zero-padding new rows."""
+    """Weight (2-D) deltas of differing label-count merge by zero-padding new rows; the new
+    rows keep full magnitude (count-aware)."""
     narrow = torch.ones(2, 3)  # 2 labels x hidden 3
     wide = torch.full((4, 3), 2.0)  # grew to 4 labels
     merged = merge_head_deltas([narrow, wide], rule="plain")
     assert merged.shape == (4, 3)
-    assert torch.allclose(merged[:2], torch.full((2, 3), 1.5), atol=1e-6)  # mean(1,2)
-    assert torch.allclose(merged[2:], torch.full((2, 3), 1.0), atol=1e-6)  # mean(0,2)
+    assert torch.allclose(merged[:2], torch.full((2, 3), 1.5), atol=1e-6)  # both → (1+2)/2
+    assert torch.allclose(merged[2:], torch.full((2, 3), 2.0), atol=1e-6)  # only wide → 2/1
 
 
 def test_lexical_memory_separates_disjoint_vocabularies():
