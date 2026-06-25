@@ -7,6 +7,7 @@ Used in pilot study to measure representational drift across CL task boundaries.
 Linear CKA is invariant to orthogonal transformations and isotropic scaling,
 making it appropriate for comparing activations across training checkpoints.
 """
+
 from __future__ import annotations
 
 import torch
@@ -156,8 +157,15 @@ def collect_activations(
 
         def _make_hook(layer_name: str):
             def hook(_module, _input, output):
-                feat = output[0] if isinstance(output, tuple) else output
+                # Unwrap nested tuples to the first tensor: HF encoder layers return
+                # ``(hidden_states, ...)``; LiLT's two-stream layer nests further as
+                # ``((text_hidden, layout_hidden), ...)`` — the text stream (the first
+                # tensor reached) is the one CKA compares.
+                feat = output
+                while isinstance(feat, (tuple, list)):
+                    feat = feat[0]
                 latest[layer_name] = feat.detach()
+
             return hook
 
         hooks.append(name_to_module[name].register_forward_hook(_make_hook(name)))
@@ -180,7 +188,8 @@ def collect_activations(
                     captured[name].append(vecs.detach().cpu())
                 ref = captured[layer_names[0]]
                 n_collected = (
-                    sum(c.shape[0] for c in ref) if token_level
+                    sum(c.shape[0] for c in ref)
+                    if token_level
                     else n_collected + batch["input_ids"].shape[0]
                 )
                 if n_collected >= max_samples:

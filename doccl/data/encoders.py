@@ -81,7 +81,12 @@ class _SubwordKIEEncoder:
     _bbox_normalize = False
 
     def __init__(self, tokenizer_name: str):
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, use_fast=True)
+        # ``add_prefix_space=True`` is required by RoBERTa/XLM-R fast tokenizers to
+        # accept pre-tokenized words (``is_split_into_words=True``); it is a harmless
+        # no-op for WordPiece tokenizers (BERT/BROS), so it is safe to set always.
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_name, use_fast=True, add_prefix_space=True
+        )
         if not self.tokenizer.is_fast:
             raise ValueError(
                 f"{tokenizer_name} did not yield a fast tokenizer; word_ids() is required "

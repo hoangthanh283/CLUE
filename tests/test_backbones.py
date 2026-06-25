@@ -8,6 +8,7 @@ run on the grid machine.
 
 Run offline subset:  pytest tests/test_backbones.py -m "not integration"
 """
+
 from __future__ import annotations
 
 import pytest
@@ -87,7 +88,8 @@ class _StubTokenizer:
 
 class _StubAutoTokenizer:
     @staticmethod
-    def from_pretrained(name, use_fast=True):  # noqa: ARG004
+    def from_pretrained(name, use_fast=True, **kwargs):  # noqa: ARG004
+        # **kwargs absorbs add_prefix_space (set by the encoder for RoBERTa/XLM-R).
         return _StubTokenizer()
 
 
@@ -173,9 +175,7 @@ def _make_wrapper(wrapper_cls):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize(
-    "wrapper_cls", [LayoutLMv3Wrapper, LiLTWrapper, BROSWrapper, BERTWrapper]
-)
+@pytest.mark.parametrize("wrapper_cls", [LayoutLMv3Wrapper, LiLTWrapper, BROSWrapper, BERTWrapper])
 def test_wrapper_forward_expand_and_groups(wrapper_cls):
     model = _make_wrapper(wrapper_cls)
     model.label_to_id = {f"L{i}": i for i in range(7)}
@@ -195,9 +195,7 @@ def test_wrapper_forward_expand_and_groups(wrapper_cls):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize(
-    "wrapper_cls", [LayoutLMv3Wrapper, LiLTWrapper, BROSWrapper, BERTWrapper]
-)
+@pytest.mark.parametrize("wrapper_cls", [LayoutLMv3Wrapper, LiLTWrapper, BROSWrapper, BERTWrapper])
 def test_wrapper_prompt_injection_shapes(wrapper_cls):
     model = _make_wrapper(wrapper_cls)
     batch = _synthetic_batch(model)
