@@ -66,13 +66,31 @@ analyze_results silently merged LiLT runs into LayoutLMv3 rows. All three fixed:
    use, so NO collision. docmerge feasibility is BROKEN+needs that config fix; rc=0 was a
    swallowed error. No watcher now lingers.
 
-**NEXT (chained, after pilot sweep — DO NOT run concurrently, single dataset builder):**
-- Launch BROS grid: `scratchpad/run_bros_grid.sh` (naive/ewc/er/der_pp × dil+mixed × 3
-  seeds = 24 runs, fills BROS=0). DRY_RUN verified the plan.
-- Then `analyze_results.py` + `doccl.pilot.analyze` to regenerate tables/figures (pilot
-  analyze auto-discovers the new conditions; backbone table picks up BROS).
-- Update thesis Ch6 limitation (vi) — it currently scopes claims to LayoutLMv3 and
-  calls LiLT/BROS "planned"; once runs land, reframe as DONE generalization result.
+**Pilot sweep RESULTS (5/6 done, all head-localized — generalization CONFIRMED):**
+| cond  | seed | AA   | BWT   | disp head/non-head |
+| cl_lilt | 42  | 27.4 | -86.8 | 67x |
+| cl_lilt | 123 | 26.8 | -86.6 | 52x |
+| cl_lilt | 7   | 27.2 | -86.8 | head leads (seed7 non-head higher) |
+| cr_bros | 42  | 28.5 | -89.6 | 33x |
+| cr_bros | 123 | 29.2 | -88.5 | 201x |
+| cr_bros | 7   | running |
+BROS CKA depth-gradient (seed42, FUNSD→CORD): 0.99 emb → 0.95 L0 → 0.61 L6 → 0.15
+L11 → 0.11 head — clean monotonic drift-with-depth, max at head. Head/depth-dominant
+forgetting REPRODUCES on both LiLT and BROS = the diagnosis is NOT architecture-specific.
+
+**BROS GRID auto-launch ARMED (guard PID, background):**
+`scratchpad/launch_bros_grid_when_idle.sh` waits until the box is idle for ~2min (no
+pilot/train.py/docmerge/grid proc) THEN runs `scratchpad/run_bros_grid.sh` (24 runs:
+naive/ewc/er/der_pp × dil+mixed × 3 seeds, fills BROS=0). The ~2min idle requirement lets
+the parallel docmerge feasibility run claim the GPU FIRST after the pilot ends (avoids the
+single-dataset-builder collision). Guard log: `scratchpad/pilot_full/bros_guard.log`.
+
+**NEXT (after BROS grid lands):**
+- `uv run python scripts/analyze_results.py --source local` (backbone table picks up BROS)
+  + `uv run python -m doccl.pilot.analyze` (auto-discovers cl_lilt/cr_bros conditions →
+  cka_heatmap/fisher_bars/displacement_bars/forgetting_matrix now 7-condition).
+- Update thesis Ch6 limitation (vi) — currently scopes claims to LayoutLMv3 & calls
+  LiLT/BROS "planned"; reframe as DONE generalization result.
 
 ## Prior Active Work
 **HRP feasibility method implemented (2026-06-24, commit b047672).** New CL method
