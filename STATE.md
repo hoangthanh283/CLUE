@@ -17,24 +17,49 @@ recorded in plan `~/.claude/plans/zazzy-brewing-popcorn.md`).
   ruff + black clean. Fixed one real bug: CIL head-growth made the Fisher-displacement
   diagnostic mismatch widths (5 vs 7); fix = paired same-moment (fisher_old, params_old)
   snapshots per boundary.
-- **Feasibility RUNNING NOW (≈22:40, local 2060):** `scripts/run_docmerge_feasibility.sh`
-  on `dil` — der_pp (training, Task 1/3) + 7 doc_merge variants
-  (memory / merge×{plain,ties,fisher} / both×{...}). 8 runs × 3 tasks × 3ep, ~2–4h.
-  Output → `results/docmerge_feas/feasibility.log`; per-variant dirs
-  `results/docmerge_feas/<tag>/dil_*_seed42/{metrics,routing,diag}.json`. **Go/no-go:**
-  `both` AA ≥ memory-only AND ≥ merge-only, AND BWT > 0; fisher>plain = bonus.
+- **Feasibility DONE (dil, seed42, 3ep) — ❌ NO-GO, head-merge hypothesis FALSIFIED.**
+  Full bake-off finished 03:47 (results/docmerge_feas/<tag>/dil_*_seed42/). Table (AA / BWT
+  / routing):
+  | variant | AA | BWT | route |
+  | der_pp (baseline) | **88.0** | -1.5 | — |
+  | memory (HRP no-replay) | **21.9** | -10.2 | 0.915 |
+  | merge_plain | 19.1 | -7.9 | — |
+  | merge_ties | 21.6 | -5.4 | — |
+  | merge_fisher | 14.3 | **-0.19** | — |
+  | both_plain | 19.3 | -6.9 | 0.915 |
+  | both_ties | 20.5 | -3.8 | 0.915 |
+  | both_fisher | 12.9 | -0.41 | 0.915 |
+  **Verdict against the criteria:** (1) `both` does NOT beat its parts — best `both` (ties
+  20.5) < `memory` (21.9); flagship `both_fisher` (12.9) is the WORST. (2) BWT NEVER goes
+  positive (best -0.19). (3) `fisher` HURTS AA (opposite of the bonus). Routing is fine
+  (0.915, matches HRP).
+  **WHY (from the retention matrices):** the merge trades AA↔BWT along the stability axis
+  and never wins both. `fisher` weighting → degenerate UNDERFIT: merge_fisher diagonal
+  `[21.5, 2.0, 19.6]` ≈ its final row → "BWT~0" only because each task barely learns
+  (task1 F1=2.0 vs memory 9.4 vs der_pp ~82); not transfer, a flat-line. plain/ties learn
+  a bit more but forget (negative BWT). **Head-MERGING does NOT reproduce the positive BWT
+  that head-REPLAY gave (HRP +5.7).** Averaging frozen-backbone task-heads lands in a basin
+  good for neither (the LMC-shares-a-basin assumption doesn't hold here) — the core
+  "merge supplies positive BWT" thesis is unsupported on this setting.
+  **Diagnostic caveat:** `diag.json` head/backbone ratio = `inf` for ALL variants — backbone
+  is FROZEN so its displacement is 0 → ratio vacuous. The Step-A premise check as designed
+  does NOT apply to a frozen-backbone method (real design oversight; would only be meaningful
+  with a trainable backbone).
+  **Open question (2 failure modes):** (a) 3ep too few + merge dilutes weak heads → maybe
+  rescuable with more epochs; (b) mechanism just wrong for frozen-backbone doc-IE → falsified.
+  The fisher-underfit pattern leans toward (b). Code/tests stay valid (the method works, the
+  *idea* doesn't beat the baseline). Saga of getting here (Hydra epochs bug fixed c33d899;
+  self-matching-pgrep watcher bug; BROS grid race) recorded below for completeness.
   - Saga: first watcher launch (18:47) crashed on `training.epochs` Hydra error (fixed
-    c33d899 → `method.epochs`). Re-armed watcher had a SELF-MATCH bug: its `pgrep -f
-    "doccl.pilot.run_pilot"` matched its OWN bash body (that literal string is in the
-    script) → it would never detect pilot-done. Moot: user stopped the BROS grid (which had
-    won the GPU race, 0/24 done, resume-safe) and I LAUNCHED the bake-off DIRECTLY after
-    confirming GPU idle (15 MiB) + retiring the broken watcher. der_pp at 4.7GB VRAM,
-    loss decreasing; `trust_remote_code` ERROR lines in the log are NON-fatal (loader
-    fallback; scenario built `dil: 3 tasks` fine).
-  - ⚠️ BROS grid (`scratchpad/run_bros_grid.sh`, 24 runs, BROS=0 backbone-gen gap) was
-    STOPPED by user to free the GPU — needs re-launch after this bake-off (resume-safe).
-- **Next after results:** confirm on `cil_cord` (routing stress test); if AA-capped, sweep
-  backbone trainability (LMC-failure curve); position for A* on positive-BWT + buffer-free.
+    c33d899 → `method.epochs`). Re-armed watcher had a SELF-MATCH bug (`pgrep -f
+    "doccl.pilot.run_pilot"` matched its OWN bash body). Moot: user stopped the BROS grid;
+    I launched the bake-off DIRECTLY after confirming GPU idle + retiring the broken watcher.
+- **NEXT (decide):** the clean negative is itself reportable (could be a "what doesn't work"
+  contrast: replay grounds the head, merging can't). To salvage the METHOD: (a) re-run at
+  higher epochs (10–15) — does the merge stop underfitting? (b) drop merge, keep the
+  HRP head-REPLAY (which DID give +5.7) as the consolidation; merge was the wrong swap.
+  (c) try a TRAINABLE backbone so LMC/merge has a real basin + the diag isn't vacuous.
+  ⚠️ BROS BASELINE grid belongs on A6000/L40, NOT local (per below) — do NOT auto-launch here.
 
 ## Active Work (2026-06-25) — backbone-generalization of the forgetting analysis
 **Task: make the forgetting analysis comprehensive across ALL 4 backbones**
