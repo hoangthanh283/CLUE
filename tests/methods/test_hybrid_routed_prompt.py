@@ -117,6 +117,20 @@ def test_idf_none_before_any_task_then_populated():
     assert idf is not None and idf.shape == (V,) and torch.isfinite(idf).all()
 
 
+def test_block_slots_for_tasks_maps_to_own_block():
+    """Replayed examples must map to their OWN task's block, not the active one."""
+    from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
+
+    m = HybridRoutedPrompt.__new__(HybridRoutedPrompt)
+    m.prompt_pool = _pool(n_tasks=4, slots_per_task=2)
+    # tasks [0, 2, 3] → blocks [0-1, 4-5, 6-7]
+    task_ids = torch.tensor([0, 2, 3])
+    slots = m._block_slots_for_tasks(task_ids)
+    assert slots.tolist() == [[0, 1], [4, 5], [6, 7]]
+    # out-of-range task id is clamped, never indexes past the pool
+    assert m._block_slots_for_tasks(torch.tensor([99])).max().item() < m.prompt_pool.n_prompts
+
+
 def test_write_routing_log_emits_json_when_out_dir_set(tmp_path):
     """_write_routing_log must produce routing.json with a correct overall hit-rate.
 
