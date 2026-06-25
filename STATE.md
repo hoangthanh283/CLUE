@@ -33,23 +33,49 @@ recorded in plan `~/.claude/plans/zazzy-brewing-popcorn.md`).
   20.5) < `memory` (21.9); flagship `both_fisher` (12.9) is the WORST. (2) BWT NEVER goes
   positive (best -0.19). (3) `fisher` HURTS AA (opposite of the bonus). Routing is fine
   (0.915, matches HRP).
-  **WHY (from the retention matrices):** the merge trades AA↔BWT along the stability axis
-  and never wins both. `fisher` weighting → degenerate UNDERFIT: merge_fisher diagonal
-  `[21.5, 2.0, 19.6]` ≈ its final row → "BWT~0" only because each task barely learns
-  (task1 F1=2.0 vs memory 9.4 vs der_pp ~82); not transfer, a flat-line. plain/ties learn
-  a bit more but forget (negative BWT). **Head-MERGING does NOT reproduce the positive BWT
-  that head-REPLAY gave (HRP +5.7).** Averaging frozen-backbone task-heads lands in a basin
-  good for neither (the LMC-shares-a-basin assumption doesn't hold here) — the core
-  "merge supplies positive BWT" thesis is unsupported on this setting.
+  **RCA (3 layered root causes, confirmed via offline merge-arithmetic probe
+  `scratchpad/rca_merge.py` + retention matrices):**
+  1. **1/T SHRINKAGE BUG (implementation, fixable).** `merge_head_deltas` does a coordinate
+     MEAN over all T task-deltas → every task's learned update is scaled by 1/T (=1/3),
+     *even on rows the other tasks never touched* (proved: CIL disjoint-rows survival
+     `[0.33,0.33,0.33]`, same as DIL). A head needing update |δ| gets |δ|/3 → systematic
+     underfit on CIL *and* DIL. I used model-soup-style MEAN; task-arithmetic SUMS task
+     vectors precisely to avoid this. → fix: sum / count-aware mean (full magnitude on a
+     task's own rows).
+  2. **DIL ROW-CONFLICT (structural, dil-specific).** dil = fixed label space → head does
+     NOT grow → all tasks fine-tune the SAME rows toward different domain optima →
+     averaging conflicting solutions CANCELS them: `||Σδ||/Σ||δ|| = 0.57`, merged-head norm
+     28.5 vs 50 each task wants (43% too small). Averaging weights ≠ finding a jointly-good
+     point when directions conflict — which is exactly why head-REPLAY (real gradients,
+     HRP +5.7) worked and head-MERGE (arithmetic mean) didn't.
+  3. **LOPSIDED FISHER (why `fisher` is worst).** task0 (FUNSD) converges first → dominant
+     head-Fisher mass → fisher-merge ≈ 99% task0 head (`cos(merged,d0)=0.99` vs d1/d2
+     ~0.09) → tasks 1-2 DROWNED (matrix: merge_fisher task1 F1=2.0). The "BWT~0" of
+     fisher is a flat-line (it pins task0, never learns the rest), not transfer.
+  **Net:** best merge (`ties`, which trims+sign-elects → dodges cancellation, |merged|/|δ|
+  =1.27) only reaches AA 21.6 ≈ no-merge `memory` 21.9 → **merging adds NOTHING positive**;
+  the LMC-shared-basin premise fails for per-task heads writing shared rows. Compounded by a
+  hard UNDERFIT FLOOR (3ep frozen-backbone caps even at-learning F1 at ~21 FUNSD / ~9 SROIE
+  / ~55 CORD vs der_pp 88/82/97).
   **Diagnostic caveat:** `diag.json` head/backbone ratio = `inf` for ALL variants — backbone
   is FROZEN so its displacement is 0 → ratio vacuous. The Step-A premise check as designed
   does NOT apply to a frozen-backbone method (real design oversight; would only be meaningful
   with a trainable backbone).
-  **Open question (2 failure modes):** (a) 3ep too few + merge dilutes weak heads → maybe
-  rescuable with more epochs; (b) mechanism just wrong for frozen-backbone doc-IE → falsified.
-  The fisher-underfit pattern leans toward (b). Code/tests stay valid (the method works, the
-  *idea* doesn't beat the baseline). Saga of getting here (Hydra epochs bug fixed c33d899;
-  self-matching-pgrep watcher bug; BROS grid race) recorded below for completeness.
+  **RCA-INFORMED NEXT (cheapest decisive test first):**
+  (1) **Fix the 1/T shrinkage** in `merge_head_deltas` (count-aware: a coordinate's mean
+     divides by how many tasks ACTUALLY wrote it, not T) → re-run merge-only. If AA jumps,
+     #1 was the dominant bug; if not, the structural row-conflict (#2) dominates and merge
+     is dead for dil. This is a ~1-line numerics change + one fast run — do this FIRST.
+  (2) If merge still fails after the fix → **the negative is real and reportable**: "weight
+     MERGING cannot consolidate a shared classifier head across conflicting domain optima;
+     gradient REPLAY can (HRP +5.7)" — a clean mechanism contrast for the thesis.
+  (3) **Strongest salvage:** drop merge, restore HRP head-REPLAY as DocMERGE's consolidation
+     (replay already gave AA 31.7 / BWT +5.7 on this exact setting). Merge was the wrong swap.
+  (4) Orthogonal: the UNDERFIT FLOOR (~21 at-learning) caps everything → higher epochs
+     (10–15) and/or trainable backbone would lift the floor AND make the diag non-vacuous;
+     but that doesn't rescue the merge MECHANISM, only the operating point.
+  Code/tests stay valid (method runs; the merge idea loses). Saga (Hydra epochs bug fixed
+  c33d899; self-matching-pgrep watcher bug; BROS grid race) recorded below for completeness.
   - Saga: first watcher launch (18:47) crashed on `training.epochs` Hydra error (fixed
     c33d899 → `method.epochs`). Re-armed watcher had a SELF-MATCH bug (`pgrep -f
     "doccl.pilot.run_pilot"` matched its OWN bash body). Moot: user stopped the BROS grid;
