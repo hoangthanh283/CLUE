@@ -57,15 +57,17 @@ head, while the modalities' role is read behaviourally from C1--C4.
 \label{sec:results-profile}
 
 Under naive sequential fine-tuning the model learns each task well in isolation but
-retains almost nothing of earlier tasks. Table~\ref{tab:forgetting-matrix} and
-Figure~\ref{fig:forgetting-matrix-viz} show the
-performance matrix for the full multimodal condition (C4): the diagonal is strong
-(88.0 / 93.0 / 80.5 entity-F1), but the off-diagonal collapses to roughly $2$ F1.
-After learning CORD, FUNSD performance falls from $88.0$ to $1.8$---an $86$-point
-drop in a single task step. The text\,+\,layout condition (C3) shows the identical
-pattern ($88.7\rightarrow0.3\rightarrow1.7$). Forgetting in this setting is therefore
-not gradual but essentially total within one boundary, which is what motivates the
-continual-learning treatment of the remaining sections.
+retains almost nothing of earlier tasks. Table~\ref{tab:forgetting-matrix} gives the
+performance matrices for all four backbones, and Figure~\ref{fig:forgetting-matrix-viz}
+visualises them: on every architecture the diagonal is strong (e.g.\ LayoutLMv3
+$89.1 / 94.1 / 81.4$ entity-F1) while the sub-diagonal collapses to roughly $1$--$3$ F1.
+After learning CORD, FUNSD performance falls from $89.1$ to $3.3$ on LayoutLMv3---an
+$86$-point drop in a single task step---and LiLT and BROS show the identical pattern
+($83.9\rightarrow2.1$ and $88.9\rightarrow6.6$). Even the unimodal BERT baseline, the
+mildest of the four, still loses most of each earlier task. Forgetting in this setting
+is therefore not gradual but essentially total within one boundary \emph{regardless of
+backbone}, which is what motivates the continual-learning treatment of the remaining
+sections.
 
 Attributing this collapse to specific parameters requires care about \emph{what}
 is measured. Table~\ref{tab:fisher-component} reports the empirical Fisher
@@ -100,33 +102,53 @@ table is consistent with but, on its own, cannot establish.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{diag_forgetting_matrix.pdf}
-  \caption[Forgetting-matrix heatmap]{Heatmap of the performance matrix $R[i,j]$: entity-F1
-  on evaluated task $j$ after the model has been trained through task $i$ (full multimodal
-  model C4, seed 42, naive sequential fine-tuning over FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE).
-  Colour encodes absolute F1 on a fixed $0$--$100$ scale; the dashed-outlined \emph{diagonal}
-  is the just-learned task and stays high ($88.0$, $93.0$, $80.5$), whereas every
-  \emph{sub-diagonal} cell---an earlier task re-evaluated after later training---collapses to
-  $\sim$2--4 F1. The arrow marks the canonical case: FUNSD falls from $88.0$ to $1.8$ after a
-  single further task. Hatched cells are tasks not yet seen at that training step.}
+  \includegraphics[width=0.92\linewidth]{backbone_forgetting_matrices.pdf}
+  \caption[Forgetting-matrix heatmaps across backbones]{Performance matrix $R[i,j]$
+  (entity-F1 on evaluated task $j$ after the model has been trained through task $i$)
+  for all four backbones under naive sequential fine-tuning over
+  FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE; mean over three seeds, fixed
+  $0$--$100$ colour scale. The pattern is identical on every architecture: the
+  \emph{diagonal} (just-learned task) stays high, while every \emph{sub-diagonal} cell
+  ---an earlier task re-evaluated after later training---collapses to $\sim$1--3 F1
+  (e.g.\ LayoutLMv3 FUNSD $89.1\rightarrow3.3$ after a single further task). The only
+  visible difference is the unimodal BERT baseline, whose retention is slightly less
+  catastrophic (CORD held at $18.4$ vs $\le 3$ for the others). White cells are tasks
+  not yet seen at that training step.}
   \label{fig:forgetting-matrix-viz}
 \end{figure}
 
 \begin{table}[!htbp]
   \centering
-  \caption[Forgetting matrix under naive sequential fine-tuning]{Performance matrix
-  $R[i,j]$: entity-F1 on task $j$ after training task $i$, for the full multimodal
-  model (C4, seed 42) under naive sequential fine-tuning. The diagonal is strong;
-  the off-diagonal collapses to $\sim$2 F1, i.e.\ near-total forgetting within one
-  task step. Pilot result (seed 42).}
+  \caption[Forgetting matrices across backbones]{Performance matrix $R[i,j]$ (entity-F1
+  on task $j$ after training task $i$) under naive sequential fine-tuning, for all four
+  backbones (mean over three seeds). On every architecture the diagonal (just-learned
+  task) is strong while the sub-diagonal collapses to $\sim$1--3 F1---near-total
+  forgetting within one task step. The unimodal BERT baseline is the mildest (CORD held
+  at $18.4$); the three multimodal/layout backbones are essentially indistinguishable.}
   \label{tab:forgetting-matrix}
-  \begin{tabular}{lccc}
+  \begin{tabular}{llccc}
     \toprule
-                       & \textbf{eval FUNSD} & \textbf{eval CORD} & \textbf{eval SROIE} \\
+    \textbf{Backbone} & \textbf{Trained through} & \textbf{eval FUNSD} & \textbf{eval CORD} & \textbf{eval SROIE} \\
     \midrule
-    after FUNSD        & 88.0 & --   & --   \\
-    after CORD         & 1.8  & 93.0 & --   \\
-    after SROIE        & 1.9  & 4.1  & 80.5 \\
+    \multirow{3}{*}{LayoutLMv3}
+       & after FUNSD & 89.1 & --   & --   \\
+       & after CORD  & 3.3  & 94.1 & --   \\
+       & after SROIE & 1.1  & 2.5  & 81.4 \\
+    \midrule
+    \multirow{3}{*}{BERT}
+       & after FUNSD & 60.2 & --   & --   \\
+       & after CORD  & 8.7  & 92.6 & --   \\
+       & after SROIE & 1.1  & 18.4 & 77.8 \\
+    \midrule
+    \multirow{3}{*}{LiLT}
+       & after FUNSD & 83.9 & --   & --   \\
+       & after CORD  & 2.1  & 91.9 & --   \\
+       & after SROIE & 1.4  & 1.0  & 79.0 \\
+    \midrule
+    \multirow{3}{*}{BROS}
+       & after FUNSD & 88.9 & --   & --   \\
+       & after CORD  & 6.6  & 93.6 & --   \\
+       & after SROIE & 1.9  & 2.8  & 81.4 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -242,14 +264,15 @@ point we return to when scoping the method (\S\ref{sec:results-stability}).
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{pilot_cka_heatmap.pdf}
+  \includegraphics[width=0.92\linewidth]{backbone_cka_grid.pdf}
   \caption[Per-layer representational drift (CKA depth gradient)]{Per-layer
-  representational drift (linear CKA between consecutive checkpoints) as a function of
-  depth, for the two task boundaries and across all backbone conditions. The input
-  encoders do not drift ($\mathrm{CKA}\approx 1.0$) while drift rises monotonically with
-  depth and peaks at the last encoder layer and the classifier head---the same gradient
-  on LayoutLMv3, BERT, LiLT and BROS alike (cf.\ Tables~\ref{tab:cka-layer},
-  \ref{tab:bert-contrast}).}
+  representational drift (linear CKA between consecutive checkpoints) by depth and task
+  boundary, one panel per backbone (mean over three seeds). The input encoders do not
+  drift ($\mathrm{CKA}\approx 1.0$, yellow) while drift rises monotonically with depth and
+  peaks at the last encoder layer and the classifier head (dark)---the same gradient on
+  LayoutLMv3, BERT, LiLT and BROS alike. This is the per-backbone, per-boundary detail
+  behind the collapsed line view of Figure~\ref{fig:backbone-signature}
+  (cf.\ Tables~\ref{tab:cka-layer}, \ref{tab:bert-contrast}).}
   \label{fig:cka-heatmap}
 \end{figure}
 

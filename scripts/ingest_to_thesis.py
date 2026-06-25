@@ -30,6 +30,8 @@ FIGURES = [
     ("pilot/figures/backbone_cka_gradient.pdf", "figures/backbone_cka_gradient.pdf"),
     ("pilot/figures/backbone_head_dominance.pdf", "figures/backbone_head_dominance.pdf"),
     ("pilot/figures/backbone_metrics.pdf", "figures/backbone_metrics.pdf"),
+    ("pilot/figures/backbone_forgetting_matrices.pdf", "figures/backbone_forgetting_matrices.pdf"),
+    ("pilot/figures/backbone_cka_grid.pdf", "figures/backbone_cka_grid.pdf"),
 ]
 TABLES = [
     ("table_main.tex", "generated/table_main.tex"),
