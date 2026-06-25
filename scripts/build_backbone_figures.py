@@ -270,7 +270,7 @@ def plot_forgetting_matrices(out: Path) -> None:
     axes = axes.ravel()
     im = None
     for ax, c in zip(axes, conds, strict=False):
-        R = mats[c]
+        R = mats[c]  # noqa: N806 — R is the retention matrix R[i,j] (thesis notation)
         masked = np.ma.masked_invalid(R)
         im = ax.imshow(masked, cmap=cmap, vmin=0, vmax=100, aspect="equal")
         ax.set_title(BACKBONES[c], fontsize=12, fontweight="bold")
