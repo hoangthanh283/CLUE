@@ -50,7 +50,10 @@ routing accuracy*. Spec: `docs/superpowers/specs/2026-06-24-hybrid-routed-prompt
   HEAD stable; together → no forgetting (matches the user's original "no forgetting"
   intuition, but via the correct mechanism). 9 unit + 2 e2e tests pass. w=0 reduces
   exactly to the router-only loop (ablation-safe).
-- **STILL TO DO:** (1) confirm w=0 control reproduces ~20.8 (in progress). (2) absolute
+- **CONTROL CONFIRMED:** w=0 run reproduced AA=20.87 BWT=-10.12 *byte-identical* to the
+  original sparse run → the +10.8 AA / +15.8 BWT gain is causally head-replay, not noise
+  (same router/data/seed, only the weight toggled). Clean controlled ablation.
+- **STILL TO DO:** (1) ~~confirm w=0 control~~ DONE. (2) absolute
   AA still well below replay (der_pp ~88) — head-replay at w=1/buffer200/3ep is a first
   cut; tune weight/buffer/epochs. (3) confirm on **cil_cord** (the routing stress test).
   (4) fix the RRF fusion (sparse-only currently best). (5) the win is the *mechanism +
