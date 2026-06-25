@@ -256,6 +256,15 @@ class TokenClassificationWrapper(nn.Module):
             )
         except TypeError:  # older transformers without the kwargs argument
             self.model.gradient_checkpointing_enable()
+        except ValueError as e:
+            # Some backbones (e.g. BROS) don't implement checkpointing. It is only a
+            # memory optimization, so warn and continue rather than crash the run —
+            # these models are small enough to fit without it.
+            logger.warning(
+                "%s: gradient checkpointing unavailable (%s); continuing without it.",
+                type(self).__name__,
+                e,
+            )
 
     def trainable_param_count(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
