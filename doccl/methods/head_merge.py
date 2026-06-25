@@ -99,6 +99,7 @@ def merge_head_deltas(
     rule: str = "plain",
     weights: list[float] | None = None,
     density: float = 0.2,
+    count_aware: bool = True,
 ) -> torch.Tensor:
     """Merge per-task head deltas into one delta.
 
@@ -110,6 +111,16 @@ def merge_head_deltas(
             task); normalised internally. Ignored by ``plain``/``ties``. Length must
             match ``deltas``.
         density: kept fraction per task for ``ties`` (top-|delta| coordinates).
+        count_aware: if True (default), a coordinate is averaged over only the tasks that
+            actually wrote a NON-ZERO delta there, not over all T. This removes the 1/T
+            shrinkage that a plain coordinate-mean inflicts on a task's OWN rows (where the
+            other tasks contributed exactly zero — e.g. CIL disjoint logit rows, or any
+            row a task never touched): such a row keeps its FULL learned magnitude instead
+            of being divided by T. On rows written by every task (the DIL shared-label
+            case) the divisor is still T, so genuinely-conflicting updates are still
+            averaged. Set False to recover the classic Model-Soups coordinate-mean (the
+            pre-RCA behaviour; kept for ablation). ``ties`` already uses an agreement-count
+            denominator so it is unaffected by this flag.
 
     Returns:
         The merged delta tensor, shaped like the widest input.
@@ -120,11 +131,18 @@ def merge_head_deltas(
         raise ValueError("merge_head_deltas: empty delta list")
     stacked, _ = _stack_deltas(deltas)  # (T, *shape)
 
-    if rule == "plain":
-        return stacked.mean(dim=0)
     if rule == "ties":
         return _ties_elect(stacked, density)
-    # rule == "fisher"
+
+    # per-coordinate count of tasks that wrote a non-zero delta there (>=1 where any did).
+    contributed = (stacked != 0).to(stacked.dtype) if count_aware else torch.ones_like(stacked)
+
+    if rule == "plain":
+        denom = contributed.sum(dim=0).clamp(min=1.0)  # avoid /0 on all-zero coords
+        return stacked.sum(dim=0) / denom
+
+    # rule == "fisher": weight each task by its (non-negative) Fisher mass, but only count
+    # a task toward a coordinate's denominator where it actually contributed.
     T = stacked.shape[0]  # noqa: N806 — T = #tasks, standard merging notation
     if weights is None:
         w = torch.ones(T, dtype=stacked.dtype, device=stacked.device)
@@ -132,10 +150,12 @@ def merge_head_deltas(
         if len(weights) != T:
             raise ValueError(f"fisher weights len {len(weights)} != n deltas {T}")
         w = torch.tensor(weights, dtype=stacked.dtype, device=stacked.device).clamp(min=0.0)
-    total = float(w.sum())
-    if total <= 0.0:  # degenerate (all-zero importance) → fall back to plain average
+    if float(w.sum()) <= 0.0:  # degenerate (all-zero importance) → uniform weights
         w = torch.ones(T, dtype=stacked.dtype, device=stacked.device)
-        total = float(w.sum())
-    w = w / total
-    shape = [T] + [1] * (stacked.dim() - 1)
-    return (stacked * w.reshape(shape)).sum(dim=0)
+    wshape = [T] + [1] * (stacked.dim() - 1)
+    w_b = w.reshape(wshape)
+    num = (stacked * w_b).sum(dim=0)
+    # denominator = sum of weights of CONTRIBUTING tasks per coordinate (count-aware), or
+    # total weight (classic) — clamp avoids /0 where no task contributed / all weights 0.
+    denom = (contributed * w_b).sum(dim=0).clamp(min=1e-12)
+    return num / denom
