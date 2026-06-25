@@ -1,0 +1,25 @@
+name: doc_merge
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+# Consolidation: merge (head-merge only) | memory (lexical memory only, == HRP no-replay)
+# | both (the full method). This is the "does each piece earn its keep?" ablation axis.
+consolidate: both
+# Head-merge rule: plain (Model-Soups average) | ties (sign-election) | fisher
+# (importance-weighted by the SAME head Fisher used for the diagnostic).
+merge_rule: fisher
+ties_density: 0.2
+# Optional null-space constraint on head updates (ablation arm; not load-bearing).
+headspace_constraint: false
+# Lexical memory: sparse = BM25/TF-IDF over OCR input_ids (drift-immune address).
+router: sparse
+n_tasks: 10
+slots_per_task: 2
+prompt_length: 5
+top_k: 2
+lambda_key: 0.5
+rrf_k: 60
+# Docs sampled for the head-Fisher (merge weight + head-locus diagnostic). One backward
+# per doc, so keep modest; a few dozen is enough for the relative head:backbone ratio.
+fisher_n_samples: 64
