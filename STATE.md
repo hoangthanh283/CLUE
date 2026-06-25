@@ -1,6 +1,43 @@
 # STATE
 
-## Active Work
+## Active Work (2026-06-25) — backbone-generalization of the forgetting analysis
+**Task: make the forgetting analysis comprehensive across ALL 4 backbones**
+(LayoutLMv3 primary + BERT + LiLT + BROS). Found it was NOT: the pilot localizer
+ran only LayoutLMv3+BERT; the grid had LiLT=24/BERT=15/**BROS=0** runs; and
+analyze_results silently merged LiLT runs into LayoutLMv3 rows. All three fixed:
+
+1. **Analysis fix (commit db07d58).** `analyze_results.py` now carries `model_family`
+   as a real column; main/ablation/compute/forgetting/baseline tables scoped to the
+   primary backbone (`_primary_only`, keeps the bert_textonly row); new
+   `write_backbone_table` → `table_backbone_<metric>.tex` (LayoutLMv3 reference +
+   LiLT/BROS). First result: replay-dominant ordering (ER/DER++ ≫ EWC > Naive)
+   **transfers from LayoutLMv3 to LiLT** on dil/mixed. 4 tests (test_backbone_analysis).
+
+2. **Pilot extension (commit 49dda2f).** Added `cl_lilt` + `cr_bros` conditions to
+   run_pilot (CKA+Fisher+displacement). LiLT uses the English checkpoint
+   (`SCUT-DLVCLab/lilt-roberta-en-base`) with the `roberta-base` tokenizer (AutoTokenizer
+   resolves the English LiLT repo to a box-demanding LayoutLMv3 tokenizer; RoBERTa vocab
+   is identical+box-free, and XLM-R's 250k embedding OOMs the 2060). Fixes:
+   `add_prefix_space=True` in encoders (RoBERTa/XLM-R need it); CKA hook unwraps nested
+   tuples (LiLT two-stream layers); gradient-ckpt warn+continue for BROS (commit d3388d4).
+   **Smoke-validated on the 2060 (1ep): head-dominant forgetting REPRODUCED on BOTH** —
+   LiLT final-Fisher classifier=0.034 vs others ≤0.005, displacement at head only;
+   BROS displacement at head=4e-7, all other depths 0.
+
+3. **RUNNING NOW (detached, local 2060):** full pilot sweep `cl_lilt`+`cr_bros` × seeds
+   {42,123,7} × 10ep (matches existing LayoutLMv3/BERT pilot for comparability).
+   Runner: `scratchpad/run_pilot_secondary.sh`; resume-safe (skips existing
+   `results/pilot/<cond>_seed<seed>.json`). ~2h. Monitor task b7k3m2hgj.
+
+**NEXT (chained, after pilot sweep — DO NOT run concurrently, single dataset builder):**
+- Launch BROS grid: `scratchpad/run_bros_grid.sh` (naive/ewc/er/der_pp × dil+mixed × 3
+  seeds = 24 runs, fills BROS=0). DRY_RUN verified the plan.
+- Then `analyze_results.py` + `doccl.pilot.analyze` to regenerate tables/figures (pilot
+  analyze auto-discovers the new conditions; backbone table picks up BROS).
+- Update thesis Ch6 limitation (vi) — it currently scopes claims to LayoutLMv3 and
+  calls LiLT/BROS "planned"; once runs land, reframe as DONE generalization result.
+
+## Prior Active Work
 **HRP feasibility method implemented (2026-06-24, commit b047672).** New CL method
 `hrp` (`doccl/methods/hybrid_routed_prompt.py`): L2P-family, frozen backbone, task-pinned
 prompt pool with a **hybrid dense+sparse router** — sparse = BM25/TF-IDF over OCR tokens
