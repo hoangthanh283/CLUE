@@ -53,7 +53,14 @@ analyze_results silently merged LiLT runs into LayoutLMv3 rows. All three fixed:
 3. **RUNNING NOW (detached, local 2060):** full pilot sweep `cl_lilt`+`cr_bros` × seeds
    {42,123,7} × 10ep (matches existing LayoutLMv3/BERT pilot for comparability).
    Runner: `scratchpad/run_pilot_secondary.sh`; resume-safe (skips existing
-   `results/pilot/<cond>_seed<seed>.json`). ~2h. Monitor task b7k3m2hgj.
+   `results/pilot/<cond>_seed<seed>.json`). ~4h. seed42+seed123 DONE. The sweep spawns a
+   FRESH PID per (cond,seed) run — don't track a single PID to detect "pilot done".
+   ⚠️ **DocMERGE watcher near-miss:** the docmerge feasibility watcher tracked only the
+   FIRST pilot PID (1890344=seed42); when that exited it fired at 18:47 while THIS sweep
+   was still running seed123 — but its run crashed instantly on a Hydra error
+   (`training.epochs` not overridable — needs `+training.epochs=`) before any dataset/GPU
+   use, so NO collision. docmerge feasibility is BROKEN+needs that config fix; rc=0 was a
+   swallowed error. No watcher now lingers.
 
 **NEXT (chained, after pilot sweep — DO NOT run concurrently, single dataset builder):**
 - Launch BROS grid: `scratchpad/run_bros_grid.sh` (naive/ewc/er/der_pp × dil+mixed × 3
