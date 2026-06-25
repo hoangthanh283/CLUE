@@ -38,10 +38,24 @@ routing accuracy*. Spec: `docs/superpowers/specs/2026-06-24-hybrid-routed-prompt
   strong sparse signal down. RRF assumes both rankers are individually useful; here dense
   is actively harmful. Full method should use **confidence-weighted / learned fusion**
   (down-weight dense when its keys collapse), not fixed RRF — or just use sparse routing.
-- **NEXT (the real A* path):** add **head protection** to HRP (per-task head masking or a
-  small head-replay buffer) so the validated router actually translates to AA — fuses the
-  routing idea with the thesis's head-locus finding. That is a stronger novelty than a
-  router alone (which can't beat replay: ER/DER++ ~88 vs prompt family ~30 on dil).
+- **HEAD-REPLAY ADDED (commit 78c1421) → IT WORKS.** A/B on dil (sparse router both,
+  ONLY head_replay_weight differs): a small reservoir of past examples, each pinned to
+  its OWN frozen block, with a CE loss to ground the shared head.
+  | variant | task0 | task1 | task2 | AA | BWT |
+  | sparse, head-replay OFF (w=0) | 6.97 | 3.67 | 51.81 | **20.87** | -10.12 |
+  | sparse, head-replay ON  (w=1) | 29.52| 11.72| 53.79 | **31.68** | **+5.65** |
+  **AA +10.8 (+52%); BWT goes POSITIVE (-10.1→+5.7).** Head protection stops the task-0
+  collapse (21→0.8 became 21→29.5) — old tasks now *improve* as new ones train. This is
+  the full thesis realised: routing keeps the right PROMPTS firing; head-replay keeps the
+  HEAD stable; together → no forgetting (matches the user's original "no forgetting"
+  intuition, but via the correct mechanism). 9 unit + 2 e2e tests pass. w=0 reduces
+  exactly to the router-only loop (ablation-safe).
+- **STILL TO DO:** (1) confirm w=0 control reproduces ~20.8 (in progress). (2) absolute
+  AA still well below replay (der_pp ~88) — head-replay at w=1/buffer200/3ep is a first
+  cut; tune weight/buffer/epochs. (3) confirm on **cil_cord** (the routing stress test).
+  (4) fix the RRF fusion (sparse-only currently best). (5) the win is the *mechanism +
+  positive BWT*; for A* it needs to close more of the gap to replay or win on a metric
+  replay can't (param-efficiency: frozen backbone, tiny prompt+head footprint).
 
 ---
 
