@@ -26,9 +26,12 @@ ROOT="${ROOT:-results/docmerge_feas}"
 PY() { uv run python "$@"; }
 
 common=(scenario="$SCENARIO" seed="$SEED"
-        training.epochs="$EPOCHS" training.batch_size="$BATCH_SIZE"
+        method.epochs="$EPOCHS" training.batch_size="$BATCH_SIZE"
         training.gradient_checkpointing="$GRAD_CKPT" training.num_workers="$NUM_WORKERS"
         wandb.mode=offline)
+# NOTE: epochs lives at method.epochs (every method config defines it), NOT
+# training.epochs — overriding training.epochs is a Hydra struct error. batch_size /
+# gradient_checkpointing / num_workers DO live under training.* (configs/training).
 
 # $1 method, $2 variant tag (unique output_dir subfolder), rest: extra overrides
 run() {
