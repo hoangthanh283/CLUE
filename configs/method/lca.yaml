@@ -1,0 +1,19 @@
+name: lca
+# Per-task fine-tune (LCA recipe: SGD + cosine).
+lr: 1.0e-2
+weight_decay: 5.0e-4
+epochs: 10
+max_grad_norm: 1.0
+# Backbone merge (LCA helper.merge defaults: TIES, lamb=1.0, topk=100 = no trim).
+merge_method: ties
+merge_coef: 1.0
+merge_topk: 100
+# Classifier alignment on sampled class-Gaussian features (the novel step).
+ca_lr: 5.0e-3
+ca_epochs: 10
+ca_batch_size: 64
+ca_samples_per_cls: 256
+ca_robust_weight: 0.1     # weight on the intra-class pairwise loss-variance term
+ca_entropy_weight: 0.0    # weight on the entropy term (off by default, as in LCA)
+ca_feature_n_batches: 16  # batches sampled per task to estimate (mu, cov)
+ca_skip_O: true           # exclude the dominant 'O' BIO class from alignment sampling

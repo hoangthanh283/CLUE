@@ -385,6 +385,24 @@ class LayoutLMv3Wrapper(nn.Module):
         }
         return self.model.layoutlmv3(**inputs).last_hidden_state[:, 0]
 
+    @torch.no_grad()
+    def token_features(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        """Per-token encoder features — the input the classifier head consumes. (B, L, D).
+
+        These are the ``sequence_output`` LayoutLMv3 feeds to ``classifier`` (the text-token
+        hidden states span ``[0, input_ids.shape[1])`` of ``last_hidden_state``; the trailing
+        image patches are excluded so the returned length matches the token labels). Used by
+        the LCA method to estimate per-class feature Gaussians and to run the classifier on
+        sampled features. ``classifier(token_features)`` reproduces the model's token logits.
+        """
+        inputs = {
+            k: batch[k]
+            for k in ("input_ids", "bbox", "pixel_values", "attention_mask")
+            if k in batch
+        }
+        seq_len = batch["input_ids"].shape[1]
+        return self.model.layoutlmv3(**inputs).last_hidden_state[:, :seq_len]
+
     # ─── CKA probe layers (depth points for representational drift) ────────────
     @property
     def cka_layers(self) -> list[str]:

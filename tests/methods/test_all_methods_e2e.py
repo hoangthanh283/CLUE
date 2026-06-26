@@ -40,6 +40,7 @@ from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.doc_merge import DocMerge
+from doccl.methods.lca import LCA
 from doccl.methods.doccl import DocCL
 
 pytestmark = pytest.mark.slow
@@ -78,6 +79,9 @@ _METHOD_CFG = {
     "doc_merge_memory": {"consolidate": "memory", "router": "sparse", "n_tasks": 3,
                          "slots_per_task": 2, "prompt_length": 2, "top_k": 2,
                          "lambda_key": 0.5, "fisher_n_samples": 2},
+    # LCA: tiny CA recipe (few samples/epochs) so the merge+align lifecycle runs fast.
+    "lca": {"ca_samples_per_cls": 8, "ca_epochs": 2, "ca_batch_size": 8,
+            "ca_robust_weight": 0.1, "ca_feature_n_batches": 2, "merge_topk": 100},
     "doccl": {"lambda_": 2000.0, "kd_alpha": 1.0, "temperature": 2.0,
               "fisher_n_samples": 4, "buffer_size": 20, "replay_batch_size": 2,
               "use_replay": True, "target_depth": "all"},
@@ -89,6 +93,7 @@ _METHOD_CLS = {
     "l2p": L2P, "dualprompt": DualPrompt, "coda_prompt": CODAPrompt,
     "hrp": HybridRoutedPrompt, "doccl": DocCL,
     "doc_merge": DocMerge, "doc_merge_merge": DocMerge, "doc_merge_memory": DocMerge,
+    "lca": LCA,
 }
 
 
