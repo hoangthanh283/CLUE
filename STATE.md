@@ -9,7 +9,10 @@ subagent-driven-development (5 tasks, all reviewed clean): `doccl/methods/grad_s
 `.superpowers/sdd/progress.md`. See [[clue-headgrad-direction]].
 **α-ablation on dil (5ep, results/hgt_ablation/) — VERDICT: NO-GO on positive-BWT.**
 AA/BWT: naive 38.7/−75.2 | er 86.2/−3.3 | hgt α0 24.8/−7.9 | hgt α0.5 25.3/−21.1 | hgt α1
-24.9/−23.2 | cuber (pending ~30min). **α-BWT monotonically WORSE (−7.9→−21.1→−23.2)** while
+24.9/−23.2 | **cuber 39.8/−73.0**. **CUBER (whole-network) ALSO fails to give positive BWT**
+(−73 ≈ naive −75; learns all at-learning diag [86,82,97] but forgets all) → the aligned-gradient
+transfer mechanism does NOT manifest on doc-IE head-only OR whole-network. Only REPLAY (er)
+works, needs a buffer. **α-BWT monotonically WORSE (−7.9→−21.1→−23.2)** while
 at-learning rises (diag 10.8→24.9→28.5), AA flat ~25 → α is a STABILITY↔PLASTICITY dial, NOT
 transfer; no positive BWT anywhere. All HGT AA~25 ≪ er 86 (frozen-backbone cap). Integration
 fully validated (hooks survived real training, no crash). **→ analysis-paper framing** (the
