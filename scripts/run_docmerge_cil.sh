@@ -28,8 +28,12 @@ run() {  # $1 tag (unique out subdir), rest: overrides
   local odir="$ROOT/$tag"; local rundir="$odir/${SCEN}_doc_merge_seed${SEED}"
   if [[ -f "$rundir/metrics.json" ]]; then echo "SKIP $tag (done)"; return 0; fi
   echo "=== RUN $tag :: $* ==="
-  uv run python scripts/train.py method=doc_merge "${common[@]}" \
-    method.fisher_n_samples="$FISHER_N" output_dir="$odir" "$@"
+  # Tolerate a single variant's failure so one crash doesn't abort the whole sweep
+  # (set -e would otherwise kill it; we want the other variants + the summary).
+  if ! uv run python scripts/train.py method=doc_merge "${common[@]}" \
+       method.fisher_n_samples="$FISHER_N" output_dir="$odir" "$@"; then
+    echo "!!! RUN $tag FAILED (rc=$?) — continuing to next variant"
+  fi
 }
 
 echo "############ DocMERGE cil_cord (5 sessions, disjoint rows, seed $SEED, ${EPOCHS}ep) ############"
