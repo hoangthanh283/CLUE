@@ -1,0 +1,11 @@
+# configs/method/cuber.yaml
+name: cuber
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+# Whole-network gradient-subspace transfer (CUBER baseline). transfer_alpha as in HGT:
+# 0 = protection (whole-network GPM); >0 = positive transfer; 1 = no projection.
+transfer_alpha: 1.0
+subspace_k: 32
+subspace_n_batches: 16
