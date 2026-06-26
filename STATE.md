@@ -36,20 +36,17 @@ Registered in METHOD_REGISTRY + `_STD_FORWARD`; config `configs/method/lca.yaml`
   independently CONFIRMS the DocMERGE RCA: merging alone is insufficient; you must re-align the
   head. Their align is buffer-free (μ/Σ, not exemplars) = the "generative head replay" floated
   in the DocMERGE brainstorm and skipped. **Strong candidate to salvage DocMERGE.**
-- **LCA RUN IN PROGRESS (2/5 done).** ⚠️ ABLATION-DESIGN BUG: `lca_nomerge_noalign`
-  (merge_coef=0) is NOT a clean "no-op" floor — merge_coef=0 makes `base+0·tv=base`, i.e. it
-  RESETS the backbone to pretrained every task (hence its weird task0=17 at-learning). Ignore it
-  as a floor; use plain `naive` (pending) as the real floor. EARLY pattern (watch when complete):
-  full `lca` task1 diag=8.3 but merge-only `lca_merge_noalign` task1=48.7 → the ALIGN step may be
-  HURTING (Gaussian-feature assumption may break for per-token feats / 'O'-class dominance). If
-  lca_merge_noalign > lca, that's the finding: LCA's classifier-align doesn't port to doc-IE.
-- **(earlier note) LCA 1/5:** Partial result on `dil` (5ep) — PRELIMINARY,
-  await ablations before concluding: **lca (full, merge+align): AA=41.9 BWT=−23.8** (diag
-  [85.2, 8.3, 79.8]; task0 forgets 85→39). vs der_pp AA=88.2/BWT=−2.9 (known). So LCA — ICLR'26
-  SoTA on IMAGE CIL — does NOT transfer its effectiveness to doc-IE out of the box at 5ep
-  (heavy forgetting, AA≪replay). NOTE SROIE/task1 weak even at-learning (8.3) — flag, ablations
-  will clarify. Pending: lca_merge_noalign, lca_nomerge_noalign, naive, der_pp → then answer
-  "is LCA effective / does align help". `scripts/run_lca.sh`; SELF-MATCH-PROOF watcher
+- **LCA VERDICT (dil seed42 5ep, 4/5 done; der_pp running but ~88 known): LCA does NOT port to
+  doc-IE.** Table AA/BWT: naive 38.7/−75.2 (floor) | lca_merge_noalign 40.2/−44.9 | **lca (full)
+  41.9/−23.8** | der_pp ~88/~−3. (lca_nomerge_noalign 21.8/−4.8 = ablation bug, merge_coef=0
+  RESETS backbone — IGNORE.) **(1) TIES backbone merge WORKS** (BWT −75→−45) — merging a TRAINED
+  backbone is LMC-valid (real task-vectors), the mirror of why DocMERGE's frozen-backbone HEAD
+  merge cancelled. **(2) ALIGN trades plasticity↔stability**: BWT −45→−24 (regrounds head) but
+  damages at-learning (merge-only task1 diag 48.7 → full-LCA 8.3) — single-Gaussian-per-class
+  replay over-regularizes per-token feats (+'O' dominance). **(3) LCA AA 41.9 ≈ naive 38.7, ≪
+  replay 88** → ICLR'26 image-CIL SoTA lands at HALF of replay on doc token-IE. Clean
+  "published SoTA fails on doc-IE" result. See [[clue-lca-paper]]. `scripts/run_lca.sh`;
+  SELF-MATCH-PROOF watcher
   (LCAGUARD_a94f) correctly fired when cil_cord freed the GPU. Output →
   `results/lca_eval/lca_run.log`. NOTE: LCA finetunes the FULL backbone (heavy, ~like der_pp).
 
