@@ -16,84 +16,168 @@ Uses a real (small) LayoutLMv3 on CPU with 1 epoch and 2 tiny synthetic document
 it exercises the true forward path (where the real bugs lived) while staying fast and
 GPU-free. Marked ``slow`` so the CI-fast lane can skip it.
 """
+
 from __future__ import annotations
 
 import pytest
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
-from doccl.types import TaskInfo
+from doccl.methods.cl_lora import CLLoRA
+from doccl.methods.coda_prompt import CODAPrompt
+from doccl.methods.cuber import CUBER
+from doccl.methods.der import DERpp
+from doccl.methods.doc_merge import DocMerge
+from doccl.methods.doccl import DocCL
+from doccl.methods.dualprompt import DualPrompt
+from doccl.methods.er import ER
+from doccl.methods.er_cflat import ERCFlat
+from doccl.methods.ewc import EWC
+from doccl.methods.hgt import HGT
+from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
+from doccl.methods.l2p import L2P
+from doccl.methods.lca import LCA
+from doccl.methods.lwf import LwF
 
 # Every method in METHOD_REGISTRY worth a behavioral test. doccl_a/c are legacy
 # ablation variants; doccl_b is covered separately (CIL shape regression).
-from doccl.methods.naive import NaiveFineTune, JointMultiTask
-from doccl.methods.ewc import EWC
-from doccl.methods.lwf import LwF
-from doccl.methods.er import ER
-from doccl.methods.der import DERpp
-from doccl.methods.er_cflat import ERCFlat
+from doccl.methods.naive import JointMultiTask, NaiveFineTune
 from doccl.methods.o_lora import OLoRA
-from doccl.methods.cl_lora import CLLoRA
-from doccl.methods.l2p import L2P
-from doccl.methods.dualprompt import DualPrompt
-from doccl.methods.coda_prompt import CODAPrompt
-from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
-from doccl.methods.doc_merge import DocMerge
-from doccl.methods.lca import LCA
-from doccl.methods.doccl import DocCL
+from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
+from doccl.types import TaskInfo
 
 pytestmark = pytest.mark.slow
 
-_T0_LABELS = ["O", "B-A", "I-A", "B-B", "I-B"]       # 5-class head
-_T1_NEW = ["B-C", "I-C"]                              # grows head to 7
+_T0_LABELS = ["O", "B-A", "I-A", "B-B", "I-B"]  # 5-class head
+_T1_NEW = ["B-C", "I-C"]  # grows head to 7
 
-_BASE_CFG = {"lr": 5e-5, "weight_decay": 0.01, "epochs": 1, "max_grad_norm": 1.0,
-             "early_stopping": False}
+_BASE_CFG = {
+    "lr": 5e-5,
+    "weight_decay": 0.01,
+    "epochs": 1,
+    "max_grad_norm": 1.0,
+    "early_stopping": False,
+}
 
 # Per-method extra config (paper defaults, scaled tiny where it matters for speed).
 _METHOD_CFG = {
-    "naive": {}, "joint": {},
+    "naive": {},
+    "joint": {},
     "ewc": {"lambda_": 1000.0, "fisher_n_samples": 4, "ewc_gamma": 1.0},
     "lwf": {"alpha": 1.0, "temperature": 2.0},
     "er": {"buffer_size": 20, "replay_batch_size": 2},
     "der_pp": {"buffer_size": 20, "replay_batch_size": 2, "alpha": 0.5, "beta": 0.5},
     "er_cflat": {"buffer_size": 20, "replay_batch_size": 2, "rho": 0.05, "cflat_lambda": 0.0},
-    "o_lora": {"lora_rank": 4, "lora_alpha": 8, "lora_dropout": 0.0,
-               "lambda_ortho": 0.5, "target_modules": ["query", "value"]},
-    "cl_lora": {"lora_rank": 4, "lora_alpha": 8, "lora_dropout": 0.0,
-                "lambda_ortho": 0.5, "target_modules": ["query", "value"], "kd_alpha": 1.0},
+    "o_lora": {
+        "lora_rank": 4,
+        "lora_alpha": 8,
+        "lora_dropout": 0.0,
+        "lambda_ortho": 0.5,
+        "target_modules": ["query", "value"],
+    },
+    "cl_lora": {
+        "lora_rank": 4,
+        "lora_alpha": 8,
+        "lora_dropout": 0.0,
+        "lambda_ortho": 0.5,
+        "target_modules": ["query", "value"],
+        "kd_alpha": 1.0,
+    },
     "l2p": {"n_prompts": 4, "prompt_length": 2, "top_k": 2, "lambda_key": 0.5},
-    "dualprompt": {"n_experts": 4, "g_prompt_length": 2, "e_prompt_length": 2,
-                   "lambda_key": 0.5},
+    "dualprompt": {"n_experts": 4, "g_prompt_length": 2, "e_prompt_length": 2, "lambda_key": 0.5},
     "coda_prompt": {"n_components": 4, "prompt_length": 2, "lambda_ortho": 0.1},
-    "hrp": {"router": "hybrid", "n_tasks": 3, "slots_per_task": 2, "prompt_length": 2,
-            "top_k": 2, "lambda_key": 0.5, "rrf_k": 60},
+    "hrp": {
+        "router": "hybrid",
+        "n_tasks": 3,
+        "slots_per_task": 2,
+        "prompt_length": 2,
+        "top_k": 2,
+        "lambda_key": 0.5,
+        "rrf_k": 60,
+    },
     # DocMERGE: one entry per consolidate mode so each branch (merge / memory / both)
     # gets full lifecycle coverage. fisher_n_samples tiny to keep the Fisher pass fast.
-    "doc_merge": {"consolidate": "both", "merge_rule": "fisher", "router": "sparse",
-                  "n_tasks": 3, "slots_per_task": 2, "prompt_length": 2, "top_k": 2,
-                  "lambda_key": 0.5, "fisher_n_samples": 2},
-    "doc_merge_merge": {"consolidate": "merge", "merge_rule": "plain", "n_tasks": 3,
-                        "slots_per_task": 2, "prompt_length": 2, "fisher_n_samples": 2},
-    "doc_merge_memory": {"consolidate": "memory", "router": "sparse", "n_tasks": 3,
-                         "slots_per_task": 2, "prompt_length": 2, "top_k": 2,
-                         "lambda_key": 0.5, "fisher_n_samples": 2},
+    "doc_merge": {
+        "consolidate": "both",
+        "merge_rule": "fisher",
+        "router": "sparse",
+        "n_tasks": 3,
+        "slots_per_task": 2,
+        "prompt_length": 2,
+        "top_k": 2,
+        "lambda_key": 0.5,
+        "fisher_n_samples": 2,
+    },
+    "doc_merge_merge": {
+        "consolidate": "merge",
+        "merge_rule": "plain",
+        "n_tasks": 3,
+        "slots_per_task": 2,
+        "prompt_length": 2,
+        "fisher_n_samples": 2,
+    },
+    "doc_merge_memory": {
+        "consolidate": "memory",
+        "router": "sparse",
+        "n_tasks": 3,
+        "slots_per_task": 2,
+        "prompt_length": 2,
+        "top_k": 2,
+        "lambda_key": 0.5,
+        "fisher_n_samples": 2,
+    },
     # LCA: tiny CA recipe (few samples/epochs) so the merge+align lifecycle runs fast.
-    "lca": {"ca_samples_per_cls": 8, "ca_epochs": 2, "ca_batch_size": 8,
-            "ca_robust_weight": 0.1, "ca_feature_n_batches": 2, "merge_topk": 100},
-    "doccl": {"lambda_": 2000.0, "kd_alpha": 1.0, "temperature": 2.0,
-              "fisher_n_samples": 4, "buffer_size": 20, "replay_batch_size": 2,
-              "use_replay": True, "target_depth": "all"},
+    "lca": {
+        "ca_samples_per_cls": 8,
+        "ca_epochs": 2,
+        "ca_batch_size": 8,
+        "ca_robust_weight": 0.1,
+        "ca_feature_n_batches": 2,
+        "merge_topk": 100,
+    },
+    # HGT: head-only gradient-subspace transfer. alpha>0 exercises the steer/transfer path;
+    # tiny subspace + 2 feature batches for speed. Frozen backbone (default).
+    "hgt": {
+        "transfer_alpha": 0.5,
+        "subspace_k": 4,
+        "subspace_n_batches": 2,
+        "backbone_trainable": False,
+    },
+    # CUBER: whole-network, exercises per-layer hooks. tiny subspace for speed.
+    "cuber": {"transfer_alpha": 0.5, "subspace_k": 4, "subspace_n_batches": 2},
+    "doccl": {
+        "lambda_": 2000.0,
+        "kd_alpha": 1.0,
+        "temperature": 2.0,
+        "fisher_n_samples": 4,
+        "buffer_size": 20,
+        "replay_batch_size": 2,
+        "use_replay": True,
+        "target_depth": "all",
+    },
 }
 
 _METHOD_CLS = {
-    "naive": NaiveFineTune, "joint": JointMultiTask, "ewc": EWC, "lwf": LwF, "er": ER,
-    "der_pp": DERpp, "er_cflat": ERCFlat, "o_lora": OLoRA, "cl_lora": CLLoRA,
-    "l2p": L2P, "dualprompt": DualPrompt, "coda_prompt": CODAPrompt,
-    "hrp": HybridRoutedPrompt, "doccl": DocCL,
-    "doc_merge": DocMerge, "doc_merge_merge": DocMerge, "doc_merge_memory": DocMerge,
+    "naive": NaiveFineTune,
+    "joint": JointMultiTask,
+    "ewc": EWC,
+    "lwf": LwF,
+    "er": ER,
+    "der_pp": DERpp,
+    "er_cflat": ERCFlat,
+    "o_lora": OLoRA,
+    "cl_lora": CLLoRA,
+    "l2p": L2P,
+    "dualprompt": DualPrompt,
+    "coda_prompt": CODAPrompt,
+    "hrp": HybridRoutedPrompt,
+    "doccl": DocCL,
+    "doc_merge": DocMerge,
+    "doc_merge_merge": DocMerge,
+    "doc_merge_memory": DocMerge,
     "lca": LCA,
+    "hgt": HGT,
+    "cuber": CUBER,
 }
 
 
@@ -135,8 +219,7 @@ def _run_one_task(method, task: TaskInfo, loader: DataLoader) -> float:
 def test_method_cil_lifecycle(name):
     """Full 2-task CIL lifecycle: train, grow head, train, evaluate — all finite, no crash."""
     torch.manual_seed(0)
-    model = LayoutLMv3Wrapper(model_name="microsoft/layoutlmv3-base",
-                              num_labels=len(_T0_LABELS))
+    model = LayoutLMv3Wrapper(model_name="microsoft/layoutlmv3-base", num_labels=len(_T0_LABELS))
     model.label_to_id = {l: i for i, l in enumerate(_T0_LABELS)}
     model.id_to_label = {i: l for l, i in model.label_to_id.items()}
     cfg = {**_BASE_CFG, **_METHOD_CFG[name]}
@@ -162,8 +245,9 @@ def test_method_cil_lifecycle(name):
     results = method.evaluate(eval_loaders)
     assert set(results) == {0, 1}, f"{name}: evaluate must return both tasks"
     for tid, m in results.items():
-        assert 0.0 <= m.f1 <= 100.0 and torch.isfinite(torch.tensor(m.f1)), \
-            f"{name}: task {tid} F1 out of range ({m.f1})"
+        assert 0.0 <= m.f1 <= 100.0 and torch.isfinite(
+            torch.tensor(m.f1)
+        ), f"{name}: task {tid} F1 out of range ({m.f1})"
 
 
 @pytest.mark.parametrize("name", list(_METHOD_CLS))
