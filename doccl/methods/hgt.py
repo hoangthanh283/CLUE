@@ -40,8 +40,9 @@ class HGT(NaiveFineTune):
                 p.requires_grad = True
         self._task_subspaces: list[torch.Tensor] = []  # each (d, k) orthonormal cols
         self._steer_enabled = False
-        # One persistent hook on the head weight; it consults _steer_enabled / subspaces.
-        self.model.model.classifier.weight.register_hook(self._steer_head_grad)
+        self._head_hook_handle = None  # removable handle for the current head hook
+        # Register the hook on the initial head; before_task re-registers after any growth.
+        self._register_head_hook()
 
     # ─── internal helpers ────────────────────────────────────────────────────
     def _head_device(self) -> torch.device:
@@ -50,6 +51,20 @@ class HGT(NaiveFineTune):
         if model is not None:
             return self.model.model.classifier.weight.device
         return torch.device("cpu")
+
+    def _register_head_hook(self) -> None:
+        """Remove any stale head-grad hook and register a fresh one on the current head.
+
+        This must be called after every classifier replacement (CIL expand_classifier
+        creates a new nn.Linear, so the old hook handle refers to a dead tensor).
+        The remove-then-register pattern guarantees no double-registration.
+        """
+        if self._head_hook_handle is not None:
+            self._head_hook_handle.remove()
+            self._head_hook_handle = None
+        self._head_hook_handle = self.model.model.classifier.weight.register_hook(
+            self._steer_head_grad
+        )
 
     # ─── subspace bookkeeping ────────────────────────────────────────────────────
     def _stacked_basis(self) -> torch.Tensor:
@@ -72,6 +87,10 @@ class HGT(NaiveFineTune):
     def before_task(self, task: TaskInfo, train_loader) -> None:
         # Steering only applies from task 1 on (no old subspaces before then).
         self._steer_enabled = task.task_id > 0 and len(self._task_subspaces) > 0
+        # Re-register the head hook every task: expand_classifier (called by the CL
+        # loop BEFORE before_task) replaces the classifier with a new nn.Linear whose
+        # weight tensor has no hook.  Remove the stale handle and hook the fresh tensor.
+        self._register_head_hook()
 
     def after_task(self, task: TaskInfo, train_loader) -> None:
         self._accumulate_subspace(train_loader)
