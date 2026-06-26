@@ -1,0 +1,13 @@
+name: hgt
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+# Backbone regime — the experiment resolves frozen vs trainable.
+backbone_trainable: false
+# Transfer strength on the in-old-subspace head-gradient component.
+# 0.0 = GPM-style protection (BWT~0 control); >0 = positive-transfer hypothesis; 1.0 = no projection.
+transfer_alpha: 1.0
+# Per-task head-input subspace: top-k eigenvectors of the token-feature second moment.
+subspace_k: 32
+subspace_n_batches: 16
