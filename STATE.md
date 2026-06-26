@@ -36,7 +36,14 @@ Registered in METHOD_REGISTRY + `_STD_FORWARD`; config `configs/method/lca.yaml`
   independently CONFIRMS the DocMERGE RCA: merging alone is insufficient; you must re-align the
   head. Their align is buffer-free (μ/Σ, not exemplars) = the "generative head replay" floated
   in the DocMERGE brainstorm and skipped. **Strong candidate to salvage DocMERGE.**
-- **LCA RUN IN PROGRESS (1/5 done, 08:08 launch).** Partial result on `dil` (5ep) — PRELIMINARY,
+- **LCA RUN IN PROGRESS (2/5 done).** ⚠️ ABLATION-DESIGN BUG: `lca_nomerge_noalign`
+  (merge_coef=0) is NOT a clean "no-op" floor — merge_coef=0 makes `base+0·tv=base`, i.e. it
+  RESETS the backbone to pretrained every task (hence its weird task0=17 at-learning). Ignore it
+  as a floor; use plain `naive` (pending) as the real floor. EARLY pattern (watch when complete):
+  full `lca` task1 diag=8.3 but merge-only `lca_merge_noalign` task1=48.7 → the ALIGN step may be
+  HURTING (Gaussian-feature assumption may break for per-token feats / 'O'-class dominance). If
+  lca_merge_noalign > lca, that's the finding: LCA's classifier-align doesn't port to doc-IE.
+- **(earlier note) LCA 1/5:** Partial result on `dil` (5ep) — PRELIMINARY,
   await ablations before concluding: **lca (full, merge+align): AA=41.9 BWT=−23.8** (diag
   [85.2, 8.3, 79.8]; task0 forgets 85→39). vs der_pp AA=88.2/BWT=−2.9 (known). So LCA — ICLR'26
   SoTA on IMAGE CIL — does NOT transfer its effectiveness to doc-IE out of the box at 5ep
