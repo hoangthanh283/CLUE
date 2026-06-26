@@ -1,5 +1,26 @@
 # STATE
 
+## Active Work (2026-06-26) — LCA baseline (ICLR 2026) IMPLEMENTED + queued to run
+**LCA: Local Classifier Alignment** (Tran/Vargas/**Khoat Than**, ICLR 2026; arXiv 2603.09888,
+repo tungts1101/LCA) — faithfully ported to doc-IE and committed (d86a53a + 1231978 on
+`doccl`). See memory [[clue-lca-paper]]. **Method `lca`** (`doccl/methods/lca.py`): per task,
+SGD+cosine finetune backbone+head → per-BIO-class feature Gaussians (μ,Σ over TOKEN features)
+→ **TIES-merge** backbone task-vectors (`doccl/methods/ties_merge.py`, verbatim port of LCA
+`helper.merge`) → **classifier ALIGN** on sampled N(μ,Σ) features with CE + robust·(intra-class
+loss-variance) + entropy·(entropy), skip task0. Added `LayoutLMv3Wrapper.token_features`.
+Registered in METHOD_REGISTRY + `_STD_FORWARD`; config `configs/method/lca.yaml`. **9 unit +
+2 e2e (CIL/DIL real LayoutLMv3) pass; ruff+black clean.**
+- **KEY INSIGHT:** LCA = TIES-merge (which DocMERGE has, and which ALONE failed) + a post-merge
+  classifier re-grounding via GENERATIVE Gaussian feature replay (which DocMERGE LACKS). LCA
+  independently CONFIRMS the DocMERGE RCA: merging alone is insufficient; you must re-align the
+  head. Their align is buffer-free (μ/Σ, not exemplars) = the "generative head replay" floated
+  in the DocMERGE brainstorm and skipped. **Strong candidate to salvage DocMERGE.**
+- **LCA RUN QUEUED:** `scripts/run_lca.sh` on `dil` (lca full vs lca_merge_noalign [ca_epochs=0]
+  vs lca_nomerge_noalign [merge_coef=0] + naive/der_pp). A SELF-MATCH-PROOF watcher (marker
+  LCAGUARD_a94f, excludes its own cmdline so it can't wait-forever like the earlier buggy ones)
+  waits for the cil_cord DocMERGE run to free the GPU, then launches. Output →
+  `results/lca_eval/lca_run.log`. NOTE: LCA finetunes the FULL backbone (heavy, ~like der_pp).
+
 ## Active Work (2026-06-25) — DocMERGE method (NEW, implemented + queued to run)
 **New CL method `doc_merge`** (committed 7185a6b + 35f5376 on `doccl`): diagnosis-guided
 head-merging + drift-immune lexical memory. Born from a scientific-brainstorm + brutal
@@ -61,11 +82,20 @@ recorded in plan `~/.claude/plans/zazzy-brewing-popcorn.md`).
   is FROZEN so its displacement is 0 → ratio vacuous. The Step-A premise check as designed
   does NOT apply to a frozen-backbone method (real design oversight; would only be meaningful
   with a trainable backbone).
-  **RCA-INFORMED NEXT (cheapest decisive test first):**
-  (1) **Fix the 1/T shrinkage** in `merge_head_deltas` (count-aware: a coordinate's mean
-     divides by how many tasks ACTUALLY wrote it, not T) → re-run merge-only. If AA jumps,
-     #1 was the dominant bug; if not, the structural row-conflict (#2) dominates and merge
-     is dead for dil. This is a ~1-line numerics change + one fast run — do this FIRST.
+  **UPDATE (06:37): step (1) DONE + step (2) RUNNING on cil_cord.** Count-aware merge fix
+  committed (f900089/amended + 0b5c927: `merge_count_aware` default True; +count-aware unit
+  tests, 11 pass; `method.merge_count_aware` config knob wired). **KEY: proved the fix is a
+  mathematical NO-OP on dil** (dense shared-label rows → divisor T either way; merged head
+  byte-identical, `max|aware−classic|=0.000`). So the dil failure is purely structural
+  (#2 row-conflict + #3 lopsided Fisher), NOT the 1/T bug. The fix only bites on DISJOINT
+  rows → re-running on **cil_cord** instead (5 sessions, growing head = disjoint logit rows;
+  RCA predicts merge *could* work there). `scripts/run_docmerge_cil.sh` RUNNING (Task 1/5,
+  1.2GB VRAM): memory + merge×{plain,ties,fisher} + both_plain + a plain count_aware=false
+  CONTROL. Decisive comparison: merge_plain(fixed) vs merge_plain_classic(pre-fix) =the fix
+  effect; best-merge vs memory = does merge add anything on CIL. Output →
+  `results/docmerge_cil/cil_feasibility.log`. ~1.5–2.5h.
+  **RCA-INFORMED NEXT (original plan, for reference):**
+  (1) ~~Fix the 1/T shrinkage → re-run~~ DONE (no-op on dil → running on cil_cord instead).
   (2) If merge still fails after the fix → **the negative is real and reportable**: "weight
      MERGING cannot consolidate a shared classifier head across conflicting domain optima;
      gradient REPLAY can (HRP +5.7)" — a clean mechanism contrast for the thesis.
