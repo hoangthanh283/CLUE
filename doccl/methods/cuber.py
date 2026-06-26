@@ -40,16 +40,29 @@ class CUBER(NaiveFineTune):
         self._layer_subspaces: dict[str, list[torch.Tensor]] = {}
         self._steer_enabled = False
         self._linear_names = self._collect_linears()
+        self._grad_hook_handles: list = []  # removable handles for current grad hooks
+        # Register hooks on the initial model; before_task re-registers after any growth.
         self._register_grad_hooks()
 
     def _collect_linears(self) -> list[str]:
         return [n for n, mod in self.model.model.named_modules() if isinstance(mod, nn.Linear)]
 
     def _register_grad_hooks(self) -> None:
+        """Remove any stale grad hooks and register fresh ones on the current model.
+
+        Re-collecting linears is necessary because expand_classifier replaces the
+        classifier nn.Linear with a new object; the old hook handle refers to the
+        dead tensor.  The remove-then-register pattern prevents double-registration.
+        """
+        for handle in self._grad_hook_handles:
+            handle.remove()
+        self._grad_hook_handles = []
+        self._linear_names = self._collect_linears()
         named = dict(self.model.model.named_modules())
         for name in self._linear_names:
             w = named[name].weight
-            w.register_hook(lambda g, nm=name: self._steer_for_layer(nm, g))
+            handle = w.register_hook(lambda g, nm=name: self._steer_for_layer(nm, g))
+            self._grad_hook_handles.append(handle)
 
     def _stacked_basis(self, name: str, device, dtype) -> torch.Tensor:
         subs = self._layer_subspaces.get(name)
@@ -67,6 +80,10 @@ class CUBER(NaiveFineTune):
 
     def before_task(self, task: TaskInfo, train_loader) -> None:
         self._steer_enabled = task.task_id > 0 and bool(self._layer_subspaces)
+        # Re-register all grad hooks: expand_classifier (called by the CL loop BEFORE
+        # before_task) replaces the classifier nn.Linear, so any hook on that tensor is
+        # stale.  Re-collecting linears + remove-then-register prevents double-hooking.
+        self._register_grad_hooks()
 
     def after_task(self, task: TaskInfo, train_loader) -> None:
         self._accumulate_layer_subspaces(train_loader)
