@@ -1,5 +1,22 @@
 # STATE
 
+## HGT method BUILT + TESTED + run (2026-06-26) — ⚠️ NO-GO verdict (analysis-paper pivot)
+**HGT (Head-localized Gradient-subspace Transfer)** + CUBER baseline implemented via
+subagent-driven-development (5 tasks, all reviewed clean): `doccl/methods/grad_subspace.py`
+(b075dc5), `hgt.py` (c45354d), `cuber.py` (9846303), e2e (5e9fd05), runner cf2aa07. Spec
+`docs/superpowers/specs/2026-06-26-head-gradient-subspace-transfer-design.md`; plan
+`docs/superpowers/plans/2026-06-26-head-gradient-subspace-transfer.md`; ledger
+`.superpowers/sdd/progress.md`. See [[clue-headgrad-direction]].
+**α-ablation on dil (5ep, results/hgt_ablation/) — VERDICT: NO-GO on positive-BWT.**
+AA/BWT: naive 38.7/−75.2 | er 86.2/−3.3 | hgt α0 24.8/−7.9 | hgt α0.5 25.3/−21.1 | hgt α1
+24.9/−23.2 | cuber (pending ~30min). **α-BWT monotonically WORSE (−7.9→−21.1→−23.2)** while
+at-learning rises (diag 10.8→24.9→28.5), AA flat ~25 → α is a STABILITY↔PLASTICITY dial, NOT
+transfer; no positive BWT anywhere. All HGT AA~25 ≪ er 86 (frozen-backbone cap). Integration
+fully validated (hooks survived real training, no crash). **→ analysis-paper framing** (the
+sharp finding: head-gradient steering trades stability/plasticity, doesn't transfer; with
+merge-fails + LCA-fails = the "nothing transfers on the head in doc-IE" story). CODE correct
+regardless. PENDING: cuber result, then FINAL whole-branch review + finishing-the-branch.
+
 ## Brainstorm (2026-06-26) — lexical-similarity-coupling CL method (DIRECTION, pre-spec)
 After DocMERGE-merge falsified + LCA-align would re-skin the baseline, brainstorming a NEW
 A*-tier direction built on our ONE validated asset (sparse-OCR lexical routing, drift-immune).
