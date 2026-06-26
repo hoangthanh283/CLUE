@@ -33,6 +33,7 @@ from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.er import ER
 from doccl.methods.er_cflat import ERCFlat
 from doccl.methods.ewc import EWC
+from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
 from doccl.methods.lca import LCA
@@ -147,6 +148,7 @@ METHOD_REGISTRY = {
     # prototype). ``method.router`` ∈ {dense, sparse, hybrid} toggles the routing
     # ablation; writes results/<run>/routing.json with the per-task routing hit-rate.
     "hrp": HybridRoutedPrompt,
+    "hgt": HGT,
     "doc_merge": DocMerge,
     # Proposed method: depth/head-targeted DocCL, derived from the corrected
     # diagnosis (forgetting concentrates in the classifier head + late layers).
@@ -621,7 +623,7 @@ def main(cfg: DictConfig) -> None:
     # Standard-forward methods only (prompt/LoRA methods have a custom forward).
     # er_cflat uses ER's standard model forward (no PEFT/prompts) → eligible.
     # cl_lora is PEFT-wrapped (custom forward) → excluded, like o_lora.
-    _STD_FORWARD = {"naive", "joint", "ewc", "lwf", "er", "der_pp", "er_cflat", "doccl", "lca"}
+    _STD_FORWARD = {"naive", "joint", "ewc", "lwf", "er", "der_pp", "er_cflat", "doccl", "lca", "hgt"}  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
         try:
             save_per_class_f1(out_dir, model, eval_loaders_seen, device)
