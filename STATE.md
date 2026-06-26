@@ -1,5 +1,26 @@
 # STATE
 
+## Brainstorm (2026-06-26) — lexical-similarity-coupling CL method (DIRECTION, pre-spec)
+After DocMERGE-merge falsified + LCA-align would re-skin the baseline, brainstorming a NEW
+A*-tier direction built on our ONE validated asset (sparse-OCR lexical routing, drift-immune).
+**Core idea:** the OCR lexical-similarity matrix S between tasks gates TWO transfer channels —
+(rep/prompt channel → FWT: warm-start a new task's prompts from lexically-similar prior tasks;
+head channel → BWT: gated GRADIENT FLOW [not merge] couples related tasks' head rows so they
+refine each other, isolating unrelated ones). Gate = drift-immune OCR signature cosine.
+**S VALIDATED (computed from raw OCR, scratchpad/compute_task_similarity_S.py):** dil task-sim
+matrix has the needed CONTRAST — SROIE↔CORD=0.311 (receipts cluster, shared top-words
+total/cash/tax = LABEL-BEARING tokens) vs FUNSD↔{SROIE,CORD}=0.10–0.15 (form is the outlier).
+~3× contrast → not flat → real signal to gate on. **Key insight:** shared vocab IS the
+label-bearing vocab → S measures "shared extraction rules", not generic affinity (uniquely a
+structured-IE signal; no image-CL analogue = the moat).
+**Open forks (user deciding):** (1) full-vocab S vs label-token-only S (lean: label-token =
+"shared rules" framing); (2) run a cheap SROIE↔CORD transfer-sanity probe first?
+**Warnings surfaced:** FWT metric is BROKEN for CIL (measures zero-shot-on-unseen-labels ≈ −85
+for everyone, NOT real transfer) → need a learning-curve/few-shot FWT metric (a 2nd
+contribution); cil_cord routing COLLAPSES to 0.22 (5 sessions = same CORD dataset → signatures
+overlap) → lexical routing needs DISTINCT-vocab tasks (dil's 0.92), fails on same-dataset CIL.
+dil is the proving ground; may be a one-scenario result — be clear-eyed.
+
 ## Active Work (2026-06-26) — LCA baseline (ICLR 2026) IMPLEMENTED + queued to run
 **LCA: Local Classifier Alignment** (Tran/Vargas/**Khoat Than**, ICLR 2026; arXiv 2603.09888,
 repo tungts1101/LCA) — faithfully ported to doc-IE and committed (d86a53a + 1231978 on
@@ -15,10 +36,14 @@ Registered in METHOD_REGISTRY + `_STD_FORWARD`; config `configs/method/lca.yaml`
   independently CONFIRMS the DocMERGE RCA: merging alone is insufficient; you must re-align the
   head. Their align is buffer-free (μ/Σ, not exemplars) = the "generative head replay" floated
   in the DocMERGE brainstorm and skipped. **Strong candidate to salvage DocMERGE.**
-- **LCA RUN QUEUED:** `scripts/run_lca.sh` on `dil` (lca full vs lca_merge_noalign [ca_epochs=0]
-  vs lca_nomerge_noalign [merge_coef=0] + naive/der_pp). A SELF-MATCH-PROOF watcher (marker
-  LCAGUARD_a94f, excludes its own cmdline so it can't wait-forever like the earlier buggy ones)
-  waits for the cil_cord DocMERGE run to free the GPU, then launches. Output →
+- **LCA RUN IN PROGRESS (1/5 done, 08:08 launch).** Partial result on `dil` (5ep) — PRELIMINARY,
+  await ablations before concluding: **lca (full, merge+align): AA=41.9 BWT=−23.8** (diag
+  [85.2, 8.3, 79.8]; task0 forgets 85→39). vs der_pp AA=88.2/BWT=−2.9 (known). So LCA — ICLR'26
+  SoTA on IMAGE CIL — does NOT transfer its effectiveness to doc-IE out of the box at 5ep
+  (heavy forgetting, AA≪replay). NOTE SROIE/task1 weak even at-learning (8.3) — flag, ablations
+  will clarify. Pending: lca_merge_noalign, lca_nomerge_noalign, naive, der_pp → then answer
+  "is LCA effective / does align help". `scripts/run_lca.sh`; SELF-MATCH-PROOF watcher
+  (LCAGUARD_a94f) correctly fired when cil_cord freed the GPU. Output →
   `results/lca_eval/lca_run.log`. NOTE: LCA finetunes the FULL backbone (heavy, ~like der_pp).
 
 ## Active Work (2026-06-25) — DocMERGE method (NEW, implemented + queued to run)
