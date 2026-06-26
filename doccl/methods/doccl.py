@@ -233,6 +233,16 @@ class DocCL(NaiveFineTune):
     ``target_depth`` ∈ {``all`` (full), ``head_only``, ``late_only``, ``uniform``}
     drives the component-targeting ablation (Table 6.7): does concentrating the
     mechanism on the diagnosed locus beat treating the network uniformly?
+
+    NOTE on the ``uniform`` baseline: it applies an *equal* per-bucket penalty
+    (``lambda_uniform``, default 1.0) to *every* depth bucket, including the input
+    and early encoders that the ``all`` schedule leaves at 0. It is therefore an
+    equal-penalty-everywhere control, NOT a budget-matched reallocation: with the
+    defaults its total weight Σ_g w_g = 5.0 exceeds the targeted schedule's 3.5.
+    The ablation thus isolates *where* the budget is spent (a collapse under uniform
+    despite a larger total budget implicates concentration, not magnitude); it is not
+    a same-total-budget comparison. The thesis prose (§3.3.6, §6.2.3) is worded to
+    match. To make it budget-matched instead, set ``lambda_uniform=0.7`` (=3.5/5).
     """
 
     name = "doccl"

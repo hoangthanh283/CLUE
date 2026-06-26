@@ -46,9 +46,9 @@ entity-F1 $84.7$ versus the oracle's $88.7$, within $\sim$4 points, backward tra
 near zero) but does \emph{not} reach it, and does not surpass experience replay,
 which remains $\sim$3 points higher; on the mixed and class-incremental scenarios DocCL
 tracks the strong baselines without exceeding them. A depth-targeting ablation confirms
-the diagnosis: spending the same stability budget \emph{uniformly} across depth collapses
-($42.6$ AA), whereas concentrating it on the diagnosed head/late locus recovers the full
-result. The honest finding is therefore that diagnosis-driven head/late targeting closes
+the diagnosis: penalising every depth \emph{uniformly}---rather than concentrating the
+budget on the diagnosed head/late locus---collapses ($42.6$ AA) even though it spends a
+larger total budget, whereas concentrating it on that locus recovers the full result. The honest finding is therefore that diagnosis-driven head/late targeting closes
 most of the forgetting gap on a domain shift, performing competitively with---though not
 beating---data replay. These
 results establish the per-component diagnostic protocol, together with a controlled
