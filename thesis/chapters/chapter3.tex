@@ -421,8 +421,9 @@ component-targeting ablation in Chapter~\ref{ch:results}:
 \begin{itemize}
   \item \textbf{H\textsubscript{target}.} Concentrating the stability budget on the
         diagnosed locus (the classifier head and late encoder layers) outperforms
-        spreading the same budget uniformly across depth (the \emph{uniform}
-        ablation) by $\ge 2$ entity-F1 on $\ge 2/3$ scenarios.
+        spreading the penalty uniformly across depth (the \emph{uniform}
+        ablation, which penalises every bucket equally) by $\ge 2$ entity-F1 on
+        $\ge 2/3$ scenarios.
   \item \textbf{H\textsubscript{head}.} Head-only protection recovers most of the
         gain of the full method; adding late-layer protection and head replay adds
         a further measurable improvement (the \emph{head-only} vs.\ \emph{late-only}
@@ -472,9 +473,11 @@ mechanisms are mutually-reinforcing and each individually ablatable:
 
 The total objective is $\mathcal{L} = \mathcal{L}_{\mathrm{CE}}
 + \tfrac{\lambda}{2}\sum_g w_g\, \mathcal{L}^{\mathrm{EWC}}_g
-+ \alpha\,\mathcal{L}_{\mathrm{KD}} + \mathcal{L}_{\mathrm{replay}}$,
-where the depth weights $w_g$ are concentrated on the diagnosed locus: with the depth
-buckets of \S\ref{sec:method-components},
++ \alpha\,\mathcal{L}_{\mathrm{KD}} + \beta\,\mathcal{L}_{\mathrm{replay}}$,
+where $\mathcal{L}_{\mathrm{replay}}$ is the cross-entropy on a small reservoir buffer
+$\mathcal{B}$ (weight $\beta$, buffer size $|\mathcal{B}|$; values in
+Appendix~\ref{app:hyperparameters}) and the depth weights $w_g$ are concentrated on the
+diagnosed locus: with the depth buckets of \S\ref{sec:method-components},
 \[
   w = \{\,\text{input}:0,\ \text{early}:0,\ \text{mid}:0.5,\ \text{late}:1.0,\ \text{head}:2.0\,\},
 \]
@@ -482,9 +485,13 @@ so the head is anchored twice as strongly as the late layers and the stable inpu
 encoders are left free to adapt. A \texttt{target\_depth} control (\emph{full},
 \emph{head-only}, \emph{late-only}, \emph{uniform}) sets these weights and drives the
 component-targeting ablation that tests H\textsubscript{target} and
-H\textsubscript{head}: the \emph{uniform} setting spends the \emph{same} total
-stability budget evenly across depth, so any gap between \emph{full} and
-\emph{uniform} is attributable to the targeting alone, not to the mechanisms. The
+H\textsubscript{head}: the \emph{uniform} setting applies an \emph{equal} non-zero
+penalty to every depth bucket---including the input and early encoders that the
+targeted schedule leaves free---rather than concentrating the budget on the head/late
+locus. It thus spends, if anything, a \emph{larger} total penalty than the targeted
+schedule ($\sum_g w_g = 5.0$ uniform versus $3.5$ targeted), so a collapse under
+uniform isolates \emph{where} the budget is spent, not how much, as the operative
+factor; the mechanisms themselves are held fixed across settings. The
 method reuses the EWC Fisher machinery, the LwF-style teacher, and the shared
 reservoir buffer, so it adds no fragile new infrastructure.
 

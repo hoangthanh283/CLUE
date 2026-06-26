@@ -89,14 +89,17 @@ table is consistent with but, on its own, cannot establish.
   \centering
   \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{pilot_displacement_bars.pdf}
   \caption[Per-component forgetting localiser]{Per-component forgetting localiser:
-  old-task-Fisher-weighted displacement $D_g$ by depth bucket, grouped by backbone
-  condition---large where parameters important to the \emph{previous} task were
-  overwritten. Across every condition (the four LayoutLMv3 modality masks, the BERT
-  text-only baseline, and the LiLT and BROS secondary backbones), the classifier
-  head's weighted displacement is one-to-four orders of magnitude larger than any
-  encoder layer's: forgetting concentrates at the classifier head and late encoder
-  layers while the input encoders barely move, and the profile is statistically the
-  same across all four architectures (\S\ref{sec:results-stability}).}
+  old-task-Fisher-weighted displacement $D_g$ by depth bucket (\textbf{log scale}, first
+  boundary FUNSD\,$\rightarrow$\,CORD), grouped by backbone condition---large where
+  parameters important to the \emph{previous} task were overwritten. Across every
+  condition (the four LayoutLMv3 modality masks, the BERT text-only baseline, and the LiLT
+  and BROS secondary backbones), the classifier head's weighted displacement is
+  one-to-four orders of magnitude larger than any encoder layer's: forgetting concentrates
+  at the classifier head and late encoder layers while the input encoders barely move, and
+  the profile is statistically the same across all four architectures
+  (\S\ref{sec:results-stability}). The log axis is what makes the per-layer gradient
+  legible (on a linear axis every non-head bar collapses to zero); bars are the mean
+  over three seeds with $\pm$1 s.d.\ whiskers.}
   \label{fig:per-component-bars}
 \end{figure}
 
@@ -162,9 +165,10 @@ table is consistent with but, on its own, cannot establish.
   by the geometry of the cross-entropy head; forgetting itself is localised by the
   displacement of Figure~\ref{fig:per-component-bars}, not by these levels. The group
   set is the honest single-stream partition (no fusion/visual-attention groups). The
-  absolute levels below are the relative ordering only; they are being recomputed with
-  the corrected per-sample empirical-Fisher estimator (see text), which leaves the
-  head-dominant ordering unchanged but narrows the head-to-backbone gap. Pilot result.}
+  absolute levels below should be read as a \emph{relative ordering} only: they use the
+  corrected per-sample empirical-Fisher estimator, under which the head-dominant ordering
+  is robust while the head-to-backbone magnitude gap is narrower than a naive batch
+  estimate would suggest. Pilot result.}
   \label{tab:fisher-component}
   \begin{tabular}{lr}
     \toprule
@@ -730,10 +734,13 @@ against the strong-baseline context the grid establishes (replay reaching the or
 The component-targeting ablation that isolates this effect---comparing the full
 depth-scaled DocCL against head-only, late-only, and uniform restrictions on DIL, three
 seeds each (Table~\ref{tab:ablation})---now \emph{confirms both hypotheses}. The
-\emph{uniform} variant, which spends the same stability budget evenly across all depths,
-\emph{collapses} to $42.6$ AA---roughly half the targeted methods and barely above the
-naive lower bound---directly supporting H\textsubscript{target}: where the consolidation
-budget is spent matters far more than how large it is. By contrast, the \emph{head-only}
+\emph{uniform} variant, which applies an equal penalty to every depth bucket---including
+the stable input and early encoders that the targeted schedule leaves free, and hence if
+anything a \emph{larger} total budget ($\sum_g w_g = 5.0$ versus the targeted $3.5$)---
+\emph{collapses} to $42.6$ AA, roughly half the targeted methods and barely above the
+naive lower bound. This directly supports H\textsubscript{target}: where the consolidation
+budget is spent matters far more than how large it is---more budget, spread evenly, is
+\emph{worse}. By contrast, the \emph{head-only}
 ($86.1$) and \emph{late-only} ($86.2$) restrictions each recover essentially the full
 result---in fact slightly \emph{edging} the full depth-scaled method ($84.7$)---confirming
 H\textsubscript{head}: concentrating the budget on the head, or on the late layers that
@@ -755,7 +762,16 @@ to $42.6$ AA, less than half the targeted variants and barely above naive, where
 result and slightly edge the full depth-scaled method ($84.7$). This confirms both
 H\textsubscript{target} (\emph{where} the budget is spent dominates) and
 H\textsubscript{head} (the head/late locus is the effective target); the interpretation is
-developed in \S\ref{sec:results-key-ablation}.
+developed in \S\ref{sec:results-key-ablation}. Two honest limits bound the claim. First,
+that head-only and late-only each \emph{match} the full schedule means the full method's
+extra late-layer consolidation term is largely \emph{redundant} with the head term on this
+scenario---a simpler head-focused variant would be near-equivalent here, which we flag as
+future work (\S\ref{sec:concl-future}) rather than as evidence for the full schedule.
+Second, this table reports the ablation on DIL---the scenario where DocCL is effective;
+the same contrast on the CIL-CORD growing-head scenario is uninformative (no variant
+clears $\sim$18 AA, since no method works there). The full schedule's robustness over the
+simpler head-only variant \emph{across} the harder Mixed and CIL scenarios is therefore not
+established here and remains an open question.
 
 \begin{table}[!htbp]
   \centering
@@ -816,14 +832,14 @@ parameters. ``Run'' denotes one full continual scenario.
   \IfFileExists{generated/table_compute.tex}{\input{generated/table_compute}}{%
   \begin{tabular}{lrrr}
     \toprule
-    \textbf{Method} & \textbf{Time / run (s)} & \textbf{Peak mem (MB)} & \textbf{Trainable params} \\
+    \textbf{Method} & \textbf{Trainable params} & \textbf{Time / run (s, indic.)} & \textbf{Peak mem (MB, indic.)} \\
     \midrule
-    Naive          & 614.5  & 10533 & 125.4 M \\
-    EWC            & 254.6  & 20386 & 125.4 M \\
-    LwF            & 392.2  & 20894 & 125.4 M \\
-    ER             & 174.5  & 27144 & 125.4 M \\
-    DER++          & 298.5  & 35540 & 125.4 M \\
-    \textbf{DocCL} & 2374.2 & 5015  & 125.4 M \\
+    Naive          & 125.4 M & 614.5  & 10533 \\
+    EWC            & 125.4 M & 254.6  & 20386 \\
+    LwF            & 125.4 M & 392.2  & 20894 \\
+    ER             & 125.4 M & 174.5  & 27144 \\
+    DER++          & 125.4 M & 298.5  & 35540 \\
+    \textbf{DocCL} & 125.4 M & 2374.2 & 5015  \\
     \bottomrule
   \end{tabular}}
 \end{table}

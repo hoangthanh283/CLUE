@@ -504,38 +504,74 @@ def _bert_contrast_lines(df: pd.DataFrame) -> list[str]:
     return out
 
 
+# Publication labels for the displacement bar chart (subject model first), so the
+# figure does not carry raw code keys like "c4_full". Unknown conditions fall back to
+# their key. Mirrors build_backbone_figures.BACKBONES for the shared conditions.
+_CONDITION_LABELS = {
+    "c4_full": "C4 full (LayoutLMv3)",
+    "c1_text": "C1 text-only",
+    "c3_no_image": "C3 text+layout",
+    "c2_no_text": "C2 layout+vision",
+    "cb_bert": "BERT (text-only)",
+    "cl_lilt": "LiLT",
+    "cr_bros": "BROS",
+}
+# Task-boundary keys → readable transition labels for figure titles.
+_BOUNDARY_LABELS = {
+    "0_to_1": "FUNSD$\\rightarrow$CORD",
+    "1_to_2": "CORD$\\rightarrow$SROIE",
+}
+
+
 def plot_displacement_bars(df: pd.DataFrame, output_path: Path) -> None:
     """Bar chart of old-task-Fisher-weighted displacement (the forgetting
-    localizer) per depth bucket, per condition, at the first task boundary."""
+    localizer) per depth bucket, per condition, at the first task boundary.
+
+    The head bucket dwarfs every encoder bucket by one-to-four orders of magnitude,
+    so a *linear* y-axis crushes all non-head bars to zero and hides the very depth
+    gradient the figure exists to show (and makes the absolute head heights look
+    dominated by the noisiest conditions). We therefore use a **log** y-axis —
+    matching backbone_head_dominance.pdf — and publication condition labels.
+    """
     disp = df[df["metric"] == "displacement_depth"].copy()
     if disp.empty:
         print("No displacement data — skipping displacement bars")
         return
     first = sorted(disp["boundary"].unique())[0]
     sub = disp[disp["boundary"] == first]
+    n_seeds = sub.groupby("condition")["seed"].nunique().to_dict()
     agg = sub.groupby(["condition", "group"])["value"].agg(["mean", "std"]).reset_index()
     order = ["input", "early", "mid", "late", "head"]
     groups = [g for g in order if g in set(agg["group"])]
-    conditions = sorted(agg["condition"].unique())
+    # Stable, publication-ordered conditions (subject model first); unknown keys appended.
+    present = set(agg["condition"])
+    conditions = [c for c in _CONDITION_LABELS if c in present]
+    conditions += sorted(c for c in present if c not in _CONDITION_LABELS)
 
     fig, ax = plt.subplots(figsize=(11, 6))
     x = np.arange(len(groups))
     width = 0.8 / max(len(conditions), 1)
     for i, cond in enumerate(conditions):
         sub_c = agg[agg["condition"] == cond].set_index("group").reindex(groups)
-        ax.bar(
-            x + i * width - 0.4,
-            sub_c["mean"].fillna(0),
-            width,
-            yerr=sub_c["std"].fillna(0),
-            label=cond,
-            capsize=2,
-        )
+        means = sub_c["mean"].to_numpy(dtype=float)
+        stds = np.nan_to_num(sub_c["std"].to_numpy(dtype=float))
+        # A log axis cannot draw non-positive bars; hide them (NaN) and clip the
+        # lower error arm so a whisker never crosses zero (which would break log).
+        positive = means > 0
+        plot_means = np.where(positive, means, np.nan)
+        lower = np.where(positive, np.minimum(stds, means * (1.0 - 1e-3)), 0.0)
+        yerr = np.vstack([lower, stds])
+        label = _CONDITION_LABELS.get(cond, cond)
+        if n_seeds.get(cond, 0) == 1:
+            label += " (1 seed)"  # honest flag: C2 has a single non-degenerate seed
+        ax.bar(x + i * width - 0.4, plot_means, width, yerr=yerr, label=label, capsize=2)
+    ax.set_yscale("log")
     ax.set_xticks(x)
-    ax.set_xticklabels(groups)
-    ax.set_ylabel("Fisher-weighted displacement (forgetting)")
-    ax.set_title(f"Where forgetting lives by depth (boundary {first})")
-    ax.legend()
+    ax.set_xticklabels([g.capitalize() for g in groups])
+    ax.set_xlabel("Network depth bucket")
+    ax.set_ylabel("Fisher-weighted displacement (log scale)")
+    ax.set_title(f"Where forgetting lives by depth ({_BOUNDARY_LABELS.get(first, first)})")
+    ax.legend(title="Condition", frameon=False, ncol=2, fontsize=8)
     fig.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
