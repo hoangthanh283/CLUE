@@ -10,6 +10,10 @@ consolidate: both
 # (importance-weighted by the SAME head Fisher used for the diagnostic).
 merge_rule: fisher
 ties_density: 0.2
+# Count-aware merge (default true): divide each coordinate by the number of tasks that
+# wrote a non-zero delta there, not by T (removes 1/T shrinkage on disjoint CIL rows).
+# false = classic Model-Soups coordinate-mean (the pre-RCA behaviour; kept for ablation).
+merge_count_aware: true
 # Optional null-space constraint on head updates (ablation arm; not load-bearing).
 headspace_constraint: false
 # Lexical memory: sparse = BM25/TF-IDF over OCR input_ids (drift-immune address).
