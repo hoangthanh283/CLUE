@@ -12,7 +12,6 @@ while high-S tasks co-train shared slots.
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as F  # noqa: N812,F401 — canonical torch alias (repo-wide)
 
 
 def signature_cosine(sig_a: torch.Tensor, sig_b: torch.Tensor) -> float:
