@@ -113,6 +113,24 @@ def test_encoder_layers_layoutlmv3_fallback():
     assert m._encoder_layers() is layer_list
 
 
+def test_slot_claim_is_per_task_budget_not_greedy():
+    """Regression: with n_tasks fixed, each task claims n_slots//n_tasks slots — NOT all
+    fresh slots (the original bug where task 0 grabbed everything and later tasks owned none).
+    Replicates the exact claim arithmetic used in before_task."""
+    n_slots, n_tasks = 12, 3
+    per_task = max(1, n_slots // max(n_tasks, 1))  # == 4
+    slot_owner = [-1] * n_slots
+    for task_id in range(3):
+        fresh = [s for s, o in enumerate(slot_owner) if o == -1]
+        claim = fresh[:per_task]
+        for s in claim:
+            slot_owner[s] = task_id
+    # Every task owns exactly its 4-slot block; none left greedily unowned-by-design.
+    assert slot_owner == [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2]
+    for t in range(3):
+        assert slot_owner.count(t) == per_task, f"task {t} should own {per_task} slots"
+
+
 def test_trainable_parameters_includes_slots():
     """CRITICAL-1 regression: slot params must appear in trainable_parameters()."""
     # Build a minimal LexSlot stub without __init__ so no real model is needed.

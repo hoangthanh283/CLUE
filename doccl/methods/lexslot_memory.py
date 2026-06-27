@@ -40,7 +40,11 @@ class LogitSlots(_MaskedSlots):
         super().__init__(n_slots)
         self.hidden_dim = hidden_dim
         self.values = nn.Parameter(torch.randn(n_slots, hidden_dim) * 0.02)
-        self.proj = nn.Parameter(torch.randn(n_slots, n_labels) * 0.02)  # small init
+        # proj zero-init -> logits_delta == 0 at init: an unclaimed / never-trained slot
+        # is an EXACT no-op, so isolated slots (grad-masked to 0) inject no logit noise into
+        # other tasks' predictions (the "isolated -> no forgetting" invariant). values can be
+        # nonzero (the key side) since the bilinear act @ proj is still gated by proj==0.
+        self.proj = nn.Parameter(torch.zeros(n_slots, n_labels))
         self.values.register_hook(self._scale_rows)
         self.proj.register_hook(self._scale_rows)
 
@@ -64,7 +68,11 @@ class ReprSlots(_MaskedSlots):
     def __init__(self, n_slots: int, hidden_dim: int, rank: int = 16):
         super().__init__(n_slots)
         self.down = nn.Parameter(torch.randn(n_slots, hidden_dim, rank) * 0.02)
-        self.up = nn.Parameter(torch.randn(n_slots, rank, hidden_dim) * 0.02)  # small init
+        # up zero-init -> repr_delta == 0 at init (LoRA-style): an unclaimed / never-trained
+        # slot is an EXACT no-op shift, so isolated slots perturb no other task's hidden state
+        # (the "isolated -> no forgetting" invariant). down can be nonzero; the slot is gated
+        # by up==0 until its owner trains it (grad w.r.t. down is 0 only on the first step).
+        self.up = nn.Parameter(torch.zeros(n_slots, rank, hidden_dim))
         self.down.register_hook(self._scale_rows)
         self.up.register_hook(self._scale_rows)
 
