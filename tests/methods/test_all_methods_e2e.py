@@ -37,6 +37,7 @@ from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
 from doccl.methods.lca import LCA
+from doccl.methods.lexslot import LexSlot
 from doccl.methods.lwf import LwF
 
 # Every method in METHOD_REGISTRY worth a behavioral test. doccl_a/c are legacy
@@ -145,6 +146,18 @@ _METHOD_CFG = {
     },
     # CUBER: whole-network, exercises per-layer hooks. tiny subspace for speed.
     "cuber": {"transfer_alpha": 0.5, "subspace_k": 4, "subspace_n_batches": 2},
+    # LexSlot: head+late slot memories, soft lexical sharing. Tiny slots/fisher/replay for speed.
+    "lexslot": {
+        "slot_depth": "head_late",
+        "slot_sharing": "soft",
+        "n_slots_head": 6,
+        "n_slots_late": 4,
+        "repr_rank": 2,
+        "fisher_n_samples": 2,
+        "buffer_size": 10,
+        "replay_batch_size": 2,
+        "target_depth": "all",
+    },
     "doccl": {
         "lambda_": 2000.0,
         "kd_alpha": 1.0,
@@ -178,6 +191,7 @@ _METHOD_CLS = {
     "lca": LCA,
     "hgt": HGT,
     "cuber": CUBER,
+    "lexslot": LexSlot,
 }
 
 
