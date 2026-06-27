@@ -85,11 +85,11 @@ RUN_BERT="${RUN_BERT:-1}"
 # default model). Every method is now backbone-agnostic (verified on LiLT/BROS/BERT — see
 # clue-backbone-agnostic-audit), so the full method set runs on every family. BACKBONES =
 # the families to add (config <family>_base must exist); BACKBONE_METHODS = which methods to
-# run on each. Empty BACKBONES (default) = LayoutLMv3-only, byte-identical to before; set
-# BACKBONES="lilt bros bert" for the full multi-backbone sweep. Run-names get the train.py
-# "_<family>" suffix so they never collide with the LayoutLMv3 run of the same
-# scenario/method/seed. (BERT-naive is still covered by RUN_BERT above; 'bert' here adds the rest.)
-BACKBONES="${BACKBONES:-}"
+# run on each. Default is the full multi-backbone sweep (lilt bros bert); set BACKBONES=""
+# for LayoutLMv3-only. Run-names get the train.py "_<family>" suffix so they never collide
+# with the LayoutLMv3 run of the same scenario/method/seed. (BERT-naive is still covered by
+# RUN_BERT above; 'bert' here adds the rest.)
+BACKBONES="${BACKBONES-lilt bros bert}"
 # Full method set per secondary backbone (all classical + prompt/LoRA + 2025 currency +
 # proposed doccl + lexslot). Override to a subset to trade coverage for compute.
 BACKBONE_METHODS="${BACKBONE_METHODS:-naive joint ewc lwf er der_pp l2p dualprompt coda_prompt o_lora cl_lora er_cflat doccl lexslot}"
