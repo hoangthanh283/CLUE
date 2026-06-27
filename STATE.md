@@ -1,5 +1,22 @@
 # STATE
 
+## All methods made BACKBONE-AGNOSTIC (2026-06-27) — verified green on 4 backbones
+Audited every CL method for LayoutLMv3 coupling (2 parallel audit agents: methods +
+data/encoder). Data/encoder path was already clean. Fixed 3 method-layer couplings:
+(1) ported `token_features` to `TokenClassificationWrapper` (+ BERT text-only override
+that drops `bbox`) → unblocks `lca`/`hgt`; (2) `prompt_base.py` hard `batch["pixel_values"]`
+→ `.get()` → unblocks `l2p`/`dualprompt`/`coda_prompt`/`hrp`; (3) ported the PEFT
+`ModulesToSaveWrapper` head-unwrap from `LayoutLMv3Wrapper` into the base wrapper →
+unblocks `o_lora`/`cl_lora` on CIL. Closed the TEST GAP: e2e method-lifecycle tests ran
+LayoutLMv3-only; added `test_method_{cil,dil}_lifecycle_secondary_backbone` = full method
+set × {LiLT,BROS,BERT} × {CIL,DIL}. Test-data gotcha fixed: `_TinyKIEDataset` is now
+backbone-aware (LiLT needs ordered boxes x0<=x1/y0<=y1; BROS needs [0,1] floats; only
+LayoutLMv3 gets pixel_values). **Verified: LayoutLMv3 12/12, BERT 42/42, BROS 42/42, LiLT
+0-fail.** Grid (`run_grid_multigpu.sh`) already has `BACKBONES`/`BACKBONE_METHODS` knobs —
+now safe to set `BACKBONES="lilt bros bert"` for any method. See
+[[clue-backbone-agnostic-audit]]. NEXT: decide whether to widen the default
+`BACKBONE_METHODS` subset for the generalization tables, then launch the multi-backbone grid.
+
 ## HGT method BUILT + TESTED + run (2026-06-26) — ⚠️ NO-GO verdict (analysis-paper pivot)
 **HGT (Head-localized Gradient-subspace Transfer)** + CUBER baseline implemented via
 subagent-driven-development (5 tasks, all reviewed clean): `doccl/methods/grad_subspace.py`

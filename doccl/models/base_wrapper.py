@@ -97,18 +97,29 @@ class TokenClassificationWrapper(nn.Module):
         all_labels = old_labels + [lbl for lbl in new_labels if lbl not in self.label_to_id]
         new_n = len(all_labels)
 
+        # Under PEFT (O-LoRA / CL-LoRA) the classifier is auto-registered in
+        # ``modules_to_save`` and REPLACED with a ``ModulesToSaveWrapper`` — which has
+        # neither ``.out_proj`` nor ``.in_features``, so reading dims off it raises an
+        # opaque AttributeError mid-CIL. Unwrap to the real head it holds (the
+        # active-adapter copy is what the forward uses; fall back to
+        # ``original_module``), expand that Linear, then write the widened copy back
+        # into every internal reference so PEFT's forward sees the new width. This
+        # mirrors ``LayoutLMv3Wrapper.expand_classifier`` so LoRA + class-IL runs on
+        # every backbone, not just LayoutLMv3.
         head = self.model.classifier
-        # A PEFT LoRA wrapper replaces the head with a ModulesToSaveWrapper, which has
-        # neither out_proj nor in_features — the naive path below would crash with an
-        # opaque AttributeError mid-CIL. Only LayoutLMv3Wrapper implements the PEFT
-        # unwrap/re-sync; fail fast and loud for secondary backbones + LoRA + CIL.
-        if type(head).__name__ == "ModulesToSaveWrapper":
-            raise NotImplementedError(
-                f"{type(self).__name__}.expand_classifier does not support a PEFT "
-                "ModulesToSaveWrapper head (LoRA/O-LoRA/CL-LoRA on a secondary "
-                "backbone in a class-incremental scenario). Use LayoutLMv3Wrapper, "
-                "which implements the PEFT head unwrap, for these runs."
-            )
+        saved = getattr(head, "modules_to_save", None)
+        if saved is not None:  # ModulesToSaveWrapper
+            active = getattr(head, "active_adapter", None)
+            if isinstance(active, (list, tuple)):
+                active = active[0] if active else None
+            keys = list(saved.keys())
+            if active is not None and active in keys:
+                head = saved[active]
+            elif keys:
+                head = saved[keys[0]]
+            else:
+                head = getattr(self.model.classifier, "original_module", head)
+
         out_linear = head.out_proj if hasattr(head, "out_proj") else head
         new_linear = nn.Linear(out_linear.in_features, new_n).to(out_linear.weight.device)
         with torch.no_grad():
@@ -120,6 +131,13 @@ class TokenClassificationWrapper(nn.Module):
 
         if hasattr(head, "out_proj"):
             head.out_proj = new_linear
+        elif saved is not None:
+            # Re-point the PEFT wrapper's copies at the widened Linear so the forward
+            # (which reads modules_to_save[active] / original_module) uses the new width.
+            for adapter in list(saved.keys()):
+                saved[adapter] = new_linear
+            if getattr(self.model.classifier, "original_module", None) is not None:
+                self.model.classifier.original_module = new_linear
         else:
             self.model.classifier = new_linear
         self.model.config.num_labels = new_n
@@ -172,6 +190,26 @@ class TokenClassificationWrapper(nn.Module):
             keys += ["pixel_values", "image"]
         inputs = {k: batch[k] for k in keys if k in batch}
         return self._inner(**inputs).last_hidden_state[:, 0]
+
+    # ─── per-token encoder features (the input the classifier head consumes) ─────
+    def token_features(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        """Per-token encoder hidden states feeding the classifier. (B, L, D).
+
+        Backbone-agnostic mirror of ``LayoutLMv3Wrapper.token_features`` for the
+        vision-free secondaries (LiLT/BROS/BERT): the inner encoder's
+        ``last_hidden_state`` over the text positions ``[0, input_ids.shape[1])``.
+        There are no trailing image patches here, so the slice is a no-op safeguard
+        that keeps the returned length aligned to the token labels.
+        ``classifier(token_features)`` reproduces the model's token logits. Used by
+        the LCA and HGT methods to estimate per-class feature Gaussians / gradient
+        subspaces and to run the head on sampled features.
+        """
+        keys = ["input_ids", "bbox", "attention_mask"]
+        if self._has_image:
+            keys += ["pixel_values", "image"]
+        inputs = {k: batch[k] for k in keys if k in batch}
+        seq_len = batch["input_ids"].shape[1]
+        return self._inner(**inputs).last_hidden_state[:, :seq_len]
 
     # ─── prompt injection (vision-free; prepend to text stream) ──────────────────
     def forward_with_prompts(

@@ -44,7 +44,10 @@ from doccl.methods.lwf import LwF
 # ablation variants; doccl_b is covered separately (CIL shape regression).
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
 from doccl.methods.o_lora import OLoRA
+from doccl.models.bert_family_wrapper import BERTWrapper
+from doccl.models.bros_wrapper import BROSWrapper
 from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
+from doccl.models.lilt_wrapper import LiLTWrapper
 from doccl.types import TaskInfo
 
 pytestmark = pytest.mark.slow
@@ -197,21 +200,42 @@ _METHOD_CLS = {
 }
 
 
-class _TinyKIEDataset(Dataset):
-    """A handful of synthetic LayoutLMv3 documents with labels in [0, n_classes)."""
+def _valid_bbox(seq_len: int, g: torch.Generator) -> torch.Tensor:
+    """Ordered boxes (x0<=x1, y0<=y1) in [0,1000]. LiLT derives width/height embeddings
+    from x1-x0 / y1-y0 and indexes an embedding table with them, so an unordered
+    (negative) box raises IndexError. Real KIE datasets always emit ordered corners."""
+    xy = torch.randint(0, 1000, (seq_len, 4), generator=g)
+    x = xy[:, [0, 2]].sort(dim=-1).values
+    y = xy[:, [1, 3]].sort(dim=-1).values
+    return torch.stack([x[:, 0], y[:, 0], x[:, 1], y[:, 1]], dim=-1)
 
-    def __init__(self, n: int = 4, seq_len: int = 8, n_classes: int = 5):
+
+class _TinyKIEDataset(Dataset):
+    """A handful of synthetic documents with labels in [0, n_classes).
+
+    ``backbone`` tailors the per-backbone contract: BROS expects [0,1]-normalized
+    float boxes; vision-free backbones (lilt/bros/bert) emit no ``pixel_values``.
+    Default ``layoutlmv3`` keeps the original LayoutLMv3 fixtures unchanged.
+    """
+
+    def __init__(
+        self, n: int = 4, seq_len: int = 8, n_classes: int = 5, backbone: str = "layoutlmv3"
+    ):
         g = torch.Generator().manual_seed(0)
-        self.items = [
-            {
+        self.items = []
+        for _ in range(n):
+            bbox = _valid_bbox(seq_len, g)
+            if backbone == "bros":
+                bbox = bbox.float() / 1000.0  # BROS expects normalized [0,1] floats
+            item = {
                 "input_ids": torch.randint(0, 100, (seq_len,), generator=g),
-                "bbox": torch.randint(0, 1000, (seq_len, 4), generator=g),
-                "pixel_values": torch.zeros(3, 224, 224),
+                "bbox": bbox,
                 "attention_mask": torch.ones(seq_len, dtype=torch.long),
                 "labels": torch.randint(0, n_classes, (seq_len,), generator=g),
             }
-            for _ in range(n)
-        ]
+            if backbone == "layoutlmv3":  # only the vision backbone gets pixel_values
+                item["pixel_values"] = torch.zeros(3, 224, 224)
+            self.items.append(item)
 
     def __len__(self):
         return len(self.items)
@@ -220,8 +244,9 @@ class _TinyKIEDataset(Dataset):
         return self.items[i]
 
 
-def _loader(n_classes: int, n: int = 4) -> DataLoader:
-    return DataLoader(_TinyKIEDataset(n=n, n_classes=n_classes), batch_size=2)
+def _loader(n_classes: int, n: int = 4, backbone: str = "layoutlmv3") -> DataLoader:
+    ds = _TinyKIEDataset(n=n, n_classes=n_classes, backbone=backbone)
+    return DataLoader(ds, batch_size=2)
 
 
 def _run_one_task(method, task: TaskInfo, loader: DataLoader) -> float:
@@ -327,3 +352,79 @@ def test_method_dil_lifecycle(name):
     assert set(results) == {0, 1}
     for tid, m in results.items():
         assert 0.0 <= m.f1 <= 100.0
+
+
+# ─── secondary-backbone coverage (LiLT / BROS / BERT) ────────────────────────────
+# The matrix above runs on LayoutLMv3 only; backbone-coupling bugs (a missing
+# wrapper method, a hard ``batch["pixel_values"]`` index, a PEFT head that the base
+# wrapper can't grow) slipped through because no method ever ran on a secondary
+# backbone. This block runs the FULL method set on each text/text+layout backbone so
+# every method is proven backbone-agnostic, not just LayoutLMv3.
+_SECONDARY_WRAPPERS = {
+    "lilt": (LiLTWrapper, {}),  # LiLT/BROS default their model_name
+    "bros": (BROSWrapper, {}),
+    "bert": (BERTWrapper, {"model_name": "bert-base-uncased"}),
+}
+
+
+def _make_backbone(backbone: str, n_labels: int):
+    wrapper_cls, kwargs = _SECONDARY_WRAPPERS[backbone]
+    model = wrapper_cls(num_labels=n_labels, **kwargs)
+    labels = _T0_LABELS if n_labels == len(_T0_LABELS) else list(range(n_labels))
+    model.label_to_id = {str(l): i for i, l in enumerate(labels)}  # noqa: E741
+    model.id_to_label = {i: l for l, i in model.label_to_id.items()}  # noqa: E741
+    return model
+
+
+@pytest.mark.parametrize("backbone", list(_SECONDARY_WRAPPERS))
+@pytest.mark.parametrize("name", list(_METHOD_CLS))
+def test_method_cil_lifecycle_secondary_backbone(name, backbone):
+    """Every method, full 2-task CIL lifecycle (incl. head growth + PEFT head for LoRA),
+    on LiLT/BROS/BERT — finite losses, in-range F1, no backbone-coupling crash."""
+    torch.manual_seed(0)
+    model = _make_backbone(backbone, len(_T0_LABELS))
+    method = _METHOD_CLS[name](model, {**_BASE_CFG, **_METHOD_CFG[name]})
+
+    t0 = TaskInfo(task_id=0, task_name="t0", label_set=_T0_LABELS)
+    loss0 = _run_one_task(method, t0, _loader(n_classes=len(_T0_LABELS), backbone=backbone))
+    assert torch.isfinite(torch.tensor(loss0)), f"{name}/{backbone}: task-0 loss not finite"
+
+    model.expand_classifier(_T1_NEW)  # CIL head growth 5 -> 7 (PEFT head unwrap path)
+    t1 = TaskInfo(task_id=1, task_name="t1", label_set=["O"] + _T1_NEW)
+    n = len(_T0_LABELS) + len(_T1_NEW)
+    loss1 = _run_one_task(method, t1, _loader(n_classes=n, backbone=backbone))
+    assert torch.isfinite(torch.tensor(loss1)), f"{name}/{backbone}: task-1 loss not finite"
+
+    results = method.evaluate(
+        {
+            0: _loader(n_classes=n, n=2, backbone=backbone),
+            1: _loader(n_classes=n, n=2, backbone=backbone),
+        }
+    )
+    assert set(results) == {0, 1}, f"{name}/{backbone}: evaluate must return both tasks"
+    for tid, m in results.items():
+        assert 0.0 <= m.f1 <= 100.0 and torch.isfinite(
+            torch.tensor(m.f1)
+        ), f"{name}/{backbone}: task {tid} F1 out of range ({m.f1})"
+
+
+@pytest.mark.parametrize("backbone", list(_SECONDARY_WRAPPERS))
+@pytest.mark.parametrize("name", list(_METHOD_CLS))
+def test_method_dil_lifecycle_secondary_backbone(name, backbone):
+    """Every method, 2-task DIL lifecycle (fixed head) on LiLT/BROS/BERT — no crash, finite."""
+    torch.manual_seed(0)
+    model = _make_backbone(backbone, len(_T0_LABELS))
+    method = _METHOD_CLS[name](model, {**_BASE_CFG, **_METHOD_CFG[name]})
+
+    for tid in (0, 1):
+        t = TaskInfo(task_id=tid, task_name=f"t{tid}", label_set=_T0_LABELS)
+        loss = _run_one_task(method, t, _loader(n_classes=len(_T0_LABELS), backbone=backbone))
+        assert torch.isfinite(torch.tensor(loss)), f"{name}/{backbone}: DIL task-{tid} not finite"
+
+    n = len(_T0_LABELS)
+    results = method.evaluate(
+        {0: _loader(n, 2, backbone=backbone), 1: _loader(n, 2, backbone=backbone)}
+    )
+    assert set(results) == {0, 1}
+    for tid, m in results.items():
+        assert 0.0 <= m.f1 <= 100.0, f"{name}/{backbone}: task {tid} F1 out of range ({m.f1})"

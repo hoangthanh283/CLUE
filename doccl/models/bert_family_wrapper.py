@@ -62,6 +62,18 @@ class BERTWrapper(TokenClassificationWrapper):
         inputs = {k: batch[k] for k in ("input_ids", "attention_mask") if k in batch}
         return self._inner(**inputs).last_hidden_state[:, 0]
 
+    # ─── per-token encoder features (text-only: BertModel rejects bbox) ───────────
+    def token_features(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        """Per-token BERT hidden states feeding the classifier. (B, L, D).
+
+        Text-only override of the base ``token_features``: the raw ``BertModel`` does
+        not accept ``bbox``, so we pass only ``input_ids``/``attention_mask`` (mirrors
+        ``encode_query``). ``classifier(token_features)`` reproduces the token logits.
+        """
+        inputs = {k: batch[k] for k in ("input_ids", "attention_mask") if k in batch}
+        seq_len = batch["input_ids"].shape[1]
+        return self._inner(**inputs).last_hidden_state[:, :seq_len]
+
     # ─── prompt injection (text-only: prepend to token embeddings, no bbox) ───────
     def forward_with_prompts(
         self,
