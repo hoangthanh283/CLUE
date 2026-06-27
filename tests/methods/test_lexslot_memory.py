@@ -29,6 +29,9 @@ def test_logit_slots_grad_mask_zeros_isolated_slot():
     loss.backward()
     assert torch.allclose(ls.values.grad[1], torch.zeros(4), atol=1e-6)  # masked
     assert ls.values.grad[0].abs().sum() > 0  # unmasked trains
+    # proj hook: masked slot row must be zeroed, unmasked slot row must be non-zero
+    assert torch.allclose(ls.proj.grad[1], torch.zeros(2), atol=1e-6)  # masked
+    assert ls.proj.grad[0].abs().sum() > 0  # unmasked trains
 
 
 def test_repr_slots_delta_shape():
@@ -46,6 +49,9 @@ def test_repr_slots_grad_mask_zeros_isolated_slot():
     loss.backward()
     assert torch.allclose(rs.down.grad[0], torch.zeros(4, 2), atol=1e-6)
     assert rs.down.grad[1].abs().sum() > 0
+    # up hook: masked slot tensor must be zeroed, unmasked slot tensor must be non-zero
+    assert torch.allclose(rs.up.grad[0], torch.zeros(2, 4), atol=1e-6)  # masked
+    assert rs.up.grad[1].abs().sum() > 0  # unmasked trains
 
 
 def test_set_owner():
