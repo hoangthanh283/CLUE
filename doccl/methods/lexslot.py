@@ -65,6 +65,27 @@ class LexSlot(DocCL):
 
         self._task_sigs: list[torch.Tensor] = []  # per-task OCR signature (V,)
 
+    # ─── backbone-agnostic accessors ──────────────────────────────────────────────
+    def _encoder_layers(self):
+        """The encoder's per-layer ModuleList, across backbone wrapper families.
+
+        Secondary wrappers (LiLT/BROS/BERT, ``TokenClassificationWrapper``) expose the
+        inner encoder via ``model._inner`` (= ``getattr(hf_model, _inner_attr)``);
+        ``LayoutLMv3Wrapper`` predates that base and nests it at ``model.layoutlmv3``.
+        Both then carry ``.encoder.layer``. We probe ``_inner`` first, then fall back
+        to the LayoutLMv3 path, so slot placement is identical on every backbone.
+        """
+        inner = getattr(self.model, "_inner", None)
+        if inner is None:
+            inner = getattr(self.model.model, "layoutlmv3", None)
+        if inner is None:
+            raise RuntimeError(
+                f"lexslot: cannot locate the inner encoder on "
+                f"{type(self.model).__name__}; expected model._inner or "
+                "model.model.layoutlmv3."
+            )
+        return inner.encoder.layer
+
     # ─── hook (de)registration ────────────────────────────────────────────────────
     def _register_slot_hooks(self) -> None:
         """Attach the head + late-layer slot forward hooks to the live model."""
@@ -72,7 +93,7 @@ class LexSlot(DocCL):
         cls = self.model.model.classifier
         self._hook_handles.append(cls.register_forward_pre_hook(self._capture_cls_input))
         self._hook_handles.append(cls.register_forward_hook(self._add_head_slots))
-        layers = self.model.model.layoutlmv3.encoder.layer
+        layers = self._encoder_layers()
         for i in self._late_idx:
             rs = self.late_slots[str(i)]
             self._hook_handles.append(layers[i].register_forward_hook(self._make_layer_hook(rs)))
@@ -108,13 +129,27 @@ class LexSlot(DocCL):
         return output + self.head_slots.logits_delta(self._cur_feats.to(output.dtype))
 
     def _make_layer_hook(self, rs: ReprSlots):
+        """Build a forward hook that adds rs.repr_delta to a layer's *text* hidden state.
+
+        Encoder-layer outputs differ by backbone:
+          - BERT / BROS / LayoutLMv3: ``output[0]`` is the text hidden tensor.
+          - LiLT: ``output[0]`` is a ``(text_hidden, layout_hidden)`` tuple — the encoder
+            reads ``layer_outputs[0][0]`` (text) and ``layer_outputs[0][1]`` (layout), so
+            the shift must apply to the text element and the nesting be preserved.
+          - bare tensor (no tuple): shift directly.
+        """
+
         def hook(_module, _inp, output):
-            # LayoutLMv3 layer returns a tuple; hidden state is output[0].
-            hs = output[0] if isinstance(output, tuple) else output
-            shifted = hs + rs.repr_delta(hs)
             if isinstance(output, tuple):
+                first = output[0]
+                if isinstance(first, tuple):  # LiLT: ((text, layout), ...)
+                    text_hs = first[0]
+                    shifted = text_hs + rs.repr_delta(text_hs)
+                    new_first = (shifted,) + tuple(first[1:])
+                    return (new_first,) + tuple(output[1:])
+                shifted = first + rs.repr_delta(first)  # BERT/BROS/LayoutLMv3
                 return (shifted,) + tuple(output[1:])
-            return shifted
+            return output + rs.repr_delta(output)  # bare tensor
 
         return hook
 

@@ -45,6 +45,74 @@ def test_derive_mask_soft_grades_by_similarity():
     assert torch.allclose(mask, torch.tensor([0.3, 0.3, 1.0, 1.0]), atol=1e-6)
 
 
+def test_layer_hook_bare_tensor():
+    """BERT/BROS/LayoutLMv3 path: layer output is a tuple whose [0] is a tensor."""
+    m = LexSlot.__new__(LexSlot)
+    rs = ReprSlots(n_slots=2, hidden_dim=4, rank=2)
+    # Force a non-zero delta so we can detect that the shift was applied.
+    with torch.no_grad():
+        rs.up.copy_(torch.ones_like(rs.up))
+        rs.down.copy_(torch.ones_like(rs.down))
+    hook = m._make_layer_hook(rs)
+    hs = torch.randn(1, 3, 4)
+    out = hook(None, None, (hs, "attn"))  # tuple output, [0] is tensor
+    assert isinstance(out, tuple) and out[1] == "attn"  # extras preserved
+    assert out[0].shape == hs.shape
+    assert not torch.allclose(out[0], hs)  # shift applied
+
+
+def test_layer_hook_bare_tensor_no_tuple():
+    """Defensive path: a layer that returns a bare tensor (no tuple wrapper)."""
+    m = LexSlot.__new__(LexSlot)
+    rs = ReprSlots(n_slots=2, hidden_dim=4, rank=2)
+    hook = m._make_layer_hook(rs)
+    hs = torch.randn(1, 3, 4)
+    out = hook(None, None, hs)
+    assert torch.is_tensor(out) and out.shape == hs.shape
+
+
+def test_layer_hook_lilt_nested_tuple():
+    """LiLT path: layer output is ((text_hidden, layout_hidden), *extras). The shift must
+    apply to the TEXT element, leave the layout element untouched, and preserve nesting."""
+    m = LexSlot.__new__(LexSlot)
+    rs = ReprSlots(n_slots=2, hidden_dim=4, rank=2)
+    with torch.no_grad():
+        rs.up.copy_(torch.ones_like(rs.up))
+        rs.down.copy_(torch.ones_like(rs.down))
+    hook = m._make_layer_hook(rs)
+    text = torch.randn(1, 3, 4)
+    layout = torch.randn(1, 3, 4)
+    out = hook(None, None, ((text, layout), "attn"))
+    # Structure preserved: ((text', layout), "attn")
+    assert isinstance(out, tuple) and out[1] == "attn"
+    assert isinstance(out[0], tuple) and len(out[0]) == 2
+    new_text, new_layout = out[0]
+    assert new_text.shape == text.shape
+    assert not torch.allclose(new_text, text)  # text shifted
+    assert torch.allclose(new_layout, layout)  # layout untouched
+
+
+def test_encoder_layers_secondary_via_inner():
+    """Backbone-agnostic: secondary wrappers expose the encoder via model._inner."""
+    m = LexSlot.__new__(LexSlot)
+    layer_list = ["L0", "L1"]
+    inner = types.SimpleNamespace(encoder=types.SimpleNamespace(layer=layer_list))
+    # Secondary wrapper: has _inner property returning the inner encoder.
+    m.model = types.SimpleNamespace(_inner=inner)
+    assert m._encoder_layers() is layer_list
+
+
+def test_encoder_layers_layoutlmv3_fallback():
+    """Backbone-agnostic: LayoutLMv3Wrapper has no _inner; falls back to model.model.layoutlmv3."""
+    m = LexSlot.__new__(LexSlot)
+    layer_list = ["L0", "L1"]
+    inner = types.SimpleNamespace(encoder=types.SimpleNamespace(layer=layer_list))
+    hf = types.SimpleNamespace(layoutlmv3=inner)
+    # LayoutLMv3Wrapper: no _inner attr; getattr(model, "_inner", None) is None -> fallback.
+    m.model = types.SimpleNamespace(model=hf)
+    assert m._encoder_layers() is layer_list
+
+
 def test_trainable_parameters_includes_slots():
     """CRITICAL-1 regression: slot params must appear in trainable_parameters()."""
     # Build a minimal LexSlot stub without __init__ so no real model is needed.

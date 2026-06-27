@@ -216,3 +216,81 @@ def test_wrapper_prompt_injection_shapes(wrapper_cls):
     logits = model.forward_with_prompts(**fwp_kwargs)
     assert logits.shape[0] == 2
     assert logits.shape[-1] == model.model.config.num_labels
+
+
+# ─────────────────────────── LexSlot across backbones ──────────────────────────
+# LexSlot places slot memories at the head + late encoder layers via forward hooks.
+# The head hook (classifier pre/post) is backbone-agnostic; the late repr-slot hook
+# must handle every encoder's layer-output shape — notably LiLT's nested
+# ((text, layout), ...) tuple. These integration tests run the full
+# before_task/train_task(KD-teacher deepcopy)/after_task/evaluate lifecycle on real
+# weights for all four backbones so the cross-backbone bug class is caught here.
+
+
+class _TinyLexDataset(torch.utils.data.Dataset):
+    """A few synthetic documents matching a wrapper's expected input streams."""
+
+    def __init__(self, wrapper, n=4, seq_len=12):
+        from tests.test_backbones import _synthetic_batch  # self-import for the helper
+
+        b = _synthetic_batch(wrapper, batch_size=n, seq_len=seq_len)
+        self.items = [{k: v[i] for k, v in b.items()} for i in range(n)]
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, i):
+        return self.items[i]
+
+
+def _lex_loader(wrapper, n=4):
+    return torch.utils.data.DataLoader(_TinyLexDataset(wrapper, n=n), batch_size=2)
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("wrapper_cls", [LayoutLMv3Wrapper, LiLTWrapper, BROSWrapper, BERTWrapper])
+def test_lexslot_lifecycle_all_backbones(wrapper_cls):
+    """LexSlot full lifecycle (head+late slots, KD-teacher deepcopy) on every backbone."""
+    from doccl.methods.lexslot import LexSlot
+    from doccl.types import TaskInfo
+
+    model = _make_wrapper(wrapper_cls)
+    labels = [f"L{i}" for i in range(7)]
+    model.label_to_id = {l: i for i, l in enumerate(labels)}  # noqa: E741
+    model.id_to_label = {i: l for i, l in enumerate(labels)}  # noqa: E741
+
+    cfg = {
+        "lr": 5e-5,
+        "weight_decay": 0.01,
+        "epochs": 1,
+        "max_grad_norm": 1.0,
+        "early_stopping": False,
+        "slot_depth": "head_late",  # exercises BOTH head + late repr-slots
+        "slot_sharing": "soft",
+        "n_slots_head": 6,
+        "n_slots_late": 4,
+        "repr_rank": 2,
+        "fisher_n_samples": 2,
+        "buffer_size": 10,
+        "replay_batch_size": 2,
+        "target_depth": "all",
+    }
+    method = LexSlot(model, cfg)
+    # Late repr-slots must have been placed (head_late -> non-empty on a 12-layer encoder).
+    assert method._late_idx, f"{wrapper_cls.__name__}: no late layers targeted"
+
+    # Two DIL tasks (fixed head): full before/train/after lifecycle on real weights.
+    for tid in (0, 1):
+        loader = _lex_loader(model)
+        task = TaskInfo(task_id=tid, task_name=f"t{tid}", label_set=labels)
+        method.before_task(task, loader)
+        metrics = method.train_task(task, loader, val_loader=None)
+        method.after_task(task, loader)
+        assert torch.isfinite(
+            torch.tensor(float(metrics.loss))
+        ), f"{wrapper_cls.__name__}: task-{tid} loss not finite"
+
+    results = method.evaluate({0: _lex_loader(model, 2), 1: _lex_loader(model, 2)})
+    assert set(results) == {0, 1}
+    for tid, m in results.items():
+        assert 0.0 <= m.f1 <= 100.0, f"{wrapper_cls.__name__}: task {tid} F1 out of range"
