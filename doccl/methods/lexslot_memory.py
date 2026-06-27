@@ -30,9 +30,10 @@ class _MaskedSlots(nn.Module):
             self.slot_owner[s] = task_id
 
     def _scale_rows(self, grad: torch.Tensor) -> torch.Tensor:
-        # grad shape (n_slots, ...) -> scale dim 0 by grad_mask.
+        # grad shape (n_slots, ...) -> scale dim 0 by grad_mask. Match grad's device+dtype
+        # so the hook is safe even if the buffer and grad ever land on different devices.
         shape = [self.n_slots] + [1] * (grad.dim() - 1)
-        return grad * self.grad_mask.to(grad.dtype).reshape(shape)
+        return grad * self.grad_mask.to(device=grad.device, dtype=grad.dtype).reshape(shape)
 
 
 class LogitSlots(_MaskedSlots):
