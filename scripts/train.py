@@ -26,6 +26,7 @@ from doccl.data.scenarios import get_scenario
 from doccl.eval.metrics import CLMetricsTracker, compute_per_class_f1
 from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
+from doccl.methods.cuber import CUBER
 from doccl.methods.der import DERpp
 from doccl.methods.doc_merge import DocMerge
 from doccl.methods.doccl import DocCL, DocCL_A, DocCL_B, DocCL_C
@@ -33,11 +34,11 @@ from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.er import ER
 from doccl.methods.er_cflat import ERCFlat
 from doccl.methods.ewc import EWC
-from doccl.methods.cuber import CUBER
 from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
 from doccl.methods.lca import LCA
+from doccl.methods.lexslot import LexSlot
 from doccl.methods.lwf import LwF
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
 from doccl.methods.o_lora import OLoRA
@@ -157,6 +158,10 @@ METHOD_REGISTRY = {
     # ``method.target_depth`` ∈ {all, head_only, late_only, uniform} drives the
     # component-targeting ablation (Table 6.7).
     "doccl": DocCL,
+    # LexSlot: DocCL + lexically-gated slot memories at the forgetting locus.
+    # ``method.slot_depth`` ∈ {head_only, head_late, head_late_mid, uniform} and
+    # ``method.slot_sharing`` ∈ {soft, hard, off} are the two ablation axes.
+    "lexslot": LexSlot,
     # Legacy sketched candidates, kept as ablation variants / NeurIPS extension.
     "doccl_a": DocCL_A,
     "doccl_b": DocCL_B,
@@ -625,7 +630,7 @@ def main(cfg: DictConfig) -> None:
     # Standard-forward methods only (prompt/LoRA methods have a custom forward).
     # er_cflat uses ER's standard model forward (no PEFT/prompts) → eligible.
     # cl_lora is PEFT-wrapped (custom forward) → excluded, like o_lora.
-    _STD_FORWARD = {"naive", "joint", "ewc", "lwf", "er", "der_pp", "er_cflat", "doccl", "lca", "hgt", "cuber"}  # noqa: N806
+    _STD_FORWARD = {"naive", "joint", "ewc", "lwf", "er", "der_pp", "er_cflat", "doccl", "lca", "hgt", "cuber", "lexslot"}  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
         try:
             save_per_class_f1(out_dir, model, eval_loaders_seen, device)

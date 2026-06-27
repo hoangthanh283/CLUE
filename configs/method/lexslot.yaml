@@ -1,0 +1,22 @@
+name: lexslot
+# DocCL base (inherited train_task: CE + KD + reservoir-replay + depth-Fisher).
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+lambda_: 2000.0
+kd_alpha: 1.0
+temperature: 2.0
+fisher_n_samples: 200
+buffer_size: 200
+replay_batch_size: 8
+use_replay: true
+target_depth: all   # DocCL depth-Fisher target ('all' = head+late weighted; head_late not a valid DocCL value)
+# LexSlot slot memory.
+slot_depth: head_late      # WHERE slots go: head_only | head_late | head_late_mid | uniform
+slot_sharing: soft         # HOW slots share: soft (graded by S) | hard | off (isolate)
+share_threshold: 0.5       # for slot_sharing=hard
+n_slots_head: 48
+n_slots_late: 12
+repr_rank: 16
+lexical_signal: ocr        # ocr (input-token TF-IDF) | activation (not impl; falls back to ocr)
