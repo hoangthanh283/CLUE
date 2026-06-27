@@ -159,12 +159,11 @@ class LexSlot(DocCL):
             for layer in teacher.model.layoutlmv3.encoder.layer:
                 layer._forward_hooks.clear()
                 layer._forward_pre_hooks.clear()
-            log.info("lexslot: stripped slot hooks from KD teacher")
-        else:
-            log.info(
-                "lexslot: task %d done; depth=%s sharing=%s late_layers=%s",
-                task.task_id,
-                self.slot_depth,
-                self.slot_sharing,
-                self._late_idx,
-            )
+        log.info(
+            "lexslot: task %d done; depth=%s sharing=%s late_layers=%s teacher_stripped=%s",
+            task.task_id,
+            self.slot_depth,
+            self.slot_sharing,
+            self._late_idx,
+            teacher is not None,
+        )
