@@ -181,6 +181,14 @@ class LexSlot(DocCL):
         new_n_labels = self.model.model.classifier.out_features
         self.head_slots.expand_labels(new_n_labels)
 
+        # CRITICAL: a CIL expand_classifier REPLACES self.model.model.classifier with a NEW
+        # nn.Linear object, orphaning the head-slot forward hooks (they stayed on the old
+        # object). Re-point all slot hooks at the CURRENT modules at the start of every task,
+        # so the head slots actually contribute during training for every CIL task — not just
+        # task 0. (DIL never grows the head, so this is a harmless re-attach there.)
+        self._detach_slot_hooks()
+        self._register_slot_hooks()
+
         # 1. OCR signature for this task (one pass over input_ids).
         sig = torch.zeros(self.vocab_size)
         for batch in train_loader:

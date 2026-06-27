@@ -266,6 +266,48 @@ def test_method_cil_lifecycle(name):
         ), f"{name}: task {tid} F1 out of range ({m.f1})"
 
 
+def test_lexslot_head_slots_active_after_cil_head_growth():
+    """Finding-6 regression: a CIL expand_classifier REPLACES the classifier object, which
+    orphaned LexSlot's head-slot forward hooks → the head slots were silently inactive for
+    every CIL task after task 0 (the method degraded to DocCL). before_task must re-register
+    the hooks on the NEW classifier so head slots contribute. We assert the head-slot logit
+    delta is actually added to the classifier's output AFTER the CIL growth + before_task."""
+    torch.manual_seed(0)
+    model = LayoutLMv3Wrapper(model_name="microsoft/layoutlmv3-base", num_labels=len(_T0_LABELS))
+    model.label_to_id = {l: i for i, l in enumerate(_T0_LABELS)}  # noqa: E741
+    model.id_to_label = {i: l for l, i in model.label_to_id.items()}  # noqa: E741
+    method = LexSlot(model, {**_BASE_CFG, **_METHOD_CFG["lexslot"]})
+
+    t0 = TaskInfo(task_id=0, task_name="t0", label_set=_T0_LABELS)
+    _run_one_task(method, t0, _loader(n_classes=len(_T0_LABELS)))
+
+    # CIL growth replaces the classifier object (orphaning the old hooks).
+    model.expand_classifier(_T1_NEW)
+    t1 = TaskInfo(task_id=1, task_name="t1", label_set=["O"] + _T1_NEW)
+    method.before_task(t1, _loader(n_classes=len(_T0_LABELS) + len(_T1_NEW)))
+
+    # Make the head slots produce a clearly non-zero contribution, then verify the forward
+    # hook on the CURRENT classifier actually adds it. Compare the live forward logits to the
+    # bare classifier(features) — they must differ by exactly the head-slot logit delta.
+    model.eval()  # deterministic: no dropout, so the comparison is exact
+    with torch.no_grad():
+        method.head_slots.proj[: method.head_slots.proj.shape[0]] = 0.5  # force non-no-op
+        batch = next(iter(_loader(n_classes=len(_T0_LABELS) + len(_T1_NEW))))
+        batch = {k: v.to(method.device) for k, v in batch.items() if torch.is_tensor(v)}
+        live_logits = model(**batch).logits  # runs through the slot forward hook
+        feats = method._cur_feats  # captured by the pre-hook during the forward above
+        delta = method.head_slots.logits_delta(feats.to(live_logits.dtype))
+        # Detach the slot hooks to get the bare classifier output (no slot bias) for the
+        # SAME captured features, then re-attach.
+        method._detach_slot_hooks()
+        bare = model.model.classifier(feats)
+        method._register_slot_hooks()
+    assert delta.abs().sum() > 0, "head-slot delta is zero (proj not applied)"
+    assert torch.allclose(
+        live_logits, bare + delta, atol=1e-4
+    ), "head-slot hook is NOT active on the post-CIL classifier (Finding-6 regression)"
+
+
 @pytest.mark.parametrize("name", list(_METHOD_CLS))
 def test_method_dil_lifecycle(name):
     """DIL (fixed head, no growth): two tasks on the same label space — no crash, finite."""
