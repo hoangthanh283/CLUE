@@ -110,6 +110,14 @@ class LexSlot(DocCL):
     def _all_slot_modules(self):
         return [self.head_slots] + [self.late_slots[k] for k in self.late_slots]
 
+    # ─── optimizer target ────────────────────────────────────────────────────────
+    def trainable_parameters(self):
+        """Include slot module params alongside backbone params so the optimizer trains them."""
+        slot_params = list(self.head_slots.parameters()) + [
+            p for rs in self.late_slots.values() for p in rs.parameters()
+        ]
+        return [p for p in self.model.parameters() if p.requires_grad] + slot_params
+
     # ─── lifecycle ──────────────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader) -> None:
         super().before_task(task, train_loader)
@@ -141,10 +149,22 @@ class LexSlot(DocCL):
 
     def after_task(self, task: TaskInfo, train_loader) -> None:
         super().after_task(task, train_loader)
-        log.info(
-            "lexslot: task %d done; depth=%s sharing=%s late_layers=%s",
-            task.task_id,
-            self.slot_depth,
-            self.slot_sharing,
-            self._late_idx,
-        )
+        # Strip slot forward/pre-hooks that deepcopy copied into the KD teacher so the
+        # teacher produces pure DocCL logits (no slot bias) for distillation.
+        teacher = self.state.custom.get("teacher")
+        if teacher is not None:
+            cls = teacher.model.classifier
+            cls._forward_hooks.clear()
+            cls._forward_pre_hooks.clear()
+            for layer in teacher.model.layoutlmv3.encoder.layer:
+                layer._forward_hooks.clear()
+                layer._forward_pre_hooks.clear()
+            log.info("lexslot: stripped slot hooks from KD teacher")
+        else:
+            log.info(
+                "lexslot: task %d done; depth=%s sharing=%s late_layers=%s",
+                task.task_id,
+                self.slot_depth,
+                self.slot_sharing,
+                self._late_idx,
+            )
