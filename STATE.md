@@ -12,10 +12,18 @@ LayoutLMv3-only; added `test_method_{cil,dil}_lifecycle_secondary_backbone` = fu
 set × {LiLT,BROS,BERT} × {CIL,DIL}. Test-data gotcha fixed: `_TinyKIEDataset` is now
 backbone-aware (LiLT needs ordered boxes x0<=x1/y0<=y1; BROS needs [0,1] floats; only
 LayoutLMv3 gets pixel_values). **Verified: LayoutLMv3 12/12, BERT 42/42, BROS 42/42, LiLT
-0-fail.** Grid (`run_grid_multigpu.sh`) already has `BACKBONES`/`BACKBONE_METHODS` knobs —
-now safe to set `BACKBONES="lilt bros bert"` for any method. See
-[[clue-backbone-agnostic-audit]]. NEXT: decide whether to widen the default
-`BACKBONE_METHODS` subset for the generalization tables, then launch the multi-backbone grid.
+0-fail; fast not-slow lane 0-fail; ruff/black clean.** Commits `8557ac6` (fixes) +
+`d76ad3d` (full method set on secondaries) + `170f81a` (default `BACKBONES="lilt bros bert"`)
+— all pushed to `origin/doccl`. **Grid default is now the full 873-job multi-backbone
+sweep**: bare `bash scripts/run_grid_multigpu.sh` runs LayoutLMv3 main grid + all 14 methods
+× {lilt,bros,bert} × 5 scenarios × 3 seeds (incl. doccl depth + lexslot slot ablations);
+`BACKBONES=""` opts back to LayoutLMv3-only. Resume-safe (skips `results/<run>/.done`; 257
+already done). DRY_RUN verified (free, ~30ms): 873 jobs = 243 LayoutLMv3 + 210 each
+lilt/bros/bert. See [[clue-backbone-agnostic-audit]].
+**BLOCKED: the 873-job sweep needs a rented GPU** — local RTX 2060 (6 GB) can't fit the
+heavy methods (der_pp ~35 GiB, er ~27) and is currently busy training `dil_lexslot_seed42`.
+NEXT SESSION: spin up the remote GPU (`scripts/setup_remote.sh` + `docs/MULTI_MACHINE_RUN.md`),
+launch the sweep, then `analyze_results.py` → generalization tables → ingest into thesis.
 
 ## HGT method BUILT + TESTED + run (2026-06-26) — ⚠️ NO-GO verdict (analysis-paper pivot)
 **HGT (Head-localized Gradient-subspace Transfer)** + CUBER baseline implemented via
