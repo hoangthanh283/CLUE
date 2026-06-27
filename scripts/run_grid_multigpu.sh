@@ -23,7 +23,8 @@
 #   CURRENCY_METHODS default "er_cflat cl_lora"  (2025 baselines, run AFTER DocCL)
 #   RUN_BERT        default 1 (BERT text-only external comparator, classical tier)
 #   RUN_DOCCL       default 1 (doccl across all scenarios)
-#   RUN_ABLATION    default 1 (doccl depth ablation on ABLATION_SCENARIOS)
+#   RUN_LEXSLOT     default 1 (lexslot across all scenarios, primary backbone)
+#   RUN_ABLATION    default 1 (doccl depth + lexslot slot_depth/sharing ablation on ABLATION_SCENARIOS)
 #   ABLATION_SCENARIOS default "cil_cord"
 #   DEPTH_TARGETS   default "head_only late_only uniform" ('all' = the main doccl run)
 #   WANDB_MODE      default online
@@ -88,8 +89,9 @@ RUN_BERT="${RUN_BERT:-1}"
 # suffix so they never collide with the LayoutLMv3 run of the same scenario/method/seed.
 # (BERT-naive is still covered by RUN_BERT above; listing 'bert' here adds the rest.)
 BACKBONES="${BACKBONES:-}"
-BACKBONE_METHODS="${BACKBONE_METHODS:-naive ewc er der_pp doccl}"
+BACKBONE_METHODS="${BACKBONE_METHODS:-naive ewc er der_pp doccl lexslot}"
 RUN_DOCCL="${RUN_DOCCL:-1}"
+RUN_LEXSLOT="${RUN_LEXSLOT:-1}"
 RUN_ABLATION="${RUN_ABLATION:-1}"
 ABLATION_SCENARIOS="${ABLATION_SCENARIOS:-cil_cord}"
 DEPTH_TARGETS="${DEPTH_TARGETS:-head_only late_only uniform}"
@@ -347,6 +349,23 @@ add_doccl() {
     done
   done; done; fi
 }
+add_lexslot() {
+  # LexSlot main (full method = slot_depth 'head_late', slot_sharing 'soft', the config
+  # defaults) across scenarios on the primary LayoutLMv3 backbone. Secondary backbones are
+  # covered by add_backbones (lexslot is in BACKBONE_METHODS).
+  if [ "$RUN_LEXSLOT" = "1" ]; then for sc in $SCENARIOS; do for s in $SEEDS; do
+    add_job "${sc}_lexslot_seed${s}" "method=lexslot scenario=${sc} seed=${s}"
+  done; done; fi
+  # LexSlot ablation (slot_depth x slot_sharing) on the ablation scenario(s): the go/no-go.
+  if [ "$RUN_ABLATION" = "1" ]; then for sc in $ABLATION_SCENARIOS; do for s in $SEEDS; do
+    add_job "${sc}_lexslot_seed${s}_off" \
+      "method=lexslot scenario=${sc} seed=${s} method.slot_sharing=off"
+    add_job "${sc}_lexslot_seed${s}_uniform" \
+      "method=lexslot scenario=${sc} seed=${s} method.slot_depth=uniform"
+    add_job "${sc}_lexslot_seed${s}_head_only" \
+      "method=lexslot scenario=${sc} seed=${s} method.slot_depth=head_only"
+  done; done; fi
+}
 add_bert() {
   # BERT text-only external comparator: naive method on the BERT backbone. The run
   # name carries the _bert family suffix (train.py) so it never collides with the
@@ -398,6 +417,7 @@ add_currency() {  # 2025 currency baselines (er_cflat, cl_lora) — lowest prior
 # still forces DocCL absolutely first, before even the classical tier.)
 if [ "${PRIORITY_DOCCL:-0}" = "1" ]; then
   add_doccl
+  add_lexslot
   add_singletask
   add_core_group "$CORE_BEFORE_DOCCL"
   add_core_group "$CORE_AFTER_DOCCL"
@@ -412,8 +432,9 @@ else
   add_core_group "$CORE_AFTER_DOCCL"
   add_bert
   add_prompt
-  # Tier 2 — the contribution.
+  # Tier 2 — the contributions (DocCL + LexSlot).
   add_doccl
+  add_lexslot
   # Tier 3 — 2025 currency baselines.
   add_currency
   # Tier 4 — secondary-backbone generalization study (empty BACKBONES = no-op).

@@ -333,6 +333,16 @@ def main(cfg: DictConfig) -> None:
     if cfg.method.name == "doccl" and target_depth not in (None, "all"):
         # "all" is the canonical full method (no suffix); ablations get one.
         run_name += f"_{target_depth}"
+    elif cfg.method.name == "lexslot":
+        # LexSlot has two ablation axes (slot_depth x slot_sharing). The canonical full
+        # method is slot_depth=head_late + slot_sharing=soft (no suffix); any deviation
+        # gets a suffix so ablation runs get distinct result dirs and never collide.
+        slot_depth = cfg.method.get("slot_depth", "head_late")
+        slot_sharing = cfg.method.get("slot_sharing", "soft")
+        if slot_depth != "head_late":
+            run_name += f"_{slot_depth}"
+        if slot_sharing != "soft":
+            run_name += f"_{slot_sharing}"
     elif target_component is not None:
         run_name += f"_{target_component}"
     run = wandb.init(
@@ -630,7 +640,20 @@ def main(cfg: DictConfig) -> None:
     # Standard-forward methods only (prompt/LoRA methods have a custom forward).
     # er_cflat uses ER's standard model forward (no PEFT/prompts) → eligible.
     # cl_lora is PEFT-wrapped (custom forward) → excluded, like o_lora.
-    _STD_FORWARD = {"naive", "joint", "ewc", "lwf", "er", "der_pp", "er_cflat", "doccl", "lca", "hgt", "cuber", "lexslot"}  # noqa: N806
+    _STD_FORWARD = {
+        "naive",
+        "joint",
+        "ewc",
+        "lwf",
+        "er",
+        "der_pp",
+        "er_cflat",
+        "doccl",
+        "lca",
+        "hgt",
+        "cuber",
+        "lexslot",
+    }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
         try:
             save_per_class_f1(out_dir, model, eval_loaders_seen, device)
