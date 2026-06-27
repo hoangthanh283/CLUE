@@ -16,6 +16,7 @@ Subclasses implement two hooks:
 This keeps the (token-classification + prompt-slot truncation) loop in one place;
 the prompt injection itself lives in ``LayoutLMv3Wrapper.forward_with_prompts``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -137,7 +138,10 @@ class PromptBasedMethod(NaiveFineTune):
             logits = self.model.forward_with_prompts(
                 input_ids=batch["input_ids"],
                 bbox=batch["bbox"],
-                pixel_values=batch["pixel_values"],
+                # ``.get`` (not hard-index): secondary backbones (LiLT/BROS/BERT) emit
+                # no ``pixel_values`` — matching the train/eval forward paths below so
+                # the val-F1 early-stop path runs on every backbone, not just LayoutLMv3.
+                pixel_values=batch.get("pixel_values"),
                 prompt_embeds=prompt_embeds,
                 attention_mask=batch.get("attention_mask"),
             )
@@ -208,8 +212,13 @@ class PromptBasedMethod(NaiveFineTune):
                 should_stop = stopper.step(val_f1, self.model, epoch)
                 log.info(
                     "%s T%s ep%d val_f1=%.4f best=%.4f bad=%d%s",
-                    self.name, task.task_id, epoch + 1, val_f1, stopper.best_f1,
-                    stopper.num_bad_epochs, " -> STOP" if should_stop else "",
+                    self.name,
+                    task.task_id,
+                    epoch + 1,
+                    val_f1,
+                    stopper.best_f1,
+                    stopper.num_bad_epochs,
+                    " -> STOP" if should_stop else "",
                 )
                 if should_stop:
                     break
