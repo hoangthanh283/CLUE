@@ -147,9 +147,11 @@ _METHOD_CFG = {
     # CUBER: whole-network, exercises per-layer hooks. tiny subspace for speed.
     "cuber": {"transfer_alpha": 0.5, "subspace_k": 4, "subspace_n_batches": 2},
     # LexSlot: head+late slot memories, soft lexical sharing. Tiny slots/fisher/replay for speed.
+    # n_tasks=2 -> each of the 2 lifecycle tasks claims its own disjoint slot block.
     "lexslot": {
         "slot_depth": "head_late",
         "slot_sharing": "soft",
+        "n_tasks": 2,
         "n_slots_head": 6,
         "n_slots_late": 4,
         "repr_rank": 2,

@@ -38,6 +38,11 @@ class LexSlot(DocCL):
         self.n_slots_head = int(config.get("n_slots_head", 48))
         self.n_slots_late = int(config.get("n_slots_late", 12))
         self.repr_rank = int(config.get("repr_rank", 16))
+        # Expected number of CL tasks: fixes the per-task slot budget so each task claims a
+        # disjoint block of n_slots // n_tasks slots (mirrors HRP's task-pinned slot pool).
+        # Without this the first task would greedily claim ALL fresh slots (a real bug:
+        # later tasks would own none and, under slot_sharing=off, could update nothing).
+        self.n_tasks = int(config.get("n_tasks", 10))
         if config.get("lexical_signal", "ocr") != "ocr":
             log.warning(
                 "lexslot: lexical_signal=%s not implemented; using ocr",
@@ -190,9 +195,12 @@ class LexSlot(DocCL):
         # 2. similarity + per-task gradient mask on every slot module; claim fresh slots.
         S = task_similarity_matrix(self._task_sigs)  # noqa: N806
         for mod in self._all_slot_modules():
-            # claim a fresh block for this task: the unclaimed slots become this task's.
+            # Claim a FIXED-SIZE disjoint block for this task: n_slots // n_tasks slots from
+            # the still-unclaimed pool (>=1). This keeps a per-task budget so every task owns
+            # its own slots — NOT a greedy grab of all fresh slots by task 0.
+            per_task = max(1, mod.n_slots // max(self.n_tasks, 1))
             fresh = [s for s, o in enumerate(mod.slot_owner) if o == -1]
-            claim = fresh[: max(1, mod.n_slots // max(len(self._task_sigs), 1))]
+            claim = fresh[:per_task]
             mask = self._derive_mask(task.task_id, mod.slot_owner, S)
             mod.set_grad_mask(mask)
             mod.set_owner(claim, task.task_id)

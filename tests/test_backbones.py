@@ -267,6 +267,7 @@ def test_lexslot_lifecycle_all_backbones(wrapper_cls):
         "early_stopping": False,
         "slot_depth": "head_late",  # exercises BOTH head + late repr-slots
         "slot_sharing": "soft",
+        "n_tasks": 2,  # each of the 2 tasks claims its own disjoint slot block
         "n_slots_head": 6,
         "n_slots_late": 4,
         "repr_rank": 2,
