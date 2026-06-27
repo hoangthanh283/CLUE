@@ -51,22 +51,37 @@ class LexSlot(DocCL):
         self.head_slots = LogitSlots(self.n_slots_head, self.hidden_dim, n_labels).to(self.device)
         # Capture the classifier's input tensor (per-token features) via a pre-hook.
         self._cur_feats: torch.Tensor | None = None
-        self._cls_pre_hook = self.model.model.classifier.register_forward_pre_hook(
-            self._capture_cls_input
-        )
-        self._cls_hook = self.model.model.classifier.register_forward_hook(self._add_head_slots)
 
         # Late repr-slots: one ReprSlots per targeted late layer.
         self._late_idx = self._late_layer_indices(self.model.num_layers, self.slot_depth)
         self.late_slots = torch.nn.ModuleDict()
-        self._layer_hooks = []
-        layers = self.model.model.layoutlmv3.encoder.layer
         for i in self._late_idx:
             rs = ReprSlots(self.n_slots_late, self.hidden_dim, self.repr_rank).to(self.device)
             self.late_slots[str(i)] = rs
-            self._layer_hooks.append(layers[i].register_forward_hook(self._make_layer_hook(rs)))
+
+        # Register all slot forward hooks on the live model (detachable for the KD deepcopy).
+        self._hook_handles: list = []
+        self._register_slot_hooks()
 
         self._task_sigs: list[torch.Tensor] = []  # per-task OCR signature (V,)
+
+    # ─── hook (de)registration ────────────────────────────────────────────────────
+    def _register_slot_hooks(self) -> None:
+        """Attach the head + late-layer slot forward hooks to the live model."""
+        self._hook_handles = []
+        cls = self.model.model.classifier
+        self._hook_handles.append(cls.register_forward_pre_hook(self._capture_cls_input))
+        self._hook_handles.append(cls.register_forward_hook(self._add_head_slots))
+        layers = self.model.model.layoutlmv3.encoder.layer
+        for i in self._late_idx:
+            rs = self.late_slots[str(i)]
+            self._hook_handles.append(layers[i].register_forward_hook(self._make_layer_hook(rs)))
+
+    def _detach_slot_hooks(self) -> None:
+        """Remove the slot hooks from the live model (so model.deepcopy is hook-free)."""
+        for h in self._hook_handles:
+            h.remove()
+        self._hook_handles = []
 
     # ─── placement ────────────────────────────────────────────────────────────────
     @staticmethod
@@ -148,22 +163,20 @@ class LexSlot(DocCL):
             mod.set_owner(claim, task.task_id)
 
     def after_task(self, task: TaskInfo, train_loader) -> None:
-        super().after_task(task, train_loader)
-        # Strip slot forward/pre-hooks that deepcopy copied into the KD teacher so the
-        # teacher produces pure DocCL logits (no slot bias) for distillation.
-        teacher = self.state.custom.get("teacher")
-        if teacher is not None:
-            cls = teacher.model.classifier
-            cls._forward_hooks.clear()
-            cls._forward_pre_hooks.clear()
-            for layer in teacher.model.layoutlmv3.encoder.layer:
-                layer._forward_hooks.clear()
-                layer._forward_pre_hooks.clear()
+        # DocCL.after_task deepcopies self.model to build the KD teacher. The slot forward
+        # hooks are bound methods of this LexSlot instance, so deepcopy would try to copy the
+        # slot Parameters (non-leaf after a backward, via the grad-mask hook) and crash. Detach
+        # the slot hooks from the live model around the deepcopy, then re-register them, so the
+        # teacher is a pure-DocCL copy and the live model keeps its slots.
+        self._detach_slot_hooks()
+        try:
+            super().after_task(task, train_loader)
+        finally:
+            self._register_slot_hooks()
         log.info(
-            "lexslot: task %d done; depth=%s sharing=%s late_layers=%s teacher_stripped=%s",
+            "lexslot: task %d done; depth=%s sharing=%s late_layers=%s",
             task.task_id,
             self.slot_depth,
             self.slot_sharing,
             self._late_idx,
-            teacher is not None,
         )
