@@ -82,14 +82,17 @@ CURRENCY_METHODS="${CURRENCY_METHODS:-er_cflat cl_lora}"
 # BERT text-only external comparator (model=bert_base, naive method) — classical tier.
 RUN_BERT="${RUN_BERT:-1}"
 # Secondary-backbone GENERALIZATION study. The main grid runs LayoutLMv3 (the implicit
-# default model). To test whether the findings transfer, run a representative method
-# subset on the other backbones too. BACKBONES = the families to add (config <family>_base
-# must exist); BACKBONE_METHODS = which methods to run on each. Empty BACKBONES (default)
-# = LayoutLMv3-only, byte-identical to before. Run-names get the train.py "_<family>"
-# suffix so they never collide with the LayoutLMv3 run of the same scenario/method/seed.
-# (BERT-naive is still covered by RUN_BERT above; listing 'bert' here adds the rest.)
+# default model). Every method is now backbone-agnostic (verified on LiLT/BROS/BERT — see
+# clue-backbone-agnostic-audit), so the full method set runs on every family. BACKBONES =
+# the families to add (config <family>_base must exist); BACKBONE_METHODS = which methods to
+# run on each. Empty BACKBONES (default) = LayoutLMv3-only, byte-identical to before; set
+# BACKBONES="lilt bros bert" for the full multi-backbone sweep. Run-names get the train.py
+# "_<family>" suffix so they never collide with the LayoutLMv3 run of the same
+# scenario/method/seed. (BERT-naive is still covered by RUN_BERT above; 'bert' here adds the rest.)
 BACKBONES="${BACKBONES:-}"
-BACKBONE_METHODS="${BACKBONE_METHODS:-naive ewc er der_pp doccl lexslot}"
+# Full method set per secondary backbone (all classical + prompt/LoRA + 2025 currency +
+# proposed doccl + lexslot). Override to a subset to trade coverage for compute.
+BACKBONE_METHODS="${BACKBONE_METHODS:-naive joint ewc lwf er der_pp l2p dualprompt coda_prompt o_lora cl_lora er_cflat doccl lexslot}"
 RUN_DOCCL="${RUN_DOCCL:-1}"
 RUN_LEXSLOT="${RUN_LEXSLOT:-1}"
 RUN_ABLATION="${RUN_ABLATION:-1}"
