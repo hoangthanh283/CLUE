@@ -98,9 +98,10 @@ The thesis pursues the following concrete objectives:
         across components or concentrates in specific ones, establishing the
         stability of any finding across seeds and task orders
         (Chapter~\ref{ch:results}, \S\ref{sec:results-diagnosis}).
-  \item \textbf{Derive and evaluate a mechanism-targeted remedy.} Propose a
-        \gls{cl} method whose mechanism is concentrated on the dominant-forgetting
-        component identified by the diagnosis, and evaluate it against ten
+  \item \textbf{Derive and evaluate mechanism-targeted remedies.} Propose
+        \gls{cl} methods whose mechanism is concentrated on the dominant-forgetting
+        component identified by the diagnosis---a consolidation/replay budget (DocCL) and
+        a buffer-free isolated slot memory (LexSlot)---and evaluate them against ten
         baselines spanning the major method families
         (Chapters~\ref{ch:methodology} and~\ref{ch:results}).
   \item \textbf{Establish a reproducible benchmark.} Release the FCS-CL benchmark
@@ -126,10 +127,13 @@ The thesis pursues the following concrete objectives:
         true unimodal (BERT) baseline, and read out by per-token representational
         drift, an old-task-Fisher-weighted displacement signal, and standard
         forgetting metrics;
-  \item \textbf{DocCL}, a mechanism-targeted continual-learning remedy whose design
-        is \emph{derived from} the diagnosis rather than chosen \emph{a priori},
-        concentrating its stability budget on the dominant-forgetting locus---the
-        classifier head and late encoder layers;
+  \item \textbf{two mechanism-targeted continual-learning remedies} whose design
+        is \emph{derived from} the diagnosis rather than chosen \emph{a priori}, each
+        concentrating its effort on the dominant-forgetting locus---the classifier head
+        and late encoder layers: \textbf{DocCL}, which spends a depth-scaled
+        consolidation/replay budget there, and \textbf{LexSlot}, which protects the same
+        locus with a buffer-free, isolated slot memory gated by a drift-immune lexical
+        signature;
   \item the \textbf{FCS-CL benchmark} together with reproducible diagnostic
         tooling---unified scenarios, baselines, configurations, and
         instrumentation---to support like-for-like comparison.
@@ -182,6 +186,20 @@ strong baselines. The honest contribution is thus that diagnosis-driven head/lat
 targeting closes most of the forgetting gap on a domain shift, competitive with---rather
 than beating---data replay.
 
+\noindent\textbf{A second, parameter-efficient remedy (LexSlot).} The same diagnosis admits
+more than one realisation. \textbf{LexSlot} protects the head/late locus not with a
+consolidation budget but with an \emph{isolated slot memory}: small additive, zero-initialised
+slot adapters at the head and late layers, where each task owns and writes \emph{only its own}
+slots over a frozen backbone, so earlier tasks are protected structurally with no replay buffer.
+A drift-immune lexical signature (OCR vocabulary overlap) governs an optional sharing axis, but
+the measurement selects \emph{isolation}: on domain-incremental learning the isolated variant
+reaches AA $88.4$ with backward transfer $-1.1$---matching replay buffer-free, with the least
+forgetting of any non-oracle method, and ahead of DocCL on both axes. We report this result
+honestly as single-seed on one scenario and backbone so far, with multi-seed and multi-backbone
+confirmation as the pending grid; what it establishes already is that localising forgetting is a
+practical instrument for \emph{designing} continual methods, admitting a family of head/late
+remedies rather than a single one.
+
 \noindent\textbf{The FCS-CL benchmark and reproducible tooling.} We provide a
 unified \gls{cl} benchmark over three public document datasets with three
 scenarios, a baseline suite, and per-component instrumentation, all under a single
@@ -204,9 +222,9 @@ the \gls{cl} problem and its method families, the nascent literature on \gls{cl}
 for \gls{ie}, evidence on where forgetting lives in multimodal models, and the
 backbones relevant to this work; it closes by identifying the research gaps the
 thesis addresses.
-\textbf{Chapter~\ref{ch:methodology}} presents the two methodological
-contributions: the per-component forgetting diagnostic and the mechanism-targeted
-\gls{cl} method derived from it.
+\textbf{Chapter~\ref{ch:methodology}} presents the methodological
+contributions: the per-component forgetting diagnostic and the two mechanism-targeted
+\gls{cl} methods derived from it (DocCL and LexSlot).
 \textbf{Chapter~\ref{ch:implementation}} describes the framework, the
 document-\gls{ie} pipeline, and the system architecture, including the
 instrumentation hooks and experiment tracking.

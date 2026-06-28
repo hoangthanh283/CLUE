@@ -44,6 +44,9 @@ recorded in the corresponding configuration files.
     Replay buffer          & $200$; $\{200,500\}$ \\
     ER replay batch size   & $8$ \\
     DER++ $\alpha$, $\beta$ & $0.5$, $0.5$; logit weight $\in\{0.1,0.5,1\}$ \\
+    LexSlot head / late slots & $48$ / $18$ (per-task budget $n_{\text{slots}}/T$) \\
+    LexSlot repr-slot rank $r$ & $16$ \\
+    LexSlot sharing; depth & off (isolated); head\_late \\
     L2P pool / length / top-$K$ & $10$ / $5$ / $5$ \\
     L2P key-loss weight $\lambda_{\text{key}}$ & $0.5$ \\
     LoRA rank / $\alpha$ / dropout & $8$ / $16$ / $0.1$; rank $\in\{4,8,16\}$ \\

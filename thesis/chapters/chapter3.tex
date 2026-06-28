@@ -359,8 +359,19 @@ the characterisation-only fallback rather than to a method.
   \label{fig:selection-tree}
 \end{figure}
 
-\section{Mechanism-Targeted Continual Learning (DocCL)}
+\section{Mechanism-Targeted Continual Learning}
 \label{sec:method-remedy}
+
+The diagnosis localises forgetting to a specific region of the network---the classifier
+head and late encoder layers (Chapter~\ref{ch:results})---rather than prescribing a single
+mechanism. That locus admits a \emph{family} of head/late-targeted remedies, and this thesis
+develops two of them. The first, \textbf{DocCL} (\S\ref{sec:method-selected}), concentrates a
+conventional consolidation/replay \emph{budget} on the locus. The second, \textbf{LexSlot}
+(\S\ref{sec:method-lexslot}), protects the same locus with a parameter-efficient, isolated
+\emph{slot memory} that needs no replay buffer. The two share the motivation, design-space
+analysis, and selection criterion of \S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection};
+they differ only in how they spend their stability at the diagnosed locus, which makes the pair
+a controlled test of \emph{how} to target, not merely \emph{where}.
 
 \subsection{Why Component-Agnostic Continual Learning Is Insufficient}
 \label{sec:method-remedy-motivation}
@@ -509,6 +520,83 @@ method after seeing which design won---is what licenses the claim that DocCL's f
 \emph{derived from} the measurement; and because the diagnostic's value stands
 independently of the remedy's margin regardless.
 
+\section{Lexical-Slot Head-Memory Continual Learning (LexSlot)}
+\label{sec:method-lexslot}
+
+DocCL protects the diagnosed locus by spending a consolidation and replay \emph{budget}
+there: a depth-scaled Fisher anchor, a distillation teacher, and a small rehearsal buffer.
+That budget is effective but not free---it keeps a frozen teacher in memory and rehearses
+stored inputs. LexSlot asks a complementary question: \emph{can the same head/late locus be
+protected by a parameter-efficient structured memory that stores no past inputs at all?} It
+shares the diagnosis, the design-space constraint, and the selection criterion of DocCL
+(\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection}); it differs only in the
+mechanism it attaches at the locus---an \emph{isolated, write-once slot memory} in place of a
+consolidation budget.
+
+\subsection{Slot Memories at the Diagnosed Locus}
+\label{sec:method-lexslot-slots}
+
+LexSlot freezes the backbone and inserts small additive \emph{slot} modules exactly where the
+diagnosis places forgetting. Two kinds of slot are used. \textbf{Head logit-slots} attach to the
+classifier: a slot bank of $n_{\text{head}}$ learnable value vectors produces a per-token logit
+shift $\Delta\ell = \big(f V^\top\big)P$ from the per-token features $f$ entering the head
+(value matrix $V$, projection $P$), added to the head's output. \textbf{Late-layer
+representation-slots} attach to each encoder block in the diagnosed \emph{late} third: a
+rank-$r$ adapter adds $\Delta h = (h\,D)\,U$ to the block's hidden state ($D\in\mathbb{R}^{d\times
+r}$ down, $U\in\mathbb{R}^{r\times d}$ up). All slot up-projections are \emph{zero-initialised}
+(LoRA-style), so an untrained slot is an exact no-op and adding slots never perturbs the frozen
+network until they are trained. Placement is governed by a \texttt{slot\_depth} control
+(\emph{head\_only}, \emph{head\_late}, \emph{uniform}); the canonical setting is
+\emph{head\_late} (head $+$ late third), matching DocCL's diagnosed target, and \emph{uniform}
+(slots on every layer) is the targeting ablation.
+
+\subsection{Per-Task Isolation: Write-Once Slots}
+\label{sec:method-lexslot-isolation}
+
+Each task \emph{owns} a fixed, disjoint budget of $n_{\text{slots}}/T$ slots, claimed from the
+unclaimed pool when the task begins ($T$ the expected number of tasks). In the selected
+configuration each task updates \emph{only its own} slots: a per-slot gradient mask freezes every
+other task's slots during training, so a new task can never overwrite the parameters a previous
+task wrote. Because the backbone is frozen and prior slots are frozen, earlier tasks are
+\emph{structurally} protected---there is no consolidation penalty to tune and no replay buffer to
+store. At inference every slot contributes additively (no routing or task-id is required), so a
+document is processed by the union of all tasks' slots over the shared frozen backbone. This is
+the sense in which LexSlot is \emph{write-once}: knowledge for a task is written into its own
+slots once and never disturbed.
+
+\subsection{The Lexical Gate and the Sharing Ablation}
+\label{sec:method-lexslot-gate}
+
+Isolation is one extreme of a more general gate. LexSlot computes, for each task, a sparse
+\emph{lexical signature}---a TF-IDF bag-of-tokens over the task's OCR input tokens---and the
+cosine similarity $S_{ij}$ between task signatures. This signature is purely input-derived and
+therefore \emph{drift-immune}: it does not depend on any learned, forgettable parameter. The
+\texttt{slot\_sharing} control then sets the gradient mask on a prior task's slots when training a
+new one: \emph{off} freezes them (the isolated, selected method); \emph{soft} makes them trainable
+in proportion to $S_{ij}$ (lexically similar tasks co-train shared slots); \emph{hard} unlocks them
+above a similarity threshold. The motivation for graded sharing is that on this benchmark the
+lexical overlap is itself label-bearing---the receipt tasks SROIE and CORD share the
+\texttt{total}/\texttt{tax}/\texttt{cash} vocabulary ($S\!\approx\!0.31$) while the form task FUNSD
+is an outlier ($S\!\approx\!0.10$)---so high-$S$ tasks might \emph{help} each other by refining a
+shared lexical-to-label rule. Whether that putative transfer outweighs the interference of letting
+two tasks write the same slots is an empirical question, and the \texttt{slot\_sharing} axis is the
+controlled ablation that answers it (Chapter~\ref{ch:results}). We present \emph{off} (isolation) as
+the method because it is what the measurement selects; \emph{soft} and \emph{hard} are reported as
+the ablation that justifies the choice.
+
+\subsection{Relation to DocCL}
+\label{sec:method-lexslot-vs-doccl}
+
+LexSlot reuses DocCL's training scaffolding---the same forward pass and the same optional
+consolidation terms are available---but its operative mechanism is the slot memory, and in the
+selected configuration the protection of old tasks comes entirely from slot isolation rather than
+from a Fisher penalty or rehearsal. The contrast is deliberate and ablatable: DocCL answers
+``concentrate a consolidation/replay budget at the locus'', LexSlot answers ``install an isolated
+parameter-efficient memory at the locus''. Both are diagnosis-derived---neither would be motivated
+without the head/late localisation---so reporting them together tests whether the diagnosis admits
+more than one effective realisation. Slot counts, ranks, and the per-task budget are listed in
+Appendix~\ref{app:hyperparameters}; the implementation is released alongside DocCL.
+
 \section{Summary}
 \label{sec:method-summary}
 
@@ -517,7 +605,9 @@ document encoder, a controlled modality-ablation protocol with an external unimo
 contrast, and complementary metrics---per-token CKA, per-group importance, an
 old-task-Fisher-weighted displacement (the forgetting localiser), and the
 forgetting matrix---that together localise forgetting by depth, stream, and head.
-The remedy, DocCL, concentrates its stability budget on the diagnosed head/late
-locus; its form follows from the diagnosis under a pre-registered, adequately
-powered decision rule. The next chapter describes how this methodology is realised
-in software.
+The diagnosis admits a family of head/late-targeted remedies, of which we develop two: DocCL,
+which concentrates a consolidation/replay stability budget on the diagnosed locus under a
+pre-registered, adequately powered decision rule; and LexSlot, which protects the same locus with
+an isolated, buffer-free slot memory gated by a drift-immune lexical signature. Reporting the pair
+tests whether the diagnosis admits more than one effective realisation. The next chapter describes
+how this methodology is realised in software.

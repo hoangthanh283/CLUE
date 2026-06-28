@@ -38,14 +38,20 @@ learning (average entity-F1 $\approx 88$ versus the oracle's $88.7$, with backwa
 transfer near zero) and closing essentially the entire forgetting gap; regularisation
 (EWC) roughly halves forgetting where a domain shift is present, and distillation (LwF)
 gives little benefit in this dense token-classification setting. Guided by the same
-measurement we design \textbf{DocCL}, a mechanism-targeted method that concentrates
-continual-learning effort on the dominant-forgetting head and late layers by combining
-depth-scaled consolidation, output distillation, and head replay. Measured over three
+measurement we design \emph{two} mechanism-targeted remedies that concentrate
+continual-learning effort on the dominant-forgetting head and late layers. The first,
+\textbf{DocCL}, combines depth-scaled consolidation, output distillation, and head replay.
+Measured over three
 seeds, DocCL \emph{closes most of} the domain-incremental forgetting gap (average
 entity-F1 $84.7$ versus the oracle's $88.7$, within $\sim$4 points, backward transfer
 near zero) but does \emph{not} reach it, and does not surpass experience replay,
 which remains $\sim$3 points higher; on the mixed and class-incremental scenarios DocCL
-tracks the strong baselines without exceeding them. A depth-targeting ablation confirms
+tracks the strong baselines without exceeding them. The second, \textbf{LexSlot},
+protects the same locus with a parameter-efficient, isolated slot memory gated by a
+drift-immune lexical signature and \emph{needs no replay buffer}; on the domain-incremental
+scenario it reaches replay-level accuracy ($88.4$) with the least forgetting of any
+non-oracle method ($-1.1$ backward transfer), though this result is single-seed on one
+scenario and backbone so far, pending the full grid. A depth-targeting ablation confirms
 the diagnosis: penalising every depth \emph{uniformly}---rather than concentrating the
 budget on the diagnosed head/late locus---collapses ($42.6$ AA) even though it spends a
 larger total budget, whereas concentrating it on that locus recovers the full result. The honest finding is therefore that diagnosis-driven head/late targeting closes

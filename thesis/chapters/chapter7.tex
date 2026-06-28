@@ -50,7 +50,12 @@ heavier methods (DocCL, the 2025 baselines, the prompt/LoRA family) were not run
 large-scale WildReceipt scenario, where only the classical methods and the oracle are
 reported; every other cell---including the DocCL depth-targeting ablation and the
 cross-lingual scenario---is measured over three seeds, and the qualitative conclusions do
-not depend on that one missing cell. Finally, results rest on three
+not depend on that one missing cell. Eighth, the second remedy, LexSlot, is at present
+evaluated on a single seed of the domain-incremental scenario on LayoutLMv3 only; its
+multi-seed and multi-backbone (LiLT/BROS/BERT) confirmation is the pending grid, and its
+lexical gate is expected to be ineffective on class-incremental learning, where same-dataset
+sessions collapse the signature contrast the gate relies on, so its claims are deliberately
+confined to the domain-shift setting. Finally, results rest on three
 seeds; more seeds would tighten the confidence intervals around the smaller
 effects.
 
@@ -105,7 +110,15 @@ and no method---DocCL included---closes the fine-grained class-incremental gap, 
 the joint oracle reaches only the low thirties. The honest finding is therefore that
 diagnosis-driven head/late targeting closes most of the forgetting gap on a domain shift,
 performing competitively with---but not exceeding---data replay, which alone matches the
-oracle. The diagnostic contribution stands on its own regardless: it provides a reusable
+oracle. The same diagnosis admits a second, mechanistically distinct remedy: \textbf{LexSlot}
+protects the head/late locus with an isolated, buffer-free slot memory instead of a
+consolidation budget, and on domain-incremental learning it reaches replay-level accuracy
+(AA $88.4$) with the least forgetting of any non-oracle method (backward transfer $-1.1$),
+ahead of DocCL on both axes. This result is single-seed on one scenario and backbone so far,
+with multi-seed and multi-backbone confirmation pending the full grid (\S\ref{sec:concl-future}),
+so we frame it as promising rather than settled; what it already shows is that the diagnosis
+yields a \emph{family} of effective head/late remedies, not a single one. The diagnostic
+contribution stands on its own regardless: it provides a reusable
 tool and a shared benchmark for studying forgetting in multimodal document
 encoders---together with the finding that replay remains the strongest single
 remedy---which the prior, fragmented literature lacked.
@@ -174,5 +187,5 @@ benchmark from single-task sequence labelling towards the joint document
 understanding that downstream applications ultimately require.
 
 These extensions are intentionally outside the present scope, which prioritises a
-rigorous diagnosis and a single, well-justified remedy over breadth; they sketch
-the trajectory for a fuller follow-up study.
+rigorous diagnosis and two well-justified, diagnosis-derived remedies over breadth; they
+sketch the trajectory for a fuller follow-up study.
