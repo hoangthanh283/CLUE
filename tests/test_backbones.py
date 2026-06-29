@@ -22,7 +22,6 @@ from doccl.models.bros_wrapper import BROSWrapper
 from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
 from doccl.models.lilt_wrapper import LiLTWrapper
 
-# ─────────────────────────────── param grouping ────────────────────────────────
 
 # Representative parameter names from LiLT / BROS that must NOT fall into ``misc``.
 _LAYOUT_NAMES = [
@@ -53,7 +52,6 @@ def test_no_real_param_lands_in_misc(name):
     assert param_grouping.classify_param(name) != "misc"
 
 
-# ─────────────────────────── subword encoder alignment ─────────────────────────
 
 
 class _StubEncoding:
@@ -138,7 +136,6 @@ def test_build_encoder_unknown_family_raises():
         build_encoder({"family": "not-a-backbone"})
 
 
-# ───────────────────────── full wrapper round-trips (network) ───────────────────
 
 
 def _synthetic_batch(wrapper, batch_size=2, seq_len=16):
@@ -218,7 +215,6 @@ def test_wrapper_prompt_injection_shapes(wrapper_cls):
     assert logits.shape[-1] == model.model.config.num_labels
 
 
-# ─────────────────────────── LexSlot across backbones ──────────────────────────
 # LexSlot places slot memories at the head + late encoder layers via forward hooks.
 # The head hook (classifier pre/post) is backbone-agnostic; the late repr-slot hook
 # must handle every encoder's layer-output shape — notably LiLT's nested

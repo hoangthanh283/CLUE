@@ -616,7 +616,6 @@ def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: P
             + " |"
         )
 
-    # ─── Hypothesis tests (Mann-Whitney U, Bonferroni-corrected) ──────────────
     lines += ["", "## Hypothesis Tests (Mann-Whitney U, Bonferroni-corrected)", ""]
 
     cond_test = condition_bwt_test(results, reference="c4_full")
@@ -660,7 +659,6 @@ def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: P
             verdict = "fail to reject H0"
         lines += ["", f"Verdict: {verdict}."]
 
-    # ─── Distribution-targeting test (where, not how much) ────────────────────
     prof_test = component_profile_test(df, reference="c4_full", metric="displacement_depth")
     lines += [
         "",
@@ -688,7 +686,6 @@ def write_findings_summary(df: pd.DataFrame, results: list[dict], output_path: P
         verdict = "**reject H0**" if prof_test["reject_H0"] else "fail to reject H0"
         lines += ["", f"Verdict: {verdict} at the Bonferroni-corrected level."]
 
-    # ─── BERT-vs-LayoutLMv3 depth gradient (multimodal-specific contrast) ─────
     lines += _bert_contrast_lines(df)
 
     comp_test = component_hypothesis_test(df, condition="c4_full")

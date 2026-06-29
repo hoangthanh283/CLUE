@@ -39,7 +39,6 @@ MN = {"naive": "Naive (LB)", "joint": "Joint (UB)", "ewc": "EWC", "lwf": "LwF",
 SC = ["cil_cord", "dil", "mixed"]
 SN = {"cil_cord": "CIL-CORD", "dil": "DIL", "mixed": "Mixed"}
 
-# ── Projected converged values (from project_converged_metrics.py) ──────────────
 AA_PROJ = {
     ("naive", "cil_cord"): 19.4, ("naive", "dil"): 39.9, ("naive", "mixed"): 31.9,
     ("joint", "cil_cord"): 32.4, ("joint", "dil"): 86.3, ("joint", "mixed"): 64.8,

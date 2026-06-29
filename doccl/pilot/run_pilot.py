@@ -203,7 +203,6 @@ def run_pilot_condition(
         )
         eval_loaders[task_idx] = eval_loader
 
-        # ─── Capture pre-training activations for CKA (before training task) ───
         # Both checkpoints are probed on the SAME inputs (this task's eval set):
         # pre with the previous checkpoint here, post below.
         if task_idx > 0:
@@ -212,10 +211,8 @@ def run_pilot_condition(
                 model, eval_loader, fisher_mask, cka_n_samples, device
             )
 
-        # ─── Train naively on this task ────────────────────────────────────────
         _train_naive(model, train_loader, modality_mask, epochs_per_task, device, is_maskless)
 
-        # ─── Capture post-training activations + per-token CKA vs pre-capture ──
         if prev_activations is not None:
             log.info("Capturing post-training activations...")
             cur_activations = _capture_activations(
@@ -230,7 +227,6 @@ def run_pilot_condition(
             log.info(f"CKA at boundary {task_idx-1}→{task_idx}: {cka}")
             prev_activations = None
 
-        # ─── Fisher importance per group (under the condition's mask) ───────────
         log.info("Computing Fisher information...")
         fisher_pp = empirical_fisher_diagonal(
             model,
@@ -243,7 +239,6 @@ def run_pilot_condition(
         fisher_records.append({"task_idx": task_idx, "fisher_per_group": fisher_grouped})
         log.info(f"Fisher per group: {fisher_grouped}")
 
-        # ─── Fisher-weighted displacement = forgetting localizer (review C4) ───
         cur_params = snapshot_params(model)
         if task_idx > 0 and prev_fisher_pp is not None and prev_params is not None:
             by_group = fisher_weighted_displacement(
@@ -265,7 +260,6 @@ def run_pilot_condition(
         prev_fisher_pp = {k: v.detach().cpu() for k, v in fisher_pp.items()}
         del fisher_pp
 
-        # ─── Evaluate on all seen tasks ────────────────────────────────────────
         log.info("Evaluating on all seen tasks...")
         eval_results = _evaluate_all(model, eval_loaders, modality_mask, device, is_maskless)
         for tid, m in eval_results.items():
@@ -273,7 +267,6 @@ def run_pilot_condition(
         tracker.update(task_idx, eval_results)
         accuracy_records.append({"task_idx": task_idx, "results": eval_results})
 
-    # ─── Save results ──────────────────────────────────────────────────────────
     order = task_order or [0, 1, 2]
     summary = {
         "condition": condition,

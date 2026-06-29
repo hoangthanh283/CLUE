@@ -47,7 +47,6 @@ RULES = {
     "der_pp": {"cil_cord": (+2.0, +2.0), "dil": (+1.0, +0.5), "mixed": (+2.0, +3.0)},
 }
 
-# ── FWT projection ──────────────────────────────────────────────────────────
 # FWT = mean_{i>0} (R[i-1, i] - b_i): zero-shot accuracy on task i BEFORE training
 # it, minus the from-scratch single-task baseline b_i. The 3-epoch matrices are
 # lower-triangular (R[i-1,i] never recorded), so FWT was 0.0/NaN — UNMEASURED, not 0.
@@ -79,7 +78,6 @@ def project_fwt(scenario_key: str) -> float:
     return sum(diffs) / len(diffs) if diffs else float("nan")
 
 
-# ── Prompt/LoRA + DocCL projections (NO measured runs — weaker evidence) ─────────
 # These methods were NEVER run to completion: there is no measured AA/BWT for them.
 # Their projection is given as an ABSOLUTE (AA, BWT) estimate per scenario, NOT a
 # delta on a measured row, and is flagged at a lower confidence tier ("lit/derived").

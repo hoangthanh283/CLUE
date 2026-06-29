@@ -70,7 +70,6 @@ class DocMerge(PromptBasedMethod):
 
     name = "doc_merge"
 
-    # ─── construction ────────────────────────────────────────────────────────────
     def _build_prompt_modules(self, config: dict, hidden_dim: int) -> None:
         self.consolidate = config.get("consolidate", "both")  # merge | memory | both
         if self.consolidate not in ("merge", "memory", "both"):
@@ -134,7 +133,6 @@ class DocMerge(PromptBasedMethod):
         self.prompt_pool.prompts.register_hook(_freeze_rows)
         self.prompt_pool.keys.register_hook(_freeze_rows)
 
-    # ─── head tensor access ───────────────────────────────────────────────────────
     @property
     def _head(self) -> torch.nn.Linear:
         return self.model.model.classifier
@@ -156,7 +154,6 @@ class DocMerge(PromptBasedMethod):
         self._head.weight.copy_(state["weight"][:n].to(dev))
         self._head.bias.copy_(state["bias"][:n].to(dev))
 
-    # ─── lifecycle ────────────────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         self._active_task = task.task_id
         self._task_to_block[task.task_id] = task.task_id
@@ -194,7 +191,6 @@ class DocMerge(PromptBasedMethod):
             self._frozen_until,
         )
 
-    # ─── head merge internals ─────────────────────────────────────────────────────
     @torch.no_grad()
     def _store_head_delta(self, fisher_mass: float) -> None:
         """Append Δ_t = θ_t − θ_base for this task (padded-on-read by the merge helper)."""
@@ -251,7 +247,6 @@ class DocMerge(PromptBasedMethod):
                 mass += float(t.sum())
         return mass
 
-    # ─── head-locus diagnostic (diag.json) ─────────────────────────────────────────
     def _update_diagnostic(self, task: TaskInfo, train_loader: DataLoader) -> None:
         """Per-task head-vs-backbone Fisher-weighted displacement → diag.json.
 
@@ -302,7 +297,6 @@ class DocMerge(PromptBasedMethod):
         except Exception as e:  # never fail a run over a diagnostic write
             log.warning("doc_merge: diag.json write skipped: %s", e)
 
-    # ─── prompt selection (memory read) ────────────────────────────────────────────
     def _sparse_query(self, batch: dict) -> torch.Tensor:
         idf = self.prompt_pool.idf
         return sparse_doc_vectors(
@@ -342,7 +336,6 @@ class DocMerge(PromptBasedMethod):
         prompt_embeds = self.prompt_pool.gather_prompts(slot_idx)
         return prompt_embeds, self.lambda_key * key_pull
 
-    # ─── evaluate (inherited prediction + routing log when memory is on) ────────────
     def evaluate(self, eval_loaders: dict[int, DataLoader]) -> dict[int, EvalMetrics]:
         if not self._use_memory:
             # Merge-only: no routing to measure; the inherited prompt loop with empty

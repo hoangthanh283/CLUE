@@ -17,7 +17,6 @@ import torch.nn as nn
 from doccl.methods.sd_lora import SDLoRA, SDLoraLinear
 
 
-# ─── SDLoraLinear: the decoupled forward ─────────────────────────────────────────
 def test_no_task_is_identity():
     orig = nn.Linear(4, 4)
     layer = SDLoraLinear(orig, rank=2)
@@ -93,7 +92,6 @@ def test_add_task_grows_banks():
     assert layer.n_tasks == 2 == len(layer.A_banks) == len(layer.B_banks) == len(layer.alphas)
 
 
-# ─── SDLoRA method: injection + freeze wiring ────────────────────────────────────
 class _Attn(nn.Module):
     def __init__(self) -> None:
         super().__init__()

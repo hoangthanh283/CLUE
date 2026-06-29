@@ -167,7 +167,6 @@ def test_scenario_registry():
     assert expected.issubset(set(SCENARIO_REGISTRY.keys()))
 
 
-# ─── Prompt-module components (fast: pure tensors, no backbone download) ──────
 def test_prompt_pool_select_shapes():
     """PromptPool.select returns (B, top_k, L_p, D) and a scalar key-pull loss."""
     from doccl.methods.prompt_base import PromptPool
@@ -208,7 +207,6 @@ def test_dualprompt_modules_shapes():
     assert dp.e_keys[0].shape == (32,)
 
 
-# ─── Dataset bbox bounds (slow: reads cached datasets) ────────────────────────
 @pytest.mark.slow
 @pytest.mark.parametrize("name", ["funsd", "cord", "sroie"])
 def test_dataset_bbox_within_layoutlmv3_bounds(name):
@@ -232,7 +230,6 @@ def test_dataset_bbox_within_layoutlmv3_bounds(name):
         assert int(bbox.max()) <= 1023, f"{name}[{j}] has bbox coord {int(bbox.max())} > 1023"
 
 
-# ─── Real-model forward (slow: downloads LayoutLMv3-base) ─────────────────────
 @pytest.mark.slow
 def test_forward_with_prompts_shape():
     """Prompt injection returns per-token logits over the (truncated) text length."""

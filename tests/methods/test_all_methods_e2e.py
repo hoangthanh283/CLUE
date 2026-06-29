@@ -266,19 +266,16 @@ def test_method_cil_lifecycle(name):
     cfg = {**_BASE_CFG, **_METHOD_CFG[name]}
     method = _METHOD_CLS[name](model, cfg)
 
-    # ── Task 0 (5 classes) ──
     t0 = TaskInfo(task_id=0, task_name="t0", label_set=_T0_LABELS)
     loss0 = _run_one_task(method, t0, _loader(n_classes=len(_T0_LABELS)))
     assert torch.isfinite(torch.tensor(loss0)), f"{name}: task-0 loss not finite ({loss0})"
 
-    # ── CIL head growth 5 -> 7 ──
     model.expand_classifier(_T1_NEW)
     # PEFT methods re-sync their saved head inside before_task; mirror the loop order.
     t1 = TaskInfo(task_id=1, task_name="t1", label_set=["O"] + _T1_NEW)
     loss1 = _run_one_task(method, t1, _loader(n_classes=len(_T0_LABELS) + len(_T1_NEW)))
     assert torch.isfinite(torch.tensor(loss1)), f"{name}: task-1 loss not finite ({loss1})"
 
-    # ── Evaluate on both seen tasks ──
     eval_loaders = {
         0: _loader(n_classes=len(_T0_LABELS) + len(_T1_NEW), n=2),
         1: _loader(n_classes=len(_T0_LABELS) + len(_T1_NEW), n=2),
@@ -354,7 +351,6 @@ def test_method_dil_lifecycle(name):
         assert 0.0 <= m.f1 <= 100.0
 
 
-# ─── secondary-backbone coverage (LiLT / BROS / BERT) ────────────────────────────
 # The matrix above runs on LayoutLMv3 only; backbone-coupling bugs (a missing
 # wrapper method, a hard ``batch["pixel_values"]`` index, a PEFT head that the base
 # wrapper can't grow) slipped through because no method ever ran on a secondary

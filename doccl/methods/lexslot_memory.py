@@ -21,6 +21,10 @@ class _MaskedSlots(nn.Module):
         self.n_slots = n_slots
         self.register_buffer("grad_mask", torch.ones(n_slots))
         self.slot_owner: list[int] = [-1] * n_slots
+        # Inference lexical gate (B, n_slots), set by LexSlot's forward pre-hook before
+        # the slot's delta is read. None -> the delta is byte-identical to the ungated
+        # path (opt-in / safe default for any caller that never sets it).
+        self._infer_gate: torch.Tensor | None = None
 
     def set_grad_mask(self, mask: torch.Tensor) -> None:
         self.grad_mask.copy_(mask.to(self.grad_mask.device))
@@ -52,6 +56,10 @@ class LogitSlots(_MaskedSlots):
     def logits_delta(self, feats: torch.Tensor) -> torch.Tensor:
         # feats (B,L,d); activation_s = <values_s, feats> -> (B,L,n_slots); @ proj -> (B,L,C)
         act = feats @ self.values.T  # (B,L,n_slots)
+        # Inference lexical gate: scale each slot's activation by its per-document gate
+        # (B,n_slots) -> broadcast over the token dim (B,1,n_slots). None => no-op.
+        if self._infer_gate is not None:
+            act = act * self._infer_gate.unsqueeze(1).to(act.dtype)
         return act @ self.proj  # (B,L,n_labels)
 
     @torch.no_grad()
@@ -81,4 +89,8 @@ class ReprSlots(_MaskedSlots):
         # hidden (B,L,d); per slot: (hidden @ down_s) @ up_s, summed over slots.
         # einsum: bld,sdr->blsr then blsr,srh->blh
         mid = torch.einsum("bld,sdr->blsr", hidden, self.down)
+        # Inference lexical gate (B,n_slots) -> broadcast over (token, rank) dims:
+        # (B,1,n_slots,1). None => no-op (byte-identical to the ungated path).
+        if self._infer_gate is not None:
+            mid = mid * self._infer_gate.unsqueeze(1).unsqueeze(-1).to(mid.dtype)
         return torch.einsum("blsr,srh->blh", mid, self.up)

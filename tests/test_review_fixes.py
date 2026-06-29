@@ -36,7 +36,6 @@ class _Stub:
         return iter(self._named)
 
 
-# ─── C2 / m2 / m4 — honest, populated parameter groups ────────────────────────
 @pytest.mark.parametrize(
     "name,expected",
     [
@@ -96,7 +95,6 @@ def test_param_groups_by_depth_buckets():
     assert all(len(v) == 1 for v in d.values())
 
 
-# ─── C4 — Fisher-weighted displacement (forgetting localizer) ─────────────────
 def test_fisher_weighted_displacement_localizes_movement():
     w_in = nn.Parameter(torch.zeros(4))
     w_head = nn.Parameter(torch.zeros(3))
@@ -127,7 +125,6 @@ def test_fisher_drop_sign():
     assert fd["b"] == pytest.approx(0.0)
 
 
-# ─── empirical Fisher: per-sample squaring, NOT batch-sum-then-square ─────────
 class _TinyTokenClassifier(nn.Module):
     """Minimal token classifier (embedding → linear head) for Fisher tests."""
 
@@ -216,7 +213,6 @@ def test_empirical_fisher_is_mean_of_squared_per_sample_grads():
     assert head_mean / max(emb_mean, 1e-12) < 1e4  # but not absurdly inflated
 
 
-# ─── M2 — per-token CKA ───────────────────────────────────────────────────────
 def test_select_vectors_token_level_picks_valid_first_subwords():
     feat = torch.randn(2, 5, 8)
     attn = torch.tensor([[1, 1, 1, 0, 0], [1, 1, 0, 0, 0]])
@@ -238,7 +234,6 @@ def test_linear_cka_identity_and_orthogonal_invariance():
     assert linear_cka(X, X @ Q) == pytest.approx(1.0, abs=1e-3)
 
 
-# ─── C3 — statistical-power floor ─────────────────────────────────────────────
 def test_min_achievable_p():
     pytest.importorskip("pandas")
     pytest.importorskip("matplotlib")
@@ -249,7 +244,6 @@ def test_min_achievable_p():
     assert min_achievable_p(5, 5) < 0.0167  # 5-vs-5 clears the bar (the corrected design)
 
 
-# ─── M3 — DocCL depth/head targeting knobs (pure logic) ───────────────────────
 def _doccl_resolver():
     from doccl.methods.doccl import DocCL
 
@@ -284,7 +278,6 @@ def test_doccl_depth_lambda_rejects_unknown():
         inst._resolve_depth_lambda("fusion_only", {})
 
 
-# ─── M5 — per-class F1 + label frequencies ────────────────────────────────────
 def test_per_class_f1_and_frequencies():
     pytest.importorskip("seqeval")
     from doccl.eval.metrics import compute_per_class_f1, label_frequencies
@@ -301,7 +294,6 @@ def test_per_class_f1_and_frequencies():
     assert freq["bio"]["O"] == 1  # -100 ignored
 
 
-# ─── C1 — real text-only masking (needs transformers; slow) ───────────────────
 @pytest.mark.slow
 def test_apply_mask_text_only_keeps_input_ids():
     pytest.importorskip("transformers")
@@ -322,7 +314,6 @@ def test_apply_mask_text_only_keeps_input_ids():
     assert torch.equal(bb2, bbox)  # layout kept
 
 
-# ═══ Board-review fixes (2026-06-18): H1 DER++ padding, H2 KD norm, H5 LiLT, H7 NaN ═══
 def test_lwf_kd_normalizes_per_token_not_per_token_class():
     """H2: KD must average per-token KL (sum over classes, mean over valid tokens),
     NOT over (token, class) pairs — the latter deflates KD by a factor of n_old and

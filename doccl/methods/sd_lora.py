@@ -146,7 +146,6 @@ class SDLoRA(NaiveFineTune):
         self._inject()
         self._freeze_backbone_keep_head()
 
-    # ─── injection / freezing ────────────────────────────────────────────────────
     def _inject(self) -> None:
         root = self.model.model
         targets = [
@@ -178,7 +177,6 @@ class SDLoRA(NaiveFineTune):
         for n, p in self.model.model.named_parameters():
             p.requires_grad_("classifier" in n)
 
-    # ─── lifecycle ───────────────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         # The CL loop has already expanded the head for this task. Freeze every prior
         # direction, then add this task's fresh (A, B, α). All scalars remain trainable.

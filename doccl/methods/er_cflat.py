@@ -84,14 +84,12 @@ class ERCFlat(ER):
                 # Sample the replay batch ONCE; reuse it for both SAM forwards.
                 replay_batch = self._sample_replay()
 
-                # ─ Step 1: clean gradient g₀ at θ, then ascend to θ+ε ─
                 optimizer.zero_grad()
                 loss = self._ce_plus_replay(batch, replay_batch)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(params, max_grad_norm)
                 eps = sam.first_step()
 
-                # ─ Step 2: gradient g₊ at θ+ε, restore θ, blend curvature, step ─
                 optimizer.zero_grad()
                 loss2 = self._ce_plus_replay(batch, replay_batch)
                 loss2.backward()

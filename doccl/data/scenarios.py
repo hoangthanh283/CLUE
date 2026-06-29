@@ -78,7 +78,6 @@ class CLScenario:
     joint_train_datasets: list[Dataset] | None = None
 
 
-# ─── CIL scenarios ─────────────────────────────────────────────────────────────
 
 
 def build_cil_funsd() -> CLScenario:
@@ -295,7 +294,6 @@ def build_cil_wildreceipt(num_sessions: int = 4) -> CLScenario:
     )
 
 
-# ─── DIL scenario ──────────────────────────────────────────────────────────────
 
 
 def build_dil(order: list[int] | None = None) -> CLScenario:
@@ -424,7 +422,6 @@ def build_dil_xlingual(langs: list[str] | None = None) -> CLScenario:
     return CLScenario("dil_xlingual", ScenarioType.DIL, tasks, train_dss, eval_dss)
 
 
-# ─── Mixed scenario ────────────────────────────────────────────────────────────
 
 
 def build_mixed() -> CLScenario:
@@ -560,7 +557,6 @@ def build_mixed() -> CLScenario:
     )
 
 
-# ─── Utility scenarios ─────────────────────────────────────────────────────────
 
 
 def build_single(dataset_name: str) -> CLScenario:
@@ -635,7 +631,6 @@ def build_pilot(order: list[int] | None = None) -> CLScenario:
     return CLScenario("pilot", ScenarioType.PILOT, tasks, train_dss, eval_dss)
 
 
-# ─── Registry ──────────────────────────────────────────────────────────────────
 
 SCENARIO_REGISTRY = {
     "single_funsd": lambda: build_single("funsd"),

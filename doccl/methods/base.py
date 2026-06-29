@@ -106,7 +106,6 @@ class ContinualMethod(ABC):
         self.tb_diag: Any = None
         self._epoch_counter: int = 0
 
-    # ─── Lifecycle hooks ───────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         """Called once before training on a new task.
 
@@ -135,7 +134,6 @@ class ContinualMethod(ABC):
         """
         ...
 
-    # ─── Early-stopping helpers (shared by all methods) ─────────────────────────
     def make_early_stopper(self, val_loader: DataLoader | None) -> EarlyStopper:
         """Construct an EarlyStopper from config; disabled if no val_loader."""
         return EarlyStopper(
@@ -245,7 +243,6 @@ class ContinualMethod(ABC):
         """
         ...
 
-    # ─── Mixed precision (opt-in; gated by self.amp_enabled) ────────────────────
     def _amp_setup(self) -> None:
         """Pick the AMP dtype + scaler for the current task. Call at train start.
 
@@ -293,7 +290,6 @@ class ContinualMethod(ABC):
             torch.nn.utils.clip_grad_norm_(params, max_grad_norm)
             optimizer.step()
 
-    # ─── Helpers ───────────────────────────────────────────────────────────────
     def trainable_parameters(self) -> list[nn.Parameter]:
         """All parameters with requires_grad=True (default optimizer target)."""
         return [p for p in self.model.parameters() if p.requires_grad]

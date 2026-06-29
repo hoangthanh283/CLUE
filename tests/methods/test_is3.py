@@ -18,7 +18,6 @@ import torch.nn.functional as F
 from doccl.methods.is3 import IS3
 
 
-# ─── minimal fake wrapper ─────────────────────────────────────────────────────
 class _FakeWrapper(nn.Module):
     def __init__(self, hidden=8, n_cls=4):
         super().__init__()
@@ -58,7 +57,6 @@ def _make_is3(**kwargs) -> IS3:
     return m
 
 
-# ─── 1. Token partition (CE on entity tokens, KD on O tokens) ─────────────────
 def test_ce_mask_excludes_o_and_padding():
     flat_labels = torch.tensor([-100, 0, 1, 2, 0, 3, -100])
     ce_mask = (flat_labels != -100) & (flat_labels != 0)
@@ -69,7 +67,6 @@ def test_ce_mask_excludes_o_and_padding():
     assert not (ce_mask & distill_mask).any()
 
 
-# ─── 2. KD on O-only tokens over first n_old dims ─────────────────────────────
 def test_kd_distill_only_on_o_tokens():
     m = _make_is3(hidden=4, n_cls=6)
     # Set up a fake teacher with n_old=3 output classes.
@@ -99,7 +96,6 @@ def test_kd_distill_zero_without_teacher():
     assert loss.item() == 0.0
 
 
-# ─── 3. Prototype replay ──────────────────────────────────────────────────────
 def test_prototype_loss_is_ce_through_live_head():
     m = _make_is3(hidden=4, n_cls=4)
     m.prototypes = {1: torch.randn(4), 2: torch.randn(4)}
@@ -113,7 +109,6 @@ def test_prototype_loss_zero_when_no_prototypes():
     assert loss.item() == 0.0
 
 
-# ─── 4. Gradient surgery (the O2E debias mechanism) ──────────────────────────
 def test_grad_surgery_scales_old_entity_rows_preserves_o_and_new():
     m = _make_is3(hidden=4, n_cls=6)  # n_cls=6: rows 0..5
     m._n_old = 4  # rows 1..3 = old entity, row 0 = O, rows 4..5 = new entity
@@ -153,7 +148,6 @@ def test_grad_surgery_noop_when_no_grad():
     m._apply_grad_surgery()  # must not raise
 
 
-# ─── 5. After-task prototype build produces L2-normed mean per class ──────────
 def test_after_task_builds_prototype_per_class():
     m = _make_is3(hidden=4, n_cls=3)
     # Fake batch: tokens 0,1 are class 1; token 2 is class 2; rest are O/pad.

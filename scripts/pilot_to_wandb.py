@@ -60,7 +60,6 @@ def log_one(summary: dict, project: str, entity: str | None, group: str) -> None
         reinit=True,
     )
 
-    # ── Per-task accuracy after each task (forgetting curve) ──
     for rec in summary.get("accuracy_records", []):
         step = rec["task_idx"]
         payload = {"task_step": step}
@@ -68,20 +67,17 @@ def log_one(summary: dict, project: str, entity: str | None, group: str) -> None
             payload[f"f1/task_{tid}"] = m["f1"] if isinstance(m, dict) else m
         wandb.log(payload, step=step)
 
-    # ── CKA per layer at each task boundary ──
     for rec in summary.get("cka_records", []):
         boundary = rec["task_boundary"]  # e.g. "0_to_1"
         for layer, val in rec["cka"].items():
             short = layer.replace("model.layoutlmv3.", "").replace("model.", "")
             wandb.log({f"cka/{boundary}/{short}": val})
 
-    # ── Fisher per component group per task ──
     for rec in summary.get("fisher_records", []):
         step = rec["task_idx"]
         for grp, val in rec["fisher_per_group"].items():
             wandb.log({f"fisher/{grp}": val}, step=step)
 
-    # ── Final CL metrics + accuracy matrix as a table ──
     clm = summary.get("cl_metrics", {})
     wandb.summary.update({f"final/{k}": v for k, v in clm.items()})
 

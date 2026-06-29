@@ -18,7 +18,6 @@ from doccl.data.receipt_remapping import (
 )
 from doccl.data.scenarios import _CORD_CANONICAL_SESSIONS, _cord_class_sessions
 
-# ───────────────────────────── receipt unified schema ──────────────────────────
 
 
 def test_receipt_schema_is_13_bio_tags():
@@ -90,7 +89,6 @@ def test_receipt_remapper_unknown_dataset_raises():
         Receipt_LabelRemapper(_FakeDataset([]), "funsd", {})
 
 
-# ───────────────────────────── CORD partition logic ────────────────────────────
 
 
 def test_cord_canonical_is_5x6_over_30_classes():
