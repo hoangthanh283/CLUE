@@ -1,5 +1,21 @@
 # ROADMAP
 
+## Thesis-review follow-ups (2026-06-29 deep review — bd was dolt-locked, logged here)
+- **Parser: fold LexSlot variant suffixes into a clean `lexslot` cell.** `analyze_results.py`
+  doesn't recognise `_off/_head_only/_uniform`, so `--proposed lexslot` empties the
+  main/ablation tables and the LexSlot row is hand-maintained in
+  `thesis/generated/table_main.tex`. Map `_off` → canonical cell, others → ablation rows,
+  then flip `--proposed` default back to `lexslot`. Ground truth: `dil_lexslot_*_off` =
+  AA 87.33±1.03, BWT −2.27±1.23. See [[clue-thesis-lexslot-row-source]].
+- **Freeze-the-bucket causal control.** The depth probe is a budget-placement result
+  (uniform under-fits to AA 42.6 but forgets *less*, BWT −1.8), not direct proof the head
+  is the forgetting locus. Freeze the high-displacement head/late bucket vs a low-displacement
+  bucket and show retained F1 recovers. Thesis now flags this as future work (ch6/ch7).
+- **Pending LexSlot grid.** Validated only on DIL/LayoutLMv3 (3 seeds, `_off`). Run on
+  CIL-CORD/WildReceipt/Mixed/DIL-XLing and LiLT/BROS/BERT (gate expected ineffective on CIL).
+- **Lower-priority:** regenerate Fisher/CKA/condition tables from pilot artifacts (currently
+  hand-kept inline); add a component-separability defense paragraph up front in ch2/ch3.
+
 ## Next Up
 1. **Launch the full multi-backbone grid on a rented GPU.** Code + grid are ready
    (commits `8557ac6`/`d76ad3d`/`170f81a`, pushed). The default `bash
