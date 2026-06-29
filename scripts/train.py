@@ -40,6 +40,7 @@ from doccl.methods.l2p import L2P
 from doccl.methods.lca import LCA
 from doccl.methods.lexslot import LexSlot
 from doccl.methods.lwf import LwF
+from doccl.methods.magmax import MagMax
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
 from doccl.methods.o_lora import OLoRA
 from doccl.models.bert_family_wrapper import BERTWrapper
@@ -144,6 +145,9 @@ METHOD_REGISTRY = {
     "cl_lora": CLLoRA,
     "l2p": L2P,
     "lca": LCA,
+    # 2024 model-merging baseline: MagMax (max-magnitude task-vector selection),
+    # merge-only control (no post-merge classifier realignment, unlike ``lca``).
+    "magmax": MagMax,
     "dualprompt": DualPrompt,
     "coda_prompt": CODAPrompt,
     # Hybrid dense+sparse task router over a task-pinned prompt pool (feasibility
@@ -650,6 +654,7 @@ def main(cfg: DictConfig) -> None:
         "er_cflat",
         "doccl",
         "lca",
+        "magmax",
         "hgt",
         "cuber",
         "lexslot",
