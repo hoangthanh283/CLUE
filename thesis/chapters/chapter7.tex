@@ -51,8 +51,8 @@ large-scale WildReceipt scenario, where only the classical methods and the oracl
 reported; every other cell---including the DocCL depth-targeting ablation and the
 cross-lingual scenario---is measured over three seeds, and the qualitative conclusions do
 not depend on that one missing cell. Eighth, the second remedy, LexSlot, is at present
-evaluated on a single seed of the domain-incremental scenario on LayoutLMv3 only; its
-multi-seed and multi-backbone (LiLT/BROS/BERT) confirmation is the pending grid, and its
+evaluated on the domain-incremental scenario (three seeds) on LayoutLMv3 only; its
+multi-backbone (LiLT/BROS/BERT) and other-scenario confirmation is the pending grid, and its
 lexical gate is expected to be ineffective on class-incremental learning, where same-dataset
 sessions collapse the signature contrast the gate relies on, so its claims are deliberately
 confined to the domain-shift setting. Finally, results rest on three
@@ -112,11 +112,13 @@ diagnosis-driven head/late targeting closes most of the forgetting gap on a doma
 performing competitively with---but not exceeding---data replay, which alone matches the
 oracle. The same diagnosis admits a second, mechanistically distinct remedy: \textbf{LexSlot}
 protects the head/late locus with an isolated, buffer-free slot memory instead of a
-consolidation budget, and on domain-incremental learning it reaches replay-level accuracy
-(AA $88.4$) with the least forgetting of any non-oracle method (backward transfer $-1.1$),
-ahead of DocCL on both axes. This result is single-seed on one scenario and backbone so far,
-with multi-seed and multi-backbone confirmation pending the full grid (\S\ref{sec:concl-future}),
-so we frame it as promising rather than settled; what it already shows is that the diagnosis
+consolidation budget, and on domain-incremental learning (three seeds) it approaches
+replay-level accuracy (AA $87.3 \pm 1.0$, within $\sim$1 point of ER/DER++) with lower forgetting
+than the plain replay methods (backward transfer $-2.3$ versus $-2.8$/$-3.4$), ahead of DocCL on
+both axes---all without a replay buffer. LexSlot is thus competitive with replay rather than
+beating the strongest replay variant; it is so far evaluated on the domain-incremental scenario and
+one backbone, with multi-backbone confirmation pending the full grid (\S\ref{sec:concl-future}),
+so we frame it as promising rather than settled. What it already shows is that the diagnosis
 yields a \emph{family} of effective head/late remedies, not a single one. The diagnostic
 contribution stands on its own regardless: it provides a reusable
 tool and a shared benchmark for studying forgetting in multimodal document

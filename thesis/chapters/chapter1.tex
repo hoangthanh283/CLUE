@@ -192,11 +192,13 @@ consolidation budget but with an \emph{isolated slot memory}: small additive, ze
 slot adapters at the head and late layers, where each task owns and writes \emph{only its own}
 slots over a frozen backbone, so earlier tasks are protected structurally with no replay buffer.
 A drift-immune lexical signature (OCR vocabulary overlap) governs an optional sharing axis, but
-the measurement selects \emph{isolation}: on domain-incremental learning the isolated variant
-reaches AA $88.4$ with backward transfer $-1.1$---matching replay buffer-free, with the least
-forgetting of any non-oracle method, and ahead of DocCL on both axes. We report this result
-honestly as single-seed on one scenario and backbone so far, with multi-seed and multi-backbone
-confirmation as the pending grid; what it establishes already is that localising forgetting is a
+the measurement selects \emph{isolation}: on domain-incremental learning (three seeds) the isolated
+variant reaches AA $87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$---approaching replay
+buffer-free (within $\sim$1 point of ER/DER++), with lower forgetting than the plain replay
+methods, and ahead of DocCL on both axes. We report this honestly: LexSlot is competitive with
+replay without a buffer rather than beating the strongest replay variant, and it is so far
+evaluated on the domain-incremental scenario and one backbone, with the multi-backbone confirmation
+the pending grid. What it establishes already is that localising forgetting is a
 practical instrument for \emph{designing} continual methods, admitting a family of head/late
 remedies rather than a single one.
 
