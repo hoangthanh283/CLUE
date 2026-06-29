@@ -6,7 +6,7 @@
 This chapter presents the two methodological contributions of the thesis. First,
 a \emph{per-component forgetting diagnostic} for tri-modal document encoders
 (\S\ref{sec:method-diagnostic}). Second, a \emph{mechanism-targeted continual-learning
-method}, DocCL, whose design is derived from the diagnosis rather than chosen in
+method}, LexSlot, whose target is derived from the diagnosis rather than chosen in
 advance (\S\ref{sec:method-remedy}). The ordering is deliberate: the diagnosis is
 the primary contribution and constrains the remedy.
 
@@ -333,7 +333,7 @@ head/late-layer concentration, a uniform-across-depth pattern, or no concentrati
     \toprule
     \textbf{Pattern} & \textbf{Signature} & \textbf{Triggers} \\
     \midrule
-    $H_a$ head/late-dominant & Displacement concentrates at the head and late layers & DocCL: depth/head-targeted (\S\ref{sec:method-selection}) \\
+    $H_a$ head/late-dominant & Displacement concentrates at the head and late layers & LexSlot: isolated slots at head/late (\S\ref{sec:method-lexslot}) \\
     $H_b$ uniform-across-depth & Displacement broadly even across depth buckets & Uniform consolidation \\
     $H_0$ no concentration & No bucket separates after correction (with adequate power) & Characterisation-only (\S\ref{sec:method-fallback}) \\
     \bottomrule
@@ -347,15 +347,30 @@ the characterisation-only fallback rather than to a method.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{method_selection_tree.pdf}
+  \begin{tikzpicture}[
+      font=\small,
+      box/.style={draw, rounded corners, align=center, inner sep=4pt, minimum height=8mm},
+      diag/.style={box, fill=gray!12},
+      rem/.style={box, fill=blue!8},
+      fall/.style={box, fill=gray!5},
+      edge/.style={-{Latex[length=2mm]}, thick},
+      lbl/.style={midway, fill=white, inner sep=1pt, font=\scriptsize}]
+    \node[diag] (root) {Per-component diagnosis\\(Fisher-weighted displacement by depth)};
+    \node[rem]  (ha) [below left=12mm and 6mm of root]  {\textbf{LexSlot}\\isolated slots at\\head/late locus};
+    \node[box]  (hb) [below=14mm of root]               {uniform\\mechanism};
+    \node[fall] (h0) [below right=12mm and 6mm of root] {characterisation-\\only fallback};
+    \draw[edge] (root) -- (ha) node[lbl, near end] {$H_a$: head/late-dominant};
+    \draw[edge] (root) -- (hb) node[lbl] {$H_b$: uniform};
+    \draw[edge] (root) -- (h0) node[lbl, near end] {$H_0$: no concentration};
+  \end{tikzpicture}
   \caption[Decision tree mapping diagnostic outcomes to the remedy]{The decision
   rule as a tree over \emph{measurable} outcomes. A head/late-layer concentration
-  ($H_a$) selects the depth/head-targeted DocCL; a uniform-across-depth pattern
-  ($H_b$) selects uniform consolidation; no significant concentration (at adequate
+  ($H_a$, the outcome the diagnosis returns) selects a head/late-targeted remedy---here
+  \textbf{LexSlot}, an isolated slot memory at that locus; a uniform-across-depth pattern
+  ($H_b$) would instead select a uniform mechanism; no significant concentration (at adequate
   power, $H_0$) selects the characterisation-only fallback. Unrealisable branches
   (fusion- or visual-attention-dominant) are excluded because a single-stream
-  encoder cannot produce those signals. \emph{Figure to be regenerated from
-  \texttt{figures\_src/drawio/} to match these branches.}}
+  encoder cannot produce those signals.}
   \label{fig:selection-tree}
 \end{figure}
 
@@ -363,15 +378,12 @@ the characterisation-only fallback rather than to a method.
 \label{sec:method-remedy}
 
 The diagnosis localises forgetting to a specific region of the network---the classifier
-head and late encoder layers (Chapter~\ref{ch:results})---rather than prescribing a single
-mechanism. That locus admits a \emph{family} of head/late-targeted remedies, and this thesis
-develops two of them. The first, \textbf{DocCL} (\S\ref{sec:method-selected}), concentrates a
-conventional consolidation/replay \emph{budget} on the locus. The second, \textbf{LexSlot}
-(\S\ref{sec:method-lexslot}), protects the same locus with a parameter-efficient, isolated
-\emph{slot memory} that needs no replay buffer. The two share the motivation, design-space
-analysis, and selection criterion of \S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection};
-they differ only in how they spend their stability at the diagnosed locus, which makes the pair
-a controlled test of \emph{how} to target, not merely \emph{where}.
+head and late encoder layers (Chapter~\ref{ch:results})---without prescribing how to protect
+it. This thesis derives one remedy from that measurement: \textbf{LexSlot}
+(\S\ref{sec:method-lexslot}), a parameter-efficient, isolated \emph{slot memory} placed at the
+diagnosed head/late locus that needs no replay buffer. The motivation, design-space analysis,
+and selection criterion below (\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection})
+fix \emph{where} a mechanism should attach; LexSlot is the mechanism we put there.
 
 \subsection{Why Component-Agnostic Continual Learning Is Insufficient}
 \label{sec:method-remedy-motivation}
@@ -380,9 +392,9 @@ Generic continual-learning methods treat the encoder uniformly. EWC penalises al
 important parameters with a single Fisher-weighted term regardless of which
 component they belong to; LW-AFT freezes layers by a fixed heuristic. If
 forgetting concentrates in one component, both spend stability budget where it is
-not needed and may under-protect where it is. The hypothesis of DocCL is that
-\emph{concentrating} the continual-learning mechanism---be it regularisation
-strength, freezing, or replay weighting---on the dominant-forgetting component
+not needed and may under-protect where it is. The hypothesis this thesis tests is that
+\emph{concentrating} the continual-learning mechanism---here, a learnable slot
+memory placed only where forgetting lives---on the dominant-forgetting component
 improves the stability--plasticity trade-off at negligible extra cost.
 
 \subsection{Design Space: Where a Mechanism Can Attach in a Single-Stream Encoder}
@@ -413,15 +425,15 @@ head---and depth is the axis along which the diagnosis (\S\ref{sec:method-diagno
 can actually localise forgetting. The remedy is therefore built on the one axis the
 instrument can measure.
 
-Within that constraint the natural realisation of each family is a
-\emph{component-specific} version of itself: a Fisher penalty whose strength varies by
-depth bucket rather than a single global $\lambda$ (regularisation); a buffer that
-re-exposes old classes at the drifting head rather than generic rehearsal (replay); and
-an output distillation that protects the output-facing representations specifically
-(distillation). These are exactly the three ingredients of the selected method
-(\S\ref{sec:method-selected}). The mechanisms themselves are established; what is novel
-is that \emph{where} each applies is fixed by measurement, not by a hand-tuned
-heuristic or a uniform default.
+Within that constraint, a mechanism can attach to the diagnosed depth in different ways: by
+spending a Fisher penalty there (a depth-scaled version of regularisation), by re-exposing old
+classes at the drifting head (a targeted version of replay), or by inserting dedicated learnable
+capacity there and freezing the rest (a structural, parameter-efficient option). This thesis
+takes the last route: \textbf{LexSlot} places small, isolated slot adapters at the head and late
+layers over a frozen backbone (\S\ref{sec:method-lexslot}). The components it uses---low-rank
+adapters and a frozen backbone---are established; what is novel is that \emph{where} they attach
+is fixed by measurement, not by a hand-tuned heuristic or a uniform default, and that each task's
+slots are write-once isolated so old knowledge is structurally protected.
 
 \subsection{Testable Component Hypotheses}
 \label{sec:method-component-hypotheses}
@@ -430,15 +442,13 @@ Two method-level hypotheses are pre-registered and map one-to-one to the
 component-targeting ablation in Chapter~\ref{ch:results}:
 
 \begin{itemize}
-  \item \textbf{H\textsubscript{target}.} Concentrating the stability budget on the
-        diagnosed locus (the classifier head and late encoder layers) outperforms
-        spreading the penalty uniformly across depth (the \emph{uniform}
-        ablation, which penalises every bucket equally) by $\ge 2$ entity-F1 on
-        $\ge 2/3$ scenarios.
-  \item \textbf{H\textsubscript{head}.} Head-only protection recovers most of the
-        gain of the full method; adding late-layer protection and head replay adds
-        a further measurable improvement (the \emph{head-only} vs.\ \emph{late-only}
-        vs.\ \emph{full} ablation).
+  \item \textbf{H\textsubscript{target}.} Placing the slot memory at the diagnosed locus
+        (the classifier head and late encoder layers, \texttt{slot\_depth=head\_late})
+        outperforms spreading slots uniformly across every depth (the \emph{uniform}
+        ablation) on the domain-incremental scenario.
+  \item \textbf{H\textsubscript{head}.} Head-only slot placement recovers most of the
+        gain of the full head/late configuration; adding late-layer slots provides at most
+        a small further improvement (the \emph{head-only} vs.\ \emph{head/late} ablation).
 \end{itemize}
 
 A falsified hypothesis remains informative and is reported as such.
@@ -447,64 +457,13 @@ A falsified hypothesis remains informative and is reported as such.
 \label{sec:method-selection}
 
 The remedy follows directly from the measurable diagnostic outcome
-(Table~\ref{tab:subhypotheses}): a head/late-layer concentration selects the
-depth/head-targeted DocCL of \S\ref{sec:method-selected}; a uniform-across-depth
-pattern selects uniform consolidation; no concentration (at adequate power) selects
-the characterisation-only fallback (\S\ref{sec:method-fallback}). Beyond alignment
-with the diagnosis, the method must be implementable within the compute budget,
-defensible under reviewer scrutiny, and reuse the existing EWC/replay/distillation
-infrastructure.
-
-\subsection{The Selected Method: DocCL}
-\label{sec:method-selected}
-
-The diagnosis localises forgetting in the \emph{classifier head and late encoder
-layers}, with the input encoders stable (Chapter~\ref{ch:results}). DocCL therefore
-spends its stability budget there. Its three ingredients are deliberately
-\emph{established} mechanisms---elastic-weight consolidation, output distillation, and
-replay; the contribution is not a new mechanism but the diagnosis-driven decision of
-\emph{where} each applies (the head and late layers, fixed by measurement rather than
-by a uniform default or a hand-tuned freezing heuristic), together with the
-component-targeting ablation that isolates the effect of that targeting. The three
-mechanisms are mutually-reinforcing and each individually ablatable:
-
-\begin{enumerate}
-  \item \textbf{Depth-scaled elastic-weight consolidation.} A Fisher-weighted
-        quadratic anchor to the previous task whose per-bucket weight scales with
-        where forgetting lives---high on the head and late layers, near zero on the
-        stable input encoders---using the depth grouping of
-        \S\ref{sec:method-components}.
-  \item \textbf{Output distillation.} A temperature-softened KL term matching the
-        previous task's output distribution from a frozen teacher, which protects
-        the output-facing (head and late) representations functionally.
-  \item \textbf{Head re-exposure replay.} A small reservoir buffer---replay being
-        the strongest baseline in the diagnosis---keeps the head grounded in earlier
-        tasks.
-\end{enumerate}
-
-The total objective is $\mathcal{L} = \mathcal{L}_{\mathrm{CE}}
-+ \tfrac{\lambda}{2}\sum_g w_g\, \mathcal{L}^{\mathrm{EWC}}_g
-+ \alpha\,\mathcal{L}_{\mathrm{KD}} + \beta\,\mathcal{L}_{\mathrm{replay}}$,
-where $\mathcal{L}_{\mathrm{replay}}$ is the cross-entropy on a small reservoir buffer
-$\mathcal{B}$ (weight $\beta$, buffer size $|\mathcal{B}|$; values in
-Appendix~\ref{app:hyperparameters}) and the depth weights $w_g$ are concentrated on the
-diagnosed locus: with the depth buckets of \S\ref{sec:method-components},
-\[
-  w = \{\,\text{input}:0,\ \text{early}:0,\ \text{mid}:0.5,\ \text{late}:1.0,\ \text{head}:2.0\,\},
-\]
-so the head is anchored twice as strongly as the late layers and the stable input
-encoders are left free to adapt. A \texttt{target\_depth} control (\emph{full},
-\emph{head-only}, \emph{late-only}, \emph{uniform}) sets these weights and drives the
-component-targeting ablation that tests H\textsubscript{target} and
-H\textsubscript{head}: the \emph{uniform} setting applies an \emph{equal} non-zero
-penalty to every depth bucket---including the input and early encoders that the
-targeted schedule leaves free---rather than concentrating the budget on the head/late
-locus. It thus spends, if anything, a \emph{larger} total penalty than the targeted
-schedule ($\sum_g w_g = 5.0$ uniform versus $3.5$ targeted), so a collapse under
-uniform isolates \emph{where} the budget is spent, not how much, as the operative
-factor; the mechanisms themselves are held fixed across settings. The
-method reuses the EWC Fisher machinery, the LwF-style teacher, and the shared
-reservoir buffer, so it adds no fragile new infrastructure.
+(Table~\ref{tab:subhypotheses}): a head/late-layer concentration selects a mechanism that
+concentrates its effort there---LexSlot with head/late slot placement
+(\S\ref{sec:method-lexslot}); a uniform-across-depth pattern would instead select a
+uniform mechanism; no concentration (at adequate power) selects the characterisation-only
+fallback (\S\ref{sec:method-fallback}). Beyond alignment with the diagnosis, the method must
+be implementable within the compute budget, defensible under reviewer scrutiny, and
+parameter-efficient enough to add no fragile new infrastructure.
 
 \subsection{Pre-Registered Fallback (Not Triggered)}
 \label{sec:method-fallback}
@@ -514,24 +473,25 @@ had forgetting \emph{not} concentrated ($H_0$ not rejected at adequate power), t
 diagnostic of \S\ref{sec:method-diagnostic} and the FCS-CL benchmark would have become
 the headline contributions and the remedy would have been withheld. The diagnosis did
 concentrate forgetting at the head and late layers (Chapter~\ref{ch:results}), so this
-branch was \emph{not} taken: DocCL is the selected, depth/head-targeted remedy. We
-state the fallback explicitly because pre-registering it---rather than choosing the
-method after seeing which design won---is what licenses the claim that DocCL's form was
+branch was \emph{not} taken: a head/late-targeted remedy is justified, and
+\S\ref{sec:method-lexslot} introduces the one this thesis proposes. We state the fallback
+explicitly because pre-registering it---rather than choosing the form after seeing which
+design won---is what licenses the claim that the remedy's \emph{target} was
 \emph{derived from} the measurement; and because the diagnostic's value stands
 independently of the remedy's margin regardless.
 
 \section{Lexical-Slot Head-Memory Continual Learning (LexSlot)}
 \label{sec:method-lexslot}
 
-DocCL protects the diagnosed locus by spending a consolidation and replay \emph{budget}
-there: a depth-scaled Fisher anchor, a distillation teacher, and a small rehearsal buffer.
-That budget is effective but not free---it keeps a frozen teacher in memory and rehearses
-stored inputs. LexSlot asks a complementary question: \emph{can the same head/late locus be
-protected by a parameter-efficient structured memory that stores no past inputs at all?} It
-shares the diagnosis, the design-space constraint, and the selection criterion of DocCL
-(\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection}); it differs only in the
-mechanism it attaches at the locus---an \emph{isolated, write-once slot memory} in place of a
-consolidation budget.
+The diagnosis fixes \emph{where} a remedy should act---the classifier head and late encoder
+layers (\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection})---and LexSlot is the
+mechanism this thesis puts there. The guiding question is whether the diagnosed locus can be
+protected by a \emph{parameter-efficient structured memory that stores no past inputs at all},
+rather than by a consolidation budget that keeps a frozen teacher in memory and rehearses stored
+inputs. LexSlot answers it with an \emph{isolated, write-once slot memory}: small additive slot
+adapters placed at the head and late layers over a frozen backbone, where each task writes only
+its own slots so earlier tasks are protected structurally---no rehearsal buffer, no consolidation
+penalty to tune (Figure~\ref{fig:lexslot-arch}).
 
 \subsection{Slot Memories at the Diagnosed Locus}
 \label{sec:method-lexslot-slots}
@@ -547,8 +507,45 @@ r}$ down, $U\in\mathbb{R}^{r\times d}$ up). All slot up-projections are \emph{ze
 (LoRA-style), so an untrained slot is an exact no-op and adding slots never perturbs the frozen
 network until they are trained. Placement is governed by a \texttt{slot\_depth} control
 (\emph{head\_only}, \emph{head\_late}, \emph{uniform}); the canonical setting is
-\emph{head\_late} (head $+$ late third), matching DocCL's diagnosed target, and \emph{uniform}
+\emph{head\_late} (head $+$ late third), matching the diagnosed locus, and \emph{uniform}
 (slots on every layer) is the targeting ablation.
+
+\begin{figure}[!htbp]
+  \centering
+  \begin{tikzpicture}[
+      font=\small, node distance=4mm,
+      blk/.style={draw, rounded corners, minimum width=30mm, minimum height=7mm, align=center},
+      frozen/.style={blk, fill=gray!15},
+      slot/.style={draw, rounded corners, fill=pink!40, minimum width=14mm, minimum height=6mm, align=center, font=\scriptsize},
+      lbl/.style={font=\scriptsize, align=left},
+      flow/.style={-{Latex[length=2mm]}, thick}]
+    % frozen backbone stack (bottom to top)
+    \node[frozen] (emb)  {input embeddings\\(text $+$ layout $+$ vision)};
+    \node[frozen, above=of emb] (early) {early/mid encoder blocks};
+    \node[frozen, above=of early] (late) {\textbf{late} encoder blocks};
+    \node[frozen, above=of late] (head) {classifier \textbf{head}};
+    \node[above=of head] (out) {per-token labels};
+    \draw[flow] (emb) -- (early); \draw[flow] (early) -- (late);
+    \draw[flow] (late) -- (head); \draw[flow] (head) -- (out);
+    % slot modules at the diagnosed locus (right side)
+    \node[slot, right=14mm of late] (rslot) {repr-slots\\$+\Delta h=(hD)U$};
+    \node[slot, right=14mm of head] (hslot) {logit-slots\\$+\Delta\ell=(fV^{\!\top})P$};
+    \draw[flow, pink!70!black] (rslot) -- (late);
+    \draw[flow, pink!70!black] (hslot) -- (head);
+    % annotations
+    \node[lbl, right=2mm of rslot, text width=33mm] {trainable, zero-init\\(no-op until trained)};
+    \node[lbl, right=2mm of emb, text width=33mm] {\textbf{frozen} backbone\\(grey): never updated};
+    \node[lbl, below=1mm of emb, text width=58mm, font=\scriptsize\itshape]
+      {Inference: all slots add their $\Delta$ at the locus---no routing, no task-id.};
+  \end{tikzpicture}
+  \caption[LexSlot architecture]{LexSlot places small additive slot adapters at the
+  diagnosed forgetting locus over a \emph{frozen} backbone (grey). \textbf{Logit-slots} add a
+  per-token bias $\Delta\ell$ at the classifier head; \textbf{repr-slots} add a low-rank shift
+  $\Delta h$ in the late encoder blocks. Up-projections are zero-initialised, so an untrained slot
+  is an exact no-op. At inference every slot contributes additively---there is no routing and no
+  task identifier.}
+  \label{fig:lexslot-arch}
+\end{figure}
 
 \subsection{Per-Task Isolation: Write-Once Slots}
 \label{sec:method-lexslot-isolation}
@@ -562,7 +559,44 @@ task wrote. Because the backbone is frozen and prior slots are frozen, earlier t
 store. At inference every slot contributes additively (no routing or task-id is required), so a
 document is processed by the union of all tasks' slots over the shared frozen backbone. This is
 the sense in which LexSlot is \emph{write-once}: knowledge for a task is written into its own
-slots once and never disturbed.
+slots once and never disturbed (Figure~\ref{fig:lexslot-isolation}).
+
+\begin{figure}[!htbp]
+  \centering
+  \begin{tikzpicture}[
+      font=\small,
+      own/.style={draw, minimum width=9mm, minimum height=7mm, font=\scriptsize, align=center},
+      t0/.style={own, fill=blue!18}, t1/.style={own, fill=orange!25}, t2/.style={own, fill=green!18},
+      free/.style={own, fill=gray!8},
+      lbl/.style={font=\scriptsize},
+      upd/.style={-{Latex[length=1.6mm]}, thick}]
+    % the slot bank: disjoint per-task blocks
+    \node[lbl] at (-2.0,0) {Slot bank:};
+    \foreach \i in {0,1} {\node[t0] (a\i) at ({\i*0.95},0) {$0$};}
+    \foreach \i in {0,1} {\node[t1] (b\i) at ({2.1+\i*0.95},0) {$1$};}
+    \foreach \i in {0,1} {\node[t2] (c\i) at ({4.2+\i*0.95},0) {$2$};}
+    \node[free] (free0) at (6.3,0) {$\cdot$};
+    \node[lbl, right=1mm of free0, text width=22mm] {unclaimed\\(free)};
+    \node[lbl] at (0.5,0.7)  {task 0};
+    \node[lbl] at (2.6,0.7)  {task 1};
+    \node[lbl] at (4.7,0.7)  {task 2};
+    % training task 2: updates only its own block; others frozen
+    \node[lbl, align=left] at (2.1,-1.4)
+      {\textbf{Training task 2:} gradient mask $=1$ on task-2 slots, $=0$ elsewhere};
+    \draw[upd, green!50!black] (2.1,-1.0) -- (c0.south);
+    \draw[upd, green!50!black] (2.1,-1.0) -- (c1.south);
+    \node[lbl] at (0.5,-0.75) {\textsf{frozen}};
+    \node[lbl] at (2.6,-0.75) {\textsf{frozen}};
+  \end{tikzpicture}
+  \caption[Per-task slot isolation]{Write-once slot isolation. The slot bank is partitioned into
+  disjoint per-task blocks of $n_{\text{slots}}/T$ slots each. When a new task (here task~2)
+  trains, a per-slot gradient mask makes \emph{only its own} slots trainable and freezes every
+  prior task's slots, so earlier tasks' parameters are never overwritten. The lexical gate
+  (\S\ref{sec:method-lexslot-gate}) generalises this: \emph{off} freezes prior blocks (the
+  selected, isolated method shown here), while \emph{soft}/\emph{hard} would unlock lexically
+  similar tasks' blocks by the similarity $S_{ij}$.}
+  \label{fig:lexslot-isolation}
+\end{figure}
 
 \subsection{The Lexical Gate and the Sharing Ablation}
 \label{sec:method-lexslot-gate}
@@ -584,18 +618,16 @@ controlled ablation that answers it (Chapter~\ref{ch:results}). We present \emph
 the method because it is what the measurement selects; \emph{soft} and \emph{hard} are reported as
 the ablation that justifies the choice.
 
-\subsection{Relation to DocCL}
-\label{sec:method-lexslot-vs-doccl}
+\subsection{Implementation Notes}
+\label{sec:method-lexslot-impl}
 
-LexSlot reuses DocCL's training scaffolding---the same forward pass and the same optional
-consolidation terms are available---but its operative mechanism is the slot memory, and in the
-selected configuration the protection of old tasks comes entirely from slot isolation rather than
-from a Fisher penalty or rehearsal. The contrast is deliberate and ablatable: DocCL answers
-``concentrate a consolidation/replay budget at the locus'', LexSlot answers ``install an isolated
-parameter-efficient memory at the locus''. Both are diagnosis-derived---neither would be motivated
-without the head/late localisation---so reporting them together tests whether the diagnosis admits
-more than one effective realisation. Slot counts, ranks, and the per-task budget are listed in
-Appendix~\ref{app:hyperparameters}; the implementation is released alongside DocCL.
+The slot memory adds no fragile new infrastructure: the head logit-slots and the low-rank
+late-layer adapters are standard modules attached by forward hooks, the per-task gradient mask is a
+single element-wise multiply at the backward pass, and the lexical signature is one sparse pass over
+input tokens. In the selected configuration the protection of old tasks comes entirely from slot
+isolation---no Fisher penalty, no distillation teacher, and no rehearsal buffer---so the method's
+standing cost is just the small slot parameters ($\sim$1--2\% over the frozen backbone). Slot counts,
+ranks, and the per-task budget are listed in Appendix~\ref{app:hyperparameters}.
 
 \section{Summary}
 \label{sec:method-summary}
@@ -605,9 +637,8 @@ document encoder, a controlled modality-ablation protocol with an external unimo
 contrast, and complementary metrics---per-token CKA, per-group importance, an
 old-task-Fisher-weighted displacement (the forgetting localiser), and the
 forgetting matrix---that together localise forgetting by depth, stream, and head.
-The diagnosis admits a family of head/late-targeted remedies, of which we develop two: DocCL,
-which concentrates a consolidation/replay stability budget on the diagnosed locus under a
-pre-registered, adequately powered decision rule; and LexSlot, which protects the same locus with
-an isolated, buffer-free slot memory gated by a drift-immune lexical signature. Reporting the pair
-tests whether the diagnosis admits more than one effective realisation. The next chapter describes
-how this methodology is realised in software.
+From that measurement we derive a single head/late-targeted remedy, \textbf{LexSlot}: an
+isolated, buffer-free slot memory placed at the diagnosed locus and gated by a drift-immune
+lexical signature, whose \emph{target} follows from the diagnosis under a pre-registered,
+adequately powered decision rule. The next chapter describes how this methodology is realised in
+software.

@@ -189,15 +189,33 @@ def doccl_vs_replay():
     print(f"wrote {FIG / 'bench_doccl_vs_replay.pdf'}")
 
 
+def _lexslot_dil_aa():
+    """Mean DIL AA of the isolated (off) LexSlot config over its seeds, or None."""
+    vals = []
+    for s in (42, 123, 7):
+        p = Path("results") / f"dil_lexslot_seed{s}_off" / "metrics.json"
+        if p.exists():
+            v = json.loads(p.read_text()).get("AA")
+            if _ok(v):
+                vals.append(float(v))
+    return (sum(vals) / len(vals)) if vals else None
+
+
 def dil_closeup():
-    """DIL-only close-up: AA bars with the joint-oracle line. DocCL closes most of
-    the gap; replay (ER/DER++) sits closest to the oracle."""
+    """DIL-only close-up: AA bars with the joint-oracle line. The proposed LexSlot
+    approaches the oracle buffer-free; replay (ER/DER++) sits closest to the oracle."""
     fig, ax = plt.subplots(figsize=(6.8, 4.0))
-    order = ["naive", "lwf", "ewc", "doccl", "er", "der_pp"]
+    order = ["naive", "lwf", "ewc", "lexslot", "er", "der_pp"]
+    MN["lexslot"] = "LexSlot"
+    COL["lexslot"] = "#e91e63"
+
+    def _aa(m):
+        return _lexslot_dil_aa() if m == "lexslot" else val(m, "dil", "AA")
+
     # Drop methods with no measured DIL cell rather than rendering them as 0-height
     # bars (a 0 bar reads as "scored 0%", not "not run").
-    order = [m for m in order if val(m, "dil", "AA") is not None]
-    vals = [val(m, "dil", "AA") for m in order]
+    order = [m for m in order if _aa(m) is not None]
+    vals = [_aa(m) for m in order]
     bars = ax.bar(
         [MN[m] for m in order],
         vals,
@@ -205,7 +223,7 @@ def dil_closeup():
         edgecolor="black",
         linewidth=0.5,
     )
-    for b, v in zip(bars, vals):
+    for b, v in zip(bars, vals, strict=False):
         ax.text(
             b.get_x() + b.get_width() / 2, v + 0.8, f"{v:.1f}", ha="center", va="bottom", fontsize=8
         )
@@ -218,7 +236,7 @@ def dil_closeup():
         label=f"Joint oracle ({oracle:.1f})",
     )
     ax.set_ylabel("Average accuracy (entity-F1)")
-    ax.set_title("Domain-incremental (DIL): replay near-oracle; DocCL closes most of the gap")
+    ax.set_title("Domain-incremental (DIL): replay near-oracle; LexSlot approaches it buffer-free")
     ax.set_ylim(0, 100)
     ax.legend(fontsize=8, frameon=False, loc="upper left")
     ax.grid(axis="y", alpha=0.3)

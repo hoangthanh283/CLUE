@@ -1,6 +1,6 @@
 %!TEX TS-program = xelatex
 % =====================================================================
-%  Master's Thesis — DocCL
+%  Master's Thesis — LexSlot
 %  "Where Does a Document Encoder Forget? A Per-Component Diagnosis of
 %   Catastrophic Forgetting in LayoutLMv3 and a Mechanism-Targeted Remedy"
 %  Author: Thanh Hoang — Hanoi University of Science and Technology (HUST)
@@ -19,6 +19,8 @@
 \usepackage{multirow}
 \usepackage{array}
 \usepackage{tabularx}   % width-constrained tables that wrap long cells to \textwidth
+\usepackage{tikz}       % LexSlot schematics + the method-selection decision tree
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds, calc}
 % Left-aligned (ragged) flexible column for text-heavy table cells.
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
 

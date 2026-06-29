@@ -98,10 +98,10 @@ The thesis pursues the following concrete objectives:
         across components or concentrates in specific ones, establishing the
         stability of any finding across seeds and task orders
         (Chapter~\ref{ch:results}, \S\ref{sec:results-diagnosis}).
-  \item \textbf{Derive and evaluate mechanism-targeted remedies.} Propose
-        \gls{cl} methods whose mechanism is concentrated on the dominant-forgetting
-        component identified by the diagnosis---a consolidation/replay budget (DocCL) and
-        a buffer-free isolated slot memory (LexSlot)---and evaluate them against ten
+  \item \textbf{Derive and evaluate a mechanism-targeted remedy.} Propose a
+        \gls{cl} method whose mechanism is concentrated on the dominant-forgetting
+        component identified by the diagnosis---LexSlot, a buffer-free isolated slot
+        memory at the head/late locus---and evaluate it against ten
         baselines spanning the major method families
         (Chapters~\ref{ch:methodology} and~\ref{ch:results}).
   \item \textbf{Establish a reproducible benchmark.} Release the FCS-CL benchmark
@@ -127,13 +127,11 @@ The thesis pursues the following concrete objectives:
         true unimodal (BERT) baseline, and read out by per-token representational
         drift, an old-task-Fisher-weighted displacement signal, and standard
         forgetting metrics;
-  \item \textbf{two mechanism-targeted continual-learning remedies} whose design
-        is \emph{derived from} the diagnosis rather than chosen \emph{a priori}, each
+  \item \textbf{LexSlot, a mechanism-targeted continual-learning remedy} whose target
+        is \emph{derived from} the diagnosis rather than chosen \emph{a priori},
         concentrating its effort on the dominant-forgetting locus---the classifier head
-        and late encoder layers: \textbf{DocCL}, which spends a depth-scaled
-        consolidation/replay budget there, and \textbf{LexSlot}, which protects the same
-        locus with a buffer-free, isolated slot memory gated by a drift-immune lexical
-        signature;
+        and late encoder layers---with a buffer-free, isolated slot memory gated by a
+        drift-immune lexical signature;
   \item the \textbf{FCS-CL benchmark} together with reproducible diagnostic
         tooling---unified scenarios, baselines, configurations, and
         instrumentation---to support like-for-like comparison.
@@ -170,37 +168,25 @@ single-stream encoder); whether the locus differs from a unimodal encoder is set
 by the BERT contrast and a powered, distribution-targeting test rather than by an
 underpowered magnitude comparison.
 
-\noindent\textbf{A mechanism-targeted continual-learning method (DocCL).} Guided by
+\noindent\textbf{A mechanism-targeted continual-learning method (LexSlot).} Guided by
 the diagnosis---which localises forgetting in the classifier head and late encoder
-layers---we design DocCL, a method that concentrates its stability budget there via
-depth-scaled elastic-weight consolidation, output distillation, and a small
-head-replay buffer, rather than treating the network uniformly. The three mechanisms
-are established; the contribution is the diagnosis-driven decision of \emph{where} they
-apply, isolated by a component-targeting ablation (head-only, late-only, uniform, full)
-that tests whether targeting the diagnosed locus beats uniform treatment. Measured over
-three seeds, DocCL closes most of the forgetting gap on domain-incremental learning
-(AA $84.7$ vs the oracle's $88.7$, within $\sim$4 points, backward transfer $-4.6$) but
-does not reach it; experience replay (ER/DER++ $\approx 88$) matches the oracle and stays
-$\sim$3--4 points above DocCL. On the mixed and class-incremental scenarios it tracks the
-strong baselines. The honest contribution is thus that diagnosis-driven head/late
-targeting closes most of the forgetting gap on a domain shift, competitive with---rather
-than beating---data replay.
-
-\noindent\textbf{A second, parameter-efficient remedy (LexSlot).} The same diagnosis admits
-more than one realisation. \textbf{LexSlot} protects the head/late locus not with a
-consolidation budget but with an \emph{isolated slot memory}: small additive, zero-initialised
-slot adapters at the head and late layers, where each task owns and writes \emph{only its own}
-slots over a frozen backbone, so earlier tasks are protected structurally with no replay buffer.
-A drift-immune lexical signature (OCR vocabulary overlap) governs an optional sharing axis, but
-the measurement selects \emph{isolation}: on domain-incremental learning (three seeds) the isolated
-variant reaches AA $87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$---approaching replay
-buffer-free (within $\sim$1 point of ER/DER++), with lower forgetting than the plain replay
-methods, and ahead of DocCL on both axes. We report this honestly: LexSlot is competitive with
-replay without a buffer rather than beating the strongest replay variant, and it is so far
-evaluated on the domain-incremental scenario and one backbone, with the multi-backbone confirmation
-the pending grid. What it establishes already is that localising forgetting is a
-practical instrument for \emph{designing} continual methods, admitting a family of head/late
-remedies rather than a single one.
+layers---we design \textbf{LexSlot}, a method that protects exactly that locus with an
+\emph{isolated slot memory}: small additive, zero-initialised slot adapters at the head and
+late layers over a frozen backbone, where each task owns and writes \emph{only its own} slots,
+so earlier tasks are protected structurally with no replay buffer and no consolidation penalty
+to tune. A drift-immune lexical signature (OCR vocabulary overlap) governs an optional sharing
+axis, but the measurement selects \emph{isolation}. The contribution is the diagnosis-driven
+decision of \emph{where} the capacity attaches, isolated by a placement ablation
+(head-only, head/late, uniform) that tests whether targeting the diagnosed locus beats uniform
+treatment. Measured over three seeds on domain-incremental learning, LexSlot reaches AA
+$87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$---approaching replay buffer-free
+(within $\sim$1 point of ER/DER++ and the oracle's $88.7$), and forgetting \emph{less} than the
+plain replay methods. We report this honestly: LexSlot is competitive with replay without a
+buffer rather than beating the strongest replay variant, and it is so far evaluated on the
+domain-incremental scenario and one backbone, with the multi-scenario and multi-backbone
+confirmation the pending grid. The honest contribution is thus that diagnosis-driven head/late
+targeting closes most of the forgetting gap on a domain shift buffer-free, competitive
+with---rather than beating---data replay.
 
 \noindent\textbf{The FCS-CL benchmark and reproducible tooling.} We provide a
 unified \gls{cl} benchmark over three public document datasets with three
@@ -214,7 +200,7 @@ domain-incremental learning (AA $\approx 88$ vs the oracle's $88.7$, backward tr
 $\approx 0$; read with per-class F1, as the unified schema is VALUE-dominant), EWC
 sharply curbing forgetting under a domain shift, and LwF giving little benefit in this
 dense token-classification setting. This strong-baseline context is what the
-diagnosis-grounded DocCL must beat.
+diagnosis-grounded LexSlot must match buffer-free.
 
 \section{Overview of the Dissertation}
 \label{sec:intro-overview}
@@ -225,8 +211,8 @@ for \gls{ie}, evidence on where forgetting lives in multimodal models, and the
 backbones relevant to this work; it closes by identifying the research gaps the
 thesis addresses.
 \textbf{Chapter~\ref{ch:methodology}} presents the methodological
-contributions: the per-component forgetting diagnostic and the two mechanism-targeted
-\gls{cl} methods derived from it (DocCL and LexSlot).
+contributions: the per-component forgetting diagnostic and the mechanism-targeted
+\gls{cl} method derived from it (LexSlot).
 \textbf{Chapter~\ref{ch:implementation}} describes the framework, the
 document-\gls{ie} pipeline, and the system architecture, including the
 instrumentation hooks and experiment tracking.

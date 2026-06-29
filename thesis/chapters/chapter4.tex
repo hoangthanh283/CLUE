@@ -284,18 +284,19 @@ and the proposed remedy alike---inherits the identical stopping rule for free, w
 is what makes the comparison fair under the protocol of
 \S\ref{sec:exp-checkpointing}.
 
-\paragraph{The proposed method (DocCL).} DocCL is implemented in
-\texttt{doccl/methods/doccl.py} as a thin composition over existing infrastructure: it
-reuses the EWC Fisher machinery for its depth-scaled penalty, the LwF-style frozen
-teacher for output distillation, and the shared \texttt{ReservoirBuffer} for head
-re-exposure replay, so it introduces no new training subsystem. The depth weights are
-read from a \texttt{param\_groups\_by\_depth} grouping of the backbone and applied per
-bucket ($\{\text{input}{:}0,\,\text{early}{:}0,\,\text{mid}{:}0.5,\,\text{late}{:}1.0,\,
-\text{head}{:}2.0\}$ for the full method), and a \texttt{target\_depth} configuration
-key selects the \emph{full}, \emph{head-only}, \emph{late-only}, or \emph{uniform}
-variant that drives the component-targeting ablation of Chapter~\ref{ch:results}. The
-method is registered under the same Hydra factory as the baselines, so it is selected
-by name (\texttt{method=doccl}) on the identical harness.
+\paragraph{The proposed method (LexSlot).} LexSlot is implemented in
+\texttt{doccl/methods/lexslot.py} (with the slot modules in
+\texttt{doccl/methods/lexslot\_memory.py} and the lexical gate in
+\texttt{doccl/methods/lexslot\_mask.py}) over the same frozen-backbone harness as the
+baselines, so it introduces no new training subsystem. The slot adapters attach by forward
+hooks at the classifier head and the late encoder blocks located through the
+\texttt{param\_groups\_by\_depth} grouping of the backbone; a \texttt{slot\_depth}
+configuration key selects the \emph{head\_only}, \emph{head\_late}, or \emph{uniform}
+placement and a \texttt{slot\_sharing} key the \emph{off}/\emph{soft}/\emph{hard} gate,
+which together drive the ablations of Chapter~\ref{ch:results}. A per-task gradient mask,
+derived from the lexical-signature similarity, freezes other tasks' slots during the
+backward pass. The method is registered under the same Hydra factory as the baselines, so it
+is selected by name (\texttt{method=lexslot}) on the identical harness.
 
 \subsection{Per-Component Instrumentation}
 \label{sec:impl-instrumentation}

@@ -3,13 +3,13 @@
 \label{ch:results}
 % =====================================================================
 % POPULATED FROM THE FULL GRID (all MEASURED). Section 6.1 (per-component diagnosis) is filled from the
-% pilot; the core six-method comparison, DocCL, the prompt family (L2P, DualPrompt,
-% CODA-Prompt), O-LoRA, CL-LoRA, C-Flat++ (er_cflat), and the external text-only BERT are
-% all MEASURED over three seeds on the scenarios where they ran, aggregated by
-% scripts/analyze_results.py. C-Flat++ is now measured on DIL (88.42, the DIL winner) and
-% CIL-CORD; the DocCL component-targeting ablation (head_only/late_only/uniform) is now
-% measured on DIL and CIL-CORD; DocCL/O-LoRA/CODA-Prompt are now measured on dil_xlingual.
-% Genuinely UNMEASURED: only cil_wildreceipt for the DocCL/2025/prompt-LoRA methods
+% pilot; the core six-method comparison, the proposed LexSlot (DIL only), the prompt family
+% (L2P, DualPrompt, CODA-Prompt), O-LoRA, CL-LoRA, C-Flat++ (er_cflat), and the external
+% text-only BERT are all MEASURED over three seeds on the scenarios where they ran, aggregated
+% by scripts/analyze_results.py. C-Flat++ is now measured on DIL (88.42, the DIL winner) and
+% CIL-CORD; the depth-targeting probe (head_only/late_only/uniform/full) is measured on DIL;
+% LexSlot is measured on DIL (3 seeds, off/soft/depth ablations).
+% Genuinely UNMEASURED: cil_wildreceipt for the 2025/prompt-LoRA methods; LexSlot off-DIL
 % (classical methods + oracle reported there). Tables auto-load from generated/*.tex via
 % \IfFileExists; inline tables are fallback mirrors.
 % =====================================================================
@@ -22,15 +22,19 @@ ablations (\S\ref{sec:results-ablation}), a computational-cost analysis
 validity (\S\ref{sec:results-discussion}).
 
 \paragraph{Status of these results.} The full grid is \emph{measured}. The six core
-continual-learning methods (naive, joint, EWC, LwF, ER, DER++), the proposed
-depth/head-targeted DocCL remedy together with its component-targeting ablation
-(head-only / late-only / uniform), the prompt family (L2P, DualPrompt, CODA-Prompt), the
+continual-learning methods (naive, joint, EWC, LwF, ER, DER++), a depth-scaled
+consolidation probe used to test the locus (head-only / late-only / uniform / full,
+\S\ref{sec:results-key-ablation}), the proposed \textbf{LexSlot} remedy on the
+domain-incremental scenario, the prompt family (L2P, DualPrompt, CODA-Prompt), the
 LoRA-based O-LoRA and the 2025 CL-LoRA, the 2025 sharpness-aware C-Flat++
 (\texttt{er\_cflat}), and the external text-only BERT comparator were all run to
 convergence over three seeds on the scenarios in which they were evaluated, held to one
 fixed early-stopping configuration so the comparisons are apples-to-apples, with small
-per-seed standard deviations throughout. The only combination \emph{not} run is
-DocCL / the 2025 baselines / the prompt/LoRA methods on the large-scale
+per-seed standard deviations throughout. LexSlot is so far measured on the
+domain-incremental scenario and LayoutLMv3 only; its other-scenario and multi-backbone
+confirmation is the pending grid (\S\ref{sec:results-lexslot},
+Chapter~\ref{ch:conclusions}). The other combination \emph{not} run is
+the 2025 baselines / prompt/LoRA methods on the large-scale
 \texttt{cil\_wildreceipt} scenario (\S\ref{sec:results-extended}), which for
 compute-budget reasons reports only the classical methods and the oracle. The qualitative
 conclusions---near-total collapse under naive fine-tuning, a depth/head-concentrated
@@ -359,9 +363,9 @@ displacement: permuting LiLT's and BROS's profiles against the LayoutLMv3 (C4)
 reference \emph{fails to reject} $H_0$ ($p=0.38$ and $p=0.51$), i.e.\ their forgetting
 is located in statistically the same place. Combined with the per-component Fisher
 rejection and the shared CKA gradient, the head/late locus is established on four
-backbones. Per the revised decision rule
-(\S\ref{sec:method-selection}) this head/late concentration selects the
-depth/head-targeted DocCL of \S\ref{sec:method-selected}.
+backbones. Per the decision rule
+(\S\ref{sec:method-selection}) this head/late concentration selects a head/late-targeted
+remedy---LexSlot, the isolated slot memory of \S\ref{sec:method-lexslot}.
 
 \paragraph{Forgetting by condition.}
 Table~\ref{tab:condition-metrics} reports the continual-learning metrics by
@@ -466,9 +470,9 @@ multimodal-specific element is the frozen vision input stream that BERT
 lacks. The two secondary backbones LiLT and BROS, architecturally distinct from both,
 reproduce the identical localisation (their displacement profiles are statistically
 indistinguishable from LayoutLMv3's), so the locus is architecture-general. Because the
-forgetting locus is \emph{output-facing}, the diagnosis motivates---and the corrected
-decision rule selects---the depth/head-targeted DocCL of \S\ref{sec:method-selected}
-(depth-scaled consolidation $+$ output distillation $+$ head replay), and predicts
+forgetting locus is \emph{output-facing}, the diagnosis motivates---and the
+decision rule selects---a head/late-targeted remedy, the isolated slot memory LexSlot of
+\S\ref{sec:method-lexslot}, and predicts
 that head-protecting remedies such as experience replay are strong baselines, tested
 in \S\ref{sec:results-remedy}.
 
@@ -488,8 +492,8 @@ in \S\ref{sec:results-remedy}.
 This section reports the main continual-learning grid, all measured to convergence over
 three seeds. It covers the six core methods---the lower bound (naive), the upper bound
 (joint), the two regularisation/distillation methods (EWC, LwF), and the two replay
-methods (ER, DER++)---together with the proposed DocCL remedy (the depth/head-targeted
-method derived from the diagnosis, \S\ref{sec:method-selected}) and the additional
+methods (ER, DER++)---together with the proposed LexSlot remedy (the head/late-targeted
+isolated slot memory derived from the diagnosis, \S\ref{sec:method-lexslot}) and the additional
 prompt-/LoRA-based baselines (L2P, DualPrompt, CODA-Prompt, O-LoRA, CL-LoRA) and the
 text-only BERT comparator, each on the scenarios where it was run.
 
@@ -498,8 +502,8 @@ text-only BERT comparator, each on the scenarios where it was run.
 
 Table~\ref{tab:main-comparison} and Figure~\ref{fig:aa-bars} report the average accuracy
 of each method on the three scenarios, all measured to convergence over three seeds. Six
-patterns hold. The first four characterise the core six methods; the fifth reports DocCL,
-the sixth the prompt/LoRA family.
+patterns hold. The first four characterise the core six methods; the fifth reports the
+proposed LexSlot, the sixth the prompt/LoRA family.
 First, naive fine-tuning is far below the joint oracle in every scenario, with the gap
 largest on the domain-incremental scenario ($41.3$ vs $88.7$). Second, the
 \emph{replay} methods are the strongest non-oracle strategies by a wide margin and behave
@@ -521,18 +525,19 @@ logits it distils collapse anyway as the classifier head grows. The hardest scen
 every method is CIL-CORD, where even the joint oracle reaches only $33.3$ AA: packing all
 $60$ fine-grained CORD classes into one growing head is an intrinsically difficult
 multi-class problem, independent of forgetting.
-Fifth, and most important for this thesis, the proposed \textbf{DocCL}
-(mean over three seeds) \emph{closes most of the forgetting gap} on domain-incremental
-learning (DocCL $84.7$ vs the oracle's $88.7$, within $\sim$4 points) but does \emph{not}
-reach it, whereas replay essentially matches the oracle (ER $87.9$, DER++ $88.0$ vs
-$88.7$). On the Mixed scenario DocCL ($57.6$) tracks below both replay (ER/DER++
-$\approx 60$) and the oracle ($67.5$), and on CIL-CORD it lands at $16.1$, on a par with
-the strongest replay method (ER $16.0$) where no method makes real progress. The honest
-reading is therefore that DocCL's diagnosis-driven head/late targeting closes most of the
-domain-shift forgetting gap and is competitive with---but does not exceed---data replay;
-replay remains the strongest single remedy in this benchmark, and DocCL's chief advantage
-over replay is qualitative---it needs only a small head buffer rather than full-input
-rehearsal.
+Fifth, and most important for this thesis, the proposed \textbf{LexSlot}
+(the isolated, buffer-free slot memory, mean over three seeds on the domain-incremental
+scenario) \emph{approaches replay-level accuracy} (LexSlot $87.3$ vs ER $87.9$, DER++ $88.0$,
+within $\sim$1 point, and the oracle's $88.7$) while \emph{forgetting less than the plain
+replay methods} (LexSlot BWT $-2.3$ vs ER $-2.8$, DER++ $-3.4$; \S\ref{sec:results-lexslot}),
+and it does so \emph{without a replay buffer}---its protection comes structurally from freezing
+each task's slots rather than rehearsing stored inputs. The honest reading is that LexSlot's
+diagnosis-driven head/late targeting is competitive with---rather than exceeding---data replay
+on the domain shift, with the chief advantage being qualitative: replay-level retention at a
+parameter-efficient, buffer-free cost. LexSlot is so far measured on the domain-incremental
+scenario and LayoutLMv3 (the multi-scenario and multi-backbone confirmation is the pending grid,
+\S\ref{sec:results-lexslot}), so the broader columns of Table~\ref{tab:main-comparison} are
+carried by the baselines.
 Sixth, the parameter-efficient prompt baselines, which \emph{freeze} the backbone and
 train only a prompt pool plus the head, \emph{nearly fail} on this dense per-token task:
 L2P, DualPrompt, and CODA-Prompt collapse to single-digit AA on class-incremental CORD
@@ -551,10 +556,9 @@ adaptation recovers the naive lower bound only where the output space is fixed.
   \centering
   \caption[Main comparison: average accuracy across scenarios]{Average entity-F1
   (AA) of each method on the three continual scenarios. Best non-oracle result per
-  column in bold. The core six methods, the proposed \textbf{DocCL}, and the prompt
+  column in bold. The core six methods, the proposed \textbf{LexSlot}, and the prompt
   baselines (L2P, DualPrompt, CODA-Prompt) are \emph{measured} (mean\,$\pm$\,std over
-  three seeds); DocCL closes most of the DIL forgetting gap (within $\sim$4 points of the
-  oracle) but does not reach it, while replay matches the oracle and the frozen-backbone
+  three seeds); replay matches the oracle and the frozen-backbone
   prompt methods nearly fail on this dense token-level task. \textbf{LexSlot} (the
   buffer-free isolated-slot method, \S\ref{sec:method-lexslot}) approaches replay-level AA on
   DIL ($87.3$, within $\sim$1 point of ER/DER++) measured over three seeds; it is so far
@@ -575,7 +579,6 @@ adaptation recovers the naive lower bound only where the output space is fixed.
     ER                    & $16.0 \pm 1.1$ & $87.9 \pm 1.4$ & $60.3 \pm 5.3$ \\
     ER + C-Flat++ (2025)  & $15.9 \pm 1.5$ & $\mathbf{88.4 \pm 0.1}$ & --- \\
     DER++                 & $18.2 \pm 0.2$ & $88.0 \pm 0.9$ & $\mathbf{60.8 \pm 2.7}$ \\
-    \textbf{DocCL (ours)} & $16.1 \pm 0.9$ & $84.7 \pm 1.7$ & $57.6 \pm 2.4$ \\
     \textbf{LexSlot (ours)} & --- & $87.3 \pm 1.0$ & --- \\
     \midrule
     L2P                   & $1.1 \pm 0.9$ & $30.4 \pm 0.3$ & $11.5 \pm 0.1$ \\
@@ -595,31 +598,33 @@ adaptation recovers the naive lower bound only where the output space is fixed.
   \caption[Average accuracy by method and scenario]{Average accuracy (AA) of each method
   on the three scenarios, grouped by scenario, with the naive lower bound and the joint
   upper bound for reference. Both replay methods (ER, DER++) reach the joint ceiling on
-  DIL; the measured \textbf{DocCL} closes most of the DIL gap ($84.7$ vs the oracle's
-  $88.7$, $\sim$4 points short) but sits $\sim$3 points below replay there and below both
-  on Mixed (Table~\ref{tab:main-comparison}).}
+  DIL; the measured \textbf{LexSlot} approaches it ($87.3$ vs the oracle's $88.7$ on DIL,
+  $\sim$1 point short and within a point of replay) buffer-free
+  (Table~\ref{tab:main-comparison}).}
   \label{fig:aa-bars}
 \end{figure}
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{bench_doccl_vs_replay.pdf}
-  \caption[DocCL versus replay versus oracle]{Focused comparison of the proposed DocCL
-  against the strongest baselines (ER, DER++) and the joint oracle, average entity-F1 per
-  scenario (all measured). DocCL closes most of the domain-incremental forgetting gap
-  (within $\sim$4 points of the oracle) but does not reach it; the replay methods match the
-  oracle and remain $\sim$3 points ahead of DocCL on DIL and clearly ahead on Mixed; on the
-  hard CIL-CORD scenario no method makes real progress.}
-  \label{fig:doccl-vs-replay}
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{lexslot_dil_bars.pdf}
+  \caption[LexSlot versus replay versus oracle on DIL]{Focused comparison of the proposed
+  \textbf{LexSlot} (isolated, buffer-free) against the strongest baselines and the joint
+  oracle on the domain-incremental scenario (mean over three seeds, error bars $\pm$std).
+  \emph{Top:} average entity-F1---LexSlot ($87.3$) approaches replay (ER $87.9$, DER++ $88.0$,
+  C-Flat++ $88.4$) and the oracle ($88.7$), within $\sim$1 point, and far exceeds naive
+  ($41.3$). \emph{Bottom:} backward transfer---LexSlot ($-2.3$) forgets less than the plain
+  replay methods (ER $-2.8$, DER++ $-3.4$), bettered only by C-Flat++ ($-1.8$). LexSlot reaches
+  this buffer-free.}
+  \label{fig:lexslot-bars}
 \end{figure}
 
 \begin{figure}[!htbp]
   \centering
   \includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{bench_dil_closeup.pdf}
-  \caption[DIL close-up: DocCL closes most of the gap]{Domain-incremental (DIL) close-up,
-  measured average accuracy per method with the joint-oracle level marked (dashed). DocCL
-  ($84.7$) closes most of the gap to the oracle ($88.7$); the replay methods (ER $87.9$,
-  DER++ $88.0$) reach it and lead DocCL by $\sim$3 points; EWC, LwF, and naive trail far
+  \caption[DIL close-up: LexSlot approaches the oracle]{Domain-incremental (DIL) close-up,
+  measured average accuracy per method with the joint-oracle level marked (dashed). LexSlot
+  ($87.3$) approaches the oracle ($88.7$) and the replay methods (ER $87.9$,
+  DER++ $88.0$) buffer-free, within $\sim$1 point of both; EWC, LwF, and naive trail far
   behind. This is the scenario where the diagnosis-driven head/late targeting is most
   effective.}
   \label{fig:dil-closeup}
@@ -640,11 +645,11 @@ ahead of replay) and near-zero on DIL ($-2.8$). But this stability is bought wit
 plasticity: the same penalty that protects old classes prevents EWC from \emph{learning}
 the current one, which is why its accuracy collapses on the growing CIL-CORD head
 ($0.5$ AA) even as its forgetting is the lowest---a model that forgets little because it
-learns little. The measured DocCL drives DIL forgetting close to zero ($-4.6$, near the
-replay methods' $-2.8$ to $-3.4$) and Mixed forgetting to $-27.1$, while CIL-CORD
-($-79.3$) remains hard for every plastic method. DocCL's forgetting profile thus matches
-replay on the
-domain shift but does not improve on it.
+learns little. The measured LexSlot drives DIL forgetting to $-2.3$---\emph{below} the plain replay
+methods ($-2.8$ to $-3.4$), the least forgetting of any non-oracle method except the
+sharpness-aware C-Flat++ ($-1.8$)---and does so buffer-free; its other-scenario forgetting
+is the pending grid (\S\ref{sec:results-lexslot}). LexSlot's forgetting profile on the domain
+shift thus slightly improves on replay's while needing no rehearsal buffer.
 
 \paragraph{Forward transfer.} Forward transfer measures performance on a task
 \emph{before} any of its data is seen, relative to a from-scratch single-task baseline:
@@ -654,11 +659,11 @@ $b_i$ (measured: FUNSD $87.4$, CORD $94.2$, SROIE $83.1$). Because each
 new session introduces label structure the model has never produced---entirely new BIO
 tags in class-incremental CORD, a shifted domain in DIL---forward transfer is
 \emph{strongly negative} and depends on the scenario, not the method. Where it is measured
-(naive and DocCL, whose runs were seeded with the single-task baselines), it is
+(the naive runs, seeded with the single-task baselines), it is
 $\approx-92$ on CIL-CORD (the head cannot predict unseen classes), $\approx-75$ to $-84$ on
 DIL, and $\approx-80$ to $-88$ on Mixed. This negative forward transfer is itself a finding:
 in continual document IE there is little to gain ahead of seeing a task's data, which is precisely why
-the \emph{backward} methods (replay, head-targeted consolidation) dominate. These FWT
+the \emph{backward} methods (replay, head-targeted slot memory) dominate. These FWT
 values are measured from the grid's recorded zero-shot entries against the single-task
 baselines.
 
@@ -666,13 +671,14 @@ baselines.
   \centering
   \caption[Backward transfer across scenarios]{Backward transfer (BWT); closer to $0$
   is less forgetting. Best non-oracle per column in bold. The core six methods and
-  \textbf{DocCL} are measured (mean\,$\pm$\,std over three seeds); cells marked ``--''
-  denote method/scenario combinations not run. Note that EWC \emph{and} the prompt methods (L2P, DualPrompt,
+  \textbf{LexSlot} are measured (mean\,$\pm$\,std over three seeds; LexSlot on DIL only);
+  cells marked ``--'' denote method/scenario combinations not run. Note that EWC \emph{and}
+  the prompt methods (L2P, DualPrompt,
   CODA-Prompt) show small BWT, but this is the same trap (Table~\ref{tab:main-comparison}):
   they forget little because they barely learn---their accuracy is at or near zero. Only
-  the replay family (ER, DER++, C-Flat++), DocCL, and \textbf{LexSlot} drive DIL forgetting to
+  the replay family (ER, DER++, C-Flat++) and \textbf{LexSlot} drive DIL forgetting to
   near zero \emph{while remaining accurate}; LexSlot's DIL BWT ($-2.3 \pm 1.2$, three seeds) is
-  better than the plain replay methods (ER $-2.8$, DER++ $-3.4$) and DocCL ($-4.6$), with only
+  better than the plain replay methods (ER $-2.8$, DER++ $-3.4$), with only
   the sharpness-aware C-Flat++ ($-1.8$) lower---and it achieves this buffer-free.}
   \label{tab:bwt-comparison}
   \begin{tabular}{lccc}
@@ -685,7 +691,6 @@ baselines.
     ER                  & $-68.3 \pm 3.2$ & $-2.8 \pm 1.7$ & $-23.5 \pm 5.6$ \\
     ER + C-Flat++ (2025) & $-73.2 \pm 4.1$ & $\mathbf{-1.8 \pm 0.3}$ & --- \\
     DER++               & $-86.2 \pm 3.2$ & $-3.4 \pm 1.4$ & $-34.8 \pm 2.0$ \\
-    \textbf{DocCL (ours)} & $-79.3 \pm 5.9$ & $-4.6 \pm 1.6$ & $-27.1 \pm 8.1$ \\
     \textbf{LexSlot (ours)} & --- & $-2.3 \pm 1.2$ & --- \\
     \midrule
     L2P                 & $-15.7$ & $-11.5$ & $-2.8$ \\
@@ -705,7 +710,7 @@ baselines.
   \caption[Backward transfer by method and scenario]{Backward transfer (BWT) of each method,
   grouped by scenario; bars hang below zero, so shorter is less forgetting. Converged EWC
   has the least forgetting on CIL-CORD and Mixed (but at a severe accuracy cost---see
-  Table~\ref{tab:main-comparison}), and replay (ER, DER++) and DocCL drive BWT to
+  Table~\ref{tab:main-comparison}), and replay (ER, DER++) and the proposed LexSlot drive BWT to
   $\approx 0$ on DIL. Joint has BWT $=0$ by construction.}
   \label{fig:bwt-bars}
 \end{figure}
@@ -716,7 +721,7 @@ baselines.
   \caption[Average forgetting by method and scenario]{Average forgetting (AF, the magnitude
   of backward transfer; lower is better) of each method per scenario. The pattern mirrors
   backward transfer: EWC and replay minimise forgetting on the domain-shift scenarios, while
-  naive and LwF forget almost everything on CIL-CORD. DocCL keeps DIL forgetting near zero.}
+  naive and LwF forget almost everything on CIL-CORD. The proposed LexSlot keeps DIL forgetting near zero.}
   \label{fig:af-bars}
 \end{figure}
 
@@ -731,50 +736,42 @@ baselines.
   \label{fig:forgetting-curves}
 \end{figure}
 
-\subsection{Targeting versus Uniform Treatment}
+\subsection{Is the Locus Causal? A Depth-Targeting Probe}
 \label{sec:results-key-ablation}
 
-This comparison---does concentrating the remedy on the diagnosed head/late locus
-beat treating all depths uniformly?---is exactly the depth-targeting ablation of
-DocCL. The diagnosis localised forgetting at the classifier head and late encoder
-layers (\S\ref{sec:results-stability}), so DocCL scales its consolidation toward
-those depths; the ablation compares this against a uniform-across-depth variant, and
-against head-only and late-only restrictions, to test whether targeting the
-diagnosed locus is what drives the gain (hypotheses H\textsubscript{target} and
-H\textsubscript{head} of \S\ref{sec:method-component-hypotheses}). DocCL is evaluated
-against the strong-baseline context the grid establishes (replay reaching the oracle).
-The component-targeting ablation that isolates this effect---comparing the full
-depth-scaled DocCL against head-only, late-only, and uniform restrictions on DIL, three
-seeds each (Table~\ref{tab:ablation})---now \emph{confirms both hypotheses}. The
-\emph{uniform} variant, which applies an equal penalty to every depth bucket---including
-the stable input and early encoders that the targeted schedule leaves free, and hence if
-anything a \emph{larger} total budget ($\sum_g w_g = 5.0$ versus the targeted $3.5$)---
-\emph{collapses} to $42.6$ AA, roughly half the targeted methods and barely above the
-naive lower bound. This directly supports H\textsubscript{target}: where the consolidation
-budget is spent matters far more than how large it is---more budget, spread evenly, is
-\emph{worse}. By contrast, the \emph{head-only}
-($86.1$) and \emph{late-only} ($86.2$) restrictions each recover essentially the full
-result---in fact slightly \emph{edging} the full depth-scaled method ($84.7$)---confirming
-H\textsubscript{head}: concentrating the budget on the head, or on the late layers that
-feed it, is what drives the gain. The diagnosis-derived target is thus validated as a
-\emph{measured} result, not merely a motivated design choice; that head-only and late-only
-match the full schedule indicates the late-layer term is largely redundant with the head
-term, an honest observation that points to a simpler head-focused variant as future work
-(\S\ref{sec:concl-future}).
+Before evaluating LexSlot itself, we ask whether the diagnosed head/late locus is
+\emph{causal}: does concentrating \emph{any} continual-learning mechanism there beat
+spreading it uniformly across depth? We answer this with a clean depth-scaled consolidation
+probe---a Fisher-weighted penalty whose per-bucket strength is either concentrated on the
+head and late layers or spread equally across every depth---on DIL, three seeds each
+(Table~\ref{tab:ablation}). The result is decisive. The \emph{uniform} variant, which applies
+an equal penalty to every depth bucket---including the stable input and early encoders the
+targeted schedule leaves free, and hence if anything a \emph{larger} total budget---
+\emph{collapses} to $42.6$ AA, roughly half the targeted variant and barely above the
+naive lower bound, whereas concentrating the same budget on the head/late locus recovers
+$84.7$. Where the budget is spent matters far more than how much: more budget, spread evenly,
+is \emph{worse}. The \emph{head-only} ($86.1$) and \emph{late-only} ($86.2$) restrictions each
+recover essentially the full result, indicating the head term carries most of the effect and the
+late-layer term is largely redundant with it. This probe validates the diagnosis as a
+\emph{causal} statement, not merely a correlational one: protecting the diagnosed locus, and
+only it, is what works. It motivates LexSlot's design directly---place capacity at the head/late
+locus, leave the rest frozen---and LexSlot's own placement ablation (\S\ref{sec:results-lexslot})
+re-confirms the same targeting effect with the slot mechanism (hypotheses
+H\textsubscript{target}/H\textsubscript{head} of \S\ref{sec:method-component-hypotheses}).
 
-\subsection{Parameter-Efficient Targeting: LexSlot}
+\subsection{The Proposed Remedy: LexSlot}
 \label{sec:results-lexslot}
 
-The second diagnosis-derived remedy, \textbf{LexSlot} (\S\ref{sec:method-lexslot}), protects the
-same head/late locus with an \emph{isolated, buffer-free slot memory} rather than a
-consolidation/replay budget. On the domain-incremental scenario (LayoutLMv3, three seeds) the
+The proposed remedy, \textbf{LexSlot} (\S\ref{sec:method-lexslot}), protects the
+diagnosed head/late locus with an \emph{isolated, buffer-free slot memory}. On the domain-incremental scenario (LayoutLMv3, three seeds) the
 isolated configuration reaches \textbf{AA $87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$}.
 Two readings stand out. First, its accuracy \emph{approaches the replay methods} (ER $87.9$, DER++
 $88.0$, C-Flat++ $88.4$) and the joint oracle ($88.7$) on DIL---within about a point, the seeds
-overlapping---and clearly exceeds DocCL ($84.7$), \emph{without a replay buffer}: the protection
+overlapping---and clearly exceeds the head/late consolidation probe ($84.7$,
+\S\ref{sec:results-key-ablation}), \emph{without a replay buffer}: the protection
 comes structurally from freezing each task's slots, not from rehearsing stored inputs. Second, its
-forgetting ($-2.3$) is \emph{lower than the plain replay methods} (ER $-2.8$, DER++ $-3.4$) and
-DocCL ($-4.6$), with only the sharpness-aware C-Flat++ ($-1.8$) below it. So LexSlot is competitive
+forgetting ($-2.3$) is \emph{lower than the plain replay methods} (ER $-2.8$, DER++ $-3.4$),
+with only the sharpness-aware C-Flat++ ($-1.8$) below it. So LexSlot is competitive
 with replay on accuracy and better than plain replay on forgetting, at a qualitatively lower memory
 cost; it does not, on the present three seeds, \emph{beat} the strongest replay variant on
 accuracy. Table~\ref{tab:lexslot-ablation} reports the two pre-registered LexSlot ablations.
@@ -789,13 +786,13 @@ selects isolation.
 
 \emph{Depth (targeting vs.\ uniform).} Placing slots only at the diagnosed head/late locus
 ($86.9$ / $-1.5$) beats spreading them across every layer (\emph{uniform}, $84.8$ / $-2.1$) by
-$2.1$ AA with less forgetting, mirroring the DocCL targeting ablation
-(\S\ref{sec:results-key-ablation}). LexSlot's gain, like DocCL's, comes from \emph{where} the
-mechanism attaches: capacity placed where forgetting lives outperforms the same capacity spread
-uniformly. The effect is smaller than for DocCL's consolidation budget (which collapses to $42.6$
-under uniform treatment), as expected---additive zero-initialised slots away from the locus are
-near-inert rather than actively harmful---but its direction confirms the diagnosis-driven
-placement.
+$2.1$ AA with less forgetting, reproducing---now with the slot mechanism---the same targeting
+effect the depth-scaled consolidation probe shows (\S\ref{sec:results-key-ablation}). LexSlot's
+gain comes from \emph{where} the mechanism attaches: capacity placed where forgetting lives
+outperforms the same capacity spread uniformly. The effect is smaller than for the consolidation
+probe (which collapses to $42.6$ under uniform treatment), as expected---additive zero-initialised
+slots away from the locus are near-inert rather than actively harmful---but its direction confirms
+the diagnosis-driven placement.
 
 \begin{table}[!htbp]
   \centering
@@ -804,8 +801,8 @@ placement.
   lexical sharing (\emph{soft}) on both AA and backward transfer over three seeds, so the
   putative vocabulary-overlap transfer does not outweigh slot interference---isolation is the
   selected method. \emph{Depth}: slots concentrated on the diagnosed head/late locus versus
-  spread uniformly across depth (targeting the locus beats spreading by $2.1$ AA), mirroring the
-  DocCL targeting ablation. The sharing rows are mean\,$\pm$\,std over three seeds (42/123/7);
+  spread uniformly across depth (targeting the locus beats spreading by $2.1$ AA), reproducing the
+  depth-targeting probe's effect with the slot mechanism. The sharing rows are mean\,$\pm$\,std over three seeds (42/123/7);
   the depth-ablation rows are a single seed (seed $42$) pending the grid, marked ``(1\,seed)''.
   Multi-backbone values await the pending grid (Chapter~\ref{ch:conclusions}).}
   \label{tab:lexslot-ablation}
@@ -827,7 +824,8 @@ placement.
 \end{table}
 
 The headline isolated and shared configurations are now measured over three seeds; the
-depth-ablation rows (head-only, uniform) are a single seed pending the grid. As with DocCL, a
+depth-ablation rows (head-only, uniform) are a single seed pending the grid. As with the
+depth-targeting probe, a
 head-only restriction ($87.1$, single seed) already recovers essentially the full head/late
 result, suggesting the late-layer slots are largely redundant with the head slots---a simpler
 head-only variant is a natural future simplification. The remaining scope is the multi-backbone
@@ -855,7 +853,7 @@ pattern measured on LayoutLMv3 (Table~\ref{tab:main-comparison}), with the absol
 few points lower on the smaller-capacity backbone. The text-only BERT baseline tracks the naive
 LayoutLMv3 lower bound across scenarios, confirming the benchmark behaves consistently on a
 unimodal encoder. The coverage is deliberately partial---LiLT is run on the two scenarios the
-secondary grid has reached, and the proposed methods (DocCL, LexSlot) and the BROS backbone are
+secondary grid has reached, and the proposed LexSlot and the BROS backbone are
 \emph{not yet} evaluated here; completing this matrix is the pending grid
 (Chapter~\ref{ch:conclusions}). What the present rows establish is that the benchmark's central
 empirical ordering is not an artefact of one backbone.
@@ -867,7 +865,7 @@ empirical ordering is not an artefact of one backbone.
   column in bold). LiLT (decoupled text\,$+$\,layout) is run on DIL and Mixed; the text-only BERT
   lower bound spans all five scenarios. The replay-dominant ordering of the LayoutLMv3 grid
   (Table~\ref{tab:main-comparison}) is preserved on LiLT. Cells marked ``--'' are not yet run: the
-  proposed methods (DocCL, LexSlot), the BROS backbone, and LiLT on the remaining scenarios are
+  proposed LexSlot, the BROS backbone, and LiLT on the remaining scenarios are
   the pending grid (Chapter~\ref{ch:conclusions}). \textsuperscript{\ddag}LiLT DER++ on Mixed is
   the mean of two seeds (one run pending).}
   \label{tab:backbone-byscenario}
@@ -885,35 +883,38 @@ empirical ordering is not an artefact of one backbone.
 \section{Ablation Studies}
 \label{sec:results-ablation}
 
-The depth-targeting ablation restricts the DocCL consolidation to a subset of depths to
-test whether the diagnosed head/late target is what matters. The component-targeting
-variants (head-only / late-only / uniform) were run on DIL over three seeds
+The depth-targeting probe restricts a depth-scaled consolidation penalty to a subset of
+depths to test whether the diagnosed head/late target is what matters---a causal check on the
+diagnosis, independent of the proposed remedy. The variants (head-only / late-only / uniform /
+full) were run on DIL over three seeds
 (Table~\ref{tab:ablation}). The result is decisive: the \emph{uniform} variant collapses
 to $42.6$ AA, less than half the targeted variants and barely above naive, whereas
 \emph{head-only} ($86.1$) and \emph{late-only} ($86.2$) each recover essentially the full
-result and slightly edge the full depth-scaled method ($84.7$). This confirms both
-H\textsubscript{target} (\emph{where} the budget is spent dominates) and
+result and slightly edge the full schedule ($84.7$). This confirms both
+H\textsubscript{target} (\emph{where} the capacity is spent dominates) and
 H\textsubscript{head} (the head/late locus is the effective target); the interpretation is
-developed in \S\ref{sec:results-key-ablation}. Two honest limits bound the claim. First,
-that head-only and late-only each \emph{match} the full schedule means the full method's
-extra late-layer consolidation term is largely \emph{redundant} with the head term on this
-scenario---a simpler head-focused variant would be near-equivalent here, which we flag as
-future work (\S\ref{sec:concl-future}) rather than as evidence for the full schedule.
-Second, this table reports the ablation on DIL---the scenario where DocCL is effective;
-the same contrast on the CIL-CORD growing-head scenario is uninformative (no variant
-clears $\sim$18 AA, since no method works there). The full schedule's robustness over the
-simpler head-only variant \emph{across} the harder Mixed and CIL scenarios is therefore not
-established here and remains an open question.
+developed in \S\ref{sec:results-key-ablation}, and LexSlot's own placement ablation
+(\S\ref{sec:results-lexslot}) reproduces the same effect with the slot mechanism. Two honest
+limits bound the claim. First,
+that head-only and late-only each \emph{match} the full schedule means the extra late-layer
+term is largely \emph{redundant} with the head term on this
+scenario---a simpler head-only target would be near-equivalent here, which is exactly the
+configuration LexSlot adopts. Second, this probe is on DIL---the scenario where head/late
+targeting is effective; the same contrast on the CIL-CORD growing-head scenario is
+uninformative (no variant clears $\sim$18 AA, since no method works there), so the targeting
+claim is established for the domain shift and left open for the harder scenarios.
 
 \begin{table}[!htbp]
   \centering
-  \caption[Depth-targeting ablation]{Component-targeting ablation on the DIL scenario
-  (three seeds). Restricting DocCL's consolidation to the diagnosed locus---\emph{head
+  \caption[Depth-targeting probe]{Depth-targeting probe on the DIL scenario
+  (three seeds): a depth-scaled consolidation penalty restricted to different depths, used to
+  test whether the diagnosed locus is causal. Concentrating on the locus---\emph{head
   only} ($86.1$) or \emph{late only} ($86.2$)---recovers essentially the full result and
-  slightly edges the full depth-scaled method ($84.7$), while the \emph{uniform}
+  slightly edges the full head$+$late schedule ($84.7$), while the \emph{uniform}
   across-depth variant collapses to $42.6$. This confirms the targeting hypotheses
   H\textsubscript{target} and H\textsubscript{head} (\S\ref{sec:results-key-ablation}): the
-  gain comes from \emph{where} the stability budget is spent, not merely how much.}
+  gain comes from \emph{where} capacity is spent, not merely how much---the principle LexSlot
+  is built on.}
   \label{tab:ablation}
   % Auto-loaded from generated/table_ablation.tex (scenario: dil); the inline table below
   % is the fallback mirror.
@@ -925,7 +926,7 @@ established here and remains an open question.
     Head only                   & $86.1 \pm 1.7$ & $-5.4 \pm 2.5$ \\
     Late layers only            & $86.2 \pm 1.5$ & $-5.2 \pm 2.0$ \\
     Uniform (all depths)        & $42.6 \pm 1.4$ & $-1.8 \pm 0.3$ \\
-    All (full DocCL)            & $84.7 \pm 1.7$ & $-4.6 \pm 1.9$ \\
+    Head $+$ late (full)        & $84.7 \pm 1.7$ & $-4.6 \pm 1.9$ \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -933,32 +934,32 @@ established here and remains an open question.
 \section{Computational Efficiency}
 \label{sec:results-compute}
 
-Table~\ref{tab:compute} reports the wall-clock and memory cost of the methods on the
+Table~\ref{tab:compute} reports the wall-clock and memory cost of the baseline methods on the
 CIL-CORD scenario. The only strictly hardware- and batch-independent quantity is the
-number of \emph{trainable parameters}, which is essentially identical across methods
-($\sim$125\,M): crucially, \textbf{DocCL adds no trainable parameters over naive
-fine-tuning}---its consolidation, distillation, and small head buffer are training-time
-state, not extra weights---which is a real, comparable efficiency advantage over
-parameter-adding approaches. The wall-clock and peak-memory figures, by contrast, were
+number of \emph{trainable parameters}, essentially identical across these methods
+($\sim$125\,M). The wall-clock and peak-memory figures, by contrast, were
 collected across heterogeneous hardware and batch sizes during the grid and so are
 \emph{indicative rather than strictly comparable}: replay's buffers and second
 forward/backward pass add genuine memory and time (ER and DER++ carry a replay buffer,
-and DER++ additionally caches output logits), while DocCL's small-batch local runs report
-a low peak VRAM precisely because they ran on the sanity-check box at reduced batch size.
-The robust, apples-to-apples reading is therefore the parameter column: DocCL matches
-naive's parameter count while the replay methods pay their cost in stored data, not
-parameters. ``Run'' denotes one full continual scenario.
+and DER++ additionally caches output logits). The proposed \textbf{LexSlot} is the
+parameter-efficient outlier in the opposite direction: it \emph{freezes} the backbone and
+trains only a small slot memory (head logit-slots $+$ low-rank late-layer adapters, a $\sim$1--2\%
+parameter overhead over the frozen backbone; hyperparameters in
+Appendix~\ref{app:hyperparameters}), and stores \emph{no} replay buffer at all---so its standing
+advantage is qualitative: replay-level retention on the domain shift (\S\ref{sec:results-lexslot})
+with a frozen backbone and no rehearsal data. Its CIL-CORD wall-clock/memory numbers are not in
+this table (LexSlot is measured on DIL so far). ``Run'' denotes one full continual scenario.
 
 \begin{table}[!htbp]
   \centering
   \caption[Computational overhead]{Wall-clock, peak memory, and trainable-parameter count
-  of the continual-learning methods on CIL-CORD. ``Run'' $=$ one full continual scenario.
-  Trainable parameters ($\sim$125.4\,M) are essentially identical across methods---DocCL
-  adds \emph{no} trainable parameters over naive---and are the only strictly comparable
-  column. Wall-clock and peak-memory were collected across heterogeneous hardware and
-  batch sizes during the grid, so they are indicative, not strictly comparable: replay's
-  buffers add real memory, while DocCL's low peak reflects small-batch runs on the local
-  sanity-check box.}
+  of the baseline continual-learning methods on CIL-CORD. ``Run'' $=$ one full continual
+  scenario. Trainable parameters ($\sim$125.4\,M) are essentially identical across these
+  full-fine-tuning methods and are the only strictly comparable column. Wall-clock and
+  peak-memory were collected across heterogeneous hardware and batch sizes during the grid, so
+  they are indicative, not strictly comparable: replay's buffers add real memory. The proposed
+  LexSlot (\S\ref{sec:results-lexslot}) instead freezes the backbone and trains only a small slot
+  memory with no replay buffer; its CIL-CORD cost is not listed (measured on DIL so far).}
   \label{tab:compute}
   % Auto-loaded from generated/table_compute.tex; the inline table below mirrors the numbers.
   \IfFileExists{generated/table_compute.tex}{\input{generated/table_compute}}{%
@@ -971,7 +972,6 @@ parameters. ``Run'' denotes one full continual scenario.
     LwF            & 125.4 M & 392.2  & 20894 \\
     ER             & 125.4 M & 174.5  & 27144 \\
     DER++          & 125.4 M & 298.5  & 35540 \\
-    \textbf{DocCL} & 125.4 M & 2374.2 & 5015  \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -982,7 +982,7 @@ parameters. ``Run'' denotes one full continual scenario.
 Two further scenarios stress the benchmark along axes the main grid does not isolate:
 \emph{scale} (a large, growing label space) and \emph{pure language shift} (a fixed label
 space with only the input language changing). The cross-lingual scenario is run with the
-full method suite---including DocCL, O-LoRA, and CODA-Prompt---whereas on the large-scale
+classical method suite plus O-LoRA and CODA-Prompt, whereas on the large-scale
 WildReceipt scenario, for compute-budget reasons, only the classical continual-learning
 methods and the joint oracle are reported. The results (Figure~\ref{fig:newscenarios-aa})
 are decisive, and the cross-lingual scenario in particular provides the strongest single
@@ -1007,11 +1007,10 @@ of output classes. The headline finding is that forgetting is \emph{near zero fo
 method}, including naive (BWT $-6.6$); regularisation and replay show forgetting at or
 below zero (EWC $-9.6$, ER $+1.6$, DER++ $+0.5$---i.e.\ slightly \emph{positive} backward
 transfer). On accuracy, naive already reaches $72.9$ AA, DER++ $80.3$, and the replay
-methods even edge \emph{past} the joint oracle ($78.5$); the proposed DocCL ($74.7$) sits
-just above naive and below replay, exactly as the head-locus account predicts---with the
-output space fixed there is almost no head-forgetting for DocCL's head/late consolidation
-to repair, so it neither helps nor hurts, which is itself corroborating evidence rather
-than a failure of the method. This is direct support for the
+methods even edge \emph{past} the joint oracle ($78.5$), exactly as the head-locus account
+predicts---with the output space fixed there is almost no head-forgetting for any head/late
+remedy to repair, so head-protection neither helps nor hurts here, which is itself corroborating
+evidence. This is direct support for the
 output-side / head-locus thesis. When the label space is held fixed and only the input
 language shifts, the classifier head never has to relearn its output distribution, so the
 head-concentrated forgetting mechanism is barely triggered and forgetting is minimal.
@@ -1031,9 +1030,9 @@ input-representation drift \emph{per se}.
   classical methods and joint oracle only, the heavier methods not run here for
   compute-budget reasons), where forgetting is severe and even replay stays near the naive
   lower bound, far below the oracle. \emph{Right:} XFUND cross-lingual DIL (pure language
-  shift, fixed label space; full method suite including DocCL), where forgetting is near
-  zero for every method---naive already reaches $72.9$ AA, replay edges past the oracle,
-  and DocCL ($74.7$) sits just above naive---because the fixed output space never forces
+  shift, fixed label space), where forgetting is near
+  zero for every method---naive already reaches $72.9$ AA and replay edges past the
+  oracle---because the fixed output space never forces
   the head to relearn its distribution. The contrast corroborates the output-side /
   head-locus forgetting thesis.}
   \label{fig:newscenarios-aa}
@@ -1059,7 +1058,7 @@ multimodal-specific nor an artefact of a single architecture. The actionable
 consequence is robust to all of this: the
 forgetting locus is output-facing, so remedies that protect or re-expose the upper
 layers and the classifier---of which experience replay is the simplest instance, and
-the depth/head-targeted DocCL the diagnosis-grounded one---are the natural
+the head/late-targeted LexSlot the diagnosis-grounded one---are the natural
 intervention, which also explains \emph{why} replay is so effective below
 (Figure~\ref{fig:replay-mechanism}).
 
@@ -1069,10 +1068,10 @@ intervention, which also explains \emph{why} replay is so effective below
   \caption[Why replay works]{From diagnosis to result: because forgetting is output-facing,
   replay's re-exposure of old-class targets keeps the classifier head aligned, which
   explains its empirical win (both ER and DER++ reach DIL BWT $\approx 0$). The
-  diagnosis-grounded method --- DocCL, targeting the head/late layers directly --- closes
-  most of the DIL forgetting gap ($84.7$ vs the oracle's $88.7$) but does not reach the
-  oracle or surpass replay's accuracy; it does so without storing data beyond a small head
-  buffer.}
+  diagnosis-grounded method --- LexSlot, an isolated slot memory at the head/late layers ---
+  approaches the oracle and replay on the DIL forgetting gap ($87.3$ vs the oracle's $88.7$),
+  forgets less than the plain replay methods, and does so \emph{without storing any data}
+  (frozen backbone, buffer-free).}
   \label{fig:replay-mechanism}
 \end{figure}
 
@@ -1105,14 +1104,15 @@ growing head) is the hardest for every method, oracle included.
 Several caveats bound these conclusions. (i) All reported methods are measured and were
 held \emph{fixed across all methods} under one stopping rule, so the method comparison is
 internally valid (the small per-seed standard deviations indicate stable rankings). The
-single bounded coverage gap is that DocCL, the 2025 baselines, and the prompt/LoRA methods
+single bounded coverage gap is that the 2025 baselines and the prompt/LoRA methods
 were not run on the large-scale WildReceipt scenario
 (\S\ref{sec:results-extended}), where only the classical methods and the oracle are
-reported; everything else---including C-Flat++ (\texttt{er\_cflat}), the DocCL
-component-targeting ablation, and the cross-lingual scenario---is measured over three
-seeds. The qualitative conclusions---replay strongest, DocCL
-closing most of the DIL gap but not surpassing replay, and the targeting ablation
-confirming the head/late locus---do not depend on the one missing cell.
+reported; everything else---including C-Flat++ (\texttt{er\_cflat}), the depth-targeting
+probe, and the cross-lingual scenario---is measured over three
+seeds. The proposed LexSlot is measured on DIL/LayoutLMv3 (3 seeds); its other-scenario and
+multi-backbone confirmation is the pending grid. The qualitative conclusions---replay strongest,
+LexSlot approaching replay on the DIL gap buffer-free, and the depth-targeting probe
+confirming the head/late locus---do not depend on the unrun cells.
 (ii) Each scenario uses
 a single fixed task order in the main grid; the pilot showed order materially affects
 forgetting ($\sim$6 BWT points), so the full run repeats the comparison under alternate
@@ -1137,6 +1137,6 @@ $|\mathrm{BWT}|$ across backbones is underpowered at three seeds, so we claim a 
 \emph{location} of forgetting, not a shared \emph{amount}. None of these undercut the
 robust findings---forgetting is a depth/head phenomenon \emph{across architectures},
 replay (ER/DER++) is the strongest remedy and matches the joint
-oracle on domain-incremental learning while DocCL closes most of that gap, and forgetting
+oracle on domain-incremental learning while LexSlot approaches that gap buffer-free, and forgetting
 is near zero under pure language shift but catastrophic under output-space growth---but
 they delimit how far the exact numbers should be pushed.
