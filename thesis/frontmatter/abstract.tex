@@ -38,26 +38,22 @@ learning (average entity-F1 $\approx 88$ versus the oracle's $88.7$, with backwa
 transfer near zero) and closing essentially the entire forgetting gap; regularisation
 (EWC) roughly halves forgetting where a domain shift is present, and distillation (LwF)
 gives little benefit in this dense token-classification setting. Guided by the same
-measurement we design \emph{two} mechanism-targeted remedies that concentrate
-continual-learning effort on the dominant-forgetting head and late layers. The first,
-\textbf{DocCL}, combines depth-scaled consolidation, output distillation, and head replay.
-Measured over three
-seeds, DocCL \emph{closes most of} the domain-incremental forgetting gap (average
-entity-F1 $84.7$ versus the oracle's $88.7$, within $\sim$4 points, backward transfer
-near zero) but does \emph{not} reach it, and does not surpass experience replay,
-which remains $\sim$3 points higher; on the mixed and class-incremental scenarios DocCL
-tracks the strong baselines without exceeding them. The second, \textbf{LexSlot},
-protects the same locus with a parameter-efficient, isolated slot memory gated by a
-drift-immune lexical signature and \emph{needs no replay buffer}; on the domain-incremental
-scenario (three seeds) it approaches replay-level accuracy ($87.3$, within $\sim$1 point of
-ER/DER++) with lower forgetting than the plain replay methods ($-2.3$ backward transfer, versus
-$-2.8$/$-3.4$), competitive with replay buffer-free though so far evaluated on the
-domain-incremental scenario and one backbone, pending the full grid. A depth-targeting ablation confirms
-the diagnosis: penalising every depth \emph{uniformly}---rather than concentrating the
-budget on the diagnosed head/late locus---collapses ($42.6$ AA) even though it spends a
-larger total budget, whereas concentrating it on that locus recovers the full result. The honest finding is therefore that diagnosis-driven head/late targeting closes
-most of the forgetting gap on a domain shift, performing competitively with---though not
-beating---data replay. These
+measurement we design \textbf{LexSlot}, a mechanism-targeted remedy that concentrates
+continual-learning effort on the dominant-forgetting head and late layers: a
+parameter-efficient, isolated slot memory placed at that locus over a frozen backbone, gated by a
+drift-immune lexical signature, that \emph{needs no replay buffer}. Each task writes only its own
+slots, so earlier tasks are protected structurally. Measured over three seeds on the
+domain-incremental scenario, LexSlot approaches replay-level accuracy (average entity-F1 $87.3$,
+within $\sim$1 point of ER/DER++ and the oracle's $88.7$) while forgetting \emph{less} than the
+plain replay methods (backward transfer $-2.3$ versus $-2.8$/$-3.4$)---competitive with replay,
+buffer-free, though so far evaluated on the domain-incremental scenario and one backbone, with the
+multi-scenario and multi-backbone confirmation pending. A depth-targeting probe confirms the
+diagnosis is \emph{causal}: concentrating a consolidation penalty on the diagnosed head/late locus
+recovers the full result, whereas spreading it across every depth \emph{uniformly} collapses
+($42.6$ AA) even though it spends a larger budget---and LexSlot's own placement ablation reproduces
+the same effect with the slot mechanism. The honest finding is therefore that diagnosis-driven
+head/late targeting closes most of the forgetting gap on a domain shift buffer-free, performing
+competitively with---though not beating---data replay. These
 results establish the per-component diagnostic protocol, together with a controlled
 benchmark and per-component tooling that we release, as a practical instrument for
 designing continual-learning methods for multimodal document
