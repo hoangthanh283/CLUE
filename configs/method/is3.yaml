@@ -1,0 +1,17 @@
+name: is3
+# IS3 "two shifts" CL (ACL 2024 Findings).
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+# β — KD weight on O-token subset (reference default 2.0)
+kd_weight: 2.0
+# α — prototype CE weight (reference default 0.1)
+proto_weight: 0.1
+# KD temperatures (reference default 1.0 for both)
+kd_temp_student: 1.0
+kd_temp_teacher: 1.0
+# Grad surgery: scale old-entity head rows by grad_weight (reference default 0.6).
+# Row 0 (O label) is left untouched. New rows scaled by new_grad_weight (1.0 = no-op).
+grad_weight: 0.6
+new_grad_weight: 1.0
