@@ -124,7 +124,7 @@ table is consistent with but, on its own, cannot establish.
   \centering
   \caption[Forgetting matrices across backbones]{Performance matrix $R[i,j]$ (entity-F1
   on task $j$ after training task $i$) under naive sequential fine-tuning, for all four
-  backbones (mean over three seeds). On every architecture the diagonal (just-learned
+  backbones (mean\,$\pm$\,std over three seeds). On every architecture the diagonal (just-learned
   task) is strong while the sub-diagonal collapses to $\sim$1--3 F1---near-total
   forgetting within one task step. The unimodal BERT baseline is the mildest (CORD held
   at $18.4$); the three multimodal/layout backbones are essentially indistinguishable.}
@@ -134,24 +134,24 @@ table is consistent with but, on its own, cannot establish.
     \textbf{Backbone} & \textbf{Trained through} & \textbf{eval FUNSD} & \textbf{eval CORD} & \textbf{eval SROIE} \\
     \midrule
     \multirow{3}{*}{LayoutLMv3}
-       & after FUNSD & 89.1 & --   & --   \\
-       & after CORD  & 3.3  & 94.1 & --   \\
-       & after SROIE & 1.1  & 2.5  & 81.4 \\
+       & after FUNSD & $89.1${\scriptsize\,$\pm$0.7} & --   & --   \\
+       & after CORD  & $3.3${\scriptsize\,$\pm$2.1}  & $94.1${\scriptsize\,$\pm$0.1} & --   \\
+       & after SROIE & $1.1${\scriptsize\,$\pm$0.1}  & $2.5${\scriptsize\,$\pm$1.1}  & $81.4${\scriptsize\,$\pm$0.9} \\
     \midrule
     \multirow{3}{*}{BERT}
-       & after FUNSD & 60.2 & --   & --   \\
-       & after CORD  & 8.7  & 92.6 & --   \\
-       & after SROIE & 1.1  & 18.4 & 77.8 \\
+       & after FUNSD & $60.2${\scriptsize\,$\pm$0.2} & --   & --   \\
+       & after CORD  & $8.7${\scriptsize\,$\pm$4.0}  & $92.6${\scriptsize\,$\pm$0.6} & --   \\
+       & after SROIE & $1.1${\scriptsize\,$\pm$0.5}  & $18.4${\scriptsize\,$\pm$8.2} & $77.8${\scriptsize\,$\pm$1.3} \\
     \midrule
     \multirow{3}{*}{LiLT}
-       & after FUNSD & 83.9 & --   & --   \\
-       & after CORD  & 2.1  & 91.9 & --   \\
-       & after SROIE & 1.4  & 1.0  & 79.0 \\
+       & after FUNSD & $83.9${\scriptsize\,$\pm$1.6} & --   & --   \\
+       & after CORD  & $2.1${\scriptsize\,$\pm$0.8}  & $91.9${\scriptsize\,$\pm$0.8} & --   \\
+       & after SROIE & $1.4${\scriptsize\,$\pm$1.1}  & $1.0${\scriptsize\,$\pm$0.8}  & $79.0${\scriptsize\,$\pm$0.6} \\
     \midrule
     \multirow{3}{*}{BROS}
-       & after FUNSD & 88.9 & --   & --   \\
-       & after CORD  & 6.6  & 93.6 & --   \\
-       & after SROIE & 1.9  & 2.8  & 81.4 \\
+       & after FUNSD & $88.9${\scriptsize\,$\pm$0.3} & --   & --   \\
+       & after CORD  & $6.6${\scriptsize\,$\pm$3.7}  & $93.6${\scriptsize\,$\pm$0.6} & --   \\
+       & after SROIE & $1.9${\scriptsize\,$\pm$0.8}  & $2.8${\scriptsize\,$\pm$0.9}  & $81.4${\scriptsize\,$\pm$1.3} \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -168,7 +168,10 @@ table is consistent with but, on its own, cannot establish.
   absolute levels below should be read as a \emph{relative ordering} only: they use the
   corrected per-sample empirical-Fisher estimator, under which the head-dominant ordering
   is robust while the head-to-backbone magnitude gap is narrower than a naive batch
-  estimate would suggest. Pilot result.}
+  estimate would suggest. Because these are order-of-magnitude importance \emph{levels}
+  read as an ordering (not a forgetting measure with a meaningful spread), we report the
+  seed-and-boundary mean only; the head-dominant ordering is stable across all three
+  seeds. Pilot result.}
   \label{tab:fisher-component}
   \begin{tabular}{lr}
     \toprule
@@ -286,18 +289,19 @@ point we return to when scoping the method (\S\ref{sec:results-stability}).
   consecutive checkpoints ($1.0=$ no drift) for the full multimodal model (C4,
   default order), over $n\ge 500$ distinct valid tokens. Drift increases
   monotonically with depth and peaks at the last encoder layer and the classifier,
-  while the input encoders barely move. Pilot result (per-token CKA, mean over seeds).}
+  while the input encoders barely move. Pilot result (per-token CKA, mean\,$\pm$\,std over
+  three seeds).}
   \label{tab:cka-layer}
   \begin{tabular}{lcc}
     \toprule
     \textbf{Layer} & \textbf{FUNSD$\rightarrow$CORD} & \textbf{CORD$\rightarrow$SROIE} \\
     \midrule
-    Text+layout embeddings  & 1.000 & 1.000 \\
-    Vision patch-embed      & 0.972 & 0.973 \\
-    Encoder layer 0 (early) & 0.963 & 0.977 \\
-    Encoder layer 6 (mid)   & 0.654 & 0.694 \\
-    Encoder layer 11 (late) & 0.246 & 0.167 \\
-    Classifier head         & 0.162 & 0.123 \\
+    Text+layout embeddings  & $1.000${\scriptsize\,$\pm$0.000} & $1.000${\scriptsize\,$\pm$0.000} \\
+    Vision patch-embed      & $0.972${\scriptsize\,$\pm$0.006} & $0.988${\scriptsize\,$\pm$0.002} \\
+    Encoder layer 0 (early) & $0.963${\scriptsize\,$\pm$0.002} & $0.977${\scriptsize\,$\pm$0.002} \\
+    Encoder layer 6 (mid)   & $0.654${\scriptsize\,$\pm$0.024} & $0.694${\scriptsize\,$\pm$0.045} \\
+    Encoder layer 11 (late) & $0.246${\scriptsize\,$\pm$0.004} & $0.167${\scriptsize\,$\pm$0.007} \\
+    Classifier head         & $0.162${\scriptsize\,$\pm$0.021} & $0.123${\scriptsize\,$\pm$0.012} \\
     \bottomrule
   \end{tabular}
 \end{table}
