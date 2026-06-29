@@ -22,15 +22,18 @@ representational drift (linear CKA), per-group Fisher information, and standard
 forgetting metrics across the FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE task
 sequence. The diagnosis returns a clear, somewhat counter-intuitive result: forgetting
 is \emph{not} fusion-specific but \emph{output-side}---it concentrates in the
-classifier head and the late encoder layers (the head carries several times more
-Fisher importance than any other group and CKA drift rises monotonically with depth, from
-$1.00$ at the input encoders to $0.22$ at the head), while the input encoders remain
+classifier head and the late encoder layers (the head carries more than an order of
+magnitude more Fisher importance than any other group and CKA drift rises monotonically with
+depth, from $1.00$ at the input encoders to $0.25$ at the late layers and $0.16$ at the head),
+while the input encoders remain
 comparatively stable; a controlled cross-condition test cannot distinguish the full
 multimodal model's forgetting from its unimodal ablations.
 
-We then benchmark six continual-learning strategies---naive and joint bounds,
-regularisation (EWC), distillation (LwF), and replay (ER, DER++)---across three
-scenarios (class-, domain-, and mixed-incremental) over three seeds. The empirical
+We then benchmark a ten-method baseline suite---spanning naive and joint bounds,
+regularisation (EWC), distillation (LwF), replay (ER, DER++), and the prompt/LoRA and
+2025 families---across three core scenarios (class-, domain-, and mixed-incremental),
+extended onto cross-lingual and large-scale axes, over three seeds. The six classical
+methods carry the headline analysis. The empirical
 ordering follows directly from the diagnosis: because forgetting is at the head,
 \emph{replay}---which re-exposes old-class targets at the output---is the strongest
 remedy, with ER and DER++ reaching the joint upper bound on domain-incremental
@@ -47,11 +50,12 @@ domain-incremental scenario, LexSlot approaches replay-level accuracy (average e
 within $\sim$1 point of ER/DER++ and the oracle's $88.7$) while forgetting \emph{less} than the
 plain replay methods (backward transfer $-2.3$ versus $-2.8$/$-3.4$)---competitive with replay,
 buffer-free, though so far evaluated on the domain-incremental scenario and one backbone, with the
-multi-scenario and multi-backbone confirmation pending. A depth-targeting probe confirms the
-diagnosis is \emph{causal}: concentrating a consolidation penalty on the diagnosed head/late locus
-recovers the full result, whereas spreading it across every depth \emph{uniformly} collapses
-($42.6$ AA) even though it spends a larger budget---and LexSlot's own placement ablation reproduces
-the same effect with the slot mechanism. The honest finding is therefore that diagnosis-driven
+multi-scenario and multi-backbone confirmation pending. A depth-targeting probe supports the
+diagnosis: concentrating a consolidation penalty on the diagnosed head/late locus recovers
+near-oracle accuracy ($\sim$86 AA), whereas spreading the same budget across every depth
+\emph{uniformly} cannot fit the tasks and collapses in accuracy ($42.6$ AA)---so the diagnosed
+locus is where a fixed budget must attach to be usable---and LexSlot's own placement ablation
+reproduces the accuracy ordering with the slot mechanism. The honest finding is therefore that diagnosis-driven
 head/late targeting closes most of the forgetting gap on a domain shift buffer-free, performing
 competitively with---though not beating---data replay. These
 results establish the per-component diagnostic protocol, together with a controlled
