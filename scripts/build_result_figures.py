@@ -50,7 +50,7 @@ METHODS = [
     "o_lora",
     "cl_lora",
     "bert_textonly",
-    "doccl",
+    "lexslot",
     "joint",
 ]
 MN = {
@@ -65,7 +65,7 @@ MN = {
     "bert_textonly": "BERT",
     "l2p": "L2P",
     "dualprompt": "DualPrompt",
-    "doccl": "DocCL",
+    "lexslot": "LexSlot",
     "joint": "Joint",
 }
 COL = {
@@ -80,7 +80,7 @@ COL = {
     "bert_textonly": "#607d8b",
     "l2p": "#009688",
     "dualprompt": "#00acc1",
-    "doccl": "#e91e63",
+    "lexslot": "#e91e63",
     "joint": "#4caf50",
 }
 
@@ -100,6 +100,16 @@ def load(dirs, scenarios):
             m, s = d.get("method"), d.get("scenario")
             if d.get("model_family") == "bert":
                 m = "bert_textonly"
+            # LexSlot configs are distinguished only by the run-dir suffix (metrics.json
+            # records method=lexslot for all). The reported method is the isolated _off
+            # config; skip the soft default (no suffix) and the depth/sharing ablations so
+            # they do not pollute the lexslot mean. The figure resolves _off via a stem rename.
+            if m == "lexslot":
+                run = Path(f).parent.name
+                if run.endswith("_off"):
+                    m = "lexslot"  # the canonical isolated config
+                else:
+                    continue  # soft default / _uniform / _head_only ablations: not the headline
             if s in scenarios:
                 for k in ("AA", "BWT", "AF"):
                     if _ok(d.get(k)):
