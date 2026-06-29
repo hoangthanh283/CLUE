@@ -35,6 +35,7 @@ FIGURES = [
 ]
 TABLES = [
     ("table_main.tex", "generated/table_main.tex"),
+    ("table_main_BWT.tex", "generated/table_main_BWT.tex"),
     ("table_ablation.tex", "generated/table_ablation.tex"),
     ("table_compute.tex", "generated/table_compute.tex"),
     ("table_single_task_baselines.tex", "generated/table_single_task_baselines.tex"),
