@@ -76,7 +76,8 @@ sequential fine-tuning LayoutLMv3 forgets almost totally---an earlier task that
 scores $88$ entity-F1 collapses to $\sim$2 F1 after a single subsequent task---and
 this forgetting is \emph{output-side}. It concentrates in the classifier head and
 the late encoder layers: per-token CKA drift rises monotonically with depth (from
-$1.00$ at the input encoders to $0.22$ at the head) and the Fisher-weighted
+$1.00$ at the input encoders to $0.25$ at the late layers and $0.16$ at the head) and the
+Fisher-weighted
 displacement of the old task's parameters is largest there, while the input encoders
 are essentially unchanged. We are careful about what this does and does not claim:
 because LayoutLMv3 is single-stream we do \emph{not} assert a ``fusion-specific''
@@ -108,9 +109,12 @@ $\sim$1 point of ER/DER++) while forgetting \emph{less} than the plain replay me
 transfer $-2.3$ versus $-2.8$/$-3.4$)---all without storing any past data. The honest finding is
 that diagnosis-driven head/late targeting is competitive with---but does not exceed---data replay
 on the domain shift, with the chief advantage being qualitative: replay-level retention
-buffer-free. A depth-targeting probe confirms the locus is \emph{causal} (a consolidation penalty
-spread uniformly across depth collapses to $42.6$ AA, versus $\sim$85 when concentrated on the
-locus), and LexSlot's own placement ablation reproduces the same effect with the slot mechanism.
+buffer-free. A depth-targeting probe supports the locus as a budget-placement claim (a fixed
+consolidation budget recovers $\sim$85 AA when concentrated on the head/late locus but
+under-fits and collapses to $42.6$ AA when spread uniformly across depth---though the uniform
+variant forgets no more, it simply cannot fit the tasks), and LexSlot's own placement ablation
+reproduces the accuracy ordering with the slot mechanism; a direct freezing intervention is left
+as the cleaner causal control.
 We report LexSlot honestly as \emph{promising rather than settled}: it is so far evaluated on the
 domain-incremental scenario and LayoutLMv3, with the multi-scenario and multi-backbone
 confirmation the pending grid (\S\ref{sec:concl-future}). The diagnostic

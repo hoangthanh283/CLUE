@@ -159,7 +159,8 @@ clear, \emph{output-side} finding: under naive sequential fine-tuning LayoutLMv3
 forgets almost totally---an $88$-F1 task collapses to $\sim$2 F1 after a single
 further task---and the damage concentrates in the classifier head and late encoder
 layers, where per-token CKA drift rises monotonically with depth (from $1.00$ at the
-input encoders to $0.22$ at the head) and the old-task-Fisher-weighted displacement
+input encoders to $0.25$ at the late layers and $0.16$ at the head) and the
+old-task-Fisher-weighted displacement
 of the parameters is largest, while the input encoders barely move; the same
 head-concentrated pattern holds for a text-only BERT encoder, so the locus is the
 general output side, not a multimodal artefact. We do \emph{not}

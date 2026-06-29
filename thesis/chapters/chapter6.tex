@@ -75,8 +75,9 @@ sections.
 
 Attributing this collapse to specific parameters requires care about \emph{what}
 is measured. Table~\ref{tab:fisher-component} reports the empirical Fisher
-\emph{importance} per parameter group: the classifier head carries several times
-more Fisher mass than any other group. This is a statement about \emph{importance to
+\emph{importance} per parameter group: the classifier head carries more than an order
+of magnitude more Fisher mass than any other group ($2.17\times10^{-1}$ versus
+$4.69\times10^{-3}$ for the next-largest group). This is a statement about \emph{importance to
 the current task}, not about forgetting: the output layer carries the largest loss
 gradients for \emph{any} token classifier (including a plain BERT) by the geometry of
 the cross-entropy head, so a high Fisher \emph{level} there is true by construction
@@ -164,8 +165,8 @@ table is consistent with but, on its own, cannot establish.
   \centering
   \caption[Per-component Fisher importance]{Empirical Fisher \emph{importance} (not a
   forgetting measure) per parameter group for the full multimodal model (C4),
-  averaged over seeds and task boundaries. The classifier head carries several times
-  more Fisher mass than any other group---as it does for \emph{any} token classifier
+  averaged over seeds and task boundaries. The classifier head carries more than an
+  order of magnitude more Fisher mass than any other group---as it does for \emph{any} token classifier
   by the geometry of the cross-entropy head; forgetting itself is localised by the
   displacement of Figure~\ref{fig:per-component-bars}, not by these levels. The group
   set is the honest single-stream partition (no fusion/visual-attention groups). The
@@ -484,7 +485,7 @@ in \S\ref{sec:results-remedy}.
       note/.style={draw, rounded corners, align=left, inner sep=4pt, text width=62mm, font=\scriptsize},
       lbl/.style={font=\scriptsize\itshape}]
     % depth stack, head (most drift) at top
-    \node[band, fill=red!40]    (head)  {Classifier head \quad CKA $0.22$ $\cdot$ Fisher $2.2\!\times\!10^{-1}$ (dominant)};
+    \node[band, fill=red!40]    (head)  {Classifier head \quad CKA $0.16$ $\cdot$ Fisher $2.2\!\times\!10^{-1}$ (dominant)};
     \node[band, fill=red!22, below=1mm of head]    (l11) {Encoder layer 11 (late) \quad CKA $0.25$ -- high drift};
     \node[band, fill=orange!20, below=1mm of l11]  (mid) {Encoder layers 5--10 (mid) \quad CKA $0.34$ -- drifting};
     \node[band, fill=yellow!18, below=1mm of mid]  (early){Encoder layers 0--4 (early) \quad CKA $0.78$ -- mostly stable};
@@ -773,14 +774,19 @@ head and late layers or spread equally across every depth---on DIL, three seeds 
 (Table~\ref{tab:ablation}). The result is decisive. The \emph{uniform} variant, which applies
 an equal penalty to every depth bucket---including the stable input and early encoders the
 targeted schedule leaves free, and hence if anything a \emph{larger} total budget---
-\emph{collapses} to $42.6$ AA, roughly half the targeted variant and barely above the
+\emph{collapses in accuracy} to $42.6$ AA, roughly half the targeted variant and barely above the
 naive lower bound, whereas concentrating the same budget on the head/late locus recovers
-$84.7$. Where the budget is spent matters far more than how much: more budget, spread evenly,
-is \emph{worse}. The \emph{head-only} ($86.1$) and \emph{late-only} ($86.2$) restrictions each
-recover essentially the full result, indicating the head term carries most of the effect and the
-late-layer term is largely redundant with it. This probe validates the diagnosis as a
-\emph{causal} statement, not merely a correlational one: protecting the diagnosed locus, and
-only it, is what works. It motivates LexSlot's design directly---place capacity at the head/late
+$84.7$. We are precise about the mechanism: the uniform variant does not forget \emph{more}---its
+backward transfer ($-1.8$) is in fact the mildest in the table---it simply cannot \emph{fit} the
+tasks when an equal penalty stiffens every depth, including the input encoders that should stay
+plastic. So what the probe establishes is a budget-placement claim: a fixed consolidation budget
+is only \emph{usable} when concentrated on the head/late locus, and is wasted (to the point of
+under-fitting) when spread evenly. The \emph{head-only} ($86.1$) and \emph{late-only} ($86.2$)
+restrictions each recover essentially the full accuracy, indicating the head term carries most of
+the effect and the late-layer term is largely redundant with it. The probe is therefore
+consistent with the diagnosis and is the strongest available causal evidence short of a direct
+freezing intervention, which we flag as the cleaner control (a freeze of the high-displacement
+bucket) for future work; it does not, on its own, isolate forgetting from capacity. It motivates LexSlot's design directly---place capacity at the head/late
 locus, leave the rest frozen---and LexSlot's own placement ablation (\S\ref{sec:results-lexslot})
 re-confirms the same targeting effect with the slot mechanism (hypotheses
 H\textsubscript{target}/H\textsubscript{head} of \S\ref{sec:method-component-hypotheses}).
@@ -1099,7 +1105,7 @@ intervention, which also explains \emph{why} replay is so effective below
     \node[stage, fill=blue!6] (diag)
       {\textbf{Diagnosis (\S\ref{sec:results-diagnosis}).} Forgetting concentrates at the
        classifier head and late layers; the head dominates Fisher importance
-       ($2.2\!\times\!10^{-1}$) and drifts most (CKA $0.22$). Inputs stay stable.};
+       ($2.2\!\times\!10^{-1}$) and drifts most (CKA $0.16$). Inputs stay stable.};
     \node[stage, fill=blue!12, right=8mm of diag] (mech)
       {\textbf{Mechanism: replay.} A small buffer of past examples is replayed each step.
        Old-class targets keep producing gradient at the output head, so the head is not
