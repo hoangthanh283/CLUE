@@ -174,8 +174,12 @@ sets the stability--plasticity balance. \Gls{si}~\citep{zenke2017si} accumulates
 importance online from the path integral of parameter change, and
 \gls{mas}~\citep{aljundi2018mas} estimates importance from output sensitivity
 without labels; both can be read as alternative estimators of the same per-parameter
-weights $F_i$. A known failure mode is that this importance accumulates across many
-tasks until the penalty effectively freezes the network~\citep{kirkpatrick2017ewc}.
+weights $F_i$. A known failure mode, noted by later analyses rather than the original
+work, is that this importance accumulates across many tasks until the penalty
+effectively freezes the network~\citep{schwarz2018progresscompress}. A related
+\emph{function}-space regulariser, \gls{lwf}~\citep{li2017lwf}, instead distils the
+previous model's outputs on new-task inputs---so we group it here as output-side
+regularisation rather than as a parameter-importance penalty.
 \emph{Implication for document \gls{ie}.} The per-parameter importance $F_i$
 aggregates naturally into the named component groups of a tri-modal encoder,
 making regularisation a natural vehicle for a \emph{component-targeted} remedy;
@@ -297,7 +301,7 @@ non-stationary O tag of Equation~\eqref{eq:otag-shift}.
     \toprule
     \textbf{Family} & \textbf{Core mechanism} & \textbf{Representative methods} \\
     \midrule
-    Regularisation & Parameter-importance penalties & \textbf{EWC}, \textbf{LwF}, SI, MAS \\
+    Regularisation & Parameter-importance penalties (EWC/SI/MAS) or function/output distillation (LwF) & \textbf{EWC}, \textbf{LwF}, SI, MAS \\
     Replay         & Store and replay past exemplars & GEM, \textbf{ER}, \textbf{DER++}, A-GEM, iCaRL \\
     Optimisation   & Gradient projection/constraints & GPM, OGD, A-GEM \\
     Representation & Frozen PTM + prompts/adapters & \textbf{L2P}, \textbf{DualPrompt}, \textbf{CODA-Prompt}, \textbf{O-LoRA}, RanPAC, SAFE \\

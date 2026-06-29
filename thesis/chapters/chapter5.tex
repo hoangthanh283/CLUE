@@ -400,7 +400,9 @@ checkpoint is chosen using information from the set it is then scored on. We bou
 rather than eliminate this bias, and we are explicit about it. The bias is small
 because the stopping rule has short patience ($2$) and selects only among a handful of
 late epochs rather than searching a large checkpoint pool; it is shared identically by
-every method, so it cannot reorder the comparison; and we retain the earlier
+every method, so it is unlikely to substantially reorder the comparison (though, because
+methods have different epoch-wise evaluation trajectories, we cannot rule out small
+reorderings near ties); and we retain the earlier
 fixed-budget (no-early-stopping) runs as a reference point against which the
 convergence-trained numbers can be checked (\S\ref{sec:results-discussion}). A
 held-out validation split carved from each training set would remove the issue
@@ -526,6 +528,11 @@ Main \emph{grid} results are reported as mean\,$\pm$\,standard deviation over th
 seeds ($42, 123, 7$) and, where applicable, over the alternate task orders;
 comparisons between the selected method and the strongest baseline use a paired
 test (paired $t$-test or Wilcoxon signed-rank over the per-seed, per-order results).
+The same small-sample power caveat that governs the pilot applies here: a Wilcoxon
+signed-rank test over three seeds cannot reach $p<0.05$ on its own, so for the main
+grid we pool seeds with the alternate task orders to raise $n$, lean on the paired
+$t$-test, and---where the pooled $n$ is still small---report the effect size and
+confidence interval rather than treating a non-rejection as evidence of equivalence.
 
 The \emph{pilot diagnosis} carries a stricter requirement, because a rank test on
 small samples is power-limited: the minimum achievable two-sided Mann--Whitney

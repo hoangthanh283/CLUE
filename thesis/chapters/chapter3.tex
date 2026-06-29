@@ -179,7 +179,7 @@ matter for validity. First, token classification lives in the \emph{per-token}
 representation, so we compute CKA over \emph{individual valid tokens} (the
 classifier-relevant first-subword positions), not over a document-mean vector that
 would average $\sim$500 token vectors per page and could read ``no drift'' while
-the token geometry has reorganised. Second, the probe collects $n\ge 500$ distinct
+the token geometry has reorganised. Second, the probe collects up to $n=2000$ distinct
 tokens (well above the hidden width $p=768$), so the estimate is not in the
 high-variance $n<p$ regime; activations are captured \emph{under the condition's
 modality mask} so each condition is probed on the inputs it was trained on.
@@ -500,8 +500,11 @@ penalty to tune (Figure~\ref{fig:lexslot-arch}).
 LexSlot freezes the backbone and inserts small additive \emph{slot} modules exactly where the
 diagnosis places forgetting. Two kinds of slot are used. \textbf{Head logit-slots} attach to the
 classifier: a slot bank of $n_{\text{head}}$ learnable value vectors produces a per-token logit
-shift $\Delta\ell = \big(f V^\top\big)P$ from the per-token features $f$ entering the head
-(value matrix $V$, projection $P$), added to the head's output. \textbf{Late-layer
+shift $\Delta\ell = \big(f V^\top\big)P$ from the per-token features $f\in\mathbb{R}^{d}$ entering
+the head (value matrix $V\in\mathbb{R}^{n_{\text{head}}\times d}$, so $fV^\top\in\mathbb{R}^{n_{\text{head}}}$
+are the slot activations; projection $P\in\mathbb{R}^{n_{\text{head}}\times|\mathcal{L}|}$ maps them
+to a shift over the $|\mathcal{L}|$ label logits), added to the head's output and zero-initialised
+through $P$. \textbf{Late-layer
 representation-slots} attach to each encoder block in the diagnosed \emph{late} third: a
 rank-$r$ adapter adds $\Delta h = (h\,D)\,U$ to the block's hidden state ($D\in\mathbb{R}^{d\times
 r}$ down, $U\in\mathbb{R}^{r\times d}$ up). All slot up-projections are \emph{zero-initialised}
