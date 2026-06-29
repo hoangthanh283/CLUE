@@ -1,5 +1,26 @@
 # STATE
 
+## 2025/2026 Baseline Porting (2026-06-29) — 3/4 baselines committed, CPFD pending
+
+Strengthening the baseline table for top-tier submission (AAAI Jul/ICLR Sep 2026).
+Porting 4 baselines: MagMax (ECCV 2024), SD-LoRA (ICLR 2025), IS3 (ACL 2024), CPFD (EMNLP 2023).
+All registered in METHOD_REGISTRY + _STD_FORWARD; added to CURRENCY_METHODS in grid script.
+
+**DONE (committed, tests green):**
+- `magmax` (`doccl/methods/magmax.py`) — max-magnitude task-vector merging; reuses `ties_merge.merge_state_dicts(method='max_abs')`; backbone-only merge, head carried forward. 4 synthetic-tensor tests.
+- `sd_lora` (`doccl/methods/sd_lora.py`) — decoupled-magnitude LoRA; custom peft-free `SDLoraLinear` with per-task frozen directions + re-trainable scalars; Q/V only; plain CE, rehearsal-free, task-id-free. 9 synthetic-tensor tests.
+- `is3` (`doccl/methods/is3.py`) — two-shift NER-CL (E2O+O2E); KD on O-only tokens, grad surgery on old-entity head rows, per-class prototype replay. 2-stage backward. 8 synthetic-tensor tests.
+
+**PENDING:**
+- `cpfd` — CPFD/CanPL (confidence pseudo-labels + feature distillation); spec agent running. Implement immediately on return.
+
+**Validation plan (local box, per method):**
+```
+uv run python scripts/train.py method=<name> scenario=cil_cord seed=42 \
+  training.batch_size=2 training.gradient_checkpointing=true wandb.mode=offline
+```
+(Only AFTER all 4 are committed; run one at a time to avoid OOM.)
+
 ## All methods made BACKBONE-AGNOSTIC (2026-06-27) — verified green on 4 backbones
 Audited every CL method for LayoutLMv3 coupling (2 parallel audit agents: methods +
 data/encoder). Data/encoder path was already clean. Fixed 3 method-layer couplings:
