@@ -592,8 +592,9 @@ adaptation recovers the naive lower bound only where the output space is fixed.
   method/scenario combinations not run.}
   \label{tab:main-comparison}
   % Auto-loaded from generated/table_main.tex (scripts/project_converged_metrics.py);
-  % the inline table below is a hand-kept mirror as a fallback.
-  \IfFileExists{generated/table_main.tex}{\input{generated/table_main}}{%
+  % the inline table below is a hand-kept mirror as a fallback. The 5-scenario generated
+  % table is wider than \textwidth, so wrap it in \resizebox to fit and stay centred.
+  \IfFileExists{generated/table_main.tex}{\resizebox{\textwidth}{!}{\input{generated/table_main}}}{%
   \begin{tabular}{lccc}
     \toprule
     \textbf{Method} & \textbf{CIL-CORD} & \textbf{DIL} & \textbf{Mixed} \\
@@ -894,7 +895,8 @@ empirical ordering is not an artefact of one backbone.
   the pending grid (Chapter~\ref{ch:conclusions}). \textsuperscript{\ddag}LiLT DER++ on Mixed is
   the mean of two seeds (one run pending).}
   \label{tab:backbone-byscenario}
-  \IfFileExists{generated/table_backbone_byscenario.tex}{\input{generated/table_backbone_byscenario}}{%
+  % 5-scenario table is wider than \textwidth; wrap in \resizebox to fit and stay centred.
+  \IfFileExists{generated/table_backbone_byscenario.tex}{\resizebox{\textwidth}{!}{\input{generated/table_backbone_byscenario}}}{%
   \begin{tabular}{llc}
     \toprule
     \textbf{Backbone} & \textbf{Method} & \textbf{DIL / Mixed} \\

@@ -219,7 +219,8 @@ component-agnostic view that the per-component metrics refine.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{forgetting_matrix_schematic.pdf}
+  \makebox[\textwidth][c]{%
+    \includegraphics[width=1.18\textwidth,height=0.66\textheight,keepaspectratio]{forgetting_matrix_schematic.pdf}}
   \caption[Annotated structure of the forgetting matrix]{Schematic structure of the
   accuracy matrix $R[i,j]$ (entity-F1 on task $j$ after training task $i$); symbolic
   labels only, with no measured values. The diagonal $R[i,i]$ records just-learned

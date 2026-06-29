@@ -139,7 +139,7 @@ def grouped(metric, out, ylabel, title, zero_line=False, methods=None, scenarios
     scenarios = scenarios or SC
     names = names or SN
     methods = _present(methods or METHODS, scenarios)
-    fig, ax = plt.subplots(figsize=(9.2, 4.6))
+    fig, ax = plt.subplots(figsize=(9.2, 5.0))
     width = 0.8 / max(len(methods), 1)
     x = range(len(scenarios))
     for i, m in enumerate(methods):
@@ -151,15 +151,20 @@ def grouped(metric, out, ylabel, title, zero_line=False, methods=None, scenarios
     ax.set_xticks(list(x))
     ax.set_xticklabels([names[s] for s in scenarios])
     ax.set_ylabel(ylabel)
-    ax.set_title(title, pad=28)
+    ax.set_title(title, pad=10)
     if zero_line:
         ax.axhline(0, color="black", linewidth=0.6)
+    # Legend BELOW the axes (not above) so it never overlaps the title or the bars.
     ncol = min(len(methods), 6) or 1
     ax.legend(
-        ncol=ncol, fontsize=7.5, frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.16)
+        ncol=ncol,
+        fontsize=8,
+        frameon=False,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.12),
     )
     ax.grid(axis="y", alpha=0.3)
-    fig.tight_layout()
+    fig.subplots_adjust(bottom=0.22, top=0.9)
     FIG.mkdir(parents=True, exist_ok=True)
     fig.savefig(FIG / out, dpi=150, bbox_inches="tight")
     plt.close(fig)
