@@ -79,7 +79,8 @@ METHOD_DISPLAY = {
     "o_lora": "O-LoRA",
     "cl_lora": "CL-LoRA (2025)",
     "bert_textonly": "BERT (text-only)",
-    "doccl": "\\textbf{DocCL (ours)}",
+    "lexslot": "\\textbf{LexSlot (ours)}",
+    "doccl": "DocCL (legacy)",
 }
 SCENARIO_ORDER = ["cil_cord", "cil_wildreceipt", "dil", "dil_xlingual", "mixed"]
 SCENARIO_DISPLAY = {
@@ -778,6 +779,12 @@ def main():
     parser.add_argument("--project", default="doccl-aaai2027")
     parser.add_argument("--entity", default=None)
     parser.add_argument("--output_dir", type=Path, default=Path("results"))
+    # Default stays "doccl": the run-name parser does not yet fold the LexSlot
+    # variant suffixes (_off/_head_only/_uniform) into a clean "lexslot" cell, so
+    # --proposed lexslot currently empties the main/ablation tables. The "lexslot"
+    # LABEL is wired up and ready; pass --proposed lexslot once the parser learns
+    # those suffixes. Until then the LexSlot row is hand-maintained in
+    # thesis/generated/table_main.tex (see the NOTE there).
     parser.add_argument("--proposed", default="doccl")
     parser.add_argument(
         "--ablation_scenario",
@@ -831,6 +838,9 @@ def main():
         write_backbone_table(df, args.output_dir / f"table_backbone_{metric}.tex", metric=metric)
 
     write_main_table(prim, args.output_dir / "table_main.tex", metric="AA", proposed=args.proposed)
+    # BWT companion to the main table, so every backward-transfer headline number
+    # is traceable to a generated artifact rather than hand-kept in the thesis prose.
+    write_main_table(prim, args.output_dir / "table_main_BWT.tex", metric="BWT", proposed=args.proposed)
     write_ablation_table(
         prim,
         args.output_dir / "table_ablation.tex",
