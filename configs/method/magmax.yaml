@@ -1,0 +1,11 @@
+name: magmax
+# Per-task fine-tune (plain AdamW, same recipe as naive — MagMax adds no training-time term).
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+# Backbone merge. ``max_abs`` is MagMax's max-magnitude task-vector selection (the headline
+# operator). ``ties`` / ``max`` / ``min`` available for ablation via the shared merger.
+merge_method: max_abs
+merge_coef: 1.0    # λ scaling on the merged task vector (MagMax's headline value)
+merge_topk: 100    # only used when merge_method == ties (100 = no trim)
