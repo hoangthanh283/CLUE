@@ -1,0 +1,20 @@
+name: cpfd
+# CPFD: Confidence-based Pseudo-labeling + Pooled Feature Distillation (EMNLP 2023).
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+# Per-class entropy threshold floor (reference default 0.001).
+# Per-class thresholds are derived from one teacher pass; this is the minimum clamp.
+threshold: 0.001
+# Distillation weight β (reference default 2).
+distill_weight: 2.0
+# KL temperature (reference uses 1 — no scaling).
+ref_temperature: 1.0
+# Adaptive distillation coefficient: sqrt((n_old-1)/(n_total-n_old)) — shrinks as tasks grow.
+adaptive_distill_weight: true
+# Scale CE by fraction of O-tokens that got pseudo-labels per sample (classif_adaptive_factor).
+classif_adaptive_factor: true
+classif_adaptive_min_factor: 0.0
+# VRAM note: CPFD requires output_attentions=True on both student and teacher → ~600 MB extra
+# on LayoutLMv3 12-layer. Use batch_size=1 on the 6 GB local box.
