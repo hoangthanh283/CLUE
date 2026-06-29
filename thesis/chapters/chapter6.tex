@@ -478,11 +478,36 @@ in \S\ref{sec:results-remedy}.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{diag_where_forgetting.pdf}
+  \begin{tikzpicture}[
+      font=\small,
+      band/.style={draw, minimum width=58mm, minimum height=8mm, align=center, font=\scriptsize},
+      note/.style={draw, rounded corners, align=left, inner sep=4pt, text width=62mm, font=\scriptsize},
+      lbl/.style={font=\scriptsize\itshape}]
+    % depth stack, head (most drift) at top
+    \node[band, fill=red!40]    (head)  {Classifier head \quad CKA $0.22$ $\cdot$ Fisher $2.2\!\times\!10^{-1}$ (dominant)};
+    \node[band, fill=red!22, below=1mm of head]    (l11) {Encoder layer 11 (late) \quad CKA $0.25$ -- high drift};
+    \node[band, fill=orange!20, below=1mm of l11]  (mid) {Encoder layers 5--10 (mid) \quad CKA $0.34$ -- drifting};
+    \node[band, fill=yellow!18, below=1mm of mid]  (early){Encoder layers 0--4 (early) \quad CKA $0.78$ -- mostly stable};
+    \node[band, fill=green!15, below=1mm of early] (emb) {Text$+$layout$+$image embeddings \quad CKA $1.00$ -- no drift};
+    % drift arrow
+    \draw[-{Latex[length=2.5mm]}, thick] (emb.west |- emb.south) ++(-5mm,0) -- ++(0,40mm)
+      node[midway, rotate=90, anchor=south, lbl] {increasing drift / forgetting};
+    % finding + hypothesis notes
+    \node[note, fill=blue!5, below=4mm of emb.south west, anchor=north west] (find)
+      {\textbf{Finding.} Forgetting concentrates in the classifier head and late encoder layers;
+       the input encoders are stable. It is \textbf{not} a fusion-specific effect---the full
+       multimodal model is statistically indistinguishable from its modality ablations. Text is
+       the load-bearing stream.};
+    \node[note, fill=gray!8, right=4mm of find]
+      {\textbf{Consequence.} Because the locus is output-facing, remedies that protect or
+       re-expose the head---experience replay, and the head/late-targeted \textbf{LexSlot}
+       (\S\ref{sec:method-lexslot})---are the natural intervention; \S\ref{sec:results-remedy}
+       confirms both work on DIL.};
+  \end{tikzpicture}
   \caption[Where forgetting lives: synthesis]{Synthesis of the per-component diagnosis on
   the LayoutLMv3 stack: drift and parameter importance increase with depth, peaking at the
   classifier head, while the input encoders are stable. The panel states the data-supported
-  finding and the diagnosis-grounded (open) hypothesis. Pilot result.}
+  finding and the diagnosis-grounded consequence. Pilot result.}
   \label{fig:where-forgetting}
 \end{figure}
 
@@ -1064,7 +1089,34 @@ intervention, which also explains \emph{why} replay is so effective below
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{replay_mechanism.pdf}
+  \begin{tikzpicture}[
+      font=\small, node distance=4mm,
+      stage/.style={draw, rounded corners, align=left, inner sep=4pt, text width=38mm, font=\scriptsize, minimum height=22mm},
+      flow/.style={-{Latex[length=2.5mm]}, thick},
+      note/.style={draw, rounded corners, align=left, inner sep=4pt, text width=\linewidth, font=\scriptsize}]
+    \node[stage, fill=blue!6] (diag)
+      {\textbf{Diagnosis (\S\ref{sec:results-diagnosis}).} Forgetting concentrates at the
+       classifier head and late layers; the head dominates Fisher importance
+       ($2.2\!\times\!10^{-1}$) and drifts most (CKA $0.22$). Inputs stay stable.};
+    \node[stage, fill=blue!12, right=8mm of diag] (mech)
+      {\textbf{Mechanism: replay.} A small buffer of past examples is replayed each step.
+       Old-class targets keep producing gradient at the output head, so the head is not
+       overwritten as new tasks arrive.};
+    \node[stage, fill=green!10, right=8mm of mech] (out)
+      {\textbf{Outcome (\S\ref{sec:results-remedy}).} The head stays aligned. On DIL: ER/DER++
+       AA $\approx 88$, BWT $\approx 0$---matching the joint oracle ($88.7$); forgetting
+       essentially eliminated.};
+    \draw[flow] (diag) -- (mech);
+    \draw[flow] (mech) -- (out);
+    \node[note, fill=gray!8, below=4mm of mech.south, anchor=north]
+      {\textbf{The diagnosis-grounded alternative.} Because the locus is output-facing, a
+       mechanism that targets the head/late layers \emph{directly}---the proposed
+       \textbf{LexSlot}, an isolated slot memory---matches replay-level accuracy on DIL
+       ($87.3$ vs the oracle's $88.7$) and forgets \emph{less} than the plain replay methods
+       ($-2.3$ vs $-2.8$/$-3.4$), \emph{without storing any past data}. By contrast EWC
+       constrains all weights broadly (partial help, mainly under domain shift) and LwF
+       distils old-class logits that decay as the head grows (no measurable benefit here).};
+  \end{tikzpicture}
   \caption[Why replay works]{From diagnosis to result: because forgetting is output-facing,
   replay's re-exposure of old-class targets keeps the classifier head aligned, which
   explains its empirical win (both ER and DER++ reach DIL BWT $\approx 0$). The

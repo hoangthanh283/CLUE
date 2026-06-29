@@ -216,7 +216,35 @@ consumes.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{system_architecture.pdf}
+  \begin{tikzpicture}[
+      font=\small, node distance=5mm,
+      grp/.style={draw, rounded corners, inner sep=5pt, align=center},
+      box/.style={draw, rounded corners, fill=gray!8, align=center, font=\scriptsize, minimum height=8mm, text width=34mm},
+      core/.style={box, fill=blue!8},
+      inst/.style={box, fill=orange!12},
+      flow/.style={-{Latex[length=2mm]}, thick},
+      tap/.style={-{Latex[length=2mm]}, orange!70!black, dashed},
+      lbl/.style={font=\scriptsize\itshape}]
+    % document pipeline
+    \node[box] (pipe) {Document pipeline\\\scriptsize OCR tokens $+$ boxes $+$ page image\\$\rightarrow$ preprocess / tokenise};
+    % core runtime
+    \node[core, below=8mm of pipe] (wrap) {\textbf{Backbone wrapper}\\\scriptsize \texttt{expand\_classifier}, \texttt{param\_groups\_by\_depth}, prompt/LoRA/slot hooks};
+    \node[core, below=of wrap] (method) {\textbf{ContinualMethod (ABC)}\\\scriptsize \texttt{before\_task} / \texttt{train\_task} / \texttt{after\_task}};
+    \node[core, below=of method] (reg) {\textbf{Method registry}\\\scriptsize Naive $\cdot$ EWC $\cdot$ LwF $\cdot$ ER $\cdot$ DER++ $\cdot$ prompts $\cdot$ LoRA $\cdot$ \textbf{LexSlot}};
+    % config + instrumentation + tracking
+    \node[box, right=14mm of wrap] (cfg) {Hydra config\\\scriptsize scenario / method / seed};
+    \node[inst, right=14mm of method] (instr) {\textbf{Instrumentation}\\\scriptsize per-layer CKA, per-group Fisher, displacement};
+    \node[box, right=14mm of reg] (track) {Experiment tracking\\\scriptsize W\&B / \texttt{metrics.json}};
+    % flows
+    \draw[flow] (pipe) -- (wrap);
+    \draw[flow] (wrap) -- (method); \draw[flow] (method) -- (reg);
+    \draw[flow, dashed] (cfg) -- (wrap);
+    \draw[tap] (method.east) -- (instr.west);
+    \draw[flow] (reg.east) -- (track.west);
+    \draw[tap] (instr.south) -- (track.north);
+    \node[lbl, below=1mm of reg.south west, anchor=north west, text width=70mm]
+      {Solid: data/control flow. \textcolor{orange!70!black}{Dashed/orange}: config and instrumentation taps (do not alter the training path).};
+  \end{tikzpicture}
   \caption[System architecture]{System architecture. The continual-learning core
   exposes a uniform method interface; the backbone wrapper exposes extension points
   for classifier expansion, prompts, and LoRA banks; the instrumentation layer
