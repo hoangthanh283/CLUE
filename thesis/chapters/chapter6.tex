@@ -556,10 +556,9 @@ adaptation recovers the naive lower bound only where the output space is fixed.
   three seeds); DocCL closes most of the DIL forgetting gap (within $\sim$4 points of the
   oracle) but does not reach it, while replay matches the oracle and the frozen-backbone
   prompt methods nearly fail on this dense token-level task. \textbf{LexSlot} (the
-  buffer-free isolated-slot method, \S\ref{sec:method-lexslot}) reaches replay-level AA on
-  DIL; \textsuperscript{\dag}its entry is a single seed (seed $42$) on DIL/LayoutLMv3 so
-  far---``(1 seed)'' marks a measured value whose standard deviation is not yet available,
-  as the multi-seed and multi-backbone confirmation is the pending grid
+  buffer-free isolated-slot method, \S\ref{sec:method-lexslot}) approaches replay-level AA on
+  DIL ($87.3$, within $\sim$1 point of ER/DER++) measured over three seeds; it is so far
+  evaluated on DIL/LayoutLMv3 only, with the multi-backbone confirmation the pending grid
   (\S\ref{sec:results-lexslot}, Chapter~\ref{ch:conclusions}). Cells marked ``--'' denote
   method/scenario combinations not run.}
   \label{tab:main-comparison}
@@ -577,7 +576,7 @@ adaptation recovers the naive lower bound only where the output space is fixed.
     ER + C-Flat++ (2025)  & $15.9 \pm 1.5$ & $\mathbf{88.4 \pm 0.1}$ & --- \\
     DER++                 & $18.2 \pm 0.2$ & $88.0 \pm 0.9$ & $\mathbf{60.8 \pm 2.7}$ \\
     \textbf{DocCL (ours)} & $16.1 \pm 0.9$ & $84.7 \pm 1.7$ & $57.6 \pm 2.4$ \\
-    \textbf{LexSlot (ours)} & --- & $88.4$~{\scriptsize (1 seed)}\textsuperscript{\dag} & --- \\
+    \textbf{LexSlot (ours)} & --- & $87.3 \pm 1.0$ & --- \\
     \midrule
     L2P                   & $1.1 \pm 0.9$ & $30.4 \pm 0.3$ & $11.5 \pm 0.1$ \\
     DualPrompt            & $1.8 \pm 1.4$ & $29.9 \pm 0.5$ & $11.7 \pm 0.1$ \\
@@ -672,9 +671,9 @@ baselines.
   CODA-Prompt) show small BWT, but this is the same trap (Table~\ref{tab:main-comparison}):
   they forget little because they barely learn---their accuracy is at or near zero. Only
   the replay family (ER, DER++, C-Flat++), DocCL, and \textbf{LexSlot} drive DIL forgetting to
-  near zero \emph{while remaining accurate}; LexSlot's DIL BWT ($-1.1$, single seed) is in fact
-  the closest to zero of any non-oracle method, but it is left unbolded pending the multi-seed
-  confirmation (the bold marks the best \emph{three-seed} result).}
+  near zero \emph{while remaining accurate}; LexSlot's DIL BWT ($-2.3 \pm 1.2$, three seeds) is
+  better than the plain replay methods (ER $-2.8$, DER++ $-3.4$) and DocCL ($-4.6$), with only
+  the sharpness-aware C-Flat++ ($-1.8$) lower---and it achieves this buffer-free.}
   \label{tab:bwt-comparison}
   \begin{tabular}{lccc}
     \toprule
@@ -687,7 +686,7 @@ baselines.
     ER + C-Flat++ (2025) & $-73.2 \pm 4.1$ & $\mathbf{-1.8 \pm 0.3}$ & --- \\
     DER++               & $-86.2 \pm 3.2$ & $-3.4 \pm 1.4$ & $-34.8 \pm 2.0$ \\
     \textbf{DocCL (ours)} & $-79.3 \pm 5.9$ & $-4.6 \pm 1.6$ & $-27.1 \pm 8.1$ \\
-    \textbf{LexSlot (ours)} & --- & $-1.1$~{\scriptsize (1 seed)} & --- \\
+    \textbf{LexSlot (ours)} & --- & $-2.3 \pm 1.2$ & --- \\
     \midrule
     L2P                 & $-15.7$ & $-11.5$ & $-2.8$ \\
     DualPrompt          & $-15.2$ & $-11.1$ & $-2.6$ \\
@@ -768,22 +767,25 @@ term, an honest observation that points to a simpler head-focused variant as fut
 
 The second diagnosis-derived remedy, \textbf{LexSlot} (\S\ref{sec:method-lexslot}), protects the
 same head/late locus with an \emph{isolated, buffer-free slot memory} rather than a
-consolidation/replay budget. On the domain-incremental scenario (seed $42$, LayoutLMv3) the
-isolated configuration reaches \textbf{AA $88.4$ with backward transfer $-1.1$}. This is the
-strongest single result in the benchmark on two counts: its accuracy \emph{matches the replay
-methods} (DER++ $88.0$, ER $87.9$) and the joint oracle ($88.7$) on DIL, and its forgetting
-($-1.1$) is the \emph{closest to zero of any non-oracle method}---below even C-Flat++ ($-1.8$) and
-the replay baselines ($-2.8$ to $-3.4$)---while DocCL sits at $84.7$ / $-4.6$. It achieves this
-\emph{without a replay buffer}: the protection comes structurally from freezing each task's slots,
-not from rehearsing stored inputs, so LexSlot matches replay's accuracy at a qualitatively lower
-memory cost. Table~\ref{tab:lexslot-ablation} reports the two pre-registered LexSlot ablations.
+consolidation/replay budget. On the domain-incremental scenario (LayoutLMv3, three seeds) the
+isolated configuration reaches \textbf{AA $87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$}.
+Two readings stand out. First, its accuracy \emph{approaches the replay methods} (ER $87.9$, DER++
+$88.0$, C-Flat++ $88.4$) and the joint oracle ($88.7$) on DIL---within about a point, the seeds
+overlapping---and clearly exceeds DocCL ($84.7$), \emph{without a replay buffer}: the protection
+comes structurally from freezing each task's slots, not from rehearsing stored inputs. Second, its
+forgetting ($-2.3$) is \emph{lower than the plain replay methods} (ER $-2.8$, DER++ $-3.4$) and
+DocCL ($-4.6$), with only the sharpness-aware C-Flat++ ($-1.8$) below it. So LexSlot is competitive
+with replay on accuracy and better than plain replay on forgetting, at a qualitatively lower memory
+cost; it does not, on the present three seeds, \emph{beat} the strongest replay variant on
+accuracy. Table~\ref{tab:lexslot-ablation} reports the two pre-registered LexSlot ablations.
 
 \emph{Sharing (isolation vs.\ graded sharing).} Letting lexically similar tasks co-train shared
-slots (\emph{soft}) reaches $86.9$ / $-1.5$, \emph{below} the isolated \emph{off} configuration
-($88.4$ / $-1.1$) on both axes. The putative vocabulary-overlap transfer does not materialise: on
-this benchmark, allowing two tasks to write the same slots costs more in interference than it
-recovers in shared-rule refinement. This is why \emph{off} (isolation) is presented as the method
-and \emph{soft} as the control---the measurement selects isolation.
+slots (\emph{soft}) reaches $86.3 \pm 0.6$ / $-3.8 \pm 2.0$, \emph{below} the isolated \emph{off}
+configuration ($87.3 \pm 1.0$ / $-2.3 \pm 1.2$) on both axes over three seeds. The putative
+vocabulary-overlap transfer does not materialise: on this benchmark, allowing two tasks to write the
+same slots costs more in interference than it recovers in shared-rule refinement. This is why
+\emph{off} (isolation) is presented as the method and \emph{soft} as the control---the measurement
+selects isolation.
 
 \emph{Depth (targeting vs.\ uniform).} Placing slots only at the diagnosed head/late locus
 ($86.9$ / $-1.5$) beats spreading them across every layer (\emph{uniform}, $84.8$ / $-2.1$) by
@@ -798,13 +800,14 @@ placement.
 \begin{table}[!htbp]
   \centering
   \caption[LexSlot ablation: sharing and depth]{LexSlot ablations on the domain-incremental
-  scenario (seed $42$, LayoutLMv3). \emph{Sharing}: isolating each task's slots (\emph{off})
-  beats graded lexical sharing (\emph{soft}) on both AA and backward transfer, so the
+  scenario (LayoutLMv3). \emph{Sharing}: isolating each task's slots (\emph{off}) beats graded
+  lexical sharing (\emph{soft}) on both AA and backward transfer over three seeds, so the
   putative vocabulary-overlap transfer does not outweigh slot interference---isolation is the
   selected method. \emph{Depth}: slots concentrated on the diagnosed head/late locus versus
   spread uniformly across depth (targeting the locus beats spreading by $2.1$ AA), mirroring the
-  DocCL targeting ablation. All entries are a single seed (seed $42$) so far; standard deviations
-  and multi-backbone values await the pending grid (Chapter~\ref{ch:conclusions}).}
+  DocCL targeting ablation. The sharing rows are mean\,$\pm$\,std over three seeds (42/123/7);
+  the depth-ablation rows are a single seed (seed $42$) pending the grid, marked ``(1\,seed)''.
+  Multi-backbone values await the pending grid (Chapter~\ref{ch:conclusions}).}
   \label{tab:lexslot-ablation}
   \IfFileExists{generated/table_lexslot_ablation.tex}{\input{generated/table_lexslot_ablation}}{%
   \begin{tabular}{llcc}
@@ -812,24 +815,29 @@ placement.
     \textbf{Axis} & \textbf{Setting} & \textbf{AA} & \textbf{BWT} \\
     \midrule
     \multirow{2}{*}{Sharing (depth = head/late)}
-      & \textbf{off (isolated, selected)} & $\mathbf{88.4}$ & $\mathbf{-1.1}$ \\
-      & soft (graded by $S$)              & $86.9$          & $-1.5$ \\
+      & \textbf{off (isolated, selected)} & $\mathbf{87.3 \pm 1.0}$ & $\mathbf{-2.3 \pm 1.2}$ \\
+      & soft (graded by $S$)              & $86.3 \pm 0.6$          & $-3.8 \pm 2.0$ \\
     \midrule
-    \multirow{2}{*}{Depth (sharing = soft)}
-      & head/late (targeted)              & $86.9$          & $-1.5$ \\
-      & uniform (all depths)              & $84.8$          & $-2.1$ \\
+    \multirow{3}{*}{Depth (seed 42)}
+      & head/late (targeted)              & $86.9$~{\scriptsize (1\,seed)} & $-1.5$~{\scriptsize (1\,seed)} \\
+      & head-only                         & $87.1$~{\scriptsize (1\,seed)} & $-3.2$~{\scriptsize (1\,seed)} \\
+      & uniform (all depths)              & $84.8$~{\scriptsize (1\,seed)} & $-2.1$~{\scriptsize (1\,seed)} \\
     \bottomrule
   \end{tabular}}
 \end{table}
 
-These numbers are a single seed on one scenario and backbone, so we make no claim beyond the
-domain-incremental setting yet; the multi-seed and multi-backbone (LiLT/BROS/BERT) confirmation
-is the pending grid, and class-incremental learning is a known hard case for the lexical gate
-(same-dataset sessions collapse the signature contrast). What the present evidence establishes is
-that the head/late diagnosis admits a \emph{second}, mechanistically distinct remedy that on a
-domain shift matches replay buffer-free with near-zero forgetting---supporting the thesis's
-central claim that localising forgetting is a practical instrument for \emph{designing} continual
-methods, not just one method.
+The headline isolated and shared configurations are now measured over three seeds; the
+depth-ablation rows (head-only, uniform) are a single seed pending the grid. As with DocCL, a
+head-only restriction ($87.1$, single seed) already recovers essentially the full head/late
+result, suggesting the late-layer slots are largely redundant with the head slots---a simpler
+head-only variant is a natural future simplification. The remaining scope is the multi-backbone
+(LiLT/BROS/BERT) confirmation, still the pending grid, and class-incremental learning is a known
+hard case for the lexical gate (same-dataset sessions collapse the signature contrast). What the
+present evidence establishes is that the head/late diagnosis admits a \emph{second},
+mechanistically distinct remedy that on a domain shift is competitive with replay buffer-free,
+with lower forgetting than the plain replay methods---supporting the thesis's central claim that
+localising forgetting is a practical instrument for \emph{designing} continual methods, not just
+one method.
 
 \section{Ablation Studies}
 \label{sec:results-ablation}

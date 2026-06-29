@@ -49,9 +49,10 @@ which remains $\sim$3 points higher; on the mixed and class-incremental scenario
 tracks the strong baselines without exceeding them. The second, \textbf{LexSlot},
 protects the same locus with a parameter-efficient, isolated slot memory gated by a
 drift-immune lexical signature and \emph{needs no replay buffer}; on the domain-incremental
-scenario it reaches replay-level accuracy ($88.4$) with the least forgetting of any
-non-oracle method ($-1.1$ backward transfer), though this result is single-seed on one
-scenario and backbone so far, pending the full grid. A depth-targeting ablation confirms
+scenario (three seeds) it approaches replay-level accuracy ($87.3$, within $\sim$1 point of
+ER/DER++) with lower forgetting than the plain replay methods ($-2.3$ backward transfer, versus
+$-2.8$/$-3.4$), competitive with replay buffer-free though so far evaluated on the
+domain-incremental scenario and one backbone, pending the full grid. A depth-targeting ablation confirms
 the diagnosis: penalising every depth \emph{uniformly}---rather than concentrating the
 budget on the diagnosed head/late locus---collapses ($42.6$ AA) even though it spends a
 larger total budget, whereas concentrating it on that locus recovers the full result. The honest finding is therefore that diagnosis-driven head/late targeting closes
