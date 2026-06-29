@@ -1,0 +1,13 @@
+name: sd_lora
+# SD-LoRA decoupled adapter (ICLR 2025). Backbone frozen; per-task LoRA direction frozen +
+# L2-normalized, with a learnable scalar magnitude per task (all re-trained every task).
+lora_rank: 10           # reference base rank r1=10
+alpha_init: 0.8         # per-task scalar magnitude init (reference value)
+target_modules: [query, value]   # SD-LoRA targets Q,V only (not K)
+# The reference uses lr 8e-3 on an image ViT (SGD); here we also train a token head, so we
+# default to a gentler AdamW lr. Bump toward 8e-3 if magnitudes stay near init; drop if the
+# head diverges on token-F1.
+lr: 1.0e-3
+weight_decay: 0.0
+epochs: 10
+max_grad_norm: 1.0
