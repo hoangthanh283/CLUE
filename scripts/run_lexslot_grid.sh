@@ -34,6 +34,9 @@ SEEDS="${SEEDS:-42 123 7}"
 SCENARIOS="${SCENARIOS:-cil_cord dil mixed dil_xlingual cil_wildreceipt}"
 # All backbones by default (primary LayoutLMv3 + LiLT + BROS + BERT). BACKBONES="" = primary only.
 BACKBONES="${BACKBONES-lilt bros bert}"
+# PRIMARY=0 drops the LayoutLMv3 primary backbone (run ONLY the families in BACKBONES) — e.g.
+# PRIMARY=0 BACKBONES=bert runs BERT-only (lightest backbone, fits the local 6 GB box).
+PRIMARY="${PRIMARY:-1}"
 RUN_ABLATION="${RUN_ABLATION:-1}"
 ABLATION_SCENARIOS="${ABLATION_SCENARIOS:-cil_cord}"
 WANDB_MODE="${WANDB_MODE:-offline}"
@@ -56,11 +59,14 @@ emit() {  # $1 scenario, $2 seed, $3 family ("" = primary), rest = extra overrid
   local model_ov=""
   [ -n "$fam" ] && { rn="${rn}_${fam}"; model_ov="model=${fam}_base"; }
   rn="${rn}${name_suffix}"
-  add "$rn" "method=lexslot scenario=${sc} seed=${s} ${model_ov} ${ovr}"
+  # Bake $COMMON (batch_size, grad_ckpt, num_workers, epochs cap, wandb) into the per-job
+  # override string so each job is SELF-CONTAINED — the xargs subshell does not inherit it.
+  add "$rn" "method=lexslot scenario=${sc} seed=${s} ${model_ov} ${COMMON} ${ovr}"
 }
 
 build() {
-  local fams="primary"; [ -n "$BACKBONES" ] && fams="primary $BACKBONES"
+  local fams=""; [ "$PRIMARY" = "1" ] && fams="primary"
+  fams="$fams $BACKBONES"
   for fam in $fams; do
     local f=""; [ "$fam" != "primary" ] && f="$fam"
     for sc in $SCENARIOS; do for s in $SEEDS; do
