@@ -40,6 +40,7 @@ from doccl.methods.l2p import L2P
 from doccl.methods.lca import LCA
 from doccl.methods.lexslot import LexSlot
 from doccl.methods.lwf import LwF
+from doccl.methods.cpfd import CPFD
 from doccl.methods.is3 import IS3
 from doccl.methods.magmax import MagMax
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
@@ -147,6 +148,8 @@ METHOD_REGISTRY = {
     "cl_lora": CLLoRA,
     "l2p": L2P,
     "lca": LCA,
+    # 2023 class-incremental NER baseline: CPFD (pseudo-labels + attention distillation, EMNLP'23).
+    "cpfd": CPFD,
     # 2024 token-level incremental NER baseline: IS3 (two-shift: E2O + O2E, ACL'24).
     "is3": IS3,
     # 2024 model-merging baseline: MagMax (max-magnitude task-vector selection),
@@ -663,6 +666,7 @@ def main(cfg: DictConfig) -> None:
         "magmax",
         "sd_lora",
         "is3",
+        "cpfd",
         "hgt",
         "cuber",
         "lexslot",
