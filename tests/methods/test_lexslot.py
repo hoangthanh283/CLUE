@@ -324,3 +324,38 @@ def test_infer_gate_noop_when_no_task_sigs():
     m.late_slots = nn.ModuleDict()
     m._install_infer_gate(None, None, {"input_ids": torch.tensor([[1, 2, 3]])})
     assert m.head_slots._infer_gate is None  # untouched -> ungated path
+
+
+def test_infer_gate_is_bounded_cosine_not_unbounded():
+    """Regression: the gate must be a TRUE cosine in [0,1], not ``doc · raw_sig`` (which
+    scales with the signature magnitude). A task whose signature has huge magnitude
+    (many docs / tokens) must NOT produce a gate > 1; otherwise a large task's slots
+    fire with a gate of hundreds on every document and overwhelm the base head
+    (the bug that collapsed task-1 F1 to 0 in the first DIL re-run)."""
+    m = LexSlot.__new__(LexSlot)
+    m.infer_gate = True
+    m.device = torch.device("cpu")
+    m.vocab_size = 8
+    m._sigs_cache = None
+    m._sigs_cache_len = -1
+    # Task 0 signature with HUGE magnitude (as if summed over thousands of docs);
+    # task 1 with small magnitude. Both share token 1, so cosine > 0.
+    m._task_sigs = [
+        torch.tensor([0.0, 1000.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),  # task 0: huge
+        torch.tensor([0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),  # task 1: small
+    ]
+    m.head_slots = LogitSlots(n_slots=2, hidden_dim=4, n_labels=2)
+    m.late_slots = nn.ModuleDict()
+    m.head_slots.set_owner([0], 0)
+    m.head_slots.set_owner([1], 1)
+    ids = torch.tensor([[1, 1, 1, 1]])  # doc on token 1 -> matches both tasks
+    m._install_infer_gate(None, None, {"input_ids": ids})
+    g = m.head_slots._infer_gate
+    assert g is not None and g.shape == (1, 2)
+    # The gate must be a cosine in [0,1] regardless of signature magnitude.
+    assert (g <= 1.0 + 1e-5).all(), f"gate exceeds 1.0 (unbounded!): {g}"
+    assert (g >= 0.0).all(), f"gate negative: {g}"
+    # Both tasks share token 1 with the doc -> cosines are both ~1 (same direction).
+    assert abs(float(g[0, 0]) - 1.0) < 1e-4
+    assert abs(float(g[0, 1]) - 1.0) < 1e-4
+

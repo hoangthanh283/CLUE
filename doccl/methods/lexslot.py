@@ -207,11 +207,22 @@ class LexSlot(NaiveFineTune):
         return hook
 
     def _task_sigs_matrix(self) -> torch.Tensor | None:
-        """Stacked (T, V) task signatures on the active device, cached per task count."""
+        """Stacked (T, V) task signatures on the active device, L2-normalised, cached
+        per task count.
+
+        The signatures are normalised so that ``doc @ sigs.T`` is a true cosine in
+        [0,1] (bag-of-tokens vectors are non-negative). Without normalisation the
+        result scales with ``‖sig‖`` (a task's total token count) and is unbounded,
+        letting a large task's slots fire with a gate of hundreds on every document
+        and overwhelming the base head. ``sparse_doc_vectors`` already normalises the
+        per-document side; this fixes the signature side to match.
+        """
         if not self._task_sigs:
             return None
         if self._sigs_cache is None or self._sigs_cache_len != len(self._task_sigs):
-            self._sigs_cache = torch.stack(self._task_sigs).to(self.device)
+            stacked = torch.stack(self._task_sigs).to(self.device)
+            norms = stacked.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+            self._sigs_cache = stacked / norms
             self._sigs_cache_len = len(self._task_sigs)
         return self._sigs_cache
 
