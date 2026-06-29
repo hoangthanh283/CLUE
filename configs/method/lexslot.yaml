@@ -1,23 +1,24 @@
 name: lexslot
-# DocCL base (inherited train_task: CE + KD + reservoir-replay + depth-Fisher).
+# LexSlot — STANDALONE method. Plain CE on a partially-frozen backbone (lower encoder
+# frozen, head + late layers + slots trainable). NO replay, NO KD teacher, NO Fisher.
+# Retention = lexically-gated slot isolation (gradient mask at train time + inference
+# lexical gate at forward time). Inherits NaiveFineTune.train_task / evaluate.
 lr: 5.0e-5
 weight_decay: 0.01
 epochs: 10
 max_grad_norm: 1.0
-lambda_: 2000.0
-kd_alpha: 1.0
-temperature: 2.0
-fisher_n_samples: 200
-buffer_size: 200
-replay_batch_size: 8
-use_replay: true
-target_depth: all   # DocCL depth-Fisher target ('all' = head+late weighted; head_late not a valid DocCL value)
+# Partial freeze: freeze every non-slot-bearing encoder layer + embeddings. The
+# slot-bearing late layers + classifier head + slots stay trainable.
+freeze_lower: true
+# Inference lexical gate (forward-time routing): a slot fires in proportion to
+# cos(sig(doc), sig_owner_task). Default on; turn off to ablate gradient-mask-only.
+infer_gate: true
 # LexSlot slot memory.
 slot_depth: head_late      # WHERE slots go: head_only | head_late | head_late_mid | uniform
 slot_sharing: soft         # HOW slots share: soft (graded by S) | hard | off (isolate)
 share_threshold: 0.5       # for slot_sharing=hard
 n_tasks: 6                 # expected #CL tasks -> per-task slot budget = n_slots // n_tasks
-                           # (covers dil=3, cil_cord=5; raise for longer horizons)
+                            # (covers dil=3, cil_cord=5; raise for longer horizons)
 n_slots_head: 48           # 48 // 6 = 8 head slots per task
 n_slots_late: 18           # 18 // 6 = 3 late slots per task
 repr_rank: 16
