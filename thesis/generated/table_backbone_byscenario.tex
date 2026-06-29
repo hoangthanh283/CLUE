@@ -1,0 +1,16 @@
+% Hand-built from results/<scenario>_<method>_seed{42,123,7}_<bk>/metrics.json (AA, mean$\pm$std).
+% Secondary-backbone coverage is partial: LiLT has naive/ewc/er/der_pp on DIL+Mixed only;
+% BERT (text-only) has naive across all five scenarios; BROS and the proposed methods on
+% secondaries are the pending grid. Regenerate via analyze_results.py once it emits this view.
+\begin{tabular}{llccccc}
+\toprule
+\textbf{Backbone} & \textbf{Method} & \textbf{CIL-CORD} & \textbf{CIL-WildR.} & \textbf{DIL} & \textbf{DIL-XLing} & \textbf{Mixed} \\
+\midrule
+\multirow{4}{*}{LiLT} & Naive (lower bound) & -- & -- & $40.1${\scriptsize\,$\pm$0.5} & -- & $30.7${\scriptsize\,$\pm$0.7} \\
+ & EWC & -- & -- & $48.4${\scriptsize\,$\pm$5.9} & -- & $28.1${\scriptsize\,$\pm$3.0} \\
+ & ER & -- & -- & $\mathbf{85.7}${\scriptsize\,$\pm$0.5} & -- & $\mathbf{57.0}${\scriptsize\,$\pm$1.4} \\
+ & DER++ & -- & -- & $84.4${\scriptsize\,$\pm$0.3} & -- & $54.2${\scriptsize\,$\pm$3.4}\textsuperscript{\ddag} \\
+\midrule
+BERT (text-only) & Naive (lower bound) & $19.3${\scriptsize\,$\pm$0.1} & $17.9${\scriptsize\,$\pm$0.2} & $39.4${\scriptsize\,$\pm$0.3} & $44.7${\scriptsize\,$\pm$1.6} & $23.4${\scriptsize\,$\pm$0.3} \\
+\bottomrule
+\end{tabular}

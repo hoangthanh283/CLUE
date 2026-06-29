@@ -839,6 +839,49 @@ with lower forgetting than the plain replay methods---supporting the thesis's ce
 localising forgetting is a practical instrument for \emph{designing} continual methods, not just
 one method.
 
+\subsection{Generalisation Across Backbones}
+\label{sec:results-backbone}
+
+\S\ref{sec:results-diagnosis} established that the \emph{forgetting locus} is
+architecture-general (the head-dominant displacement and the monotonic CKA depth gradient
+reproduce on BERT, LiLT, and BROS). A complementary question is whether the \emph{method
+ordering}---replay $\gg$ regularisation $\gg$ naive---also transfers off LayoutLMv3.
+Table~\ref{tab:backbone-byscenario} reports the secondary-backbone runs available so far:
+the four classical methods on the decoupled-stream LiLT backbone (DIL and Mixed, three seeds),
+and the text-only BERT lower bound across all five scenarios.
+The ordering is preserved on LiLT: replay (ER $85.7$, DER++ $84.4$ on DIL) dominates by a wide
+margin, regularisation (EWC $48.4$) sits in between, and naive ($40.1$) is the floor---the same
+pattern measured on LayoutLMv3 (Table~\ref{tab:main-comparison}), with the absolute replay level a
+few points lower on the smaller-capacity backbone. The text-only BERT baseline tracks the naive
+LayoutLMv3 lower bound across scenarios, confirming the benchmark behaves consistently on a
+unimodal encoder. The coverage is deliberately partial---LiLT is run on the two scenarios the
+secondary grid has reached, and the proposed methods (DocCL, LexSlot) and the BROS backbone are
+\emph{not yet} evaluated here; completing this matrix is the pending grid
+(Chapter~\ref{ch:conclusions}). What the present rows establish is that the benchmark's central
+empirical ordering is not an artefact of one backbone.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Method comparison across backbones]{Average accuracy (AA) of the classical methods on
+  secondary backbones, by scenario (mean\,$\pm$\,std over three seeds; best non-naive per LiLT
+  column in bold). LiLT (decoupled text\,$+$\,layout) is run on DIL and Mixed; the text-only BERT
+  lower bound spans all five scenarios. The replay-dominant ordering of the LayoutLMv3 grid
+  (Table~\ref{tab:main-comparison}) is preserved on LiLT. Cells marked ``--'' are not yet run: the
+  proposed methods (DocCL, LexSlot), the BROS backbone, and LiLT on the remaining scenarios are
+  the pending grid (Chapter~\ref{ch:conclusions}). \textsuperscript{\ddag}LiLT DER++ on Mixed is
+  the mean of two seeds (one run pending).}
+  \label{tab:backbone-byscenario}
+  \IfFileExists{generated/table_backbone_byscenario.tex}{\input{generated/table_backbone_byscenario}}{%
+  \begin{tabular}{llc}
+    \toprule
+    \textbf{Backbone} & \textbf{Method} & \textbf{DIL / Mixed} \\
+    \midrule
+    LiLT & ER & $85.7$ / $57.0$ \\
+    LiLT & DER++ & $84.4$ / $54.2$ \\
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
 \section{Ablation Studies}
 \label{sec:results-ablation}
 
