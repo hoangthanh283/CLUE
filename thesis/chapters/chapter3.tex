@@ -490,15 +490,18 @@ mechanism this thesis puts there. The guiding question is whether the diagnosed 
 protected by a \emph{parameter-efficient structured memory that stores no past inputs at all},
 rather than by a consolidation budget that keeps a frozen teacher in memory and rehearses stored
 inputs. LexSlot answers it with an \emph{isolated, write-once slot memory}: small additive slot
-adapters placed at the head and late layers over a frozen backbone, where each task writes only
-its own slots so earlier tasks are protected structurally---no rehearsal buffer, no consolidation
-penalty to tune (Figure~\ref{fig:lexslot-arch}).
+adapters placed at the head and late layers over a partially-frozen backbone (lower encoder
+frozen, head and late layers trainable), where each task writes its own slots and a drift-immune
+lexical signature gates both updates and activations so earlier tasks are protected
+structurally---no rehearsal buffer, no consolidation penalty to tune
+(Figure~\ref{fig:lexslot-arch}).
 
 \subsection{Slot Memories at the Diagnosed Locus}
 \label{sec:method-lexslot-slots}
 
-LexSlot freezes the backbone and inserts small additive \emph{slot} modules exactly where the
-diagnosis places forgetting. Two kinds of slot are used. \textbf{Head logit-slots} attach to the
+LexSlot freezes the lower encoder and inserts small additive \emph{slot} modules exactly
+where the diagnosis places forgetting, leaving the late blocks and the classifier head
+trainable. Two kinds of slot are used. \textbf{Head logit-slots} attach to the
 classifier: a slot bank of $n_{\text{head}}$ learnable value vectors produces a per-token logit
 shift $\Delta\ell = \big(f V^\top\big)P$ from the per-token features $f\in\mathbb{R}^{d}$ entering
 the head (value matrix $V\in\mathbb{R}^{n_{\text{head}}\times d}$, so $fV^\top\in\mathbb{R}^{n_{\text{head}}}$
@@ -508,46 +511,66 @@ through $P$. \textbf{Late-layer
 representation-slots} attach to each encoder block in the diagnosed \emph{late} third: a
 rank-$r$ adapter adds $\Delta h = (h\,D)\,U$ to the block's hidden state ($D\in\mathbb{R}^{d\times
 r}$ down, $U\in\mathbb{R}^{r\times d}$ up). All slot up-projections are \emph{zero-initialised}
-(LoRA-style), so an untrained slot is an exact no-op and adding slots never perturbs the frozen
+(LoRA-style), so an untrained slot is an exact no-op and adding slots never perturbs the
 network until they are trained. Placement is governed by a \texttt{slot\_depth} control
 (\emph{head\_only}, \emph{head\_late}, \emph{uniform}); the canonical setting is
 \emph{head\_late} (head $+$ late third), matching the diagnosed locus, and \emph{uniform}
-(slots on every layer) is the targeting ablation.
+(slots on every layer) is the targeting ablation. Crucially the freeze boundary coincides
+with the slot boundary: the layers that carry slots are exactly the layers that stay
+trainable, so stable pretrained features flow into the slots without drifting while the
+slot-bearing locus remains plastic.
 
 \begin{figure}[!htbp]
   \centering
   \begin{tikzpicture}[
-      font=\small, node distance=4mm,
-      blk/.style={draw, rounded corners, minimum width=30mm, minimum height=7mm, align=center},
+      font=\small, node distance=3.5mm,
+      blk/.style={draw, rounded corners, minimum width=34mm, minimum height=7mm, align=center},
       frozen/.style={blk, fill=gray!15},
-      slot/.style={draw, rounded corners, fill=pink!40, minimum width=14mm, minimum height=6mm, align=center, font=\scriptsize},
+      train/.style={blk, fill=blue!8},
+      slot/.style={draw, rounded corners, fill=pink!40, minimum width=18mm, minimum height=6mm, align=center, font=\scriptsize},
+      gate/.style={draw, rounded corners, fill=yellow!25, minimum width=26mm, minimum height=8mm, align=center, font=\scriptsize},
       lbl/.style={font=\scriptsize, align=left},
-      flow/.style={-{Latex[length=2mm]}, thick}]
-    % frozen backbone stack (bottom to top)
+      flow/.style={-{Latex[length=2mm]}, thick},
+      tap/.style={-{Latex[length=1.6mm]}, pink!70!black, thick},
+      gfl/.style={-{Latex[length=1.6mm]}, yellow!55!black, thick}]
+    % backbone stack (bottom to top): frozen lower 2/3, trainable late + head
     \node[frozen] (emb)  {input embeddings\\(text $+$ layout $+$ vision)};
     \node[frozen, above=of emb] (early) {early/mid encoder blocks};
-    \node[frozen, above=of early] (late) {\textbf{late} encoder blocks};
-    \node[frozen, above=of late] (head) {classifier \textbf{head}};
+    \node[train, above=of early] (late) {\textbf{late} encoder blocks};
+    \node[train, above=of late] (head) {classifier \textbf{head}};
     \node[above=of head] (out) {per-token labels};
     \draw[flow] (emb) -- (early); \draw[flow] (early) -- (late);
     \draw[flow] (late) -- (head); \draw[flow] (head) -- (out);
-    % slot modules at the diagnosed locus (right side)
-    \node[slot, right=14mm of late] (rslot) {repr-slots\\$+\Delta h=(hD)U$};
-    \node[slot, right=14mm of head] (hslot) {logit-slots\\$+\Delta\ell=(fV^{\!\top})P$};
-    \draw[flow, pink!70!black] (rslot) -- (late);
-    \draw[flow, pink!70!black] (hslot) -- (head);
-    % annotations
-    \node[lbl, right=2mm of rslot, text width=33mm] {trainable, zero-init\\(no-op until trained)};
-    \node[lbl, right=2mm of emb, text width=33mm] {\textbf{frozen} backbone\\(grey): never updated};
-    \node[lbl, below=1mm of emb, text width=58mm, font=\scriptsize\itshape]
-      {Inference: all slots add their $\Delta$ at the locus---no routing, no task-id.};
+    % freeze boundary: dashed line between early and late (the slot boundary)
+    \draw[dashed, gray!70] ([xshift=-19mm,yshift=1mm]late.south west) -- ([xshift=19mm,yshift=1mm]late.south west);
+    \node[lbl, gray!70, anchor=west, xshift=2mm, yshift=1mm] at ([xshift=19mm,yshift=1mm]late.south west)
+      {freeze boundary};
+    % inline frozen/trainable tags (left, compact)
+    \node[lbl, anchor=east] at ([xshift=-2mm]early.west) {\textbf{frozen} (grey)};
+    \node[lbl, anchor=east] at ([xshift=-2mm]late.west) {\textbf{trainable} (white)};
+    % slot modules as additive residual taps at head + late
+    \node[slot, right=10mm of late] (rslot) {repr-slots\\$+\Delta h{=}(hD)U$};
+    \node[slot, right=10mm of head] (hslot) {logit-slots\\$+\Delta\ell{=}(fV^{\!\top})P$};
+    \draw[tap] (rslot) -- (late);
+    \draw[tap] (hslot) -- (head);
+    % inference lexical gate (forward-time routing; train + eval consistent)
+    \node[gate, right=10mm of hslot.north east, anchor=west, yshift=-2mm] (gt)
+      {lexical gate\\$g_s{=}\cos(\mathrm{sig}(x),\mathrm{sig}_{t(s)})$};
+    \draw[gfl] (gt.west) -- (hslot.east);
+    \draw[gfl] (gt.west) -- (rslot.east);
   \end{tikzpicture}
   \caption[LexSlot architecture]{LexSlot places small additive slot adapters at the
-  diagnosed forgetting locus over a \emph{frozen} backbone (grey). \textbf{Logit-slots} add a
-  per-token bias $\Delta\ell$ at the classifier head; \textbf{repr-slots} add a low-rank shift
-  $\Delta h$ in the late encoder blocks. Up-projections are zero-initialised, so an untrained slot
-  is an exact no-op. At inference every slot contributes additively---there is no routing and no
-  task identifier.}
+  diagnosed forgetting locus over a \emph{partially-frozen} backbone. The lower $2/3$
+  encoder (grey) is frozen so stable pretrained features flow into the slots without
+  drifting; the late blocks and the classifier head (white) stay trainable and carry the
+  slots---the trainable set is exactly the slot-bearing set, and the dashed line marks the
+  freeze boundary. \textbf{Logit-slots} add a per-token bias $\Delta\ell$ at the head;
+  \textbf{repr-slots} add a low-rank shift $\Delta h$ in the late blocks. Up-projections
+  are zero-initialised, so an untrained slot is an exact no-op. The \emph{inference lexical
+  gate} (yellow) scales each slot's activation at forward time by the cosine between the
+  document's signature and the slot's owner-task signature, routing the right memory to the
+  right document at prediction time (active in both training and inference;
+  \S\ref{sec:method-lexslot-gate}).}
   \label{fig:lexslot-arch}
 \end{figure}
 
@@ -555,50 +578,92 @@ network until they are trained. Placement is governed by a \texttt{slot\_depth} 
 \label{sec:method-lexslot-isolation}
 
 Each task \emph{owns} a fixed, disjoint budget of $n_{\text{slots}}/T$ slots, claimed from the
-unclaimed pool when the task begins ($T$ the expected number of tasks). In the selected
-configuration each task updates \emph{only its own} slots: a per-slot gradient mask freezes every
-other task's slots during training, so a new task can never overwrite the parameters a previous
-task wrote. Because the backbone is frozen and prior slots are frozen, earlier tasks are
-\emph{structurally} protected---there is no consolidation penalty to tune and no replay buffer to
-store. At inference every slot contributes additively (no routing or task-id is required), so a
-document is processed by the union of all tasks' slots over the shared frozen backbone. This is
-the sense in which LexSlot is \emph{write-once}: knowledge for a task is written into its own
-slots once and never disturbed (Figure~\ref{fig:lexslot-isolation}).
+unclaimed pool when the task begins ($T$ the expected number of tasks). In the canonical
+configuration each task updates its own slots fully and co-trains a lexically similar prior
+task's slots in proportion to their signature similarity: a per-slot gradient mask scales every
+slot's update by that similarity, so a dissimilar new task can never meaningfully overwrite the
+parameters a previous task wrote. Because the lower encoder is frozen and low-similarity slots
+are masked, earlier tasks are \emph{structurally} protected---there is no consolidation penalty
+to tune and no replay buffer to store. Protection is reinforced at \emph{forward} time by the
+inference lexical gate (\S\ref{sec:method-lexslot-gate}), which routes each document to the
+slots of its signature-matching task. This is the sense in which LexSlot is
+\emph{write-once}: knowledge for a task is written into its own slots once and, gated by a
+drift-immune signature, never disturbed (Figure~\ref{fig:lexslot-isolation}).
 
 \begin{figure}[!htbp]
   \centering
+  % ── Panel (a): train-time gradient isolation ──
   \begin{tikzpicture}[
       font=\small,
       own/.style={draw, minimum width=9mm, minimum height=7mm, font=\scriptsize, align=center},
       t0/.style={own, fill=blue!18}, t1/.style={own, fill=orange!25}, t2/.style={own, fill=green!18},
       free/.style={own, fill=gray!8},
       lbl/.style={font=\scriptsize},
+      pan/.style={font=\small\bfseries},
       upd/.style={-{Latex[length=1.6mm]}, thick}]
-    % the slot bank: disjoint per-task blocks
-    \node[lbl] at (-2.0,0) {Slot bank:};
+    \node[pan] at (2.1,1.6) {(a) Train-time gradient isolation};
+    \node[lbl] at (-1.6,0) {Slot bank:};
     \foreach \i in {0,1} {\node[t0] (a\i) at ({\i*0.95},0) {$0$};}
     \foreach \i in {0,1} {\node[t1] (b\i) at ({2.1+\i*0.95},0) {$1$};}
     \foreach \i in {0,1} {\node[t2] (c\i) at ({4.2+\i*0.95},0) {$2$};}
     \node[free] (free0) at (6.3,0) {$\cdot$};
-    \node[lbl, right=1mm of free0, text width=22mm] {unclaimed\\(free)};
+    \node[lbl, right=1mm of free0, text width=18mm] {unclaimed\\(free)};
     \node[lbl] at (0.5,0.7)  {task 0};
     \node[lbl] at (2.6,0.7)  {task 1};
     \node[lbl] at (4.7,0.7)  {task 2};
-    % training task 2: updates only its own block; others frozen
-    \node[lbl, align=left] at (2.1,-1.4)
-      {\textbf{Training task 2:} gradient mask $=1$ on task-2 slots, $=0$ elsewhere};
-    \draw[upd, green!50!black] (2.1,-1.0) -- (c0.south);
-    \draw[upd, green!50!black] (2.1,-1.0) -- (c1.south);
-    \node[lbl] at (0.5,-0.75) {\textsf{frozen}};
-    \node[lbl] at (2.6,-0.75) {\textsf{frozen}};
+    \node[lbl, align=left] at (2.1,-1.2)
+      {\textbf{Training task 2:} grad mask $=1$ on own, $S_{2,\tau}$-graded on task $\tau$ (\emph{soft}), $0$ on \emph{off}};
+    \draw[upd, green!50!black] (2.1,-0.75) -- (c0.south);
+    \draw[upd, green!50!black] (2.1,-0.75) -- (c1.south);
+    \node[lbl] at (0.5,-0.55) {mask $= S_{20}$};
+    \node[lbl] at (2.6,-0.55) {mask $= S_{21}$};
   \end{tikzpicture}
-  \caption[Per-task slot isolation]{Write-once slot isolation. The slot bank is partitioned into
-  disjoint per-task blocks of $n_{\text{slots}}/T$ slots each. When a new task (here task~2)
-  trains, a per-slot gradient mask makes \emph{only its own} slots trainable and freezes every
-  prior task's slots, so earlier tasks' parameters are never overwritten. The lexical gate
-  (\S\ref{sec:method-lexslot-gate}) generalises this: \emph{off} freezes prior blocks (the
-  selected, isolated method shown here), while \emph{soft}/\emph{hard} would unlock lexically
-  similar tasks' blocks by the similarity $S_{ij}$.}
+
+  \vspace{2mm}
+  % ── Panel (b): inference-time lexical gate ──
+  \begin{tikzpicture}[
+      font=\small,
+      own/.style={draw, minimum width=9mm, minimum height=7mm, font=\scriptsize, align=center},
+      t0/.style={own, fill=blue!18}, t1/.style={own, fill=orange!25}, t2/.style={own, fill=green!18},
+      free/.style={own, fill=gray!8},
+      lbl/.style={font=\scriptsize},
+      pan/.style={font=\small\bfseries},
+      upd/.style={-{Latex[length=1.6mm]}, thick}]
+    \node[pan] at (2.1,1.6) {(b) Inference-time lexical gate};
+    \node[lbl] at (-1.6,0) {Slot bank:};
+    \foreach \i in {0,1} {\node[t0] (d\i) at ({\i*0.95},0) {$0$};}
+    \foreach \i in {0,1} {\node[t1] (e\i) at ({2.1+\i*0.95},0) {$1$};}
+    \foreach \i in {0,1} {\node[t2] (f\i) at ({4.2+\i*0.95},0) {$2$};}
+    \node[free] (free1) at (6.3,0) {$\cdot$};
+    \node[lbl, right=1mm of free1, text width=18mm] {unclaimed\\($g{=}1$)};
+    \node[lbl] at (0.5,0.7)  {task 0};
+    \node[lbl] at (2.6,0.7)  {task 1};
+    \node[lbl] at (4.7,0.7)  {task 2};
+    \node[lbl, align=left] at (2.1,-1.2)
+      {\textbf{Eval on task-1 doc:} gate $g_s{=}\cos(\mathrm{sig}(x),\mathrm{sig}_{t(s)})$};
+    \draw[upd, orange!80!black] (2.6,-0.75) -- (e0.south);
+    \draw[upd, orange!80!black] (2.6,-0.75) -- (e1.south);
+    \node[lbl] at (0.5,-0.55) {$g{\approx}0$};
+    \node[lbl] at (2.6,-0.55) {$g{\approx}1$};
+    \node[lbl] at (4.7,-0.55) {$g{\approx}0$};
+  \end{tikzpicture}
+
+  \vspace{1mm}
+  {\scriptsize\itshape Both mechanisms are driven by the same drift-immune lexical
+  signature $S$: the gradient mask protects \emph{parameters} at train time; the gate
+  routes \emph{activations} at forward time.}
+
+  \caption[Two consistent lexical isolation mechanisms]{LexSlot isolates tasks through
+  two mechanisms driven by the same drift-immune lexical signature. (a)~At \emph{train}
+  time a per-slot gradient mask scales each slot's update: a task trains its own slots
+  fully and, under the canonical \emph{soft} setting, co-trains a prior task $\tau$'s
+  slots in proportion to $S_{t,\tau}$ (\emph{off} zeroes them---the isolated ablation).
+  (b)~At \emph{forward} time (train and inference) a per-document lexical gate
+  $g_s=\cos(\mathrm{sig}(x),\mathrm{sig}_{t(s)})$ scales each slot's activation, so on a
+  task-$\tau$ document the task-$\tau$ slots fire strongly and foreign slots are
+  suppressed---routing the right memory to the right document, which the gradient mask
+  alone cannot do. The two are consistent: the signature that gates updates also gates
+  activations.}
   \label{fig:lexslot-isolation}
 \end{figure}
 
@@ -609,29 +674,40 @@ Isolation is one extreme of a more general gate. LexSlot computes, for each task
 \emph{lexical signature}---a TF-IDF bag-of-tokens over the task's OCR input tokens---and the
 cosine similarity $S_{ij}$ between task signatures. This signature is purely input-derived and
 therefore \emph{drift-immune}: it does not depend on any learned, forgettable parameter. The
-\texttt{slot\_sharing} control then sets the gradient mask on a prior task's slots when training a
-new one: \emph{off} freezes them (the isolated, selected method); \emph{soft} makes them trainable
-in proportion to $S_{ij}$ (lexically similar tasks co-train shared slots); \emph{hard} unlocks them
-above a similarity threshold. The motivation for graded sharing is that on this benchmark the
-lexical overlap is itself label-bearing---the receipt tasks SROIE and CORD share the
-\texttt{total}/\texttt{tax}/\texttt{cash} vocabulary ($S\!\approx\!0.31$) while the form task FUNSD
-is an outlier ($S\!\approx\!0.10$)---so high-$S$ tasks might \emph{help} each other by refining a
-shared lexical-to-label rule. Whether that putative transfer outweighs the interference of letting
-two tasks write the same slots is an empirical question, and the \texttt{slot\_sharing} axis is the
-controlled ablation that answers it (Chapter~\ref{ch:results}). We present \emph{off} (isolation) as
-the method because it is what the measurement selects; \emph{soft} and \emph{hard} are reported as
-the ablation that justifies the choice.
+signature drives \emph{two} consistent mechanisms (Figure~\ref{fig:lexslot-isolation}).
+\textbf{At train time} the \texttt{slot\_sharing} control sets the per-slot gradient mask on a
+prior task's slots when training a new one: \emph{soft} (the canonical setting) makes them
+trainable in proportion to $S_{ij}$, so lexically similar tasks co-train shared slots;
+\emph{hard} unlocks them above a similarity threshold; \emph{off} zeroes them (the isolated
+ablation). \textbf{At forward time}---in both training and inference---an \emph{inference
+lexical gate} $g_s=\cos(\mathrm{sig}(x),\mathrm{sig}_{t(s)})$ scales each slot's activation by
+the cosine between the document's signature and the slot's owner-task signature, so on a
+task-$\tau$ document the task-$\tau$ slots fire strongly and foreign slots are suppressed.
+The gradient mask protects \emph{parameters}; the gate routes \emph{activations}; both use the
+same signature, so the train-time and forward-time decisions are consistent. The motivation for
+graded sharing is that on this benchmark the lexical overlap is itself label-bearing---the
+receipt tasks SROIE and CORD share the \texttt{total}/\texttt{tax}/\texttt{cash} vocabulary
+($S\!\approx\!0.31$) while the form task FUNSD is an outlier ($S\!\approx\!0.10$)---so high-$S$
+tasks might \emph{help} each other by refining a shared lexical-to-label rule, and the
+inference gate ensures a document only ever activates the slots whose owner task is
+lexically close. Whether that putative transfer outweighs the interference of letting two
+tasks write the same slots is an empirical question, and the \texttt{slot\_sharing} axis is the
+controlled ablation that answers it (Chapter~\ref{ch:results}). We present \emph{soft} with the
+inference gate as the method (it lets lexically related tasks share what is shared and isolates
+what is not); \emph{off} and \emph{hard} are reported as the ablation that justifies the choice.
 
 \subsection{Implementation Notes}
 \label{sec:method-lexslot-impl}
 
 The slot memory adds no fragile new infrastructure: the head logit-slots and the low-rank
-late-layer adapters are standard modules attached by forward hooks, the per-task gradient mask is a
-single element-wise multiply at the backward pass, and the lexical signature is one sparse pass over
-input tokens. In the selected configuration the protection of old tasks comes entirely from slot
-isolation---no Fisher penalty, no distillation teacher, and no rehearsal buffer---so the method's
-standing cost is just the small slot parameters ($\sim$1--2\% over the frozen backbone). Slot counts,
-ranks, and the per-task budget are listed in Appendix~\ref{app:hyperparameters}.
+late-layer adapters are standard modules attached by forward hooks, the per-slot gradient mask is a
+single element-wise multiply at the backward pass, the inference lexical gate is one cosine per
+slot installed by a forward pre-hook, and the lexical signature is one sparse pass over input
+tokens. In the canonical configuration the protection of old tasks comes entirely from the
+lexical gradient mask and inference gate---no Fisher penalty, no distillation teacher, and no
+rehearsal buffer---so the method's standing cost is just the small slot parameters
+($\sim$1--2\% over the frozen lower encoder, plus the trainable late blocks and head). Slot
+counts, ranks, and the per-task budget are listed in Appendix~\ref{app:hyperparameters}.
 
 \section{Summary}
 \label{sec:method-summary}
