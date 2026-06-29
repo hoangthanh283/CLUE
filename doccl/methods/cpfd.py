@@ -79,7 +79,6 @@ class CPFD(NaiveFineTune):
         self._n_old: int = 0
         self._thresholds: torch.Tensor | None = None  # (n_old,) per-class entropy medians
 
-    # ─── helpers ─────────────────────────────────────────────────────────────────
     @staticmethod
     def _entropy(probs: torch.Tensor) -> torch.Tensor:
         """Per-token Shannon entropy [B, L]."""
@@ -131,7 +130,6 @@ class CPFD(NaiveFineTune):
             return 1.0
         return math.sqrt(max(0, n_old - 1) / max(1, n_total - n_old))
 
-    # ─── pseudo-label threshold computation ──────────────────────────────────────
     @torch.no_grad()
     def _find_median_thresholds(self, train_loader: DataLoader) -> None:
         """One teacher forward pass; per-class entropy medians → self._thresholds."""
@@ -187,7 +185,6 @@ class CPFD(NaiveFineTune):
         factor = (num / (den + 1e-6)).clamp(min=self.adaptive_ce_min)  # (B, 1)
         return labels, factor
 
-    # ─── lifecycle ───────────────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         if task.task_id > 0:
             self._n_old = self.model.classifier.out_features
@@ -228,7 +225,6 @@ class CPFD(NaiveFineTune):
                 if labels_2d is None:
                     continue
 
-                # ── Student forward (attentions needed for FD) ────────────────────
                 s_logits, s_attns = self._forward_with_attentions(self.model, batch)
                 # (B, L, C_total)
 
@@ -237,14 +233,11 @@ class CPFD(NaiveFineTune):
                 attn_loss = torch.tensor(0.0, device=self.device)
 
                 if not is_first_task:
-                    # ── Teacher forward ───────────────────────────────────────────
                     with torch.no_grad():
                         t_logits, t_attns = self._forward_with_attentions(self._teacher, batch)
 
-                    # ── Pseudo-label relabeling ───────────────────────────────────
                     labels_2d, ce_factor = self._apply_pseudo_labels(labels_2d, t_logits)
 
-                    # ── Logit-KD on O-labeled positions (sliced to n_old dims) ────
                     flat_logits = s_logits.view(-1, s_logits.size(-1))
                     flat_t_logits = t_logits.view(-1, t_logits.size(-1))
                     orig_bg = batch["labels"].view(-1) == _BG_LABEL  # use original O-mask
@@ -256,10 +249,8 @@ class CPFD(NaiveFineTune):
                         t_soft = F.softmax(flat_t_logits[orig_bg] / self.ref_temperature, dim=-1)
                         kd_loss = F.kl_div(s_log, t_soft, reduction="batchmean")
 
-                    # ── Attention-map MSE (3-view, all layers) ────────────────────
                     attn_loss = self._attn_mse(s_attns, t_attns)
 
-                # ── CE with adaptive per-sample scaling ───────────────────────────
                 # ce_loss_per_token: (B, L) — permute because F.cross_entropy expects (B,C,L)
                 ce_per_tok = F.cross_entropy(
                     s_logits.permute(0, 2, 1), labels_2d, ignore_index=-100, reduction="none"
@@ -273,7 +264,6 @@ class CPFD(NaiveFineTune):
                 else:
                     ce_loss = s_logits.sum() * 0.0
 
-                # ── Total loss ────────────────────────────────────────────────────
                 n_total = s_logits.size(-1)
                 coef = self._adaptive_coef(self._n_old, n_total) if not is_first_task else 1.0
                 distill_loss = coef * self.distill_weight * (kd_loss + attn_loss)

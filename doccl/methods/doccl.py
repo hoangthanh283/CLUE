@@ -32,9 +32,7 @@ from doccl.types import TaskInfo, TrainMetrics
 log = logging.getLogger(__name__)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Candidate A — Hierarchical LoRA (component-banked orthogonal LoRA)
-# ─────────────────────────────────────────────────────────────────────────────
 class DocCL_A(OLoRA):
     """Candidate A — H-LoRA: component-banked orthogonal LoRA.
 
@@ -75,9 +73,7 @@ class DocCL_A(OLoRA):
         self.target_component = comp
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Candidate B — Layout-Protected EWC (per-component-group penalty weighting)
-# ─────────────────────────────────────────────────────────────────────────────
 class DocCL_B(EWC):
     """Candidate B — Layout-Protected EWC: per-group EWC penalty weighting.
 
@@ -147,9 +143,7 @@ class DocCL_B(EWC):
         return penalty
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Candidate C — Modality-Routed Prompts
-# ─────────────────────────────────────────────────────────────────────────────
 class _Router(nn.Module):
     """MLP router producing softmax weights over the modality sub-pools."""
 
@@ -210,9 +204,7 @@ class DocCL_C(PromptBasedMethod):
         return combined, self.lambda_key * aux / len(self.MODALITIES)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # DocCL — the SELECTED method: depth/head-targeted consolidation
-# ─────────────────────────────────────────────────────────────────────────────
 class DocCL(NaiveFineTune):
     """Depth/head-targeted continual learning — the method the diagnosis selects.
 

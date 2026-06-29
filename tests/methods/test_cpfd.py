@@ -32,7 +32,6 @@ def _make_cpfd() -> CPFD:
     return m
 
 
-# ─── entropy helper ──────────────────────────────────────────────────────────
 def test_entropy_uniform_is_log_n():
     m = _make_cpfd()
     import math
@@ -51,7 +50,6 @@ def test_entropy_degenerate_is_zero():
     assert (entr.abs() < 1e-3).all()
 
 
-# ─── pseudo-label relabeling ─────────────────────────────────────────────────
 def test_pseudo_label_confident_token_gets_old_class():
     m = _make_cpfd()
     m._n_old = 2
@@ -99,7 +97,6 @@ def test_pseudo_label_nonzero_tokens_untouched():
     assert factor[0, 0].item() == 0.0  # 0/0 = 0 (no O-tokens → factor=0)
 
 
-# ─── adaptive distillation coefficient ───────────────────────────────────────
 def test_adaptive_coef_root_schedule():
     import math
 
@@ -116,7 +113,6 @@ def test_adaptive_coef_disabled_returns_1():
     assert m._adaptive_coef(10, 15) == 1.0
 
 
-# ─── attention MSE (three-view pooling) ──────────────────────────────────────
 def test_attn_mse_identical_attentions_is_zero():
     m = _make_cpfd()
     attn = torch.randn(2, 4, 8, 8)  # (B, heads, L, L)

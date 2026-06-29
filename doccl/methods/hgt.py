@@ -44,7 +44,6 @@ class HGT(NaiveFineTune):
         # Register the hook on the initial head; before_task re-registers after any growth.
         self._register_head_hook()
 
-    # ─── internal helpers ────────────────────────────────────────────────────
     def _head_device(self) -> torch.device:
         """Return device of the classifier head weight, or CPU if no model (tests)."""
         model = getattr(self, "model", None)
@@ -66,7 +65,6 @@ class HGT(NaiveFineTune):
             self._steer_head_grad
         )
 
-    # ─── subspace bookkeeping ────────────────────────────────────────────────────
     def _stacked_basis(self) -> torch.Tensor:
         """Concatenate stored per-task subspaces, re-orthonormalise -> (d, m)."""
         if not self._task_subspaces:
@@ -83,7 +81,6 @@ class HGT(NaiveFineTune):
         basis = self._stacked_basis().to(grad.dtype)
         return steer_gradient(grad, basis, self.transfer_alpha)
 
-    # ─── lifecycle ───────────────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader) -> None:
         # Steering only applies from task 1 on (no old subspaces before then).
         self._steer_enabled = task.task_id > 0 and len(self._task_subspaces) > 0

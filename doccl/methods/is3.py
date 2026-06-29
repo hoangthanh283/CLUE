@@ -79,7 +79,6 @@ class IS3(NaiveFineTune):
         self._n_old: int = 0  # n seen classes at previous task boundary
         self.prototypes: dict[int, torch.Tensor] = {}  # class_id → (D,) L2-normed mean feature
 
-    # ─── lifecycle ───────────────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         if task.task_id > 0:
             # Snapshot frozen teacher.
@@ -141,7 +140,6 @@ class IS3(NaiveFineTune):
                 pro_loss = self._prototype_loss()
                 remain_loss = self.kd_weight * kd_loss + self.proto_weight * pro_loss
 
-                # ── 2-stage gradient (IS3 reference lines 250-270) ───────────────
                 # Stage 1: CE backward → grad surgery on head rows.
                 # Stage 2: KD + prototype backward, grads added on top.
                 optimizer.zero_grad()
@@ -196,7 +194,6 @@ class IS3(NaiveFineTune):
         )
         self.model.train()
 
-    # ─── internals ───────────────────────────────────────────────────────────────
     def _kd_distill(
         self,
         flat_logits: torch.Tensor,

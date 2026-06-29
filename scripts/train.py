@@ -171,9 +171,10 @@ METHOD_REGISTRY = {
     # ``method.target_depth`` ∈ {all, head_only, late_only, uniform} drives the
     # component-targeting ablation (Table 6.7).
     "doccl": DocCL,
-    # LexSlot: DocCL + lexically-gated slot memories at the forgetting locus.
-    # ``method.slot_depth`` ∈ {head_only, head_late, head_late_mid, uniform} and
-    # ``method.slot_sharing`` ∈ {soft, hard, off} are the two ablation axes.
+    # LexSlot: standalone lexically-gated slot memories (no DocCL base; plain CE on a
+    # partially-frozen backbone, no replay/KD/Fisher). ``method.slot_depth`` ∈
+    # {head_only, head_late, head_late_mid, uniform} and ``method.slot_sharing`` ∈
+    # {soft, hard, off} are the two ablation axes.
     "lexslot": LexSlot,
     # Legacy sketched candidates, kept as ablation variants / NeurIPS extension.
     "doccl_a": DocCL_A,
@@ -331,7 +332,6 @@ def main(cfg: DictConfig) -> None:
     log.info("Config:\n%s", OmegaConf.to_yaml(cfg))
     set_seed(cfg.seed)
 
-    # ─── W&B init ──────────────────────────────────────────────────────────────
     # Include the ablation knob in the run name so ablation runs (same method,
     # different target) get distinct result dirs and are identifiable. DocCL uses
     # target_depth; the legacy candidates use target_component.
@@ -366,7 +366,6 @@ def main(cfg: DictConfig) -> None:
         mode=cfg.wandb.get("mode", "online"),
     )
 
-    # ─── Build scenario ────────────────────────────────────────────────────────
     # The encoder (per-backbone tokenization) is set as the process default before
     # the datasets are built so every loader tokenizes for the active backbone.
     scenario = get_scenario(
@@ -376,7 +375,6 @@ def main(cfg: DictConfig) -> None:
     )
     log.info("Scenario %s: %d tasks", scenario.name, len(scenario.tasks))
 
-    # ─── Build model ───────────────────────────────────────────────────────────
     # Initial num_labels = first task's label set size
     n_init_labels = len(scenario.tasks[0].label_set)
     model_cls = MODEL_REGISTRY[cfg.model.get("family", "layoutlmv3")]
@@ -397,7 +395,6 @@ def main(cfg: DictConfig) -> None:
         model.trainable_param_count(),
     )
 
-    # ─── Build method ──────────────────────────────────────────────────────────
     method_cls = METHOD_REGISTRY[cfg.method.name]
     method = method_cls(model, OmegaConf.to_container(cfg.method, resolve=True))
 
@@ -415,7 +412,6 @@ def main(cfg: DictConfig) -> None:
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
 
-    # ─── CL loop ───────────────────────────────────────────────────────────────
     # Seed the tracker with single-task baselines b_i so it can compute a real per-run
     # FWT (alongside AA/BWT/AF) once the zero-shot upper-triangular term is recorded
     # below. None if baselines aren't available yet → FWT stays NaN (honest).
@@ -632,7 +628,6 @@ def main(cfg: DictConfig) -> None:
             {tid: f"F1={r.f1:.2f}" for tid, r in results.items()},
         )
 
-    # ─── Final summary ─────────────────────────────────────────────────────────
     summary = tracker.summary()
     log.info("Final: AA=%.2f BWT=%.2f AF=%.2f", summary["AA"], summary["BWT"], summary["AF"])
     wandb.log({"final/" + k: v for k, v in summary.items()})

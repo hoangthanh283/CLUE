@@ -67,7 +67,6 @@ class MagMax(NaiveFineTune):
         self._base_backbone: dict[str, torch.Tensor] | None = None  # θ_0 (pre-task anchor)
         self._task_backbones: list[dict[str, torch.Tensor]] = []  # per-task θ_t (backbone)
 
-    # ─── helpers ─────────────────────────────────────────────────────────────────
     def _backbone_state(self) -> dict[str, torch.Tensor]:
         """Snapshot backbone params (everything but the classifier head) on CPU."""
         return {
@@ -76,7 +75,6 @@ class MagMax(NaiveFineTune):
             if "classifier" not in n
         }
 
-    # ─── lifecycle ───────────────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         # θ_0 captured once, before any task vector is formed. The CL loop has already
         # expanded the head for this task; the backbone is still the pre-training init.

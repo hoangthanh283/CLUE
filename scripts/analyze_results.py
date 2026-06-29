@@ -46,7 +46,6 @@ except ImportError:
     wandb = None
 
 
-# ─── Display maps (match thesis chapter 6 row/column labels) ────────────────────
 # Reported method order: classical families (each represented by its strongest
 # member) + the 2025 "currency" baselines next to their family peers + DocCL last.
 # L2P/DualPrompt are deliberately demoted to cite-only (the prompt family is
@@ -139,7 +138,6 @@ def _is_full_method(series: "pd.Series") -> "pd.Series":
     return series.isna() | (series == "all")
 
 
-# ─── FWT baseline mapping (see docs/FWT_NOTE.md) ────────────────────────────────
 # Per-task underlying *dataset* for each multi-task scenario, in task order. The
 # single-task naive baseline b_i for task i is the from-scratch F1 on this dataset,
 # read from the corresponding ``single_<dataset>`` run. Derived from the scenario
@@ -167,7 +165,6 @@ SINGLE_SCENARIO = {
 }
 
 
-# ─── Sources ────────────────────────────────────────────────────────────────────
 def load_local_runs(results_dir: Path) -> pd.DataFrame:
     """Read every ``results/<run>/metrics.json`` into one row per run.
 
@@ -252,7 +249,6 @@ def pull_runs(project: str, entity: str | None = None) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-# ─── Helpers ────────────────────────────────────────────────────────────────────
 # Secondary backbones are reported in their OWN table; only LayoutLMv3 (the primary)
 # feeds the main/ablation/compute/forgetting tables. ``bert_textonly`` is the one
 # exception — it is the external comparator with its own method row, so it is kept
@@ -324,7 +320,6 @@ def aggregate(df: pd.DataFrame, metric: str = "AA") -> pd.DataFrame:
     return agg
 
 
-# ─── Table 6.1 — main comparison ────────────────────────────────────────────────
 def write_main_table(
     df: pd.DataFrame, output: Path, metric: str = "AA", proposed: str = "doccl"
 ) -> None:
@@ -404,7 +399,6 @@ def write_main_table(
     print(f"Wrote {output}")
 
 
-# ─── Secondary-backbone generalization table ────────────────────────────────────
 def write_backbone_table(df: pd.DataFrame, output: Path, metric: str = "AA") -> None:
     """One row per (backbone, method), columns = scenarios — the generalization study.
 
@@ -481,7 +475,6 @@ def write_backbone_table(df: pd.DataFrame, output: Path, metric: str = "AA") -> 
     print(f"Wrote {output}  (backbones: {', '.join(families)}; methods: {', '.join(methods)})")
 
 
-# ─── Table 6.2 — component-targeting ablation ───────────────────────────────────
 def write_ablation_table(
     df: pd.DataFrame, output: Path, proposed: str = "doccl", scenario: str | None = None
 ) -> None:
@@ -526,7 +519,6 @@ def write_ablation_table(
     print(f"Wrote {output}")
 
 
-# ─── Table 6.3 — computational overhead ─────────────────────────────────────────
 def write_compute_table(
     df: pd.DataFrame,
     output: Path,
@@ -574,7 +566,6 @@ def write_compute_table(
     print(f"Wrote {output}")
 
 
-# ─── Figure 6.3 — forgetting curves ─────────────────────────────────────────────
 def plot_forgetting_curves(
     df: pd.DataFrame, output: Path, methods: list[str] | None = None, scenario: str | None = None
 ) -> None:
@@ -613,7 +604,6 @@ def plot_forgetting_curves(
     print(f"Wrote {output}")
 
 
-# ─── Single-task baselines & forward transfer (FWT) ─────────────────────────────
 #
 # Why this is a *baseline table* and NOT a FWT column
 # ---------------------------------------------------

@@ -57,7 +57,6 @@ class BertTokenClassificationWrapper(nn.Module):
         if freeze_backbone:
             self.freeze_backbone()
 
-    # ─── Forward (ignores non-text inputs from the shared pilot loop) ──────────
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -72,7 +71,6 @@ class BertTokenClassificationWrapper(nn.Module):
             input_ids=input_ids, attention_mask=attention_mask, labels=labels
         )
 
-    # ─── Class-incremental: expand classifier (plain Linear head) ─────────────
     def expand_classifier(self, new_labels: list[str]) -> None:
         """Widen the token-classification head, preserving old logits."""
         old_labels = list(self.id_to_label.values())
@@ -94,7 +92,6 @@ class BertTokenClassificationWrapper(nn.Module):
         self.id_to_label = {i: l for i, l in enumerate(all_labels)}
         self.label_to_id = {l: i for i, l in enumerate(all_labels)}
 
-    # ─── CKA probe layers (depth points matched to LayoutLMv3) ─────────────────
     @property
     def cka_layers(self) -> list[str]:
         last = self.num_layers - 1
@@ -107,7 +104,6 @@ class BertTokenClassificationWrapper(nn.Module):
             "model.classifier",
         ]
 
-    # ─── Parameter groups (shared vocabulary; layout/patch groups stay empty) ──
     @property
     def param_groups(self) -> dict[str, list[nn.Parameter]]:
         return param_grouping.param_groups(self.model)
@@ -116,7 +112,6 @@ class BertTokenClassificationWrapper(nn.Module):
     def param_groups_by_depth(self) -> dict[str, list[nn.Parameter]]:
         return param_grouping.param_groups_by_depth(self.model, self.num_layers)
 
-    # ─── Freeze / checkpoint controls ─────────────────────────────────────────
     def freeze_backbone(self) -> None:
         for p in self.model.bert.parameters():
             p.requires_grad = False

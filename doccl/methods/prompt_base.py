@@ -84,7 +84,6 @@ class PromptBasedMethod(NaiveFineTune):
         self._prompt_modules: list[nn.Module] = []
         self._build_prompt_modules(config, self.hidden_dim)
 
-    # ─── hooks for subclasses ───────────────────────────────────────────────
     def _build_prompt_modules(self, config: dict, hidden_dim: int) -> None:
         raise NotImplementedError
 
@@ -93,7 +92,6 @@ class PromptBasedMethod(NaiveFineTune):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         raise NotImplementedError
 
-    # ─── shared helpers ─────────────────────────────────────────────────────
     def _register_prompt_module(self, name: str, module: nn.Module) -> None:
         """Attach a trainable prompt module, moved to device and tracked."""
         module = module.to(self.device)
@@ -114,7 +112,6 @@ class PromptBasedMethod(NaiveFineTune):
         """q(x) = CLS embedding from the frozen backbone (backbone-agnostic)."""
         return self.model.encode_query(batch)  # (B, D)
 
-    # ─── training / evaluation ──────────────────────────────────────────────
     @torch.no_grad()
     def _prompt_val_f1(self, val_loader: DataLoader) -> float:
         """Entity-F1 on a held-out loader using the PROMPT forward path.

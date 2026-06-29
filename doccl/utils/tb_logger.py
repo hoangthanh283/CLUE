@@ -112,7 +112,6 @@ class TBLogger:
         if np.any(~np.isnan(row)):
             self.writer.add_scalar("metrics/running_AA", float(np.nanmean(row)), task_idx)
 
-    # ─── Deep diagnostics (gated by cfg.tensorboard.diagnostics) ─────────────────
     # These expose the *existing* analysis machinery (param_grouping / fisher / cka)
     # as TensorBoard series. The caller computes the quantities (so the logger keeps
     # no model/torch state); the logger just writes histograms + scalars. Heavier

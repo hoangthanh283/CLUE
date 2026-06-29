@@ -41,7 +41,6 @@ class BERTWrapper(TokenClassificationWrapper):
     ):
         super().__init__(model_name, num_labels=num_labels, freeze_backbone=freeze_backbone)
 
-    # ─── forward (unimodal: no bbox / pixel_values / image) ──────────────────────
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -55,14 +54,12 @@ class BERTWrapper(TokenClassificationWrapper):
     ) -> Any:
         return self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
 
-    # ─── CLS query for prompt methods (text-only) ────────────────────────────────
     @torch.no_grad()
     def encode_query(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         """q(x) = CLS embedding from the frozen BERT encoder. (B, D)."""
         inputs = {k: batch[k] for k in ("input_ids", "attention_mask") if k in batch}
         return self._inner(**inputs).last_hidden_state[:, 0]
 
-    # ─── per-token encoder features (text-only: BertModel rejects bbox) ───────────
     def token_features(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         """Per-token BERT hidden states feeding the classifier. (B, L, D).
 
@@ -74,7 +71,6 @@ class BERTWrapper(TokenClassificationWrapper):
         seq_len = batch["input_ids"].shape[1]
         return self._inner(**inputs).last_hidden_state[:, :seq_len]
 
-    # ─── prompt injection (text-only: prepend to token embeddings, no bbox) ───────
     def forward_with_prompts(
         self,
         input_ids: torch.Tensor,

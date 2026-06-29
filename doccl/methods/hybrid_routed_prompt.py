@@ -112,7 +112,6 @@ class HybridPromptPool(nn.Module):
         self.register_buffer("doc_freq", torch.zeros(vocab_size))
         self.register_buffer("n_docs", torch.zeros(()))
 
-    # ─── block <-> slot helpers ─────────────────────────────────────────────────
     def block_slots(self, task_id: int) -> slice:
         """Slot index slice owned by ``task_id``."""
         start = task_id * self.slots_per_task
@@ -129,7 +128,6 @@ class HybridPromptPool(nn.Module):
             return None
         return torch.log((1.0 + self.n_docs) / (1.0 + self.doc_freq)) + 1.0
 
-    # ─── routing ────────────────────────────────────────────────────────────────
     def _dense_scores(self, dense_q: torch.Tensor) -> torch.Tensor:
         q = F.normalize(dense_q, dim=-1)
         k = F.normalize(self.keys, dim=-1)
@@ -189,7 +187,6 @@ class HybridPromptPool(nn.Module):
         B, K, Lp, D = selected.shape
         return selected.reshape(B, K * Lp, D)
 
-    # ─── signature accumulation (called in after_task) ──────────────────────────
     @torch.no_grad()
     def accumulate_signature(self, task_id: int, input_ids: torch.Tensor) -> None:
         """Fold one batch of OCR tokens into this task's block signature + doc-freq."""
@@ -262,7 +259,6 @@ class HybridRoutedPrompt(PromptBasedMethod):
         self.prompt_pool.prompts.register_hook(_freeze_rows)
         self.prompt_pool.keys.register_hook(_freeze_rows)
 
-    # ─── lifecycle ──────────────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         self._active_task = task.task_id
         self._task_to_block[task.task_id] = task.task_id
@@ -297,7 +293,6 @@ class HybridRoutedPrompt(PromptBasedMethod):
             len(self.head_buffer.buffer),
         )
 
-    # ─── training (prompt loop + head replay) ────────────────────────────────────
     def train_task(
         self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None
     ) -> TrainMetrics:
@@ -392,7 +387,6 @@ class HybridRoutedPrompt(PromptBasedMethod):
         offsets = torch.arange(spt, device=task_ids.device).unsqueeze(0)  # (1, S)
         return base + offsets  # (B, S)
 
-    # ─── routing ────────────────────────────────────────────────────────────────
     def _sparse_query(self, batch: dict) -> torch.Tensor:
         idf = self.prompt_pool.idf
         return sparse_doc_vectors(
@@ -433,7 +427,6 @@ class HybridRoutedPrompt(PromptBasedMethod):
         row = torch.arange(sl.start, sl.stop, device=self.device)
         return row.unsqueeze(0).expand(batch_size, -1)
 
-    # ─── evaluate (inherited prediction + routing-accuracy log) ──────────────────
     def evaluate(self, eval_loaders: dict[int, DataLoader]) -> dict[int, EvalMetrics]:
         self.model.eval()
         results: dict[int, EvalMetrics] = {}

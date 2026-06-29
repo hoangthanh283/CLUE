@@ -174,7 +174,6 @@ def build_encoder(model_cfg: Any) -> KIEEncoder:
     return _ENCODER_BY_FAMILY[family](model_cfg)
 
 
-# ─── process-level default encoder ───────────────────────────────────────────────
 # A run builds exactly one scenario for one backbone, so the active encoder is set
 # once (by ``get_scenario``/``train.py``) and read by every dataset loader whose
 # ``encoder`` arg is left None. Defaults lazily to LayoutLMv3 so existing callers

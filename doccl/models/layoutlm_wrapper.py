@@ -106,7 +106,6 @@ class LayoutLMv3Wrapper(nn.Module):
         nn.init.zeros_(linear.bias)
         self.model.classifier = linear
 
-    # ─── Class-incremental: expand classifier ──────────────────────────────────
     def expand_classifier(self, new_labels: list[str]) -> None:
         """Extend the classification head to add new labels. Old logits preserved.
 
@@ -180,7 +179,6 @@ class LayoutLMv3Wrapper(nn.Module):
         self.id_to_label = {i: l for i, l in enumerate(all_labels)}
         self.label_to_id = {l: i for i, l in enumerate(all_labels)}
 
-    # ─── Layout signature for LAPP and pilot analysis ──────────────────────────
     @staticmethod
     def get_layout_signature(boxes: torch.Tensor, grid_size: int = 4) -> torch.Tensor:
         """Compute layout signature φ(boxes) as histogram of box centers on grid.
@@ -211,7 +209,6 @@ class LayoutLMv3Wrapper(nn.Module):
         hist = hist / (hist.sum(dim=-1, keepdim=True) + 1e-8)
         return hist
 
-    # ─── Forward with optional modality masking (for pilot C2/C3) ──────────────
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -307,7 +304,6 @@ class LayoutLMv3Wrapper(nn.Module):
 
         return new_input_ids, new_pixel_values, new_bbox
 
-    # ─── Prompt injection (L2P / DualPrompt / CODA-Prompt / routed prompts) ─────
     def forward_with_prompts(
         self,
         input_ids: torch.Tensor,
@@ -370,7 +366,6 @@ class LayoutLMv3Wrapper(nn.Module):
         # fp32 at the boundary so prompt-method CE/aux losses are unchanged.
         return logits.float() if amp_on else logits
 
-    # ─── CLS query for prompt-based methods (backbone-agnostic entry point) ────
     @torch.no_grad()
     def encode_query(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         """q(x) = CLS embedding from the frozen encoder. (B, D).
@@ -403,7 +398,6 @@ class LayoutLMv3Wrapper(nn.Module):
         seq_len = batch["input_ids"].shape[1]
         return self.model.layoutlmv3(**inputs).last_hidden_state[:, :seq_len]
 
-    # ─── CKA probe layers (depth points for representational drift) ────────────
     @property
     def cka_layers(self) -> list[str]:
         """Module names probed for per-layer CKA, spanning input→depth→head.
@@ -424,7 +418,6 @@ class LayoutLMv3Wrapper(nn.Module):
             "model.classifier",
         ]
 
-    # ─── Parameter groups for Fisher analysis (pilot study) ────────────────────
     @property
     def param_groups(self) -> dict[str, list[nn.Parameter]]:
         """Named, fully-populated component groups (see ``param_grouping``)."""
@@ -435,7 +428,6 @@ class LayoutLMv3Wrapper(nn.Module):
         """Encoder parameters bucketed by depth (input/early/mid/late/head)."""
         return param_grouping.param_groups_by_depth(self.model, self.num_layers)
 
-    # ─── Freeze controls ───────────────────────────────────────────────────────
     def freeze_backbone(self) -> None:
         """Freeze everything except classifier head. Used by prompt-only methods."""
         for p in self.model.layoutlmv3.parameters():

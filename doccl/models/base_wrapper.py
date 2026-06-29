@@ -37,7 +37,6 @@ logger = logging.getLogger(__name__)
 class TokenClassificationWrapper(nn.Module):
     """Backbone-agnostic wrapper base (vision-free defaults)."""
 
-    # ─── subclass contract ──────────────────────────────────────────────────────
     _HF_CLS: type | None = None  # HF *ForTokenClassification class
     _inner_attr: str = ""  # encoder submodule name on the HF model
     _pos_offset: int = 2  # absolute-position pad offset for prompt truncation
@@ -72,12 +71,10 @@ class TokenClassificationWrapper(nn.Module):
         if freeze_backbone:
             self.freeze_backbone()
 
-    # ─── inner encoder accessor (delegates through PeftModel for O-LoRA) ─────────
     @property
     def _inner(self) -> nn.Module:
         return getattr(self.model, self._inner_attr)
 
-    # ─── head: force plain Linear ───────────────────────────────────────────────
     def _force_linear_head(self) -> None:
         head = self.model.classifier
         if isinstance(head, nn.Linear):
@@ -90,7 +87,6 @@ class TokenClassificationWrapper(nn.Module):
         nn.init.zeros_(linear.bias)
         self.model.classifier = linear
 
-    # ─── class-incremental: expand classifier ───────────────────────────────────
     def expand_classifier(self, new_labels: list[str]) -> None:
         """Widen the final output Linear, preserving old logits + label maps."""
         old_labels = list(self.id_to_label.values())
@@ -145,7 +141,6 @@ class TokenClassificationWrapper(nn.Module):
         self.id_to_label = {i: lbl for i, lbl in enumerate(all_labels)}
         self.label_to_id = {lbl: i for i, lbl in enumerate(all_labels)}
 
-    # ─── layout signature (shared, backbone-agnostic — operates on bboxes) ───────
     @staticmethod
     def get_layout_signature(boxes: torch.Tensor, grid_size: int = 4) -> torch.Tensor:
         """Histogram of box centers on a grid_size × grid_size grid. (B, grid_size²)."""
@@ -165,7 +160,6 @@ class TokenClassificationWrapper(nn.Module):
         hist = hist / (hist.sum(dim=-1, keepdim=True) + 1e-8)
         return hist
 
-    # ─── forward (vision-free; tolerant of extra streams) ───────────────────────
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -181,7 +175,6 @@ class TokenClassificationWrapper(nn.Module):
             input_ids=input_ids, bbox=bbox, attention_mask=attention_mask, labels=labels
         )
 
-    # ─── CLS query for prompt-based methods (replaces reaching into internals) ───
     @torch.no_grad()
     def encode_query(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         """q(x) = CLS embedding from the frozen encoder. (B, D)."""
@@ -191,7 +184,6 @@ class TokenClassificationWrapper(nn.Module):
         inputs = {k: batch[k] for k in keys if k in batch}
         return self._inner(**inputs).last_hidden_state[:, 0]
 
-    # ─── per-token encoder features (the input the classifier head consumes) ─────
     def token_features(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         """Per-token encoder hidden states feeding the classifier. (B, L, D).
 
@@ -211,7 +203,6 @@ class TokenClassificationWrapper(nn.Module):
         seq_len = batch["input_ids"].shape[1]
         return self._inner(**inputs).last_hidden_state[:, :seq_len]
 
-    # ─── prompt injection (vision-free; prepend to text stream) ──────────────────
     def forward_with_prompts(
         self,
         input_ids: torch.Tensor,
@@ -255,7 +246,6 @@ class TokenClassificationWrapper(nn.Module):
         logits = self.model.classifier(self.model.dropout(text_out))
         return logits
 
-    # ─── CKA probe layers (depth points matched to LayoutLMv3 / BERT) ────────────
     @property
     def cka_layers(self) -> list[str]:
         last = self.num_layers - 1
@@ -269,7 +259,6 @@ class TokenClassificationWrapper(nn.Module):
             "model.classifier",
         ]
 
-    # ─── parameter groups (shared vocabulary; absent groups stay empty) ──────────
     @property
     def param_groups(self) -> dict[str, list[nn.Parameter]]:
         return param_grouping.param_groups(self.model)
@@ -278,7 +267,6 @@ class TokenClassificationWrapper(nn.Module):
     def param_groups_by_depth(self) -> dict[str, list[nn.Parameter]]:
         return param_grouping.param_groups_by_depth(self.model, self.num_layers)
 
-    # ─── freeze / checkpoint controls ────────────────────────────────────────────
     def freeze_backbone(self) -> None:
         for p in self._inner.parameters():
             p.requires_grad = False

@@ -78,7 +78,6 @@ class LCA(NaiveFineTune):
         self._class_means: dict[int, torch.Tensor] = {}
         self._class_covs: dict[int, torch.Tensor] = {}
 
-    # ─── helpers: which params are "backbone" (everything but the classifier head) ──
     def _backbone_state(self) -> dict[str, torch.Tensor]:
         return {
             n: p.detach().clone().cpu()
@@ -90,7 +89,6 @@ class LCA(NaiveFineTune):
     def _head(self) -> torch.nn.Linear:
         return self.model.model.classifier
 
-    # ─── lifecycle ──────────────────────────────────────────────────────────────
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         self._task_idx = task.task_id
         if self._base_backbone is None:
@@ -158,7 +156,6 @@ class LCA(NaiveFineTune):
             len(self._class_means),
         )
 
-    # ─── (1) per-class feature Gaussians over TOKEN features ─────────────────────
     @torch.no_grad()
     def _compute_class_stats(self, loader: DataLoader) -> None:
         """Estimate (μ_c, Σ_c) over token features for each class present in this task."""
@@ -185,7 +182,6 @@ class LCA(NaiveFineTune):
             self._class_means[c] = mean
             self._class_covs[c] = cov
 
-    # ─── (2) TIES-merge the per-task backbones ──────────────────────────────────
     @torch.no_grad()
     def _merge_backbones(self) -> None:
         if self._base_backbone is None or not self._task_backbones:
@@ -202,7 +198,6 @@ class LCA(NaiveFineTune):
             if name in own:
                 own[name].data.copy_(val.to(own[name].device))
 
-    # ─── (3) classifier alignment on sampled Gaussian features ──────────────────
     def _align(self) -> None:
         """Re-train the classifier head on synthetic features ~ N(μ_c, Σ_c) (LCA align)."""
         classes = [c for c in sorted(self._class_means) if not (self.ca_skip_O and c == 0)]
@@ -286,7 +281,6 @@ class LCA(NaiveFineTune):
             total = total + term1 + self.ca_robust_weight * term2 + self.ca_entropy_weight * term3
         return total / max(len(uniq), 1)
 
-    # ─── evaluate (standard forward — single growing head) ──────────────────────
     def evaluate(self, eval_loaders: dict[int, DataLoader]) -> dict[int, EvalMetrics]:
         self.model.eval()
         results: dict[int, EvalMetrics] = {}
