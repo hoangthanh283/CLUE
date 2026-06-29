@@ -45,7 +45,7 @@ git clone git@github.com:hoangthanh283/CLUE.git && cd CLUE && git checkout doccl
 ```
 
 `setup_remote.sh` installs deps (reuses the template torch), checks the GPU, prompts for W&B
-(optional — answer blank / set `WANDB_MODE=offline` to skip), then launches the grid. Pass the
+(optional — answer blank / set `WANDB_MODE=disabled` to skip), then launches the grid. Pass the
 A6000 knobs inline so it packs jobs and skips the small-GPU recipe:
 
 ```bash
@@ -56,13 +56,13 @@ GRAD_CKPT=false \
 NUM_WORKERS=4 \
 AMP=1 \
 GPU_VRAM_BUDGET_GB=46 \
-WANDB_MODE=offline \
+WANDB_MODE=disabled \
 bash scripts/setup_remote.sh
 ```
 
 - `JOBS_PER_GPU=8` + `GPU_VRAM_BUDGET_GB=46` → the VRAM-aware scheduler packs light jobs
   (lexslot/doccl ~5 GB) up to ~8-up while heavy replay jobs (der_pp ~35 GB) stay 1-2 — no OOM.
-- `WANDB_MODE=offline` avoids needing a W&B login; metrics still land in `results/` for analysis.
+- `WANDB_MODE=disabled` avoids needing a W&B login; metrics still land in `results/` for analysis.
 
 ## Step 3 — Watch it
 
@@ -126,7 +126,7 @@ DRY_RUN=1 bash scripts/run_lexslot_grid.sh                    # print plan + cou
 ```bash
 # LexSlot + its direct comparison baselines, ALL backbones, all scenarios:
 CORE_METHODS="naive joint er der_pp" PROMPT_METHODS="" CURRENCY_METHODS="" RUN_BERT=0 \
-GPUS=0 JOBS_PER_GPU=8 BATCH_SIZE=16 GRAD_CKPT=false GPU_VRAM_BUDGET_GB=46 WANDB_MODE=offline \
+GPUS=0 JOBS_PER_GPU=8 BATCH_SIZE=16 GRAD_CKPT=false GPU_VRAM_BUDGET_GB=46 WANDB_MODE=disabled \
 bash scripts/setup_remote.sh
 ```
 
