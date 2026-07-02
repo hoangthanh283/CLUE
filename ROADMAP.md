@@ -1,5 +1,16 @@
 # ROADMAP
 
+## Direction change (2026-07-02): LexSlot DROPPED → LexMem (beads CLUE-b0b)
+RCA verdict: standalone LexSlot is naive-level (AA 42.2 vs naive 40–43; the pre-fix 86.9
+was an unnormalized-gate artifact; the thesis 87.3 row was the DocCL hybrid). LexSlot-FM
+fails on capacity (50.4 F1 single-FUNSD). Successor **LexMem** = Sparse Memory Finetuning
+(arXiv 2510.15103) adapted to doc IE: frozen base after task 0 + key-value logit-memory
+head, TF-IDF slot-access selection, top-t sparse SGD. Implemented + committed (all e2e
+green). **Pilot `dil_lexmem_seed42` queued** behind the leftover lexslot_fm run; go/no-go:
+new-task diag F1 ≥ 75, task-0 drop ≤ 5, low slot Jaccard. Go → cil_cord + dil_xlingual
+×3 seeds; no-go (after `unfreeze_late_n=4` retry) → pivot to head-bank/merge (DocMERGE/LCA).
+The LexSlot items below are superseded except as honest negative-result material.
+
 ## Thesis-review follow-ups (2026-06-29 deep review — bd was dolt-locked, logged here)
 - **Parser: fold LexSlot variant suffixes into a clean `lexslot` cell.** `analyze_results.py`
   doesn't recognise `_off/_head_only/_uniform`, so `--proposed lexslot` empties the
