@@ -43,6 +43,7 @@ class LexicalMemoryHead(nn.Module):
         n_labels: int,
         top_k: int = 32,
         temp: float = 0.05,
+        value_dim: int | None = None,
     ):
         super().__init__()
         self.n_slots = n_slots
@@ -51,8 +52,10 @@ class LexicalMemoryHead(nn.Module):
         self.temp = temp
         # Random unit keys until init_keys anchors them in task-0 feature space.
         self.register_buffer("keys", F.normalize(torch.randn(n_slots, hidden_dim), dim=-1))
-        # Logit-space values, zero-init -> exact no-op until a slot is trained.
-        self.values = nn.Parameter(torch.zeros(n_slots, n_labels))
+        # Zero-init values -> exact no-op until a slot is trained. value_dim defaults
+        # to n_labels (logit-space delta); pass hidden_dim for feature-space values
+        # (delta added to the classifier INPUT, so capacity is d per slot, not C).
+        self.values = nn.Parameter(torch.zeros(n_slots, value_dim or n_labels))
         # Per-task binary trainability mask (set by select_topt).
         self.register_buffer("grad_mask", torch.zeros(n_slots))
         # First task to train each slot (-1 = unclaimed) — analysis artifact.

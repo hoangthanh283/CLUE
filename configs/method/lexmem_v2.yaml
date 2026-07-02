@@ -1,0 +1,34 @@
+name: lexmem_v2
+# LexMem v2 — diagnosis-guided plasticity allocation. The v1 pilot showed the memory
+# mechanism gives PERFECT stability (task-0 drop 0.0) but a fully-frozen backbone
+# blocks all new-task learning (SROIE 3.4 F1). v2 assigns roles from the forgetting
+# diagnosis: the head (locus #1) is the memory; the last freeze_late_n layers
+# (locus #2) are frozen; the early/mid layers the diagnosis certifies as low-drift
+# stay TRAINABLE and supply plasticity. Values move to feature space (capacity d per
+# slot instead of C) and the optimizer/patience fixes address the v1 undertraining.
+lr: 5.0e-5           # task-0 full fine-tune AND the plastic backbone group (tasks >= 1)
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+early_stop_patience: 4
+# Memory geometry.
+n_slots: 65536
+top_k: 32
+temp: 0.05
+value_space: feature # hidden-dim values added to the classifier INPUT (768/slot)
+# Key anchoring from task-0 token features.
+key_init: kmeans
+kmeans_iters: 8
+key_sample_cap: 200000
+# Sparse update selection (tasks >= 1).
+select: tfidf        # tfidf | tf | random — the selection ablation axis
+top_t: 4096
+mem_optimizer: adamw # one AdamW over {values (lr_mem, wd 0)} + {plastic backbone (lr)}
+lr_mem: 5.0e-3
+# Diagnosis-guided freeze map: freeze the last-N encoder layers + head after task 0;
+# embeddings + early/mid layers stay trainable (-1 would freeze the whole backbone).
+freeze_late_n: 4
+# Drift probe: cache N task-0 batches; log CKA + top-1 key cosine at task boundaries
+# (measures the pressure-redirection / key-staleness risk of the freeze map).
+drift_probe_batches: 4
+mem_enabled: true
