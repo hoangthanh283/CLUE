@@ -212,6 +212,23 @@ _METHOD_CFG = {
         "top_k": 4,
         "top_t": 8,
     },
+    # LexMem v3: v2 + EWC on the plastic bucket (tiny Fisher for speed).
+    "lexmem_v3": {
+        "n_slots": 64,
+        "top_k": 4,
+        "top_t": 8,
+        "temp": 0.05,
+        "key_init": "sample",
+        "select": "tfidf",
+        "value_space": "feature",
+        "mem_optimizer": "adamw",
+        "lr_mem": 5.0e-3,
+        "freeze_late_n": 1,
+        "drift_probe_batches": 1,
+        "key_sample_cap": 512,
+        "ewc_lambda": 100.0,
+        "fisher_n_samples": 2,
+    },
 }
 
 _METHOD_CLS = {
@@ -239,6 +256,7 @@ _METHOD_CLS = {
     "lexmem": LexMem,
     "lexmem_v2": LexMem,
     "lexmem_ctrl": LexMem,
+    "lexmem_v3": LexMem,
 }
 
 

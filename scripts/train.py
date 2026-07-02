@@ -188,6 +188,9 @@ METHOD_REGISTRY = {
     # LexMem control: identical freeze map, NO memory — isolates the freeze map's
     # own contribution (reviewer control for the v2 comparison).
     "lexmem_ctrl": LexMem,
+    # LexMem v3: v2 + online EWC restricted to the plastic early/mid bucket
+    # (counters the pressure-redirection drift the v2 pilot measured, CKA 0.19).
+    "lexmem_v3": LexMem,
     # LexSlot-FM: Functional Memory LexSlot (dual-stream; frozen encoder + per-task
     # frozen functional heads, lexically blended with a plastic base head).
     "lexslot_fm": LexSlotFM,
@@ -684,6 +687,7 @@ def main(cfg: DictConfig) -> None:
         "lexmem",
         "lexmem_v2",
         "lexmem_ctrl",
+        "lexmem_v3",
     }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
         try:
