@@ -1,6 +1,27 @@
 # STATE
 
-## LexMem pilot in flight (2026-07-02)
+## LexMem pilot program COMPLETE (2026-07-02) — 5 arms, dil seed42
+
+| arm | AA | BWT | new-task diag | task-0 drop | note |
+|-----|----|-----|---------------|-------------|------|
+| v1 freeze-all | 41.1 | -0.0 | 3.4/32 | 0.0 | memory=stability, no plasticity |
+| v2 freeze-locus | 38.8 | -76.8 | 82.7/98 | -84 | pressure redirection (CKA 0.19) |
+| ctrl (no mem) | 38.9 | -75.6 | 81.7/97 | -83 | drift is the bottleneck, not memory |
+| v3 +trunk-EWC λ1000 | 60.8 | -22.9 | 51/88 | -6.7 | beats plain EWC (41) by +20 |
+| v3b λ300+exclude_owned | 66.0 | -24.5 | 68/90 | -4.4 | task-0 bar PASSED; SROIE 68<75 |
+
+- **Key finding (thesis-grade):** the forgetting locus migrates to whatever remains
+  plastic — freeze head+late and early/mid drift takes over (measured CKA 1.0->0.19).
+- **Residuals:** mid-task (SROIE) squeezed by task-0-dominated online Fisher; its
+  forgetting (-44.6) lives in the trunk (slot Jaccard 0.0, CKA 0.99). Line is
+  asymptoting to "EWC++", ~22 pts below ER/DER++ (88).
+- **Proposed next direction (awaiting go):** Lexical Ledger — input-anchored
+  (lexeme x layout-cell) append-only memory, drift-immune by construction; novelty
+  scanned (open at token/layout level). Gate = zero-training CPU counting experiment.
+- Runs: results/dil_lexmem{,_v2,_ctrl,_v3,_v3b}_seed42 (+ lexmem_slots.json with
+  drift probes). Code through commit 7df7ecc, all pushed.
+
+## (superseded) LexMem pilot in flight (2026-07-02)
 
 - **Active:** background chain waits for the leftover `lexslot_fm` run (pid 3090730) to
   exit, then auto-launches `method=lexmem scenario=dil seed=42` (log:
