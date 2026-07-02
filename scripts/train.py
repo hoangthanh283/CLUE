@@ -38,7 +38,9 @@ from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
 from doccl.methods.lca import LCA
+from doccl.methods.lexmem import LexMem
 from doccl.methods.lexslot import LexSlot
+from doccl.methods.lexslot_fm import LexSlotFM
 from doccl.methods.lwf import LwF
 from doccl.methods.cpfd import CPFD
 from doccl.methods.is3 import IS3
@@ -176,6 +178,13 @@ METHOD_REGISTRY = {
     # {head_only, head_late, head_late_mid, uniform} and ``method.slot_sharing`` ∈
     # {soft, hard, off} are the two ablation axes.
     "lexslot": LexSlot,
+    # LexMem: sparse lexical-memory head (SMF-style, arXiv 2510.15103 adapted to doc
+    # IE). Task 0 full FT then frozen base; tasks >= 1 train only top-t TF-IDF-selected
+    # memory-value rows. ``method.select`` ∈ {tfidf, tf, random} is the ablation axis.
+    "lexmem": LexMem,
+    # LexSlot-FM: Functional Memory LexSlot (dual-stream; frozen encoder + per-task
+    # frozen functional heads, lexically blended with a plastic base head).
+    "lexslot_fm": LexSlotFM,
     # Legacy sketched candidates, kept as ablation variants / NeurIPS extension.
     "doccl_a": DocCL_A,
     "doccl_b": DocCL_B,
@@ -665,6 +674,8 @@ def main(cfg: DictConfig) -> None:
         "hgt",
         "cuber",
         "lexslot",
+        "lexslot_fm",
+        "lexmem",
     }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
         try:

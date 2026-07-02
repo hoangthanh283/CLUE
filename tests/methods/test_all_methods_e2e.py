@@ -37,6 +37,7 @@ from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
 from doccl.methods.lca import LCA
+from doccl.methods.lexmem import LexMem
 from doccl.methods.lexslot import LexSlot
 from doccl.methods.lwf import LwF
 
@@ -173,6 +174,18 @@ _METHOD_CFG = {
         "use_replay": True,
         "target_depth": "all",
     },
+    # LexMem: sparse lexical-memory head. Tiny pool/top-k/top-t for speed; task 0
+    # full FT then frozen base, task 1 trains only selected memory-value rows.
+    "lexmem": {
+        "n_slots": 64,
+        "top_k": 4,
+        "top_t": 8,
+        "temp": 0.05,
+        "key_init": "sample",
+        "select": "tfidf",
+        "lr_mem": 0.05,
+        "key_sample_cap": 512,
+    },
 }
 
 _METHOD_CLS = {
@@ -197,6 +210,7 @@ _METHOD_CLS = {
     "hgt": HGT,
     "cuber": CUBER,
     "lexslot": LexSlot,
+    "lexmem": LexMem,
 }
 
 

@@ -1,0 +1,28 @@
+name: lexmem
+# LexMem — sparse lexical-memory head (Sparse Memory Finetuning, arXiv 2510.15103,
+# adapted to encoder document IE). Task 0: full fine-tune, then the backbone AND base
+# classifier head are frozen forever. Tasks >= 1: a flat key-value memory head
+# (keys anchored from task-0 token features, frozen; values in logit space) is the
+# ONLY thing that trains — and only the top-t slots ranked by TF-IDF of slot-access
+# counts against a cumulative background (task 0 + previously learned tasks).
+# No replay, no KD, no Fisher.
+lr: 5.0e-5           # task-0 full fine-tune (AdamW, inherited naive loop)
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+# Memory geometry.
+n_slots: 65536       # memory pool size N
+top_k: 32            # slots retrieved per token (forward-pass routing)
+temp: 0.05           # softmax temperature over the k retrieved cosine scores
+# Key anchoring from task-0 token features.
+key_init: kmeans     # kmeans | sample | random (kmeans falls back to sampling when
+                     # #feats <= N — on small doc datasets they coincide)
+kmeans_iters: 8
+key_sample_cap: 200000
+# Sparse update selection (tasks >= 1).
+select: tfidf        # tfidf | tf | random — the selection ablation axis
+top_t: 4096          # trainable slots per task
+lr_mem: 0.05         # plain SGD on selected value rows (no momentum/decay leakage)
+# Fallback plasticity knob: unfreeze the last-N encoder layers for tasks >= 1
+# (0 = fully frozen backbone, the staleness-guarantee default).
+unfreeze_late_n: 0
