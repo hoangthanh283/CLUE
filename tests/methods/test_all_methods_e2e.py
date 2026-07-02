@@ -186,6 +186,32 @@ _METHOD_CFG = {
         "lr_mem": 0.05,
         "key_sample_cap": 512,
     },
+    # LexMem v2: diagnosis-guided freeze map (late-1 + head frozen, early/mid
+    # trainable) + feature-space values + AdamW + drift probe.
+    "lexmem_v2": {
+        "n_slots": 64,
+        "top_k": 4,
+        "top_t": 8,
+        "temp": 0.05,
+        "key_init": "sample",
+        "select": "tfidf",
+        "value_space": "feature",
+        "mem_optimizer": "adamw",
+        "lr_mem": 5.0e-3,
+        "freeze_late_n": 1,
+        "drift_probe_batches": 1,
+        "key_sample_cap": 512,
+    },
+    # LexMem control: identical freeze map, memory disabled.
+    "lexmem_ctrl": {
+        "mem_enabled": False,
+        "mem_optimizer": "adamw",
+        "freeze_late_n": 1,
+        "drift_probe_batches": 1,
+        "n_slots": 64,
+        "top_k": 4,
+        "top_t": 8,
+    },
 }
 
 _METHOD_CLS = {
@@ -211,6 +237,8 @@ _METHOD_CLS = {
     "cuber": CUBER,
     "lexslot": LexSlot,
     "lexmem": LexMem,
+    "lexmem_v2": LexMem,
+    "lexmem_ctrl": LexMem,
 }
 
 
@@ -300,6 +328,30 @@ def test_method_cil_lifecycle(name):
         assert 0.0 <= m.f1 <= 100.0 and torch.isfinite(
             torch.tensor(m.f1)
         ), f"{name}: task {tid} F1 out of range ({m.f1})"
+
+
+def test_lexmem_v2_freeze_map_after_task0():
+    """After task 0, lexmem_v2 must freeze exactly the diagnosed locus: the last
+    freeze_late_n encoder layers + classifier head, leaving embeddings and the
+    early/mid layers trainable (the plasticity source)."""
+    torch.manual_seed(0)
+    model = LayoutLMv3Wrapper(model_name="microsoft/layoutlmv3-base", num_labels=len(_T0_LABELS))
+    model.label_to_id = {l: i for i, l in enumerate(_T0_LABELS)}  # noqa: E741
+    model.id_to_label = {i: l for l, i in model.label_to_id.items()}  # noqa: E741
+    cfg = {**_BASE_CFG, **_METHOD_CFG["lexmem_v2"], "freeze_late_n": 2}
+    method = LexMem(model, cfg)
+    t0 = TaskInfo(task_id=0, task_name="t0", label_set=_T0_LABELS)
+    _run_one_task(method, t0, _loader(n_classes=len(_T0_LABELS)))
+
+    layers = model.model.layoutlmv3.encoder.layer
+    n = len(layers)
+    for i, layer in enumerate(layers):
+        expect_trainable = i < n - 2
+        got = all(p.requires_grad for p in layer.parameters())
+        assert got == expect_trainable, f"layer {i}: trainable={got}, expected {expect_trainable}"
+    assert all(not p.requires_grad for p in model.model.classifier.parameters())
+    assert all(p.requires_grad for p in model.model.layoutlmv3.embeddings.parameters())
+    assert method._mem_active, "memory must be active after task 0"
 
 
 def test_lexslot_head_slots_active_after_cil_head_growth():

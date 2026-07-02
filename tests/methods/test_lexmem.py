@@ -162,6 +162,34 @@ def test_init_keys_kmeans_runs_and_normalizes():
     assert torch.allclose(mem.keys.norm(dim=-1), torch.ones(4), atol=1e-4)
 
 
+def test_feature_space_values_shape_and_noop():
+    torch.manual_seed(0)
+    mem = LexicalMemoryHead(8, 8, 5, top_k=4, temp=0.05, value_dim=8)
+    assert mem.values.shape == (8, 8), "feature-space values must be (N, hidden_dim)"
+    feats = torch.randn(2, 4, 8)
+    out = mem.delta(feats)
+    assert out.shape == (2, 4, 8), "feature-space delta must match the feature dim"
+    assert torch.all(out == 0), "zero-init feature values must give an exact zero delta"
+
+
+def test_adamw_step_only_updates_selected_rows():
+    """AdamW (v2 optimizer) must not move masked rows: grad is exactly 0 and
+    weight_decay is 0 on the values group, so no decay/momentum leakage."""
+    torch.manual_seed(0)
+    mem = LexicalMemoryHead(8, 8, 5, top_k=8, temp=0.05, value_dim=8)
+    mem.select_topt(torch.ones(8), t=3, task_id=0, mode="tf")
+    selected = set(mem.grad_mask.nonzero().flatten().tolist())
+    opt = torch.optim.AdamW([{"params": [mem.values], "lr": 1e-2, "weight_decay": 0.0}])
+    for _ in range(3):
+        opt.zero_grad()
+        loss = mem.delta(torch.randn(2, 4, 8)).pow(2).sum() + mem.delta(torch.randn(2, 4, 8)).sum()
+        loss.backward()
+        opt.step()
+    for i in range(8):
+        if i not in selected:
+            assert torch.all(mem.values[i] == 0), f"unselected row {i} moved under AdamW"
+
+
 def test_expand_labels_preserves_and_masks_after():
     mem = _head(top_k=8, n_labels=5)
     mem.select_topt(torch.ones(8), t=2, task_id=0, mode="tf")

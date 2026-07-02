@@ -182,6 +182,12 @@ METHOD_REGISTRY = {
     # IE). Task 0 full FT then frozen base; tasks >= 1 train only top-t TF-IDF-selected
     # memory-value rows. ``method.select`` ∈ {tfidf, tf, random} is the ablation axis.
     "lexmem": LexMem,
+    # LexMem v2: diagnosis-guided freeze map (head + late-N frozen = the forgetting
+    # locus; early/mid trainable = plasticity) + feature-space memory values.
+    "lexmem_v2": LexMem,
+    # LexMem control: identical freeze map, NO memory — isolates the freeze map's
+    # own contribution (reviewer control for the v2 comparison).
+    "lexmem_ctrl": LexMem,
     # LexSlot-FM: Functional Memory LexSlot (dual-stream; frozen encoder + per-task
     # frozen functional heads, lexically blended with a plastic base head).
     "lexslot_fm": LexSlotFM,
@@ -676,6 +682,8 @@ def main(cfg: DictConfig) -> None:
         "lexslot",
         "lexslot_fm",
         "lexmem",
+        "lexmem_v2",
+        "lexmem_ctrl",
     }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
         try:

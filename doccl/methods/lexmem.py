@@ -1,34 +1,43 @@
 """LexMem — sparse lexical-memory head for continual document IE.
 
 Adaptation of "Continual Learning via Sparse Memory Finetuning" (Lin et al.,
-arXiv 2510.15103) to encoder token classification, built from the LexSlot RCA:
+arXiv 2510.15103) to encoder token classification, built from the LexSlot RCA
+and refined by the v1 pilot (perfect retention, no plasticity):
 
-  - **Task 0**: full fine-tune (plain NaiveFineTune loop — full plasticity, which
-    kills LexSlot-FM's frozen-probe capacity failure). Then the backbone AND the
-    base classifier head are frozen forever — the base predictor can never drift
-    (which kills standalone LexSlot's base-drift collapse).
-  - **Memory head**: a flat key-value memory (``LexicalMemoryHead``) attached via
-    classifier forward hooks; keys are anchored in task-0 token features and
-    frozen; values live in logit space and add to the frozen base head's logits.
-    Routing is per-token top-k retrieval — the forward pass itself, train == eval,
-    no external gate.
-  - **Tasks >= 1**: a counting pass records per-slot access counts; TF-IDF against
-    a cumulative background (task 0 + all previously learned tasks) selects the
-    top-t task-specific slots; ONLY those value rows train (plain SGD — no
-    momentum/decay leakage into masked rows). Interference between tasks is
-    bounded by slot-access overlap, which for documents tracks lexical overlap.
+  - **Task 0**: full fine-tune (plain NaiveFineTune loop — full plasticity).
+    Then a **diagnosis-guided freeze map** is applied: the classifier head and
+    the last ``freeze_late_n`` encoder layers — the components the forgetting
+    diagnosis (Fisher-weighted displacement + CKA) implicates — are frozen;
+    the early/mid layers the diagnosis certifies as low-drift stay TRAINABLE
+    and supply plasticity for later tasks. (``freeze_late_n: -1`` freezes the
+    whole backbone — the v1 pilot regime, kept for the ablation row.)
+  - **Memory head**: a flat key-value memory (``LexicalMemoryHead``) attached
+    via classifier hooks; keys are anchored in task-0 token features and
+    frozen. ``value_space: feature`` (v2 default) adds a hidden-dim delta to
+    the classifier INPUT (capacity d per slot); ``logit`` adds directly to the
+    logits (the v1 regime, C per slot). Routing is per-token top-k retrieval —
+    the forward pass itself, train == eval, no external gate.
+  - **Tasks >= 1**: a counting pass records per-slot access counts; TF-IDF
+    against a cumulative background (task 0 + previously learned tasks)
+    selects the top-t task-specific slots; only those value rows train,
+    jointly with the diagnosed-plastic backbone layers.
 
-Fallback knob for frozen-feature plasticity: ``unfreeze_late_n`` unfreezes the
-last-N encoder layers for tasks >= 1 (default 0 = fully frozen; turning it on
-trades away the staleness guarantee).
+Control arm: ``mem_enabled: false`` runs the identical freeze map with a plain
+frozen head and NO memory — isolating what the freeze map alone contributes.
 
-CIL caveat (pilot targets DIL first): after ``expand_classifier`` replaces the
-head module, hooks are re-registered in ``before_task``; the zero-shot FWT
-reading train.py takes between expansion and ``before_task`` therefore runs
-without the memory delta on CIL only.
+Drift probe (``drift_probe_batches > 0``): a few task-0 batches are cached; at
+every task boundary the classifier-input features on those batches are compared
+to their task-0 snapshot (linear CKA + mean top-1 key cosine), measuring the
+pressure-redirection / key-staleness risk the freeze map introduces. Logged and
+saved into the slot artifact.
+
+CIL caveats (pilots target DIL): hooks are re-registered in ``before_task``
+after ``expand_classifier`` replaces the head; with ``value_space: feature``
+labels introduced after task 0 sit in frozen zero-init head rows and are not
+reachable — CIL needs ``logit`` values (which grow via ``expand_labels``).
 
 Artifact: ``results/<run>/lexmem_slots.json`` — per-task selected slots, owner
-histogram, pairwise selection Jaccard (the routing-interpretability evidence).
+histogram, pairwise selection Jaccard, drift-probe readings.
 """
 
 from __future__ import annotations
@@ -39,6 +48,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F  # noqa: N812 — canonical torch alias (repo-wide)
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -51,8 +61,17 @@ log = logging.getLogger(__name__)
 __all__ = ["LexMem"]
 
 
+def _linear_cka(x: torch.Tensor, y: torch.Tensor) -> float:
+    """Linear CKA between two (n, d) feature matrices (column-centered)."""
+    x = (x - x.mean(0)).float()
+    y = (y - y.mean(0)).float()
+    num = (x.T @ y).norm() ** 2
+    den = (x.T @ x).norm() * (y.T @ y).norm()
+    return float(num / den.clamp(min=1e-12))
+
+
 class LexMem(NaiveFineTune):
-    """Frozen base + sparsely-finetuned lexical memory head (SMF-style)."""
+    """Diagnosis-guided freeze map + sparsely-finetuned lexical memory head."""
 
     name = "lexmem"
 
@@ -67,12 +86,29 @@ class LexMem(NaiveFineTune):
         self.key_sample_cap = int(config.get("key_sample_cap", 200_000))
         self.select_mode = str(config.get("select", "tfidf"))
         self.lr_mem = float(config.get("lr_mem", 0.05))
-        self.unfreeze_late_n = int(config.get("unfreeze_late_n", 0))
+        # v2 knobs. Defaults reproduce the v1 pilot exactly (logit values, SGD,
+        # full backbone freeze, no probe) so the saved v1 run stays reproducible.
+        self.value_space = str(config.get("value_space", "logit"))
+        self.mem_enabled = bool(config.get("mem_enabled", True))
+        self.mem_optimizer = str(config.get("mem_optimizer", "sgd"))
+        self.freeze_late_n = int(config.get("freeze_late_n", -1))
+        self.drift_probe_batches = int(config.get("drift_probe_batches", 0))
+        if not self.mem_enabled and self.freeze_late_n < 0:
+            raise ValueError(
+                "lexmem: mem_enabled=false with freeze_late_n=-1 leaves nothing "
+                "trainable after task 0 — set freeze_late_n >= 0 for the control arm."
+            )
 
         self.hidden_dim = model.hidden_size
         n_labels = self.model.model.classifier.out_features
+        value_dim = self.hidden_dim if self.value_space == "feature" else None
         self.mem = LexicalMemoryHead(
-            self.n_slots, self.hidden_dim, n_labels, top_k=self.top_k, temp=self.temp
+            self.n_slots,
+            self.hidden_dim,
+            n_labels,
+            top_k=self.top_k,
+            temp=self.temp,
+            value_dim=value_dim,
         ).to(self.device)
 
         # Inactive until task 0 is trained and keys are anchored — the hook is an
@@ -80,11 +116,18 @@ class LexMem(NaiveFineTune):
         self._mem_active = False
         self._cur_feats: torch.Tensor | None = None
         self._hook_handles: list = []
+        # Hooks are registered even in the control arm (mem_enabled=false): the
+        # capture pre-hook feeds the drift probe; the memory paths stay gated off
+        # because _mem_active is never set true without the memory.
         self._register_head_hooks()
 
         self._selected: dict[int, list[int]] = {}  # task_id -> selected slot indices
+        # Drift probe state: cached task-0 batches + their task-0 feature snapshot.
+        self._probe_batches: list[dict] = []
+        self._probe_feats0: torch.Tensor | None = None
+        self._drift: dict[str, dict[str, float]] = {}
 
-    # ── hooks (classifier capture + additive memory delta) ──────────────────
+    # ── hooks (classifier capture + memory delta) ────────────────────────────
 
     def _register_head_hooks(self) -> None:
         self._hook_handles = []
@@ -98,12 +141,22 @@ class LexMem(NaiveFineTune):
         self._hook_handles = []
 
     def _capture_feats(self, _module, inp):
+        """Stash the RAW classifier input; in feature mode, return it shifted.
+
+        The raw (pre-delta) features are what key anchoring, counting, and the
+        drift probe read; the memory's correction is applied on top. Gradient
+        flows to the trainable backbone through ``inp[0]`` and to the selected
+        value rows through the delta (whose query side is detached).
+        """
         self._cur_feats = inp[0]
+        if self._mem_active and self.value_space == "feature":
+            return (inp[0] + self.mem.delta(inp[0]).to(inp[0].dtype),)
         return None
 
     def _add_mem(self, _module, _inp, output):
         if (
             not self._mem_active
+            or self.value_space != "logit"
             or self._cur_feats is None
             or self._cur_feats.shape[1] != output.shape[1]
         ):
@@ -114,22 +167,25 @@ class LexMem(NaiveFineTune):
 
     def before_task(self, task: TaskInfo, train_loader) -> None:
         # CIL: expand_classifier may have REPLACED the classifier module (orphaning
-        # the hooks) and re-created it trainable. Re-point hooks; grow value columns;
-        # re-freeze the base head for tasks >= 1 (it froze at end of task 0).
-        self.mem.expand_labels(self.model.model.classifier.out_features)
+        # the hooks) and re-created it trainable. Re-point hooks; grow value columns
+        # (logit space only); re-freeze the base head for tasks >= 1.
+        if self.mem_enabled and self.value_space == "logit":
+            self.mem.expand_labels(self.model.model.classifier.out_features)
         self._detach_head_hooks()
         self._register_head_hooks()
         if task.task_id == 0:
             return
         for p in self.model.model.classifier.parameters():
             p.requires_grad = False
+        if not self.mem_enabled:
+            return
 
         counts = self._count_pass(train_loader, desc=f"T{task.task_id} slot-count")
         idx = self.mem.select_topt(counts, self.top_t, task.task_id, self.select_mode)
         self._selected[task.task_id] = idx.cpu().tolist()
         n_accessed = int((counts > 0).sum())
         log.info(
-            "lexmem: task %d — %d/%d slots accessed, %d selected (%s); " "bg batches=%d",
+            "lexmem: task %d — %d/%d slots accessed, %d selected (%s); bg batches=%d",
             task.task_id,
             n_accessed,
             self.n_slots,
@@ -148,17 +204,28 @@ class LexMem(NaiveFineTune):
     def _train_memory(
         self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None
     ) -> TrainMetrics:
-        """Sparse memory finetuning: SGD on the selected value rows only."""
+        """Tasks >= 1: selected memory rows + diagnosed-plastic backbone layers."""
         self.model.train()
-        params: list[nn.Parameter] = [self.mem.values]
-        groups = [{"params": [self.mem.values], "lr": self.lr_mem, "weight_decay": 0.0}]
-        snap = nn.ModuleList([self.mem])  # what the early stopper snapshots/restores
-        if self.unfreeze_late_n > 0:
-            late = self._unfreeze_late_layers(self.unfreeze_late_n)
-            params += late
-            groups.append({"params": late, "lr": float(self.config.get("lr", 5e-5))})
+        params: list[nn.Parameter] = []
+        groups: list[dict] = []
+        snap = nn.ModuleList()
+        if self.mem_enabled:
+            groups.append({"params": [self.mem.values], "lr": self.lr_mem, "weight_decay": 0.0})
+            params.append(self.mem.values)
+            snap.append(self.mem)
+        backbone = [p for p in self.model.parameters() if p.requires_grad]
+        if backbone:
+            groups.append(
+                {
+                    "params": backbone,
+                    "lr": float(self.config.get("lr", 5e-5)),
+                    "weight_decay": float(self.config.get("weight_decay", 0.01)),
+                }
+            )
+            params += backbone
             snap.append(self.model)
-        optimizer = torch.optim.SGD(groups)
+        opt_cls = torch.optim.AdamW if self.mem_optimizer == "adamw" else torch.optim.SGD
+        optimizer = opt_cls(groups)
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
         stopper = self.make_early_stopper(val_loader)
@@ -171,14 +238,14 @@ class LexMem(NaiveFineTune):
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
                 optimizer.zero_grad()
                 with self._amp_autocast():
-                    outputs = self.model(**batch)  # hook adds the memory delta
+                    outputs = self.model(**batch)  # hook applies the memory delta
                     loss = outputs.loss
                 self._amp_backward_step(loss, optimizer, params, max_grad_norm)
                 total_loss += float(loss.item())
                 n_steps += 1
                 pbar.set_postfix({"loss": f"{loss.item():.4f}"})
             # Early-stop tail mirroring base._early_stop_after_epoch, but snapshotting
-            # the memory (the only thing training) instead of the frozen model.
+            # exactly the modules that train (memory and/or plastic backbone).
             self._log_weight_diagnostics()
             if stopper.enabled and val_loader is not None:
                 val_f1 = self.current_task_val_f1(val_loader)
@@ -201,23 +268,59 @@ class LexMem(NaiveFineTune):
 
     def after_task(self, task: TaskInfo, train_loader) -> None:
         if task.task_id == 0:
-            # Freeze the base predictor forever: backbone AND classifier head.
-            self.model.freeze_backbone()
-            for p in self.model.model.classifier.parameters():
-                p.requires_grad = False
-            feats = self._collect_feats(train_loader)
-            self.mem.init_keys(feats, mode=self.key_init, iters=self.kmeans_iters)
-            self._mem_active = True
-            log.info(
-                "lexmem: task 0 done — base frozen; keys anchored from %d token feats "
-                "(%s); memory active.",
-                feats.shape[0],
-                self.key_init,
-            )
-        # Fold this task's data into the IDF background so later tasks avoid the
-        # slots that now carry learned knowledge (cumulative "existing capabilities").
-        self._merge_background(train_loader, desc=f"T{task.task_id} bg-count")
+            self._apply_freeze_map()
+            if self.mem_enabled:
+                feats = self._collect_feats(train_loader)
+                self.mem.init_keys(feats, mode=self.key_init, iters=self.kmeans_iters)
+                self._mem_active = True
+                log.info(
+                    "lexmem: task 0 done — freeze map applied; keys anchored from %d "
+                    "token feats (%s); memory active.",
+                    feats.shape[0],
+                    self.key_init,
+                )
+            if self.drift_probe_batches > 0:
+                self._snapshot_probe(train_loader)
+        if self.mem_enabled:
+            # Fold this task's data into the IDF background so later tasks avoid the
+            # slots that now carry learned knowledge (cumulative existing capabilities).
+            self._merge_background(train_loader, desc=f"T{task.task_id} bg-count")
+        if task.task_id > 0:
+            self._measure_drift(task.task_id)
         self._save_slot_artifact()
+
+    def _apply_freeze_map(self) -> None:
+        """Freeze the diagnosed forgetting locus; leave the low-drift bucket plastic.
+
+        ``freeze_late_n == -1``: freeze the whole backbone (v1 / full-stability).
+        ``freeze_late_n == n >= 0``: freeze only the last-n encoder layers; the
+        embeddings and early/mid layers stay trainable. The classifier head is
+        always frozen — its role is taken by the memory (or, in the control arm,
+        it acts as the fixed task-0 anchor).
+        """
+        if self.freeze_late_n < 0:
+            self.model.freeze_backbone()
+        elif self.freeze_late_n > 0:
+            layers = list(self._inner_encoder().encoder.layer)
+            for layer in layers[len(layers) - self.freeze_late_n :]:
+                for p in layer.parameters():
+                    p.requires_grad = False
+        for p in self.model.model.classifier.parameters():
+            p.requires_grad = False
+        n_train = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        log.info(
+            "lexmem: freeze map — freeze_late_n=%d, head frozen; trainable backbone " "params=%d",
+            self.freeze_late_n,
+            n_train,
+        )
+
+    def _inner_encoder(self):
+        inner = getattr(self.model, "_inner", None)
+        if inner is None:
+            inner = getattr(self.model.model, "layoutlmv3", None)
+        if inner is None:
+            raise RuntimeError("lexmem: cannot locate the inner encoder module")
+        return inner
 
     # ── counting / feature-collection passes (no_grad, eval mode) ────────────
 
@@ -283,22 +386,59 @@ class LexMem(NaiveFineTune):
             feats = feats[torch.randperm(feats.shape[0])[: self.key_sample_cap]]
         return feats.to(self.device)
 
-    # ── fallback plasticity knob ─────────────────────────────────────────────
+    # ── drift probe (pressure-redirection / key-staleness measurement) ───────
 
-    def _unfreeze_late_layers(self, n: int) -> list[nn.Parameter]:
-        inner = getattr(self.model, "_inner", None)
-        if inner is None:
-            inner = getattr(self.model.model, "layoutlmv3", None)
-        if inner is None:
-            raise RuntimeError("lexmem: cannot locate inner encoder for unfreeze_late_n")
-        layers = inner.encoder.layer
-        params: list[nn.Parameter] = []
-        for layer in list(layers)[-n:]:
-            for p in layer.parameters():
-                p.requires_grad = True
-                params.append(p)
-        log.info("lexmem: unfroze last %d encoder layers (staleness guarantee off)", n)
-        return params
+    def _probe_feats(self) -> torch.Tensor:
+        """Raw classifier-input features on the cached probe batches (masked)."""
+        was_training = self.model.training
+        self.model.eval()
+        out: list[torch.Tensor] = []
+        with torch.no_grad():
+            for batch in self._probe_batches:
+                batch = {k: v.to(self.device) for k, v in batch.items()}
+                self.model(**{k: v for k, v in batch.items() if k != "labels"})
+                f = self._cur_feats
+                mask = batch.get("attention_mask")
+                if mask is not None and mask.shape[:2] == f.shape[:2]:
+                    f = f[mask.bool()]
+                else:
+                    f = f.reshape(-1, f.shape[-1])
+                out.append(f.detach().float().cpu())
+        if was_training:
+            self.model.train()
+        return torch.cat(out)
+
+    def _snapshot_probe(self, loader) -> None:
+        """Cache a few task-0 batches + their post-freeze feature snapshot."""
+        for i, batch in enumerate(loader):
+            if i >= self.drift_probe_batches:
+                break
+            self._probe_batches.append(
+                {k: v.detach().cpu().clone() for k, v in batch.items() if torch.is_tensor(v)}
+            )
+        self._probe_feats0 = self._probe_feats()
+        log.info(
+            "lexmem: drift probe cached (%d batches, %d token feats)",
+            len(self._probe_batches),
+            self._probe_feats0.shape[0],
+        )
+
+    def _measure_drift(self, task_id: int) -> None:
+        """CKA + top-1 key cosine of task-0 probe features vs their t0 snapshot."""
+        if self._probe_feats0 is None or not self._probe_batches:
+            return
+        cur = self._probe_feats()
+        cka = _linear_cka(self._probe_feats0, cur)
+        reading = {"cka_t0_feats": round(cka, 4)}
+        if self.mem_enabled:
+            q = F.normalize(cur.to(self.device), dim=-1)
+            keys = self.mem.keys.to(q.dtype)
+            top1 = torch.cat(
+                [(q[i : i + 4096] @ keys.T).max(dim=-1).values for i in range(0, q.shape[0], 4096)]
+            )
+            reading["mean_top1_key_cos"] = round(float(top1.mean()), 4)
+        self._drift[str(task_id)] = reading
+        log.info("lexmem: drift probe after task %d — %s", task_id, reading)
 
     # ── artifact ─────────────────────────────────────────────────────────────
 
@@ -320,10 +460,14 @@ class LexMem(NaiveFineTune):
             "top_k": self.top_k,
             "top_t": self.top_t,
             "select": self.select_mode,
+            "value_space": self.value_space,
+            "mem_enabled": self.mem_enabled,
+            "freeze_late_n": self.freeze_late_n,
             "n_bg_batches": self.mem.n_bg_batches,
             "owner_histogram": hist,
             "selected": {str(t): v for t, v in self._selected.items()},
             "selection_jaccard": overlap,
+            "drift": self._drift,
         }
         path = Path(out_dir) / "lexmem_slots.json"
         path.parent.mkdir(parents=True, exist_ok=True)

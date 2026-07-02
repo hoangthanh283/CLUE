@@ -1,0 +1,23 @@
+name: lexmem_ctrl
+# LexMem control arm — the identical diagnosis-guided freeze map (head + late-4
+# frozen, early/mid trainable) with NO memory head. Isolates what the freeze map
+# alone contributes: if this matches lexmem_v2, the memory is decorative; if v2
+# beats it on retention at equal plasticity, the memory earns its place.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+early_stop_patience: 4
+mem_enabled: false
+mem_optimizer: adamw
+freeze_late_n: 4
+drift_probe_batches: 4
+# Memory geometry keys kept for schema parity (module is built but never activated).
+n_slots: 65536
+top_k: 32
+temp: 0.05
+value_space: feature
+key_init: kmeans
+select: tfidf
+top_t: 4096
+lr_mem: 5.0e-3
