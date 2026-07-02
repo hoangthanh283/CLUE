@@ -1,5 +1,16 @@
 # STATE
 
+## Ledger gate falsified standalone; strategy fork OPEN (2026-07-02 23:30)
+
+- Ledger gate v2 (relational context keys): CORD OWN 76.1 (!) but cumulative
+  FUNSD 21 / SROIE 23 << 60 bar; key-collision interference -18 on CORD.
+  Memory-as-retention falsified at all 3 levels (parametric / +drift-ctrl /
+  input-keyed). Script: scripts/lexical_ledger_gate.py (commit 12dfba2);
+  results/ledger_gate{_v1_unigram,}.json.
+- **USER DECISION PENDING** (asked, away): (a) analysis-paper + v3b spine
+  [recommended], (b) push v3b vs replay, (c) xlingual ledger gate.
+- Meanwhile: v3b seeds 7+123 running overnight (serves all forks).
+
 ## LexMem pilot program COMPLETE (2026-07-02) — 5 arms, dil seed42
 
 | arm | AA | BWT | new-task diag | task-0 drop | note |
