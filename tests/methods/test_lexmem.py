@@ -114,6 +114,19 @@ def test_select_sets_owner_first_claim_only():
     assert set(mem.grad_mask.nonzero().flatten().tolist()) == {0, 2}
 
 
+def test_select_exclude_owned_blocks_foreign_slots():
+    mem = _head(top_k=8)
+    mem.select_topt(torch.tensor([9.0, 9, 0, 0, 0, 0, 0, 0]), t=2, task_id=0, mode="tf")
+    assert mem.slot_owner[0] == 0 and mem.slot_owner[1] == 0
+    # Task 1 hammers task-0's slot 0 but exclude_owned must force fresh slots.
+    counts = torch.tensor([100.0, 0, 9, 8, 0, 0, 0, 0])
+    idx = mem.select_topt(counts, t=2, task_id=1, mode="tf", exclude_owned=True)
+    assert set(idx.tolist()) == {2, 3}, f"owned slot 0 must be excluded, got {idx.tolist()}"
+    # Re-selection of a task's OWN slots stays allowed.
+    idx2 = mem.select_topt(counts, t=2, task_id=0, mode="tf", exclude_owned=True)
+    assert 0 in idx2.tolist()
+
+
 def test_counting_respects_attention_mask():
     mem = _head(n_slots=8, d=8, top_k=1, temp=1.0)
     with torch.no_grad():

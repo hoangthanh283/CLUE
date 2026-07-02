@@ -191,6 +191,10 @@ METHOD_REGISTRY = {
     # LexMem v3: v2 + online EWC restricted to the plastic early/mid bucket
     # (counters the pressure-redirection drift the v2 pilot measured, CKA 0.19).
     "lexmem_v3": LexMem,
+    # LexMem v3b: v3 with lambda retuned (1000 -> 300; CKA 0.999 was over-stiff,
+    # SROIE 51) + hard exclusion of prior-task slots from selection (Jaccard
+    # 0.31 slot overwrite drove task-1 forgetting 51 -> 12).
+    "lexmem_v3b": LexMem,
     # LexSlot-FM: Functional Memory LexSlot (dual-stream; frozen encoder + per-task
     # frozen functional heads, lexically blended with a plastic base head).
     "lexslot_fm": LexSlotFM,
@@ -688,6 +692,7 @@ def main(cfg: DictConfig) -> None:
         "lexmem_v2",
         "lexmem_ctrl",
         "lexmem_v3",
+        "lexmem_v3b",
     }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
         try:

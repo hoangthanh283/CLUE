@@ -86,6 +86,7 @@ class LexMem(NaiveFineTune):
         self.kmeans_iters = int(config.get("kmeans_iters", 8))
         self.key_sample_cap = int(config.get("key_sample_cap", 200_000))
         self.select_mode = str(config.get("select", "tfidf"))
+        self.select_exclude_owned = bool(config.get("select_exclude_owned", False))
         self.lr_mem = float(config.get("lr_mem", 0.05))
         # v2 knobs. Defaults reproduce the v1 pilot exactly (logit values, SGD,
         # full backbone freeze, no probe) so the saved v1 run stays reproducible.
@@ -190,7 +191,13 @@ class LexMem(NaiveFineTune):
             return
 
         counts = self._count_pass(train_loader, desc=f"T{task.task_id} slot-count")
-        idx = self.mem.select_topt(counts, self.top_t, task.task_id, self.select_mode)
+        idx = self.mem.select_topt(
+            counts,
+            self.top_t,
+            task.task_id,
+            self.select_mode,
+            exclude_owned=self.select_exclude_owned,
+        )
         self._selected[task.task_id] = idx.cpu().tolist()
         n_accessed = int((counts > 0).sum())
         log.info(
