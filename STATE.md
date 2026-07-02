@@ -1,5 +1,16 @@
 # STATE
 
+## LexMem pilot in flight (2026-07-02)
+
+- **Active:** background chain waits for the leftover `lexslot_fm` run (pid 3090730) to
+  exit, then auto-launches `method=lexmem scenario=dil seed=42` (log:
+  `results/lexmem_pilot_seed42.log`). Do NOT start any other dataset job meanwhile.
+- **Last decision:** dropped LexSlot/LexSlot-FM after RCA (residual-slot-on-plastic-base
+  is structurally unfixable; good numbers were artifact/hybrid). Rebuilt as LexMem
+  (SMF, arXiv 2510.15103): `doccl/methods/lexmem{,_memory}.py`, config `lexmem`,
+  beads CLUE-b0b. Committed with tests green (275 fast + CIL/DIL e2e × 4 backbones).
+- **Blocked on:** pilot result → go/no-go table in CLUE-b0b notes / ROADMAP.
+
 ## 2025/2026 Baseline Porting (2026-06-29) — ALL 4 COMMITTED ✅
 
 Strengthening the baseline table for top-tier submission (AAAI Jul/ICLR Sep 2026).
