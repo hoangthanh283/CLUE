@@ -1,0 +1,29 @@
+name: lexslot_fm
+# LexSlot-FM Functional Memory LexSlot (dual-stream plasticity-stability).
+# Full encoder freeze + per-task frozen full-rank functional head copies, lexically
+# blended with a plastic base head. No replay, no KD, no Fisher.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+# Max tasks (pre-allocates the FM bank; grow if horizon > max_tasks).
+max_tasks: 10
+# Inference lexical gate (routes docs to their task frozen functional memory).
+infer_gate: true
+# Oracle gate: ground-truth task id used as one-hot gate (for ablation only).
+oracle_gate: false
+# Gate mode: "cls" (learned Linear on [CLS]), "tfidf" (sklearn TF-IDF cosine),
+# "layout" (learned Linear on bbox-derived spatial features), "hybrid" (averaged
+# fusion of layout + TF-IDF), or "oracle".
+# "cls" is the default.
+gate_mode: cls
+# EWC (Fisher-relaxed encoder): set > 0 to unfreeze encoder with EWC regularisation.
+# This allows encoder adaptation (especially for CORD Korean) while protecting
+# old-task features. Uses "online EWC": Fisher accumulates across tasks.
+ewc_lambda: 0
+fisher_n_samples: 200
+# FM re-fitting after encoder shift: re-fit old FM slots on small replay buffers
+# so they stay accurate even after the encoder adapts to new tasks.
+# Set > 0 to enable (number of epochs per old FM slot, on ~50 replay samples).
+fm_refit_epochs: 0
+fm_refit_samples: 50
