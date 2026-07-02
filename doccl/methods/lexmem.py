@@ -52,6 +52,7 @@ import torch.nn.functional as F  # noqa: N812 — canonical torch alias (repo-wi
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from doccl.eval.fisher import empirical_fisher_diagonal
 from doccl.methods.lexmem_memory import LexicalMemoryHead
 from doccl.methods.naive import NaiveFineTune
 from doccl.types import TaskInfo, TrainMetrics
@@ -93,6 +94,14 @@ class LexMem(NaiveFineTune):
         self.mem_optimizer = str(config.get("mem_optimizer", "sgd"))
         self.freeze_late_n = int(config.get("freeze_late_n", -1))
         self.drift_probe_batches = int(config.get("drift_probe_batches", 0))
+        # v3 knob: EWC on the PLASTIC bucket only (the diagnosed-stable early/mid
+        # layers). The v2 pilot measured massive pressure-redirection drift there
+        # (CKA 0.19); this is the stability regularizer where plasticity lives,
+        # while the memory is the architecture where forgetting lives.
+        self.ewc_lambda = float(config.get("ewc_lambda", 0.0))
+        self.fisher_n_samples = int(config.get("fisher_n_samples", 200))
+        self._fisher: dict[str, torch.Tensor] = {}
+        self._theta_star: dict[str, torch.Tensor] = {}
         if not self.mem_enabled and self.freeze_late_n < 0:
             raise ValueError(
                 "lexmem: mem_enabled=false with freeze_late_n=-1 leaves nothing "
@@ -240,6 +249,8 @@ class LexMem(NaiveFineTune):
                 with self._amp_autocast():
                     outputs = self.model(**batch)  # hook applies the memory delta
                     loss = outputs.loss
+                    if self.ewc_lambda > 0 and self._fisher:
+                        loss = loss + self._ewc_penalty()
                 self._amp_backward_step(loss, optimizer, params, max_grad_norm)
                 total_loss += float(loss.item())
                 n_steps += 1
@@ -285,9 +296,52 @@ class LexMem(NaiveFineTune):
             # Fold this task's data into the IDF background so later tasks avoid the
             # slots that now carry learned knowledge (cumulative existing capabilities).
             self._merge_background(train_loader, desc=f"T{task.task_id} bg-count")
+        if self.ewc_lambda > 0:
+            self._accumulate_fisher(task, train_loader)
         if task.task_id > 0:
             self._measure_drift(task.task_id)
         self._save_slot_artifact()
+
+    # ── EWC on the plastic bucket ────────────────────────────────────────────
+
+    def _accumulate_fisher(self, task: TaskInfo, train_loader) -> None:
+        """Fisher diagonal + θ* snapshot for the PLASTIC (trainable) params only.
+
+        Runs after the freeze map, so frozen params receive no grad and drop out
+        naturally; the memory lives outside ``model.named_parameters()``. Online
+        EWC: Fishers sum across tasks (as in lexslot_fm/DocCL).
+        """
+        log.info(
+            "lexmem: computing EWC Fisher on task %d (%d samples)",
+            task.task_id,
+            self.fisher_n_samples,
+        )
+        new_fisher = empirical_fisher_diagonal(
+            self.model, train_loader, n_samples=self.fisher_n_samples, device=self.device
+        )
+        params = dict(self.model.named_parameters())
+        n_prot = 0
+        for name, f_val in new_fisher.items():
+            p = params.get(name)
+            if p is None or not p.requires_grad:
+                continue
+            self._theta_star[name] = p.detach().clone()
+            old = self._fisher.get(name)
+            self._fisher[name] = f_val if old is None else old + f_val
+            n_prot += 1
+        log.info("lexmem: EWC Fisher accumulated — %d plastic tensors protected", n_prot)
+
+    def _ewc_penalty(self) -> torch.Tensor:
+        """(λ/2)·Σ F_i (θ_i − θ*_i)² over the plastic bucket."""
+        params = dict(self.model.named_parameters())
+        penalty = torch.zeros((), device=self.device)
+        for name, fisher_val in self._fisher.items():
+            p = params.get(name)
+            star = self._theta_star.get(name)
+            if p is None or star is None:
+                continue
+            penalty = penalty + (fisher_val * (p - star) ** 2).sum()
+        return (self.ewc_lambda / 2) * penalty
 
     def _apply_freeze_map(self) -> None:
         """Freeze the diagnosed forgetting locus; leave the low-drift bucket plastic.
