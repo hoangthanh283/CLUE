@@ -139,14 +139,26 @@ class LexicalMemoryHead(nn.Module):
         return tf * idf
 
     def select_topt(
-        self, task_counts: torch.Tensor, t: int, task_id: int, mode: str = "tfidf"
+        self,
+        task_counts: torch.Tensor,
+        t: int,
+        task_id: int,
+        mode: str = "tfidf",
+        exclude_owned: bool = False,
     ) -> torch.Tensor:
         """Pick the top-t slots for this task and make ONLY them trainable.
 
         Returns the selected indices. Ownership is recorded on first claim only;
-        the grad mask is per-task (reset on every call).
+        the grad mask is per-task (reset on every call). ``exclude_owned`` makes
+        prior-task slots hard-unavailable (IDF only *discourages* reuse; for
+        lexically close tasks — SROIE↔CORD Jaccard 0.31 — soft discouragement
+        still overwrites a third of the previous task's memory).
         """
-        c = task_counts.to(self.bg_hits.device)
+        c = task_counts.to(self.bg_hits.device).clone()
+        if exclude_owned:
+            owner = self.slot_owner.to(c.device)
+            foreign = (owner >= 0) & (owner != task_id)
+            c[foreign] = 0.0  # unaccessed-equivalent: never rankable below
         t = min(t, self.n_slots)
         if mode == "random":
             accessed = (c > 0).nonzero().flatten()

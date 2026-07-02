@@ -1,0 +1,30 @@
+name: lexmem_v3b
+# LexMem v3b — v3 with the two measured failure modes addressed:
+#   1. SROIE on-task 51.1 (< 75 bar): ewc_lambda 1000 over-stiffened the trunk
+#      (task-0 CKA 0.999 — functionally frozen). 300 aims for CKA ~0.9-0.95,
+#      buying the far-domain task feature room while keeping task-0 anchored.
+#   2. Task-1 forgetting 51.1 -> 11.9: CORD's selection overwrote 31% of SROIE's
+#      slots (Jaccard 0.31 — IDF only discourages reuse between lexically close
+#      receipt tasks). select_exclude_owned hard-excludes prior-task slots.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+early_stop_patience: 4
+n_slots: 65536
+top_k: 32
+temp: 0.05
+value_space: feature
+key_init: kmeans
+kmeans_iters: 8
+key_sample_cap: 200000
+select: tfidf
+select_exclude_owned: true
+top_t: 4096
+mem_optimizer: adamw
+lr_mem: 5.0e-3
+freeze_late_n: 4
+drift_probe_batches: 4
+mem_enabled: true
+ewc_lambda: 300.0
+fisher_n_samples: 200
