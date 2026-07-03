@@ -95,6 +95,11 @@ class LexMem(NaiveFineTune):
         self.mem_optimizer = str(config.get("mem_optimizer", "sgd"))
         self.freeze_late_n = int(config.get("freeze_late_n", -1))
         self.drift_probe_batches = int(config.get("drift_probe_batches", 0))
+        # v4 knobs (Gaussian head-replay family): keep the head trainable after
+        # task 0 so distributional replay can realign it; exclude it from EWC so
+        # the penalty doesn't fight the realignment.
+        self.freeze_head = bool(config.get("freeze_head", True))
+        self.ewc_exclude_head = bool(config.get("ewc_exclude_head", False))
         # v3 knob: EWC on the PLASTIC bucket only (the diagnosed-stable early/mid
         # layers). The v2 pilot measured massive pressure-redirection drift there
         # (CKA 0.19); this is the stability regularizer where plasticity lives,
@@ -186,7 +191,7 @@ class LexMem(NaiveFineTune):
         if task.task_id == 0:
             return
         for p in self.model.model.classifier.parameters():
-            p.requires_grad = False
+            p.requires_grad = not self.freeze_head
         if not self.mem_enabled:
             return
 
@@ -332,6 +337,8 @@ class LexMem(NaiveFineTune):
             p = params.get(name)
             if p is None or not p.requires_grad:
                 continue
+            if self.ewc_exclude_head and "classifier" in name:
+                continue
             self._theta_star[name] = p.detach().clone()
             old = self._fisher.get(name)
             self._fisher[name] = f_val if old is None else old + f_val
@@ -367,7 +374,7 @@ class LexMem(NaiveFineTune):
                 for p in layer.parameters():
                     p.requires_grad = False
         for p in self.model.model.classifier.parameters():
-            p.requires_grad = False
+            p.requires_grad = not self.freeze_head
         n_train = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         log.info(
             "lexmem: freeze map — freeze_late_n=%d, head frozen; trainable backbone " "params=%d",
