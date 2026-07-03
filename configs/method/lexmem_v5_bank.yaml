@@ -1,0 +1,27 @@
+name: lexmem_v5
+# LexMem v5 — edges-OFF ablation (the FeCAM-style independent-node bank arm).
+# IDENTICAL to lexmem_v5.yaml except edges_enabled=false: same nodes, same
+# storage, but reconstruction samples each class Gaussian in isolation with NO
+# message-passing. This isolates the entire contribution of the relational graph
+# (Claim A: AA(edges-on) - AA(edges-off) >= +3). See the design doc.
+#
+# name is deliberately "lexmem_v5" (same method class); the run-name family
+# suffix distinguishes the ablation on disk.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+early_stop_patience: 4
+mem_optimizer: adamw
+freeze_late_n: 4
+drift_probe_batches: 0
+ewc_lambda: 300.0
+fisher_n_samples: 200
+key_sample_cap: 200000
+edges_enabled: false      # <-- the ablation: independent-node bank, no relations
+cov_rank: 0
+n_hops: 2
+edge_temp: 1.0
+recon_per_class: 64
+recon_weight: 1.0
+head_lr: 5.0e-5

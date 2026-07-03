@@ -1,0 +1,32 @@
+name: lexmem_v5
+# LexMem v5 — relational reconstruction memory (graph-as-memory). See
+# docs/design/LEXMEM_V5_GRAPH_RECONSTRUCTION.md. Tracks CLUE-yc4.
+#
+# Reuses the v3b trunk recipe (freeze_late_n=4, online EWC lambda=300) so the
+# trunk stays stable and stored per-class Gaussians remain approximately valid.
+# Departure from v3b: the KV-slot memory is OFF; the classifier head is PLASTIC
+# and is consolidated on features reconstructed from the growing graph each
+# session (the synthesised-replay signal that grounds the head).
+#
+# This is the edges-ON arm. Pair with lexmem_v5_bank (edges-OFF) for the Claim-A
+# ablation: same nodes, same storage, message-passing vs independent-node bank.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+early_stop_patience: 4
+mem_optimizer: adamw
+freeze_late_n: 4
+drift_probe_batches: 0
+ewc_lambda: 300.0
+fisher_n_samples: 200
+# key_sample_cap caps how many token features are gathered per task for node stats.
+key_sample_cap: 200000
+# --- graph knobs ---
+edges_enabled: true       # message-passing on (relational reconstruction)
+cov_rank: 0               # Stage 1: diagonal covariance only (low-rank omitted)
+n_hops: 2                 # message-passing hops over the node graph
+edge_temp: 1.0
+recon_per_class: 64       # reconstructed samples per past class-node per step
+recon_weight: 1.0         # weight of the head-consolidation loss
+head_lr: 5.0e-5           # learning rate for the (now-plastic) classifier head

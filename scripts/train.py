@@ -39,6 +39,7 @@ from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
 from doccl.methods.lca import LCA
 from doccl.methods.lexmem import LexMem
+from doccl.methods.lexmem_v5 import LexMemV5
 from doccl.methods.lexslot import LexSlot
 from doccl.methods.lexslot_fm import LexSlotFM
 from doccl.methods.lwf import LwF
@@ -195,6 +196,11 @@ METHOD_REGISTRY = {
     # SROIE 51) + hard exclusion of prior-task slots from selection (Jaccard
     # 0.31 slot overwrite drove task-1 forgetting 51 -> 12).
     "lexmem_v3b": LexMem,
+    # LexMem v5: relational reconstruction memory (graph-as-memory). Stores per-class
+    # feature Gaussians as growing-graph nodes; reconstructs (feature,label) training
+    # signal via message-passing and consolidates into the head. edges_enabled toggles
+    # the Stage-1 ablation (message-passing vs FeCAM-style independent-node bank).
+    "lexmem_v5": LexMemV5,
     # LexSlot-FM: Functional Memory LexSlot (dual-stream; frozen encoder + per-task
     # frozen functional heads, lexically blended with a plastic base head).
     "lexslot_fm": LexSlotFM,
@@ -378,6 +384,12 @@ def main(cfg: DictConfig) -> None:
             run_name += f"_{slot_depth}"
         if slot_sharing != "soft":
             run_name += f"_{slot_sharing}"
+    elif cfg.method.name == "lexslot_fm":
+        # LexSlot-FM has a gate_mode axis. The canonical default is "layout"; any
+        # other gate mode gets a suffix so ablation runs are distinct.
+        gate_mode = cfg.method.get("gate_mode", "layout")
+        if gate_mode != "layout":
+            run_name += f"_{gate_mode}"
     elif target_component is not None:
         run_name += f"_{target_component}"
     run = wandb.init(
@@ -693,6 +705,7 @@ def main(cfg: DictConfig) -> None:
         "lexmem_ctrl",
         "lexmem_v3",
         "lexmem_v3b",
+        "lexmem_v5",
     }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
         try:
