@@ -1,0 +1,31 @@
+name: gauss_replay
+# Gaussian head-replay on the drift-controlled trunk (LexMem-v4 family) —
+# experiment #2 of the analysis program. The head-refit oracle bounded head-only
+# recovery on a NAIVE trunk at AA ~55 (features forget), so distributional head
+# replay runs on the v3b trunk recipe (freeze late-4 locus + EWC'd early/mid,
+# task-0 CKA ~0.99). Exemplar-free: stores per-(class x task) diagonal Gaussians
+# (means/vars/counts), never documents. Head stays trainable and outside EWC;
+# every step adds replay CE on features sampled from all prior tasks.
+# Gate bars: AA >= 80 go | 70-80 rework | <= 70 falsified (4th chain level).
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+early_stop_patience: 4
+# Trunk recipe (inherited from lexmem_v3b, minus the KV memory).
+mem_enabled: false
+freeze_late_n: 4
+ewc_lambda: 300.0
+fisher_n_samples: 200
+drift_probe_batches: 4
+# v4 head policy.
+freeze_head: false
+ewc_exclude_head: true
+# Gaussian replay.
+replay_tokens: 1024      # sampled old-task feature tokens per training step
+replay_weight: 1.0
+gauss_max_tokens: 50000  # per-task token cap when fitting the Gaussians
+# Inert memory-geometry keys for schema parity with the lexmem family.
+n_slots: 64
+top_k: 4
+top_t: 8

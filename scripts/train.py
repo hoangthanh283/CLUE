@@ -38,6 +38,7 @@ from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
 from doccl.methods.lca import LCA
+from doccl.methods.gauss_replay import GaussReplay
 from doccl.methods.lexmem import LexMem
 from doccl.methods.lexmem_v5 import LexMemV5
 from doccl.methods.lexslot import LexSlot
@@ -192,6 +193,9 @@ METHOD_REGISTRY = {
     # LexMem v3: v2 + online EWC restricted to the plastic early/mid bucket
     # (counters the pressure-redirection drift the v2 pilot measured, CKA 0.19).
     "lexmem_v3": LexMem,
+    # Gaussian head-replay on the v3b drift-controlled trunk (exemplar-free,
+    # stores per-(class x task) feature Gaussians) — analysis-program experiment #2.
+    "gauss_replay": GaussReplay,
     # LexMem v3b: v3 with lambda retuned (1000 -> 300; CKA 0.999 was over-stiff,
     # SROIE 51) + hard exclusion of prior-task slots from selection (Jaccard
     # 0.31 slot overwrite drove task-1 forgetting 51 -> 12).

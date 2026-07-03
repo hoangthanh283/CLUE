@@ -37,6 +37,7 @@ from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
 from doccl.methods.lca import LCA
+from doccl.methods.gauss_replay import GaussReplay
 from doccl.methods.lexmem import LexMem
 from doccl.methods.lexslot import LexSlot
 from doccl.methods.lwf import LwF
@@ -212,6 +213,22 @@ _METHOD_CFG = {
         "top_k": 4,
         "top_t": 8,
     },
+    # Gaussian head-replay on the drift-controlled trunk (tiny everything).
+    "gauss_replay": {
+        "mem_enabled": False,
+        "freeze_head": False,
+        "ewc_exclude_head": True,
+        "freeze_late_n": 1,
+        "ewc_lambda": 100.0,
+        "fisher_n_samples": 2,
+        "drift_probe_batches": 1,
+        "replay_tokens": 16,
+        "replay_weight": 1.0,
+        "gauss_max_tokens": 256,
+        "n_slots": 64,
+        "top_k": 4,
+        "top_t": 8,
+    },
     # LexMem v3: v2 + EWC on the plastic bucket (tiny Fisher for speed).
     "lexmem_v3": {
         "n_slots": 64,
@@ -257,6 +274,7 @@ _METHOD_CLS = {
     "lexmem_v2": LexMem,
     "lexmem_ctrl": LexMem,
     "lexmem_v3": LexMem,
+    "gauss_replay": GaussReplay,
 }
 
 
