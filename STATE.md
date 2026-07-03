@@ -1,5 +1,37 @@
 # STATE
 
+## Analysis program: experiments 1-3 COMPLETE (2026-07-03)
+
+**#1 Head-refit oracle (LOW branch):** pooled probe on naive trunk AA 55.3
+(FUNSD per-task probe caps at 41.9). Representation forgetting is REAL in
+doc-IE — Davari's "representations survive" does NOT transfer. All head-only
+methods on a naive trunk ceiling-bounded at ~55. results/head_refit_oracle.json
+
+**#2 Gaussian head-replay (FALSIFIED, 4th chain level):** AA 63.6 ≈ v3b 66.1±3.0.
+Failure signature IDENTICAL across head mechanisms (slots vs replay: SROIE
+~67→~17 despite balanced head gradients) => mid-task bottleneck is per-task
+REPRESENTATION drift, not head misalignment. results/dil_gauss_replay_seed42
+
+**#3 Retention-information curve (dil seed42):**
+| stored | AA |
+| naive (nothing) | 41.3 |
+| input counts (ledger) | 33.8 |
+| naive-trunk probe ceiling | 55.3 |
+| ER 1 doc/task | 57.6 |
+| feature Gaussians | 63.6 |
+| slot memory (v3b, 3 seeds) | 66.1 ± 3.0 |
+| **ER 5 docs/task** | **82.1** |
+| ER 10 docs/task | 84.8 |
+| ER 50/task | 85.6 | ER-200 87.9 | joint 88.7 |
+=> FIVE raw documents per task beat every buffer-free memory we built by 16 AA.
+Sharpened claim: raw inputs are the only storage that survives representation
+drift (encoder re-renders current features); all derived quantities go stale.
+Runs: results/retention_curve/er_buf{3,15,30,150}.
+
+**Remaining: #4 migration robustness** (2 freeze maps x 2 task orders +
+cil_cord_long) — needs dil task-order scenario variants. Then thesis writing.
+v3b 3-seed: AA 66.1±3.0. gauss_replay code committed (bec95b4).
+
 ## LexSlot-FM: FM refit bug FIXED — AA +5.25/+5.68 on both gate modes (2026-07-03)
 
 - **Bug found + fixed:** `_refit_old_fm_slots` ran `self.model.eval()` → forward hook
