@@ -34,11 +34,11 @@ from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.er import ER
 from doccl.methods.er_cflat import ERCFlat
 from doccl.methods.ewc import EWC
+from doccl.methods.gauss_replay import GaussReplay
 from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
 from doccl.methods.lca import LCA
-from doccl.methods.gauss_replay import GaussReplay
 from doccl.methods.lexmem import LexMem
 from doccl.methods.lexmem_v5 import LexMemV5
 from doccl.methods.lexslot import LexSlot
