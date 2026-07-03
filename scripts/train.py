@@ -390,6 +390,12 @@ def main(cfg: DictConfig) -> None:
         gate_mode = cfg.method.get("gate_mode", "layout")
         if gate_mode != "layout":
             run_name += f"_{gate_mode}"
+    elif cfg.method.name == "lexmem_v5":
+        # LexMem v5's ablation axis is edges_enabled (message-passing vs the
+        # independent-node bank). The canonical full method is edges-on (no suffix);
+        # the edges-off bank gets a "_bank" suffix so the two arms never collide.
+        if not cfg.method.get("edges_enabled", True):
+            run_name += "_bank"
     elif target_component is not None:
         run_name += f"_{target_component}"
     run = wandb.init(
