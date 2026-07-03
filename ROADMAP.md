@@ -28,17 +28,26 @@ The LexSlot items below are superseded except as honest negative-result material
   hand-kept inline); add a component-separability defense paragraph up front in ch2/ch3.
 
 ## Next Up
-1. **Launch the full multi-backbone grid on a rented GPU.** Code + grid are ready
+1. **LexSlot-FM FM refit fix landed (AA 48.67).** Next directions (decide):
+   - **(a) Increase refit budget** — FM_1 (SROIE) needs >50 samples to recover from
+     encoder drift. Try `fm_refit_samples=200` / `fm_refit_epochs=10` → if T1 recovers to
+     ~40+, AA targets 55+.
+   - **(b) Conditional gate** — TF-IDF for Korean/English decision (T2=88.64 best), then
+     layout within English (T0=40.78, T1=20.35). Would combine best of both.
+   - **(c) More seeds** — run seeds 0-4 for variance estimates on the fixed refit.
+   - **(d) Analysis-paper pivot** — document the FM refit mechanism and the T1/T2
+     tradeoff as a controllable bias-variance knob in functional-memory methods.
+2. **Launch the full multi-backbone grid on a rented GPU.** Code + grid are ready
    (commits `8557ac6`/`d76ad3d`/`170f81a`, pushed). The default `bash
    scripts/run_grid_multigpu.sh` is now the 873-job sweep (LayoutLMv3 + all 14 methods ×
    {lilt,bros,bert}). Local RTX 2060 can't fit it → use `scripts/setup_remote.sh` +
    `docs/MULTI_MACHINE_RUN.md` / `RUNBOOK.md`. Preview first with `DRY_RUN=1`. Resume-safe
    (257 runs already `.done`). Watch `results/logs/progress.json` + the heartbeat.
-2. **Analyze → thesis.** When the sweep finishes: `analyze_results.py --source local`
+3. **Analyze → thesis.** When the sweep finishes: `analyze_results.py --source local`
    (or remote) → `all_runs.csv`, `pivot_*.csv`, `table_*.tex`, figures →
    `ingest_to_thesis.py` → build the secondary-backbone **generalization tables**
    (does the forgetting locus + the proposed method transfer across LiLT/BROS/BERT?).
-3. **Let the local `dil_lexslot_seed42` run finish** (in progress at session end) before
+4. **Let the local `dil_lexslot_seed42` run finish** (in progress at session end) before
    starting anything else heavy on the local box — it fits exactly one job.
 
 ## Deferred
