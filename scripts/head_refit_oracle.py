@@ -130,6 +130,9 @@ def main() -> None:
     model = LayoutLMv3Wrapper(model_name="microsoft/layoutlmv3-base", num_labels=len(labels0))
     model.label_to_id = {l: i for i, l in enumerate(labels0)}  # noqa: E741
     model.id_to_label = {i: l for l, i in model.label_to_id.items()}  # noqa: E741
+    # BEFORE method construction: ContinualMethod derives self.device from the
+    # model's parameters (base.py:95), exactly as train.py does at line ~418.
+    model = model.to(device)
     if device == "cuda":
         model.enable_gradient_checkpointing()
     method = NaiveFineTune(model, dict(NAIVE_CFG))
