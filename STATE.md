@@ -1,5 +1,24 @@
 # STATE
 
+## LexMem v5 (graph-as-memory) Stage 1 IMPLEMENTED — DIL gate queued (2026-07-03)
+
+- **Direction chosen (user):** memory breakthrough via *reconstruction*, not storage.
+  Memory-as-graph: per-class feature Gaussians as growing-graph nodes; reconstruct
+  (feature,label) training signal by K-hop message-passing over a node+neighbours;
+  consolidate into a (re-plasticized) head. Synthesises replay's balanced all-task
+  gradient without storing docs. Design: `docs/design/LEXMEM_V5_GRAPH_RECONSTRUCTION.md`.
+  Findings spine (why every prior buffer-free method failed): `docs/FINDINGS_ANALYSIS_PAPER_2026-07.md`.
+- **Implemented (CLUE-yc4, commits bc82ff7/f2b8b33):** `doccl/methods/lexmem_v5.py`
+  (RelationalMemory graph + LexMemV5 on the v3b spine, head kept plastic),
+  configs `lexmem_v5` (edges-on) / `lexmem_v5_bank` (edges-off ablation), registry +
+  `_STD_FORWARD` + run-name suffix (`_bank`). 9 unit tests + full 287 fast suite GREEN.
+- **GATE (Claim A), NOT YET RUN — GPU busy:** DIL seed42 edges-on vs edges-off (bank).
+  Bar: AA(on)−AA(off) ≥ +3 AND on > 66 (LexMem-v3b asymptote). Launcher staged (do NOT
+  start competing): `scratchpad/run_v5_edge_ablation.sh` (resume-safe, waits for clear GPU).
+- **GPU currently running the healthy oracle→seeds chain** (a prior session's
+  `run_oracle_then_seeds.sh`, PID watcher 4120084): head-refit oracle (task 0 now) →
+  v3b seeds 7,123. v5 gate must run AFTER that frees. No crash-loop; leave it alone.
+
 ## Ledger gate falsified standalone; strategy fork OPEN (2026-07-02 23:30)
 
 - Ledger gate v2 (relational context keys): CORD OWN 76.1 (!) but cumulative
