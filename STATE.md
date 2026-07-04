@@ -1,5 +1,23 @@
 # STATE
 
+## SESSION HANDOFF (2026-07-04 close)
+
+- **Done this session:** v5 graph-as-memory gate run to completion → FALSIFIED
+  (both arms AA 63/SROIE 13, byte-identical). Found+fixed the val-restore no-op bug.
+  Then the KEY pivot (user): v5's mechanism = solved literature (FeCAM/FeTrIL/PASS) →
+  **reframed the whole program as a diagnostic+falsification paper, v5 = tombstone.**
+  Docs `docs/FINDINGS_ANALYSIS_PAPER_2026-07.md` + STATE updated & pushed (7514cf3).
+- **Quality gates:** 287 fast tests green, ruff clean on v5+train.py.
+- **NEXT SESSION = WRITE THE PAPER, not more methods.** Lead = migration finding +
+  convergent negative result. Concrete next steps (cheapest first, per program review):
+  (1) head-refit probe oracle already done (AA 55.3 — representation forgetting is REAL);
+  (2) exp #4 migration robustness (2 freeze maps × 2 task orders + cil_cord_long) — the
+  one remaining experiment; (3) relabel thesis "LexSlot 87.3" row (it's the DocCL hybrid).
+- **KNOWN BLOCKER:** `bd` is in a degraded re-clone-warning state (stray dolt server
+  killed but local DB still complaining). Paper-reframe follow-up issue NOT filed in bd —
+  captured here + in FINDINGS doc instead. Fix bd (or `bd export`/re-clone carefully)
+  before relying on it next session. Don't block on it.
+
 ## FRAMING LOCKED: diagnostic+falsification paper, NOT a method paper (2026-07-04)
 
 - **Decision (user):** v5 (feature-Gaussian graph replay) is NOT a contribution.
