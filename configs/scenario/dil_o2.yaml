@@ -1,0 +1,4 @@
+name: dil_o2
+# Order-permuted DIL (migration-robustness study): SROIE -> CORD -> FUNSD.
+kwargs:
+  order: [1, 2, 0]
