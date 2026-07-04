@@ -15,8 +15,13 @@
   if the LEAD is the migration finding, never a method.
 - **Docs updated:** `docs/FINDINGS_ANALYSIS_PAPER_2026-07.md` (v5 = falsification level 4;
   "is NOT a method paper" section). v5 code stays (evidence), no further method work on it.
-- **In flight:** v5 edges-off bank arm finishing (completes the on-vs-off falsification
-  row); exact ΔAA no longer load-bearing — v5 is a tombstone either way.
+- **v5 gate COMPLETE (both arms):** edges-on = edges-off = AA 63.17, SROIE→13.0,
+  BYTE-IDENTICAL (ΔAA exactly 0.00) despite differing recon-loss streams (1.42 vs 0.013).
+  → do NOT claim an edges ablation; the head-side signal is swamped by trunk drift (recon
+  grad reaches head but doesn't move the evaluated model). Uninformative ablation is itself
+  consistent with Finding 3 (bottleneck = trunk representation drift, not head). v5 = tombstone.
+  Runs: results/dil_lexmem_v5_seed42{,_bank}. Earlier byte-identical pair (pre-fix, from
+  the val-restore bug) archived at results/_invalid_v5_restore_bug/.
 
 ## Analysis program: experiments 1-3 COMPLETE (2026-07-03)
 
