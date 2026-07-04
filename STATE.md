@@ -1,5 +1,23 @@
 # STATE
 
+## FRAMING LOCKED: diagnostic+falsification paper, NOT a method paper (2026-07-04)
+
+- **Decision (user):** v5 (feature-Gaussian graph replay) is NOT a contribution.
+  Its core mechanism = PASS/FeTrIL/FeCAM (solved 2021-2023) → un-submittable as novelty.
+  v5 enters the paper ONLY as the **terminal tombstone** of the falsification chain:
+  even the field's strongest buffer-free tool (+ a novel relational variant) can't beat
+  representation drift (edges-on AA 63.2, SROIE→13.0).
+- **The paper's actual novelty:** (1) the diagnosis — forgetting is head-localized,
+  architecture-general, and the locus MIGRATES under naive protection; (2) a rigorous
+  convergent negative result: FIVE buffer-free families fail for one identified reason
+  (representation drift), so "only replay grounds the head." NOT any method.
+- **Venue:** CoLLAs/TMLR/ACL-Findings for the negative result; AAAI/ICML main-track only
+  if the LEAD is the migration finding, never a method.
+- **Docs updated:** `docs/FINDINGS_ANALYSIS_PAPER_2026-07.md` (v5 = falsification level 4;
+  "is NOT a method paper" section). v5 code stays (evidence), no further method work on it.
+- **In flight:** v5 edges-off bank arm finishing (completes the on-vs-off falsification
+  row); exact ΔAA no longer load-bearing — v5 is a tombstone either way.
+
 ## Analysis program: experiments 1-3 COMPLETE (2026-07-03)
 
 **#1 Head-refit oracle (LOW branch):** pooled probe on naive trunk AA 55.3

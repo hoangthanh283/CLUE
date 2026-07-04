@@ -1,9 +1,16 @@
 # Findings: The Anatomy of Forgetting in Multimodal Document IE
 
-**Date:** 2026-07-02
+**Date:** 2026-07-02 (v5 reframe added 2026-07-04)
 **Status:** Consolidated articulation of the full research program (diagnostic pilot →
-7 proposed/ported methods → falsification chain). This is the argument spine of the
-analysis paper (the direction chosen on 2026-07-02: analysis paper + LexMem-v3b spine).
+8 proposed/ported methods → falsification chain). This is the argument spine of the
+analysis paper. **Framing decision (2026-07-04): this is a DIAGNOSTIC + FALSIFICATION
+paper, not a method paper.** No proposed method beats replay; each is evidence in a
+convergent negative result. In particular LexMem v5 (feature-Gaussian graph replay) is
+NOT a contribution — feature-statistic replay is a solved 2021-2023 subfield (PASS
+CVPR'21, FeTrIL WACV'23, FeCAM NeurIPS'23). v5 enters the paper only as the *terminal
+tombstone* of the falsification chain: the strongest, most literature-standard
+buffer-free method (plus a novel relational variant) STILL cannot beat representation
+drift. Its value is as evidence, not as a method.
 
 All numbers are from ground-truth artifacts: `STATE.md`, `results/ledger_gate*.json`,
 `thesis/generated/table_main.tex`, `results/dil_lexmem*_seed42/metrics.json`.
@@ -91,9 +98,11 @@ in this program lands at or near the floor:
 | LexSlot / LexSlot-FM (ours) | residual lexical slot memories on a plastic base | DROPPED (RCA) | standalone ≈ naive (AA ~42); the 87.3 figure was the DocCL hybrid (replay+KD+Fisher), not the standalone method |
 | LexMem v3b (ours, SMF port) | frozen-after-task-0 base + sparse KV logit memory + trunk EWC | partial — "EWC++" | AA 66.0, task-0 drop −4.4 (bar passed), but mid-task SROIE 68 < 75; asymptote ~22 pts below replay |
 | Lexical Ledger (ours) | input-anchored (lexeme × layout-cell) append-only memory, zero-training probe | FALSIFIED | own-ledger CORD 76.1, but **cumulative** ledger (what sequential CL actually produces) collapses: FUNSD 21 / SROIE 23 ≪ 60 bar; key collisions cost −18 on CORD |
+| LexMem v5 (ours) | feature-Gaussian **generative replay** into a drift-controlled head; edges-on = novel *relational* variant (class prototypes reconstructed via graph message-passing) vs edges-off = standard independent-prototype replay (FeCAM-style) | FALSIFIED (terminal) | edges-on AA 63.2, row [FUNSD 86.6 / **SROIE 13.0** / CORD 89.9]: the mid-task collapses to 13 — even the field-standard buffer-free method, and a novel graph variant of it, cannot beat representation drift. (Not a contribution; the strongest tombstone.) |
 
 **The falsification chain.** The hypothesis "an explicit memory can substitute for
-replay" was tested at three successively weaker (more drift-immune) levels:
+replay" was tested at four successively stronger / more literature-standard levels,
+all falsified:
 
 1. **Parametric slot memory on a plastic base** (LexSlot) — falsified: the base drifts
    under the slots, and residual corrections written in an old feature space are
@@ -106,6 +115,14 @@ replay" was tested at three successively weaker (more drift-immune) levels:
    raw lexeme × layout cells, no learned features at all) — falsified: without a
    shared feature space, task-conditional retrieval fails; merged ledgers collide and
    cumulative accuracy collapses even though per-task ledgers are strong (76.1 own).
+4. **Feature-Gaussian generative replay — the field's own strongest buffer-free tool**
+   (LexMem v5; independent-prototype replay = PASS/FeTrIL/FeCAM, plus a novel relational
+   graph variant) — falsified: AA 63.2, mid-task SROIE collapses to 13.0. This is the
+   decisive level: the mechanism the CIL literature holds up as the exemplar-free answer
+   still cannot survive representation drift in doc-IE, and neither does making it
+   relational. **The method is not the contribution — its failure is.** It closes the
+   chain: if *this* can't do it, no buffer-free memory can, and the "only replay grounds
+   the head" claim (Finding 3) is complete.
 
 **Interpretation / mechanism.** The shared classifier head must place N tasks'
 conflicting label geometries into one weight matrix. Merging cancels conflicting rows;
@@ -140,16 +157,29 @@ rather than a proxy for it.
 
 **Is:** a diagnostic + falsification paper. (1) A multi-backbone anatomy of forgetting
 in multimodal doc IE (localized, general, migrating). (2) A controlled demonstration
-that four distinct buffer-free consolidation families fail *for identified mechanistic
-reasons*, with LexMem-v3b as the buffer-free positive control showing what partial
-recovery looks like (AA 66) and precisely where it asymptotes (mid-task trunk drift
-under task-0-dominated online Fisher). (3) The implication: in this regime the research
-question is not "how to avoid the buffer" but "how small can the buffer be / what must
-it contain" — replay's gradients are doing something no tested surrogate replicates.
+that FIVE distinct buffer-free consolidation families fail *for identified mechanistic
+reasons* — weight-merge (DocMERGE/LCA), subspace-transfer (HGT/CUBER), parametric slots
+(LexSlot), input-anchored memory (Ledger), and **feature-Gaussian generative replay, the
+field's own strongest exemplar-free tool** (LexMem v5 ≈ PASS/FeTrIL/FeCAM + a novel
+relational variant). LexMem-v3b is the positive control (AA 66, where partial recovery
+asymptotes); v5 is the terminal negative (AA 63, mid-task → 13, even the standard method
+fails). (3) The implication: in this regime the research question is not "how to avoid
+the buffer" but "how small can the buffer be / what must it contain" — replay's gradients
+are doing something no tested surrogate replicates.
 
-**Is not:** a SoTA-method paper. No proposed method beats replay; the thesis
-"LexSlot (ours) 87.3" row is the DocCL hybrid and must be relabeled before submission
-(tracked, deferred).
+**Is NOT a method paper — and must not be pitched as one.** Every proposed method is
+evidence, not a contribution. Concretely, v5's core mechanism (feature-statistic replay)
+is *already solved literature* — pitching it as novel would be a desk-reject at
+AAAI/ICML. The novelty of the paper is the **diagnosis** (localization + migration) and
+the **rigorous convergent negative result** ("nothing buffer-free works, and here is the
+mechanism"). The novel bits inside methods (v5's relational replay, HRP's routing) are
+reported honestly as *tried and insufficient*, which strengthens the negative result
+rather than pretending to a SoTA claim. The thesis "LexSlot (ours) 87.3" row is the
+DocCL hybrid and must be relabeled before submission (tracked).
+
+**Venue implication:** a negative-result-with-mechanism paper fits CoLLAs / TMLR /
+ACL-Findings naturally; for AAAI/ICML main-track the lead must be the migration finding,
+not any method.
 
 **Gating work before submission:**
 1. LexMem-v3b multi-seed (7, 123) — the spine's error bars. Currently **stalled**: the
