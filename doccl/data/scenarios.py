@@ -648,6 +648,10 @@ SCENARIO_REGISTRY = {
         num_sessions=kw.pop("num_sessions", 8), **kw
     ),
     "dil": build_dil,
+    # Order-permuted DIL for the locus-migration robustness study (order comes
+    # from the scenario config's ``kwargs.order``; the builder validates it).
+    "dil_o2": build_dil,
+    "dil_o3": build_dil,
     "dil_receipts": build_dil_receipts,
     "dil_xlingual": build_dil_xlingual,
     "mixed": build_mixed,
