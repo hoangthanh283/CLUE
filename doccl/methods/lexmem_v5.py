@@ -33,7 +33,6 @@ from dataclasses import dataclass, field
 
 import torch
 import torch.nn.functional as F  # noqa: N812 — canonical torch alias (repo-wide)
-from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -361,14 +360,20 @@ class LexMemV5(LexMem):
                 }
             )
         params = head_params + backbone
-        snap = nn.ModuleList([head])
         opt_cls = torch.optim.AdamW if self.mem_optimizer == "adamw" else torch.optim.SGD
         optimizer = opt_cls(groups)
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
-        stopper = self.make_early_stopper(val_loader)
         self._amp_setup()
 
+        # NOTE: v5 deliberately does NOT use best-val-F1 restoration. The validation
+        # signal available here is CURRENT-task F1, which the reconstruction-
+        # consolidation loss (targeting PAST tasks) barely moves. Restoring the
+        # best-current-F1 epoch therefore reverts exactly the recon updates that make
+        # edges-on differ from edges-off — collapsing the whole method to a no-op and
+        # producing byte-identical arms (the bug this replaces). We instead keep the
+        # fully consolidated final state and use a fixed epoch budget. Patience-based
+        # *stopping* on a retention signal is future work (needs all-seen-task loaders).
         past_ids = self.graph.node_ids_for_tasks(set(range(task.task_id)))
         total_loss, n_steps = 0.0, 0
         for epoch in range(epochs):
@@ -386,16 +391,10 @@ class LexMemV5(LexMem):
                 self._amp_backward_step(loss, optimizer, params, max_grad_norm)
                 total_loss += float(loss.item())
                 n_steps += 1
-                pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+                pbar.set_postfix(
+                    {"loss": f"{loss.item():.4f}", "recon": f"{float(recon_loss):.3f}"}
+                )
             self._log_weight_diagnostics()
-            if stopper.enabled and val_loader is not None:
-                val_f1 = self.current_task_val_f1(val_loader)
-                if stopper.step(val_f1, snap, epoch):
-                    log.info(
-                        "v5 T%s ep%d early stop (val_f1=%.4f)", task.task_id, epoch + 1, val_f1
-                    )
-                    break
-        stopper.restore_best(snap)
         return TrainMetrics(
             task_id=task.task_id, loss=total_loss / max(n_steps, 1), n_steps=n_steps
         )
