@@ -1,5 +1,24 @@
 # STATE
 
+## Experiment #4 COMPLETE — migration robustness (2026-07-05). PROGRAM DONE -> WRITING
+
+8 runs (lexmem_ctrl freeze vs free, seed42, drift-probed):
+| arm | AA | BWT | t0-final | t0-CKA trace |
+| o2_freeze / o2_free | 46.6 / 47.6 | -63 / -62 | 4.3 / 4.7 | .08,.22 / .14,.25 |
+| o3_freeze / o3_free | 30.6 / 32.0 | -86 / -85 | 5.8 / 7.9 | .40,.19 / .48,.20 |
+| map8 (4 plastic) / map1 (11 plastic) | 40.8 / 39.7 | -73 / -75 | 20.7 / 17.7 | ~.24 endpoint both |
+| long_freeze / long_free (10-session CIL) | 9.3 / 9.5 | -83 / -80 | 0 / 0 | ~.1-.2 across 9 boundaries |
+
+**LAW (strongest form): total forgetting is CONSERVED under architectural
+constraint — freeze-vs-free AA within 1-2 pts in every order, map, and horizon;
+only the locus moves.** Freeze arms prove localization structurally (head+late
+frozen => endpoint CKA collapse can only originate early/mid). Dose-response:
+even 4 plastic layers absorb the full drift (map8 ~= map1). Long horizon: the
+effect compounds to t0-F1=0 over 10 boundaries regardless of map.
+
+All 4 program experiments done: oracle (55.3 low branch) / gauss-replay
+falsified (63.6) / retention curve (5 raw docs 82 > all buffer-free) /
+migration law. results/migration/*. NEXT: thesis/paper writing.
 ## SESSION HANDOFF (2026-07-04 close)
 
 - **Done this session:** v5 graph-as-memory gate run to completion → FALSIFIED
