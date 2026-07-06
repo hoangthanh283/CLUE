@@ -1,6 +1,37 @@
 # STATE
 
-## Experiment #6 QUEUED — parameter-granularity migration test (2026-07-07)
+## Experiment #6 RESULT — the law BENDS at parameter granularity, doesn't break (2026-07-07)
+
+Seed-42 dil, masks verified at exact target fractions (50.0/80.0/95.0% of 125.3M):
+
+| arm | AA | BWT | final row [t0/t1/t2] |
+|-----|----|-----|----------------------|
+| p=0.50 | 45.0 | −66.0 | 30.6 / 6.9 / 97.5 |
+| p=0.80 | 49.6 | −59.0 | 44.5 / 6.2 / 97.9 |
+| p=0.95 | 54.8 | −46.3 | 62.4 / 5.8 / 96.0 |
+
+Reading vs pre-registered gates: neither strict conservation (54.8 > naive+3) nor a
+real opening (< v3b 66.1) — the "interesting" band. Refinements:
+1. GRANULARITY MODULATES THE LAW: layer-level protection conserves (freeze≈free,
+   exp #4); per-tensor interleaved protection buys up to +13.5 AA over naive with
+   plasticity fully intact (new-task 96–98 even at p=95). Hard masking also beats
+   soft penalty at the same importance signal (fisher_mask 54.8 vs EWC 41.2).
+2. PROTECTION IS TASK-SELECTIVE, NOT GENERAL: task-0 (forms, lexically distinct)
+   retention rises monotonically with p (31→45→62), but the mid task (receipts,
+   competing with task 2 for the same parameters) collapses to ~6 at EVERY p — the
+   drift signature survives protection wherever tasks compete for capacity.
+   Same scenario-boundedness pattern as lexical routing (works across domain gaps,
+   fails within them).
+3. Non-monotone at the limit: p=1.0 = freeze-all = 41.1 (v1), so the curve
+   45→50→55→41 peaks in (0.95, 1). Curve-completion runs p=0.90 / p=0.99 QUEUED
+   (bg task b2nga1xg6, behind the exp-5 extension chain).
+
+Verdict for the paper: the lottery-ticket family gets a diagnosed ceiling — masking
+protects only lexically-separable tasks and never recovers within-domain competition;
+still 27 pts below ER-5. Consistent with Finding 3: no protection scheme substitutes
+for real past-task gradients.
+
+## Experiment #6 launch record (2026-07-07)
 
 The migration law was established at LAYER granularity (exp #4); this closes the
 granularity attack surface ("maybe fine-grained interleaved masks share capacity where
