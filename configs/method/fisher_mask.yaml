@@ -1,0 +1,12 @@
+name: fisher_mask
+# Parameter-granularity migration test (experiment #6): within every tensor, the
+# top-p fraction of entries by accumulated Fisher importance over seen tasks is
+# hard-frozen; the interleaved remainder stays plastic. Tests whether forgetting
+# conservation (experiment #4, layer-level) survives fine-grained protection.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+mask_top_p: 0.8      # canonical arm (no run-name suffix); 0.5 / 0.95 get _p<N>
+fisher_n_samples: 100
+fisher_gamma: 1.0

@@ -36,6 +36,7 @@ from doccl.methods.ewc import EWC
 from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
+from doccl.methods.fisher_mask import FisherMaskFreeze
 from doccl.methods.latent_replay import LatentReplay
 from doccl.methods.lca import LCA
 from doccl.methods.gauss_replay import GaussReplay
@@ -214,6 +215,8 @@ _METHOD_CFG = {
         "top_k": 4,
         "top_t": 8,
     },
+    # Fisher-mask: per-tensor top-p freeze (tiny Fisher for speed).
+    "fisher_mask": {"mask_top_p": 0.5, "fisher_n_samples": 2},
     # Latent replay: frozen-trunk activation replay at layer k (tiny buffer).
     "latent_replay": {"split_layer_k": 8, "docs_per_task": 2, "replay_batch_size": 2},
     # Gaussian head-replay on the drift-controlled trunk (tiny everything).
@@ -279,6 +282,7 @@ _METHOD_CLS = {
     "lexmem_v3": LexMem,
     "gauss_replay": GaussReplay,
     "latent_replay": LatentReplay,
+    "fisher_mask": FisherMaskFreeze,
 }
 
 
