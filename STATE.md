@@ -1,5 +1,28 @@
 # STATE
 
+## Experiment #6 QUEUED — parameter-granularity migration test (2026-07-07)
+
+The migration law was established at LAYER granularity (exp #4); this closes the
+granularity attack surface ("maybe fine-grained interleaved masks share capacity where
+whole-layer freezing cannot" — the PackNet/HAT/WSN lottery-ticket argument). Method
+`fisher_mask` (commit 37ff257): per-tensor top-p Fisher-important entries hard-frozen
+(exact freeze: grad mask + snapshot/restore across AdamW step), rest plastic, mask
+rebuilt after every task from the running Fisher sum (same estimator as EWC).
+
+**PRE-REGISTERED READINGS (set before any result):**
+- Conservation holds at every p (AA ≈ naive 41.3 ± ~3, or pure-stability collapse at
+  high p) → law is GRANULARITY-INDEPENDENT — stronger lead result, and explains away
+  the PackNet/WSN family for task-ID-free doc-IE.
+- Some p gives AA well above floor with real retention (≥ ~50 interesting, ≥ 66 = v3b
+  → real opening) → law breaks at fine grain → mask-based method justified by mechanism.
+
+3 arms queued behind exp #5 chain (bg task bi1cmr7r8, polls for free GPU):
+`dil_fisher_mask_seed42` (p=0.8 canonical) / `_p50` / `_p95`.
+Decided vs alternatives (2026-07-07 session): directional optimization (GPM-family)
+already falsified in-house (HGT/CUBER); RanPAC premise contradicted by frozen-encoder
+45.3 arm but worth one baseline run later; activation-based masking rejected in favor
+of Fisher to keep one importance language.
+
 ## Experiment #5 RUNNING — latent replay vs migration law (launched 2026-07-07)
 
 Chain level 6: frozen-trunk activation replay (Pellegrini-style), the untested cell of
