@@ -23,7 +23,30 @@ already falsified in-house (HGT/CUBER); RanPAC premise contradicted by frozen-en
 45.3 arm but worth one baseline run later; activation-based masking rejected in favor
 of Fisher to keep one importance language.
 
-## Experiment #5 RUNNING — latent replay vs migration law (launched 2026-07-07)
+## Experiment #5 RESULT — P1: THE MIGRATION LAW IS BOUNDED (read 2026-07-07)
+
+Seed-42 dil results against the pre-registered gates (set before results existed):
+
+| arm | AA | BWT | final row [funsd/receipts-1/receipts-2] | reading |
+|-----|----|-----|------------------------------------------|---------|
+| k=4 (8 plastic) | **76.0** | −19.3 | 72.6 / **57.6** / 97.9 | **P1** (gate ≥75) |
+| k=8 (4 plastic) | 65.8 | −30.8 | 67.9 / 34.5 / 94.9 | ≈ v3b (66.1) |
+| ctrl (freeze-only k=8) | 37.3 | −74.1 | 15.2 / 2.4 / 94.4 | conservation confirmed |
+
+Reading: real past-task gradients into the plastic remainder BREAK conservation, and
+monotonically in plastic depth (76.0 @ 8 plastic > 65.8 @ 4 plastic; control = law).
+The mid-task drift signature (~13–17 for every buffer-free method) is broken: 57.6.
+Law statement upgrades to: "forgetting is conserved under architectural constraint
+*unless* the plastic remainder receives real past-task gradients — and raw inputs are
+not the only sufficient carrier: frozen-space activations (no raw documents stored)
+recover most of the replay effect (76.0 vs ER-5 82.1 vs best buffer-free 66.1)."
+The 2×2 (real gradients × feature validity) is complete: it is the GRADIENTS, not the
+storage format, that matter — but the features must not be stale.
+
+Extension RUNNING (pre-registered; bg task bt3m3hfa0, queued behind exp #6 chain):
+k=4 × docs {1, 50}, k=2 (dose–response completion), k=4 seeds {7, 123}.
+
+## Experiment #5 launch record (2026-07-07)
 
 Chain level 6: frozen-trunk activation replay (Pellegrini-style), the untested cell of
 the 2x2 (real gradients x feature validity). Freeze layers <k after task 0; bank
