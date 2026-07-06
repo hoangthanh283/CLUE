@@ -34,6 +34,7 @@ from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.er import ER
 from doccl.methods.er_cflat import ERCFlat
 from doccl.methods.ewc import EWC
+from doccl.methods.fisher_mask import FisherMaskFreeze
 from doccl.methods.gauss_replay import GaussReplay
 from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
@@ -197,6 +198,9 @@ METHOD_REGISTRY = {
     # Gaussian head-replay on the v3b drift-controlled trunk (exemplar-free,
     # stores per-(class x task) feature Gaussians) — analysis-program experiment #2.
     "gauss_replay": GaussReplay,
+    # Experiment #6: parameter-granularity migration test — per-tensor top-p
+    # Fisher-important entries hard-frozen, interleaved remainder plastic.
+    "fisher_mask": FisherMaskFreeze,
     # Falsification-chain level 6: frozen-trunk activation replay at encoder layer k
     # (Pellegrini-style latent replay). Tests the migration law's untested cell —
     # real past-task gradients into the plastic upper layers on never-stale features.
@@ -406,6 +410,11 @@ def main(cfg: DictConfig) -> None:
         # the edges-off bank gets a "_bank" suffix so the two arms never collide.
         if not cfg.method.get("edges_enabled", True):
             run_name += "_bank"
+    elif cfg.method.name == "fisher_mask":
+        # Granularity arm: canonical p=0.8 (no suffix); other fractions get _p<N>.
+        top_p = cfg.method.get("mask_top_p", 0.8)
+        if top_p != 0.8:
+            run_name += f"_p{int(round(top_p * 100))}"
     elif cfg.method.name == "latent_replay":
         # Latent replay's axes are split depth and buffer size. Canonical operating
         # point is k=8 / 5 docs per task (no suffix); other depths get "_k<N>" and
@@ -735,6 +744,7 @@ def main(cfg: DictConfig) -> None:
         "lexmem_v3b",
         "lexmem_v5",
         "latent_replay",
+        "fisher_mask",
     }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
         try:
