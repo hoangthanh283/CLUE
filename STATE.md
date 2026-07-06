@@ -1,5 +1,29 @@
 # STATE
 
+## Experiment #5 RUNNING — latent replay vs migration law (launched 2026-07-07)
+
+Chain level 6: frozen-trunk activation replay (Pellegrini-style), the untested cell of
+the 2x2 (real gradients x feature validity). Freeze layers <k after task 0; bank
+layer-k hidden (fp16) for 5 docs/task; replay via pre-hook injection → real past-task
+gradients into exactly the plastic layers the migration law says absorb the drift.
+Method `latent_replay` (commit 93aa144), 13 tests green, smoke OK (single_funsd 70.5@1ep).
+
+**PRE-REGISTERED GATES (set before any result existed):**
+- P1 success: dil AA ≥ 75 → law bounded ("conserved *unless* plastic part gets real
+  past-task gradients"); raw-data-free method on par with ER exists.
+- P2 falsified: AA ≤ 68 (v3b 66.1+2σ) → chain closes at level 6 with predicted mechanism.
+- P3 68–75: boundary result; dose-response on k tells where it breaks.
+- Signature to watch: mid-task row (buffer-free collapses ~67→~17; ER holds ~67+).
+
+3 sequential runs on local box (bg task b8rnl3zyp, logs in scratchpad/latent_runs/):
+1. `dil_latent_replay_seed42` (k=8, 4 plastic — matches map8) — primary
+2. `dil_latent_replay_seed42_k4` (8 plastic) — dose-response
+3. `dil_latent_replay_seed42_ctrl` (freeze-only, no replay) — control
+References (no new runs): naive 41.3 / v3b 66.1±3.0 / ER-5 82.1 / joint 88.7.
+If P1/P3: extend best k × docs {1,50} + seeds 7,123. Spec + rationale:
+`~/.claude/plans/1-yes-my-motivation-foamy-boot.md`. bd still degraded — issue NOT
+filed in bd; this section is the tracking record.
+
 ## Experiment #4 COMPLETE — migration robustness (2026-07-05). PROGRAM DONE -> WRITING
 
 8 runs (lexmem_ctrl freeze vs free, seed42, drift-probed):
