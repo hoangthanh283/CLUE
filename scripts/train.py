@@ -38,6 +38,7 @@ from doccl.methods.gauss_replay import GaussReplay
 from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
 from doccl.methods.l2p import L2P
+from doccl.methods.latent_replay import LatentReplay
 from doccl.methods.lca import LCA
 from doccl.methods.lexmem import LexMem
 from doccl.methods.lexmem_v5 import LexMemV5
@@ -196,6 +197,11 @@ METHOD_REGISTRY = {
     # Gaussian head-replay on the v3b drift-controlled trunk (exemplar-free,
     # stores per-(class x task) feature Gaussians) — analysis-program experiment #2.
     "gauss_replay": GaussReplay,
+    # Falsification-chain level 6: frozen-trunk activation replay at encoder layer k
+    # (Pellegrini-style latent replay). Tests the migration law's untested cell —
+    # real past-task gradients into the plastic upper layers on never-stale features.
+    # ``method.docs_per_task=0`` is the freeze-only control arm.
+    "latent_replay": LatentReplay,
     # LexMem v3b: v3 with lambda retuned (1000 -> 300; CKA 0.999 was over-stiff,
     # SROIE 51) + hard exclusion of prior-task slots from selection (Jaccard
     # 0.31 slot overwrite drove task-1 forgetting 51 -> 12).
@@ -400,6 +406,18 @@ def main(cfg: DictConfig) -> None:
         # the edges-off bank gets a "_bank" suffix so the two arms never collide.
         if not cfg.method.get("edges_enabled", True):
             run_name += "_bank"
+    elif cfg.method.name == "latent_replay":
+        # Latent replay's axes are split depth and buffer size. Canonical operating
+        # point is k=8 / 5 docs per task (no suffix); other depths get "_k<N>" and
+        # docs_per_task=0 is the freeze-only control arm ("_ctrl").
+        split_k = cfg.method.get("split_layer_k", 8)
+        docs = cfg.method.get("docs_per_task", 5)
+        if split_k != 8:
+            run_name += f"_k{split_k}"
+        if docs == 0:
+            run_name += "_ctrl"
+        elif docs != 5:
+            run_name += f"_d{docs}"
     elif target_component is not None:
         run_name += f"_{target_component}"
     run = wandb.init(
@@ -716,6 +734,7 @@ def main(cfg: DictConfig) -> None:
         "lexmem_v3",
         "lexmem_v3b",
         "lexmem_v5",
+        "latent_replay",
     }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
         try:

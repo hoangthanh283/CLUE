@@ -1,0 +1,12 @@
+name: latent_replay
+# Frozen-trunk activation replay at encoder layer k (Pellegrini-style latent replay,
+# adapted to doc-IE). Falsification-chain level 6: real past-task gradients into the
+# plastic upper layers, on features that cannot go stale (producer layers frozen after
+# task 0). docs_per_task=0 is the control arm (identical freeze map, no replay).
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8    # freeze layers <k after task 0; k..11 + head stay plastic
+docs_per_task: 5    # matches the retention-curve ER-5 operating point
+replay_batch_size: 4
