@@ -74,8 +74,21 @@ recover most of the replay effect (76.0 vs ER-5 82.1 vs best buffer-free 66.1)."
 The 2×2 (real gradients × feature validity) is complete: it is the GRADIENTS, not the
 storage format, that matter — but the features must not be stale.
 
-Extension RUNNING (pre-registered; bg task bt3m3hfa0, queued behind exp #6 chain):
-k=4 × docs {1, 50}, k=2 (dose–response completion), k=4 seeds {7, 123}.
+Extension COMPLETE (2026-07-07 13:27, all exit 0):
+
+| run | AA | BWT | final [t0/t1/t2] | note |
+|-----|----|-----|------------------|------|
+| k=4, 50 docs/task | **87.3** | **−2.3** | 88.8 / 76.7 / 96.6 | ≈ ER-200 (87.9), 1.4 below joint (88.7); BEATS raw ER-50 (85.6) at equal doc count |
+| k=2, 5 docs | 79.7 | −13.9 | 73.1 / 68.5 / 97.4 | depth dose–response still monotone: 65.8 (k8) → 76.0 (k4) → 79.7 (k2) |
+| k=4, 5 docs, seed 7 | 77.3 | −17.4 | 81.0 / 53.3 / 97.4 | |
+| k=4, 5 docs, seed 123 | 81.4 | −11.7 | 79.4 / 67.9 / 97.0 | |
+
+Headline k=4/5-docs across seeds: **78.2 ± 2.8** (n=3) — all seeds clear the P1 gate (75).
+Doc-count crossover vs raw ER at k=4: 1 doc 61.3 vs 57.6 (latent wins), 5 docs 76.0–81.4
+vs 82.1 (ER slightly ahead), 50 docs 87.3 vs 85.6 (latent wins). At scale, activation
+replay on a drift-immunized trunk ≈ joint oracle WITHOUT raw documents. Honest caveats
+for the paper: activation storage ≈1.1 MB/doc (bytes larger than raw docs — claim is
+"no raw documents stored", not compression) and activations are partially invertible.
 
 ## Experiment #5 launch record (2026-07-07)
 
