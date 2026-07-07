@@ -22,9 +22,15 @@ real opening (< v3b 66.1) — the "interesting" band. Refinements:
    drift signature survives protection wherever tasks compete for capacity.
    Same scenario-boundedness pattern as lexical routing (works across domain gaps,
    fails within them).
-3. Non-monotone at the limit: p=1.0 = freeze-all = 41.1 (v1), so the curve
-   45→50→55→41 peaks in (0.95, 1). Curve-completion runs p=0.90 / p=0.99 QUEUED
-   (bg task b2nga1xg6, behind the exp-5 extension chain).
+3. CURVE COMPLETE (2026-07-07 15:55, both exit 0) — 7 points, seed 42:
+
+   | p | 0 (naive) | 0.50 | 0.80 | 0.90 | 0.95 | 0.99 | 1.0 (freeze-all) |
+   |---|-----------|------|------|------|------|------|------------------|
+   | AA | 41.3 | 45.0 | 49.6 | 51.1 | **54.8** | 52.5 | 41.1 |
+
+   Peak at p=0.95. At p=0.99 plasticity finally degrades (new-task 89.5 vs 96–98
+   elsewhere) — the turn toward the freeze-all collapse. Mid-task stays 5–9 at
+   EVERY p: within-domain capacity competition is never rescued by protection.
 
 Verdict for the paper: the lottery-ticket family gets a diagnosed ceiling — masking
 protects only lexically-separable tasks and never recovers within-domain competition;
