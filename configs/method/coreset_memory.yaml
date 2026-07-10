@@ -1,0 +1,14 @@
+name: coreset_memory
+# Real-activation coreset replay: k-means centroids of REAL layer-k token activations per
+# (task, class) — the one feature-replay variant not falsified at Gate 0 (SpectralMemory and
+# AGLR-CL both synthesise from a fitted marginal and collapse; centroids are real points that
+# preserve joint feature structure). Reuses AGLRReplay's capture (frozen k, salience filter).
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8         # freeze layers <k after task 0; k..11 + head stay plastic
+centroids_per_class: 8   # real activation modes kept per class (1 = class-mean coreset)
+attn_keep: 0.5           # salience filter on which tokens feed the coreset (1.0 = off)
+carriers_per_task: 4     # real bbox/mask/labels kept per task for the replay scaffold
+replay_batch_size: 4

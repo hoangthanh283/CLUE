@@ -122,7 +122,11 @@ all falsified:
    still cannot survive representation drift in doc-IE, and neither does making it
    relational. **The method is not the contribution — its failure is.** It closes the
    chain: if *this* can't do it, no buffer-free memory can, and the "only replay grounds
-   the head" claim (Finding 3) is complete.
+   the head" claim (Finding 3) is complete. *(Finding 3b, added 2026-07-10, empirically
+   discharges the "no buffer-free memory can" clause: we then tried the logically strongest
+   remaining case — a **real**-activation coreset, not a fitted distribution — and it fails
+   too; the isolating control shows the missing ingredient is whole-document (feature,
+   position, label) consistency, which no marginal summary preserves.)*
 
 **Interpretation / mechanism.** The shared classifier head must place N tasks'
 conflicting label geometries into one weight matrix. Merging cancels conflicting rows;
@@ -132,6 +136,47 @@ shared representation needed to route queries. Replay is unique because it suppl
 *real past-task gradients* that re-carve the joint optimum every session — it is the
 only mechanism among those tested that optimizes the actual multi-task objective
 rather than a proxy for it.
+
+### Finding 3b — *what* the buffer must contain: whole-document consistency, not summaries (2026-07-10)
+
+The chain above ends by asking not "how to avoid the buffer" but "what must it contain."
+A four-way controlled ablation now answers it. Working in the frozen-trunk **latent-replay**
+regime (freeze layers `<k=8` after task 0, replay real layer-`k` activations into the plastic
+head+late layers — the one buffer variant that WORKS: dil AA 87.3, ≈ ER-200, within 1.4 of the
+joint oracle), we ask which property of the replayed content is load-bearing by replacing the
+stored real documents with progressively more "buffer-free" feature memories, all behind the
+*same* replay hook (dil, LayoutLMv3, k=8, epochs=5, AA / SROIE-final-F1 / memory):
+
+| replay content | AA | SROIE final | mem |
+|---|---|---|---|
+| **whole real documents** (latent_replay, 5 docs) | **87.3** (conv) | survives | 16 MB |
+| synthetic features, rank-`r` forgetting subspace (SpectralMemory / "SLR") | 41.9 | 3.2 | 0.45 MB |
+| synthetic features, full-`d` per-class Gaussian (AGLR-CL port, arXiv 2505.08524) | 39.4 | 3.0 | 0.39 MB |
+| **real** activation centroids (k-means coreset), 4 layout carriers | 36.7 | 2.9 | 0.48 MB |
+| **real** centroids, 50 carriers + 16 centroids/class | 39.7 | 3.1 | 4.05 MB |
+
+Every buffer-free variant reproduces the LexMem-v5 signature (current task ~93, **all prior tasks
+~3**). Four independent controls isolate the cause:
+1. **Not synthesis quality** — a *real*-activation coreset fails identically to synthetic Gaussians.
+2. **Not rank** — full-`d` Gaussians fail like rank-16. (And the features are not low-rank to begin
+   with: rank-16 explains only 43% of layer-8 feature variance, rank-256 ≈ 92% — the "forgetting is
+   low-rank" property is of the *output/NTK* space, not the head-*input* feature space.)
+3. **Not carrier diversity** — 50 layout carriers at 8× the memory fail like 4.
+4. **The necessary ingredient is (feature, position, label) co-occurrence.** The clean isolation:
+   replaying **4 whole real documents** (feature[t], bbox[t], label[t] all from the same real token)
+   scores AA 63.8 / SROIE 37.1, versus **4 layout carriers with real centroid features pasted onto
+   unrelated positions** at AA 36.7 / SROIE 2.9 — **+27 AA from consistency alone**, same count,
+   same boundary, same real features.
+
+**Interpretation.** Every buffer-free memory tested — parametric slot, feature-Gaussian, real
+coreset, lexical ledger — is some *marginal* summary (per-class, per-token, or per-lexeme). The
+head cannot be grounded by marginals: it needs the *joint* structure of an intact document, where
+each feature is bound to its real spatial position and label. This is why replay is
+non-substitutable, stated more precisely than before: not merely "real gradients," but **real
+gradients from consistently-bound (feature, position, label) triples that only a stored whole
+document preserves.** It also reframes the "SLR/spectral latent replay" idea (arXiv-theorem-inspired,
+2606.18024) as *falsified for doc-IE* and folds it, plus the AGLR-CL port and the real-coreset
+probe, into the chain as its terminal level.
 
 ---
 

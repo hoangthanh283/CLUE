@@ -24,8 +24,10 @@ import wandb
 from doccl.data.encoders import build_encoder
 from doccl.data.scenarios import get_scenario
 from doccl.eval.metrics import CLMetricsTracker, compute_per_class_f1
+from doccl.methods.aglr_replay import AGLRReplay
 from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
+from doccl.methods.coreset_memory import CoresetMemory
 from doccl.methods.cuber import CUBER
 from doccl.methods.der import DERpp
 from doccl.methods.doc_merge import DocMerge
@@ -52,6 +54,7 @@ from doccl.methods.magmax import MagMax
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
 from doccl.methods.o_lora import OLoRA
 from doccl.methods.sd_lora import SDLoRA
+from doccl.methods.spectral_memory import SpectralMemory
 from doccl.models.bert_family_wrapper import BERTWrapper
 from doccl.models.bros_wrapper import BROSWrapper
 from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
@@ -206,6 +209,16 @@ METHOD_REGISTRY = {
     # real past-task gradients into the plastic upper layers on never-stale features.
     # ``method.docs_per_task=0`` is the freeze-only control arm.
     "latent_replay": LatentReplay,
+    # SLR (Spectral Latent Replay): latent_replay with the raw activation bank replaced
+    # by a per-task rank-r spectral summary (SVD factors) — memory indexed by the
+    # forgetting subspace. The proposed method; Gate 0 = beat aglr_replay at lower bytes.
+    "spectral_memory": SpectralMemory,
+    # AGLR-CL port (arXiv 2505.08524): per-(task x class) Gaussians in layer-k space +
+    # attention-salience filter — memory indexed BY CLASS. The Gate-0 comparator for SLR.
+    "aglr_replay": AGLRReplay,
+    # CoresetMemory: stores REAL layer-k activation centroids (k-means) per (task,class),
+    # not a fitted distribution — the one feature-replay variant not falsified at Gate 0.
+    "coreset_memory": CoresetMemory,
     # LexMem v3b: v3 with lambda retuned (1000 -> 300; CKA 0.999 was over-stiff,
     # SROIE 51) + hard exclusion of prior-task slots from selection (Jaccard
     # 0.31 slot overwrite drove task-1 forgetting 51 -> 12).
@@ -293,6 +306,13 @@ def save_run_metrics(
         "total_params": int(method.total_param_count()),
         "trainable_params": int(method.trainable_param_count()),
         "peak_gpu_mem_mb": peak_mem_mb,
+        # Replay/episodic memory footprint in bytes for methods that expose it (latent/
+        # spectral/AGLR replay) — the x-axis of the SLR accuracy-vs-memory Pareto curve.
+        # None for methods without a replay bank. See doccl/methods/{spectral_memory,
+        # aglr_replay,latent_replay}.py :: memory_bytes().
+        "replay_memory_bytes": (
+            int(method.memory_bytes()) if hasattr(method, "memory_bytes") else None
+        ),
         # Full method hyper-parameters as actually resolved at run time. Records the
         # real value of every knob (e.g. cflat_lambda, use_replay, lambda_ortho,
         # buffer_size) so a run's configuration is always recoverable from its
@@ -427,6 +447,34 @@ def main(cfg: DictConfig) -> None:
             run_name += "_ctrl"
         elif docs != 5:
             run_name += f"_d{docs}"
+    elif cfg.method.name == "spectral_memory":
+        # SLR axes: split depth and spectral rank. Canonical is k=8 / rank=16 (no suffix);
+        # the Gate-1 Pareto sweep varies rank ("_r<N>"), rank=0 is the no-replay control.
+        split_k = cfg.method.get("split_layer_k", 8)
+        rank_r = cfg.method.get("rank_r", 16)
+        if split_k != 8:
+            run_name += f"_k{split_k}"
+        if rank_r == 0:
+            run_name += "_ctrl"
+        elif rank_r != 16:
+            run_name += f"_r{rank_r}"
+    elif cfg.method.name == "aglr_replay":
+        # AGLR-CL axes: split depth and salience-keep fraction. Canonical is k=8 /
+        # keep=0.5 (no suffix); other keeps get "_keep<NN>".
+        split_k = cfg.method.get("split_layer_k", 8)
+        keep = cfg.method.get("attn_keep", 0.5)
+        if split_k != 8:
+            run_name += f"_k{split_k}"
+        if keep != 0.5:
+            run_name += f"_keep{int(round(keep * 100))}"
+    elif cfg.method.name == "coreset_memory":
+        # Coreset axes: split depth and centroids-per-class. Canonical k=8 / m=8 (no suffix).
+        split_k = cfg.method.get("split_layer_k", 8)
+        mpc = cfg.method.get("centroids_per_class", 8)
+        if split_k != 8:
+            run_name += f"_k{split_k}"
+        if mpc != 8:
+            run_name += f"_m{mpc}"
     elif target_component is not None:
         run_name += f"_{target_component}"
     run = wandb.init(
@@ -744,6 +792,9 @@ def main(cfg: DictConfig) -> None:
         "lexmem_v3b",
         "lexmem_v5",
         "latent_replay",
+        "spectral_memory",
+        "aglr_replay",
+        "coreset_memory",
         "fisher_mask",
     }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
