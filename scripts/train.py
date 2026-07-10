@@ -491,6 +491,8 @@ def main(cfg: DictConfig) -> None:
             run_name += f"_tau{int(round(tau * 100))}"
         if cfg.method.get("soft_labels", False):
             run_name += "_soft"
+        if cfg.method.get("task_masked_labels", False):
+            run_name += "_tmask"
         if pool != "wildreceipt":
             run_name += f"_{pool}"
     elif target_component is not None:
