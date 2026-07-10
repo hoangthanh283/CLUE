@@ -1,0 +1,34 @@
+2.6.1 Gap 1: No Per-Component Forgetting Diagnosis for Tri-Modal Encoders
+Prior diagnostic work measures forgetting at the level of whole tasks or, at most, layers.
+The anatomy of catastrophic forgetting (Ramasesh et al., 2021) localises forgetting by
+depth, but in unimodal image-classification networks. The MLLM study of Zhai et al.
+(2023) measures forgetting at the whole-model level only. CL-CrossVQA (Zhang et al.,
+2025) compares forgetting across architectures (dual-stream versus single-stream) rather
+than within one encoder. D-MoLE (Ge et al., 2025) implicitly assumes non-uniform capacity needs across layers but never measures forgetting per component. What is missing:
+an attribution of forgetting to the text, layout, visual, and fusion components of a single
+tri-modal document encoder.
+
+2.6.2 Gap 2: Sentence-Level Bias of Continual Information Extraction
+Continual NER methods—distillation and pseudo-labelling approaches (Liu and Huang,
+2023, Zhang et al., 2023, Zheng et al., 2022, 2023) and generative reformulations (Yang
+et al., 2025)—operate on sentence-level, text-only corpora, as do the continual RE
+lines (Dao et al., 2025, Nguyen et al., 2025). ProtoNER (Kumar et al., 2024) reaches
+LayoutLM-family encoders but only in a few-shot regime, without a full continual
+evaluation. None of these confronts the structural failure modes that arise when the unit
+of extraction grows from a sentence to a page (§2.3). What is missing: continual IE
+methods designed for, and evaluated on, document-level multimodal inputs.
+
+2.6.3 Gap 3: Heuristic Rather than Measurement-Driven Remedies
+Where remedies do exist, their targeting is heuristic. LW-AFT freezes layers by a heuristic
+schedule rather than by a measurement of where forgetting occurs (Li et al., 2025). GPM
+protects per-layer subspaces but never attributes them to semantic components of the network (Saha et al., 2021). The open question is whether a remedy targeted by measurement
+beats uniform or heuristic treatment. What is missing: a remedy whose targeting is derived
+from a per-component forgetting diagnosis rather than from a predetermined schedule.
+
+2.6.4 Gap 4: Fragmented Evaluation for Continual Document IE
+Existing results are scattered across incompatible protocols. Continual NER and RE use
+disjoint, text-only benchmarks; document CL uses GDI-Bench (Li et al., 2025) or detection tasks (Minouei et al., 2022); and the image-CL prompt methods (Smith et al., 2023,
+Wang et al., 2022c,d) have never been compared against IE-specific methods on document
+22
+
+
