@@ -53,6 +53,7 @@ from doccl.methods.is3 import IS3
 from doccl.methods.magmax import MagMax
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
 from doccl.methods.o_lora import OLoRA
+from doccl.methods.proxy_latent_replay import ProxyLatentReplay
 from doccl.methods.sd_lora import SDLoRA
 from doccl.methods.spectral_memory import SpectralMemory
 from doccl.models.bert_family_wrapper import BERTWrapper
@@ -219,6 +220,9 @@ METHOD_REGISTRY = {
     # CoresetMemory: stores REAL layer-k activation centroids (k-means) per (task,class),
     # not a fitted distribution — the one feature-replay variant not falsified at Gate 0.
     "coreset_memory": CoresetMemory,
+    # PLaR: whole-doc latent replay from a pseudo-labeled PUBLIC proxy pool (WildReceipt) —
+    # zero private storage; consistency-law-prescribed successor to the falsified variants.
+    "proxy_latent_replay": ProxyLatentReplay,
     # LexMem v3b: v3 with lambda retuned (1000 -> 300; CKA 0.999 was over-stiff,
     # SROIE 51) + hard exclusion of prior-task slots from selection (Jaccard
     # 0.31 slot overwrite drove task-1 forgetting 51 -> 12).
@@ -475,6 +479,20 @@ def main(cfg: DictConfig) -> None:
             run_name += f"_k{split_k}"
         if mpc != 8:
             run_name += f"_m{mpc}"
+    elif cfg.method.name == "proxy_latent_replay":
+        # PLaR axes: proxy docs per task, confidence floor, pool. Canonical d=5/tau=0/
+        # wildreceipt (no suffix).
+        docs = cfg.method.get("docs_per_task", 5)
+        tau = cfg.method.get("pseudo_conf_tau", 0.0)
+        pool = cfg.method.get("proxy_dataset", "wildreceipt")
+        if docs != 5:
+            run_name += f"_d{docs}"
+        if tau > 0:
+            run_name += f"_tau{int(round(tau * 100))}"
+        if cfg.method.get("soft_labels", False):
+            run_name += "_soft"
+        if pool != "wildreceipt":
+            run_name += f"_{pool}"
     elif target_component is not None:
         run_name += f"_{target_component}"
     run = wandb.init(
@@ -795,6 +813,7 @@ def main(cfg: DictConfig) -> None:
         "spectral_memory",
         "aglr_replay",
         "coreset_memory",
+        "proxy_latent_replay",
         "fisher_mask",
     }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:

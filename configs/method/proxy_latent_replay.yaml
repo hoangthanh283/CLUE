@@ -1,0 +1,18 @@
+name: proxy_latent_replay
+# PLaR: whole-document latent replay from a pseudo-labeled PUBLIC proxy pool — zero private
+# storage. Prescribed by the consistency law (STATE.md GATE-0 FINAL): keep whole-doc
+# (feature, position, label) binding — the proven necessary ingredient — but source the docs
+# from a public corpus, pseudo-labeled once by the just-trained head at each boundary.
+# Inherits the proven latent_replay hook (frozen trunk k=8 → immortal latents).
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8        # freeze layers <k after task 0; k..11 + head stay plastic
+docs_per_task: 5        # PUBLIC proxy docs banked per boundary (matches ER-5 operating point)
+replay_batch_size: 4
+proxy_dataset: wildreceipt   # public pool; disjoint from the dil/cil task corpora
+pseudo_conf_tau: 0.0    # min softmax confidence for a pseudo-label (0 = plain argmax)
+soft_labels: false      # bank the head's full logit distribution; replay with soft-CE
+                        # (dark knowledge — rescues sparse-entity tasks that argmax starves)
+soft_T: 1.0             # soft-CE temperature
