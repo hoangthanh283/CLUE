@@ -16,3 +16,6 @@ pseudo_conf_tau: 0.0    # min softmax confidence for a pseudo-label (0 = plain a
 soft_labels: false      # bank the head's full logit distribution; replay with soft-CE
                         # (dark knowledge — rescues sparse-entity tasks that argmax starves)
 soft_T: 1.0             # soft-CE temperature
+task_masked_labels: false   # mask pseudo-labeling to the current task's label subset —
+                            # counters proxy-domain capture (task 0 otherwise claims the
+                            # pool: measured zero task-t-class labels on proxies for t>0)

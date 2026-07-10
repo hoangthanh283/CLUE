@@ -157,6 +157,36 @@ def test_soft_mode_banks_logits_and_replays_soft_ce():
     )
 
 
+def test_task_masked_labels_restrict_to_task_subset():
+    """With task_masked_labels, pseudo-labels at boundary t may only use task t's label ids
+    — the fix for proxy-domain capture (task 0 otherwise claims the pool forever)."""
+    from doccl.types import TaskInfo
+
+    torch.manual_seed(0)
+    w = _Wrapper()
+    w.label_to_id = {f"L{i}": i for i in range(NL)}
+    m = ProxyLatentReplay(
+        w,
+        {
+            "split_layer_k": K,
+            "docs_per_task": 2,
+            "replay_batch_size": 2,
+            "soft_labels": True,
+            "task_masked_labels": True,
+        },
+    )
+    m._proxy_loader = [_proxy_batch(2)]
+    allowed = ["L1", "L3"]
+    task = TaskInfo(task_id=1, task_name="t1", label_set=allowed)
+    m.after_task(task, [])  # stashes the task, then banks via _capture_task
+    lab = torch.cat([d["labels"] for d in m.store])
+    lab = lab[lab != -100]
+    assert set(lab.unique().tolist()) <= {1, 3}  # only the task's ids appear
+    # banked soft logits are masked too: disallowed classes carry ~zero probability
+    p = torch.softmax(m.store[0]["logits"].float(), dim=-1)
+    assert p[..., 0].max() < 1e-4 and p[..., 2].max() < 1e-4
+
+
 def test_soft_loss_zero_when_current_matches_banked():
     """Soft-CE against the banked distribution is minimized when the current head still
     produces it — the loss must anchor the head to its bank-time behavior."""

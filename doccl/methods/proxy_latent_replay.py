@@ -55,6 +55,14 @@ class ProxyLatentReplay(LatentReplay):
         # full distribution carries boundary information even where argmax says "O".
         self.soft_labels = bool(config.get("soft_labels", False))
         self.soft_T = float(config.get("soft_T", 1.0))
+        # Task-conditioned pseudo-labeling: at boundary t, mask the head's logits to task
+        # t's label subset before argmax/softmax. Counters PROXY-DOMAIN CAPTURE (measured
+        # 2026-07-11: the post-task-t head assigns ZERO task-t-class labels to proxy tokens
+        # for t>0 — task 0 claims the proxy domain and replay self-reinforces it). Forcing
+        # each boundary's fresh proxies into task-t's classes makes them carry task-t
+        # boundary signal; the soft variant absorbs the extra label noise.
+        self.task_masked_labels = bool(config.get("task_masked_labels", False))
+        self._current_task = None  # stashed by after_task for the masking
         self._proxy_loader: DataLoader | None = None
 
     # ── proxy pool ────────────────────────────────────────────────────────────
@@ -79,6 +87,20 @@ class ProxyLatentReplay(LatentReplay):
         return self._proxy_loader
 
     # ── banking: whole proxy docs, pseudo-labeled by the current head ─────────
+
+    def after_task(self, task, train_loader: DataLoader) -> None:
+        self._current_task = task  # for task-conditioned label masking
+        super().after_task(task, train_loader)
+
+    def _task_label_ids(self) -> list[int] | None:
+        """Unified head ids of the current task's label subset (None = no masking)."""
+        if not self.task_masked_labels or self._current_task is None:
+            return None
+        l2i = getattr(self.model, "label_to_id", None)
+        if not l2i:
+            return None
+        ids = [l2i[name] for name in self._current_task.label_set if name in l2i]
+        return ids or None
 
     def _capture_task(self, train_loader: DataLoader) -> None:
         """Bank ``docs_per_task`` PUBLIC docs instead of private training docs.
@@ -105,7 +127,18 @@ class ProxyLatentReplay(LatentReplay):
                     hidden = self._capture[0]  # (b, seq_k, d) fp16 CPU via the hook
                 finally:
                     self._capture = None
-                probs = out.logits.softmax(-1)  # (b, text_len, n_labels)
+                logits = out.logits
+                task_ids = self._task_label_ids()
+                if task_ids is not None:
+                    # Task-conditioned: only the current task's classes compete. Banked
+                    # soft logits are masked too, so soft-CE anchors the within-task
+                    # distribution rather than re-teaching the captured cross-task one.
+                    keep = torch.full(
+                        (logits.shape[-1],), False, dtype=torch.bool, device=logits.device
+                    )
+                    keep[torch.tensor(task_ids, device=logits.device)] = True
+                    logits = logits.masked_fill(~keep, -1e4)  # fp16-safe "-inf"
+                probs = logits.softmax(-1)  # (b, text_len, n_labels)
                 conf, pseudo = probs.max(-1)
                 am = batch["attention_mask"].bool()
                 pseudo = pseudo.masked_fill(~am, -100)
@@ -123,14 +156,25 @@ class ProxyLatentReplay(LatentReplay):
                         "labels": pseudo[i].cpu(),
                     }
                     if self.soft_labels:
-                        # dark knowledge, banked once → drift-free (never regenerated)
-                        doc["logits"] = out.logits[i].detach().cpu().to(torch.float16)
+                        # dark knowledge, banked once → drift-free (never regenerated);
+                        # uses the task-masked logits when task_masked_labels is on
+                        doc["logits"] = logits[i].detach().cpu().to(torch.float16)
                     self.store.append(doc)
                     stored += 1
                 if stored >= self.docs_per_task:
                     break
         if was_training:
             self.model.train()
+        # Class histogram of this boundary's pseudo-labels — the self-diagnosis for the
+        # sparse-class starvation question (does the head put ANY mass on the just-learned
+        # task's classes when labeling proxy docs?).
+        recent = [d["labels"] for d in self.store[-stored:]] if stored else []
+        if recent:
+            lab = torch.cat(recent)
+            lab = lab[lab != -100]
+            ids, counts = lab.unique(return_counts=True)
+            top = sorted(zip(ids.tolist(), counts.tolist(), strict=True), key=lambda x: -x[1])[:8]
+            log.info("proxy_latent_replay: pseudo-label class histogram (top-8): %s", top)
         log.info(
             "proxy_latent_replay: banked %d PUBLIC docs (store=%d, ~%.1f MB fp16; "
             "pseudo-label keep=%.0f%%, tau=%.2f, soft=%s)",

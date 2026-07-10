@@ -18,14 +18,53 @@ remove/shrink private storage —
   stays dead (5.1). **Diagnosis: class density.** FUNSD labels are dense (most form tokens are
   question/answer → proxies carry rich signal); SROIE has 4 sparse entity types → argmax
   pseudo-labels on receipts ≈ 99% "O" → replay carries no SROIE-class gradient.
-  **Fix built + OVERNIGHT RUN IN FLIGHT** (`_run_plar_d50_soft`, run `bgyu4vvbk`): `soft_labels`
-  — bank the head's full logit distribution per token (dark knowledge, banked once → drift-free),
-  replay with soft-CE (`soft_T`); every masked token then carries boundary info even where argmax
-  says "O" (DER-style). 5 unit tests green (incl. soft-loss-increases-under-head-perturbation and
-  plastic-only-gradient invariants). Read `results/dil_proxy_latent_replay_seed42_d50_soft/`
-  in the morning. If SROIE recovers → PLaR is a live ICML method ("replay is free"); if not →
-  next knobs: soft_T=2, mixed pool (XFUND+WildReceipt), convergence budget, class-balanced
-  replay weighting.
+  **SOFT RESULT (00:52): AA 58.9 [FUNSD 76.1, SROIE 7.0, CORD 93.5]** — incremental (+1.7 AA);
+  FUNSD keeps climbing (76.1 = +15 over matched private d4!) but SROIE barely moves. So sparse-class
+  starvation is only part of it: either the head puts ~zero SROIE-class mass on WildReceipt tokens
+  (now SELF-DIAGNOSED: banking logs a pseudo-label class histogram per boundary), or the mid-task
+  needs the CONVERGENCE budget (every PLaR run so far = 5ep diagnostic; the 87.3 reference needed
+  10ep early-stop).
+  **CONVERGENCE RUN IN FLIGHT overnight** (`_run_plar_d50_soft_conv`, task `by803p7bw`, ~2.5-3h):
+  d50+soft at the default 10ep/val-F1-early-stop. ⚠️ writes to the SAME run-name dir
+  `dil_proxy_latent_replay_seed42_d50_soft` (epochs not in name) — the 5ep result is archived at
+  `..._d50_soft_5ep_archive/`. Morning read: (1) the class histograms at each boundary (does the
+  post-SROIE head label ANY proxy tokens with SROIE classes?), (2) the converged matrix. Decision:
+  SROIE ≥30 → PLaR fully alive → Vast.ai sweep + CoLaR build. SROIE still ~7 + histogram shows no
+  SROIE mass → the proxy pool carries no SROIE signal → mixed/matched pool or class-balanced
+  weighting; if those fail, PLaR is a *partial* method (grounds dense-label tasks only) and folds
+  into the law paper as the bounded-transfer finding.
+
+  **PLaR ladder so far (dil, zero private bytes):** d5-hard 45.8 → d50-hard 57.2 → d50-soft 58.9
+  → d50-soft-CONV pending. References: private d4-5ep 63.8, private d5-conv 87.3, best falsified
+  marginal 41.9, naive ~41.
+
+  **DIAGNOSIS v1 (01:30) — RETRACTED at 02:15.** First reading of the histograms ("head assigns
+  zero SROIE-class labels; task 0 captures the pool's LABELS") was label-centric and WRONG for
+  dil: `build_dil` gives every task the SAME `DIL_UNIFIED_LABELS` (9 shared BIO tags — there are
+  no task-specific classes to capture; histogram ids 0-6 are 7/9 unified tags, ids 7-8 = the
+  OTHER tags simply never predicted on proxies). Consequently the built `task_masked_labels` fix
+  is a **NO-OP on dil** (kept in the code — tested, and genuinely relevant for CIL later); the
+  planned tmask dil run was NOT launched (would prove nothing).
+
+  **DIAGNOSIS v2 (02:15, fits ALL of tonight's data): FEATURE-REGION COVERAGE.** Proxy replay
+  anchors the head's conditional only on the PROXY POOL'S OWN feature region (as encoded by the
+  trunk that was FUNSD-tuned before freezing). FUNSD's region is covered → held (76.1 at 5ep);
+  SROIE's region (different OCR/layout stats, encoded through a FUNSD-shaped frozen trunk) is NOT
+  covered by WildReceipt latents → drifts freely (5.5) no matter the label format (hard/soft
+  identical) or count (d5→d50 no help on SROIE). Also explains why CONVERGENCE HURT proxy replay
+  (58.9@5ep → 50.3@conv) while it helps real replay (63.8→87.3): longer training = more drift in
+  the uncovered region while the anchor holds only elsewhere — a noisy/offset anchor amplifies.
+
+  **MORNING PLAN (in order, cheap→decisive):**
+  1. **Coverage probe (no training, ~1 min):** mean/quantile L2 (or CKA) distances at layer 8
+     between each task's latents and (a) the WildReceipt pool, (b) the other tasks. Prediction:
+     d(SROIE, pool) ≫ d(FUNSD, pool). Confirms/kills v2 before any run.
+  2. **Coverage-targeted proxy selection (~20 lines):** at boundary t, RETRIEVE from the pool the
+     `docs_per_task` docs nearest to task t's latent centroid (CIL-QUD-style) instead of random.
+     Run dil 5ep d50+soft. If SROIE recovers → PLaR alive + the coverage law is the paper's second
+     mechanism. If the pool simply contains NO docs near SROIE's region (probe shows a floor) →
+     enlarge/mix pools (XFUND + more corpora) or accept bounded-transfer.
+  3. Optional: pool-mix ablation; CoLaR build (per-doc SVD, independent of the proxy question).
 - **CoLaR (compressed latent replay):** per-DOC SVD is low-rank (r64=87.7%, r128=95.2% measured —
   unlike the full-rank pooled space) → 6–12× private-latent compression preserving whole-doc
   binding. NOT built yet; next after PLaR verdict.
