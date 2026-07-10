@@ -1,0 +1,14 @@
+name: aglr_replay
+# AGLR-CL port (arXiv 2505.08524), the Gate-0 comparator. Same frozen-trunk / layer-k
+# replay hook as latent_replay, but the memory is per-(task x class) diagonal Gaussians in
+# layer-k activation space + an attention-salience token filter (top-fraction by hidden
+# L2 norm) + carrier skeletons. Indexes memory BY CLASS — if SLR (spectral_memory) cannot
+# beat this at equal/lower bytes, SLR is AGLR-CL and there is no paper.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8        # freeze layers <k after task 0; k..11 + head stay plastic
+attn_keep: 0.5          # keep top-fraction salient tokens per doc for the fit (1.0 = off)
+carriers_per_task: 4    # real bbox/mask/labels kept per task (no activations) for the scaffold
+replay_batch_size: 4

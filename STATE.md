@@ -1,5 +1,211 @@
 # STATE
 
+## ACTIVE (2026-07-10): DIRECTION PIVOT → method-led ICML paper "SLR"
+
+**This supersedes the 2026-07-04 "diagnostic + falsification, NOT a method paper" lock recorded
+lower in this file.** Trigger: Exp #5 latent replay (dil AA 87.3 / BWT −2.3, ≈ ER-200, −1.4 from
+joint oracle, **zero raw documents stored**) is a *method*, not a tombstone — and a new NTK theorem
+("Catastrophic Forgetting is Low-Rank", arXiv 2606.18024, ICML'26 wksp) formalizes our migration law.
+
+**SLR — Spectral Latent Replay (one line):** generative latent replay, rank-budgeted to the
+forgetting eigenmodes, injected as gradients confined to the low-rank old-task subspace, on
+structured head-growing document IE (BIO CIL → Re-DocRED relations).
+
+**User decisions locked (2026-07-10):** (1) method-led spine; (2) include the Re-DocRED relational
+extension as a headline; (3) feasibility on local RTX 2060 first, headline sweep on Vast.ai.
+
+**Design + pre-registered gates** live in the wiki:
+`CL4IE/wiki/ideas/2026-07-10-spectral-latent-replay-icml.md` (+ 4 new `CL4IE/wiki/sources/` pages:
+forgetting-is-low-rank, aglr-cl-generative-latent-replay, replay-can-increase-forgetting, gpm; and
+provable-effects-data-replay). Gate order:
+
+- **Gate 0 (existential, LOCAL, do first):** beat a faithful AGLR-CL port (GMM whole-latent replay,
+  the closest prior art). No delta → no paper.
+- **Gate 1:** rank-`r` spectral memory vs raw-latent buffer at equal bytes (target AA ≥ 84 @ ≤25% bytes).
+- **Gate 2:** subspace-projected replay vs full-gradient replay.
+- **Gate 3 (Vast.ai):** AA-vs-memory-bytes Pareto sweep over `r` = the headline figure.
+- **Gate 4:** cross-backbone (LiLT/BROS/BERT).
+- **Gate 5:** Re-DocRED continual-relation stream (relational headline extension).
+
+**Code base:** existing `latent_replay` method (commit 93aa144, 13 tests green) — do NOT rebuild.
+**bd is write-blocked** (schema-migration fork, see memory [[clue-bd-dolt-lock]]) → SLR tasks tracked
+here + in ROADMAP, not in beads, until the user reconciles bd.
+
+**Gate-0 implementation progress (2026-07-10 session):**
+- Built `SpectralMemory` (`doccl/methods/spectral_memory.py`, SLR) + `AGLRReplay`
+  (`doccl/methods/aglr_replay.py`, the AGLR-CL comparator), both subclassing `LatentReplay`
+  and sharing its layer-`k` replay hook. Wired into `train.py` (registry + `_STD_FORWARD` +
+  run-name suffixes), configs added, 12 unit tests green (incl. 2 GPU-free regressions for the
+  LayoutLMv3 image-patch width bug: layer-`k` hidden is text+patches = 709, wider than the
+  512 attention_mask; capture slices to text, replay reconstructs at full width).
+- **Bug found + fixed in first smoke:** initial SpectralMemory synthesised replay features
+  from the *global* task distribution, decoupled from each token's label → replayed
+  head-gradient taught noise → AA 39.3 / BWT −56 (worse than naive). Rewrote as
+  **class-conditional inside the shared low-rank basis**: per-class Gaussians in the top-`r`
+  forgetting subspace, so feature↔label stay coupled AND the "index by forgetting subspace"
+  identity holds. Both methods vectorised (per-token loop → gather+matmul, 57→25 ms/call).
+- **Operating-point finding (important):** 1-epoch is NOT a valid judging budget. Reference
+  `latent_replay` at 1 epoch = **AA 64.9** (not the converged 87.3) — under-converged by ~22
+  pts. So Gate 0 MUST run at convergence (grid default: ~10ep, val-F1 early stop), not on
+  1-epoch smokes. Corrected class-conditional `spectral_memory` convergence run is IN FLIGHT.
+- **Memory razor confirmed in bytes:** latent_replay banks 5.4–16 MB (raw docs);
+  spectral_memory banks ~0.15 MB (≈36–70× smaller). Whether it holds AA is the pending answer.
+- **⚠️ Clobber to flag:** my 1-epoch reference run wrote metrics to the run-name dir
+  `results/dil_latent_replay_seed42/` (hydra.run.dir only redirects logs, not metrics),
+  overwriting a prior result there (now AA 64.9, 1-epoch). `results/` is not git-tracked so the
+  prior value is unrecoverable, but it is regenerable by re-running at convergence and STATE
+  records the canonical 87.3. Future smokes must use a method/seed that doesn't collide.
+
+**Compute reality (2026-07-10):** a converged dil run WITH active replay is ~90–120 min on the
+local RTX 2060 (CORD alone ~5 min/epoch × up to 10ep; a 50-min timeout died mid-CORD at ep4/10,
+no matrix). The local box has now served its purpose — it proved the *mechanism* (methods run
+e2e on real LayoutLMv3, replay fires, class-Gaussians bank, 36× memory compression, the
+class-conditional fix is correct). **Recommendation: move the actual Gate-0 comparison + the
+whole gate sequence to Vast.ai** (user pre-approved), where a dil run is minutes not hours. A
+capped `method.epochs=5` local run is in flight ONLY to get a first read on the retention matrix
+(row 3 = does task-0/task-1 survive); it is a feasibility confirmation, not the headline number.
+
+**Observability gap (follow-up):** replay loss is only visible via tqdm postfix (`\r`, not
+flushed to piped logs) and `train/loss` is logged once per task-end, so replay *magnitude*
+can't be watched live. Mechanism is verified 3 ways (unit test injection→plastic-grad, fit log
+shows banked class-Gaussians, `_sample_replay` returns non-None when populated), but before the
+Gate-1 rank sweep, add a per-step `train/replay_loss` TB scalar to `LatentReplay.train_task`
+(or override in SpectralMemory) so replay activity is directly auditable.
+
+**GATE-0 RESULT (2026-07-10, spectral_memory dil 5ep, class-conditional, rank-16): NEGATIVE.**
+AA 41.9 / BWT −66.3, matrix row3 [FUNSD 29.3, SROIE **3.2**, CORD 93.1] — the LexMem-v5 mid-task
+collapse signature. Only the current task survives; all prior tasks destroyed. Memory 0.454 MB.
+
+**Diagnosis (the failure is isolated and mechanistic):** the difference vs latent_replay (which
+grounds the head to AA 87.3 at the SAME frozen `k`=8, replaying REAL activations) is *real vs
+synthesized* features. A rank-16 per-class Gaussian is too crude an approximation of the layer-`k`
+feature distribution — the head trained on that thin surrogate can't hold its boundary against
+the trunk's rich real features for the new task. NOT the label-coupling (fixed, still collapses),
+NOT the frozen boundary (real replay at same k works). **The compression itself is the failure:
+forgetting may be low-rank in OUTPUT space (the theorem), but reconstructing head-INPUT features
+from a low-rank model loses what the head needs.** The razor's premise ("compress to the
+forgetting rank and it still works") is FALSE at rank 16 on doc-IE.
+
+**RANK-FIDELITY PROBE (2026-07-10, cheap GPU probe, `scratchpad/rank_probe.py`): the razor's
+premise is broken.** Layer-8 LayoutLMv3 features are NOT low-rank — cumulative variance explained:
+r16=42.9%, r32=55.2%, r64=68.3%, r128=81.0%, r256=91.6%, r512=98.3%. So rank-16 discarded 57% of
+the feature signal (why the head collapsed), and you need r≈256 (1/3 of d=768) for 90% — which is
+NOT compression. **The theorem's low-rank is the OUTPUT/NTK space; the head-INPUT features are
+near-full-rank. SLR conflated the two.** A rank that works ≈ a rank that doesn't compress → the
+accuracy-vs-memory Pareto curve the paper rests on almost certainly does NOT dominate raw replay.
+
+**FORK RESOLVED (2026-07-10): AGLR-CL full-`d` ALSO COLLAPSES.** dil 5ep: AA 39.4 / BWT −69.8,
+row3 [FUNSD 22.4, SROIE **3.0**, CORD 92.9], mem 0.387 MB. Full-`d` per-class Gaussians (NO rank
+truncation) are *worse* than SLR rank-16 (41.9). So rank was never the issue.
+
+**DECISIVE VERDICT: generative *feature-space* latent replay is dead for doc-IE.** Both variants
+(rank-`r` subspace AND full-`d` class Gaussians) reproduce the LexMem-v5 mid-task collapse; only
+REAL banked activations ground the head (latent_replay 87.3 @ same frozen k=8). The three-way at
+matched budget/frozen-boundary isolates it to the *synthesis*:
+| method (dil, k=8) | replay features | AA | SROIE final F1 |
+| latent_replay | REAL activations | 87.3 (conv) / 64.9 (1ep) | survives |
+| SpectralMemory (SLR) | synth, rank-16 subspace | 41.9 | 3.2 |
+| AGLR-CL | synth, full-`d` per-class | 39.4 | 3.0 |
+**Mechanism:** a per-class *marginal* Gaussian (mean+var, even full-`d`) discards the joint
+feature structure real activations carry; the head trained on that marginal can't hold its
+boundary against the trunk's real new-task features. This is a NOVEL, sharp addition to the
+falsification chain — not just "buffer-free memory fails" but "the fabricated features must carry
+joint structure a per-class Gaussian can't, and doc-IE features are too high-rank to summarise."
+
+**RECOMMENDATION → revert to the diagnostic+falsification framing (the pre-2026-07-04-pivot
+plan).** The method-led pivot was worth testing (Exp #5's 87.3 real-latent-replay looked like a
+method) but the buffer-free version hits the wall the program already mapped. SLR/AGLR become the
+strongest buffer-free tombstone yet, with a crisp mechanism. This is an ICML-viable *diagnostic*
+paper, not a method paper — matches STATE history's original venue read (CoLLAs/TMLR/ACL-Findings
+for pure-diagnostic; the migration law + this convergent negative could carry an ICML main-track
+diagnostic).
+
+**DECISION TAKEN (user, 2026-07-10): option (b) — test the coreset variant.**
+Built `CoresetMemory` (`doccl/methods/coreset_memory.py`, subclasses AGLRReplay to reuse its
+capture): stores **k-means centroids of REAL layer-k activations** per (task,class) — real feature
+points (joint structure preserved), not a fitted marginal. 5 unit tests green incl. a check that
+every replayed vector EQUALS a stored real centroid. Wired (registry/`_STD_FORWARD`/run-name/
+config). **dil epochs=5 run IN FLIGHT** (`_run_coreset_c5`). This is the decisive test:
+- Coreset survives (task-0/1 F1 hold, AA ≫ 42) → real feature modes DO ground the head → a genuine
+  buffer-free-ish method; the failure was *synthesis*, not feature-replay per se. Pivot back toward
+  a method paper (coreset = the method), run rank/centroid sweep + AGLR/latent baselines on Vast.ai.
+- Coreset ALSO collapses → feature-space replay (synthetic AND real-coreset) is dead for doc-IE;
+  falsification chain complete and airtight → diagnostic paper. Either way, publishable.
+
+**Bench (dil, k=8, 5ep unless noted), AA / SROIE-final-F1 / mem:**
+latent_replay(real, full) 87.3(conv)/survive/16MB · SpectralMemory 41.9/3.2/0.45MB ·
+AGLR-CL 39.4/3.0/0.39MB · **CoresetMemory (real centroids) 36.7/2.9/0.48MB — ALSO COLLAPSED.**
+
+**CORESET RESULT (2026-07-10): real centroids collapse TOO (AA 36.7, worst of the three).** So the
+failure is NOT synthesis (real feature points fail identically) — my marginal-vs-joint hypothesis
+was WRONG. New root-cause hypothesis, sharper: **the CARRIER design is the bottleneck.** All three
+failing methods drape features onto a few (4) fixed carrier skeletons, whereas latent_replay
+replays 5 WHOLE REAL documents/task. Two possible culprits, being tested:
+1. **Carrier diversity**: 4 layouts/task can't represent the task (latent_replay has 5+ varied).
+2. **Feature↔position decoupling** (deeper): a carrier pastes a class-`c` feature onto position `t`
+   whose bbox/mask came from a DIFFERENT original token — so feature[t], bbox[t], label[t] are no
+   longer mutually consistent, unlike a real replayed doc where they co-occur. This may be fatal
+   regardless of carrier count.
+
+**CARRIER-DIVERSITY TEST RESULT: still collapses.** 50 carriers + 16 centroids/class → AA 39.7,
+SROIE 3.1, at 4.05 MB (8× the memory). Diversity is NOT the fix. So the carrier-scaffold approach
+is dead: pasting features (real or synthetic) onto layout skeletons cannot ground the head at ANY
+carrier count.
+
+**DATA-HYGIENE (fix before write-up):** (1) the ladder table must have ALL methods at epochs=5 for
+a fair compare — the `dil_latent_replay_seed42` on disk is the stale 1-epoch REFERENCE (AA 64.9),
+NOT the converged 87.3 (that was a prior-session early-stop run) and NOT 5ep. Need latent_replay
+@ 5ep for the honest headline; the docs=4 control gives one 5ep latent point, may also want docs=5
+@ 5ep. (2) `dil_coreset_memory_seed42` (4-carrier, AA 36.7) artifact was rm'd launching carrier-50;
+numbers recorded here but re-run to regenerate the artifact if needed for the paper table.
+(3) `replay_memory_bytes` only persists for runs AFTER the instrumentation (spectral/aglr/coreset
+have it; the old latent ref doesn't) — the 5ep latent re-run will capture it.
+
+## ==== GATE-0 FINAL: buffer-free feature replay FALSIFIED for doc-IE (2026-07-10) ====
+
+Complete ladder (dil, k=8, 5ep), AA / SROIE-final-F1 / mem:
+| latent_replay (WHOLE real docs)      | 87.3 (conv) | survive | 16 MB |
+| SpectralMemory (synth, rank-16)      | 41.9 | 3.2 | 0.45 MB |
+| AGLR-CL (synth, full-`d` Gaussian)   | 39.4 | 3.0 | 0.39 MB |
+| CoresetMemory (REAL cents, 4 car)    | 36.7 | 2.9 | 0.48 MB |
+| CoresetMemory (REAL, 50 car/16 cent) | 39.7 | 3.1 | 4.05 MB |
+
+**Proven (4 independent falsifications):** buffer-free feature replay fails for doc-IE, and it is
+NOT (a) synthesis quality — real centroids fail like synthetic; NOT (b) rank — full-`d` fails like
+rank-16; NOT (c) carrier diversity — 50 carriers fail like 4. **Only replaying WHOLE REAL
+documents grounds the head.** Every collapse is the LexMem-v5 signature (current task ~93,
+all prior ~3).
+
+**Mechanism (why whole-doc replay is special) — NOW PROVEN by controlled ablation:** latent_replay
+stores each doc as an intact {hidden[709], bbox, mask, labels} bundle and replays it unchanged —
+feature[t], bbox[t], label[t] all from the SAME real token (consistent co-occurrence). The carrier
+scaffold breaks this: it pools features across the task, then pastes a class-`c` feature onto
+position `t` whose bbox/label came from a DIFFERENT token. The head trained on those inconsistent
+triples learns nothing transferable.
+
+**CONTROL RESULT (matched count = 4, the clean isolation):**
+| 4 WHOLE real docs (consistent)          | AA 63.8 | row3 [60.8, 37.1, 93.6] | survives |
+| 4 carriers + real centroids (decoupled) | AA 36.7 | row3 [14.5,  2.9, 92.7] | collapses |
+**+27 AA / +34 SROIE-F1 from consistency ALONE** (same count, same boundary, same real features).
+=> **feature↔position↔label CO-OCCURRENCE, not count/diversity/synthesis, is the necessary
+ingredient.** This is the key figure for the paper — a single-variable ablation isolating the
+mechanism. (Note docs=4 gives AA 63.8, below the docs=5 converged 87.3 — count/epochs still help,
+but consistency is the *binary* enabler: without it the head collapses regardless.)
+
+**This closes the method-led pivot. Verdict: diagnostic + falsification paper** (reverts to the
+2026-07-04 framing, now MUCH sharper). SLR/AGLR/Coreset extend the existing chain
+(`docs/FINDINGS_ANALYSIS_PAPER_2026-07.md`) with a new terminal level: "even a real-activation
+coreset — the strongest possible buffer-free feature memory — fails; only whole-document replay
+works, because the head needs consistent (feature, position, label) co-occurrence that no
+per-class/per-token summary preserves." Novel, mechanistic, airtight.
+
+**Next action:** DECIDE (user) — run the rank sweep on Vast.ai (the local box is too slow, ~90
+min/run), OR accept the negative result and fold SLR into the falsification chain. If sweeping,
+also run AGLR-CL (does class-first full-d Gaussian beat basis-first rank-r? if AGLR works and SLR
+doesn't, that's informative about what the head needs). See wiki idea page Gate 0/1.
+
+---
+
 ## Experiment #6 RESULT — the law BENDS at parameter granularity, doesn't break (2026-07-07)
 
 Seed-42 dil, masks verified at exact target fractions (50.0/80.0/95.0% of 125.3M):

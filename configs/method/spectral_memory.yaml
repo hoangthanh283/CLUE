@@ -1,0 +1,14 @@
+name: spectral_memory
+# SLR-minimal (Spectral Latent Replay). Same frozen-trunk / layer-k replay hook as
+# latent_replay, but the memory is a per-task rank-r spectral summary (SVD factors of the
+# pooled layer-k activation matrix) + a few carrier skeletons, NOT raw documents. Indexes
+# memory by the forgetting subspace (top-r eigenmodes) — the razor vs aglr_replay's
+# per-class Gaussians. Gate 1 sweeps rank_r for the accuracy/bytes Pareto curve.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8        # freeze layers <k after task 0; k..11 + head stay plastic
+rank_r: 16              # rank of the per-task spectral summary (0 disables the fit)
+carriers_per_task: 4    # real bbox/mask/labels kept per task (no activations) for the scaffold
+replay_batch_size: 4

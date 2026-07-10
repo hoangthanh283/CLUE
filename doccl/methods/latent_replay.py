@@ -256,3 +256,13 @@ class LatentReplay(NaiveFineTune):
             len(self.store),
             sum(d["hidden"].numel() for d in self.store) * 2 / 1e6,
         )
+
+    def memory_bytes(self) -> int:
+        """Raw replay-buffer footprint in bytes — the x-axis of the SLR memory Pareto
+        curve for the incumbent (hidden fp16 + bbox/mask/labels int64). Overridden by the
+        compressed variants (SpectralMemory, AGLRReplay)."""
+        total = 0
+        for d in self.store:
+            total += d["hidden"].numel() * 2  # fp16 activations
+            total += (d["bbox"].numel() + d["attention_mask"].numel() + d["labels"].numel()) * 8
+        return total

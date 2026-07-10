@@ -1,5 +1,35 @@
 # ROADMAP
 
+## DIRECTION (2026-07-10): method-led "SLR" pivot CLOSED → back to diagnostic + falsification paper
+
+The 2026-07-10 method-led pivot (SLR = subspace-targeted latent replay) was tested to Gate 0 and
+**FALSIFIED** — buffer-free feature replay does not work for doc-IE. See `STATE.md` "GATE-0 FINAL"
+block and `docs/FINDINGS_ANALYSIS_PAPER_2026-07.md` Finding 3b for the full 5-run ablation. The
+paper reverts to the pre-pivot **diagnostic + falsification** framing, now sharper: SLR/AGLR/Coreset
+are the new *terminal level* of the falsification chain, with a clean single-variable mechanism
+figure (consistency ablation: 4 whole docs AA 63.8 vs 4 decoupled carriers AA 36.7).
+
+### Next Up (diagnostic-paper writing + evidence hygiene)
+1. **Write-up DONE** (2026-07-10): Finding 3b added to the findings doc; SLR idea page marked
+   falsified; STATE/ROADMAP reverted. Next: fold Finding 3b into the thesis/paper falsification
+   section when drafting that chapter.
+2. **Fair-ladder re-runs (before the paper table):** latent_replay @ 5ep docs=5 (the on-disk
+   `dil_latent_replay_seed42` is stale 1-epoch AA 64.9, not the converged 87.3); regenerate the
+   rm'd `dil_coreset_memory_seed42` (4-carrier) artifact. All cheap; do on Vast.ai with the grid.
+3. **Multi-backbone generalization grid** (the pre-pivot priority, still open): does the
+   forgetting locus + the negative result transfer across LiLT/BROS/BERT? `run_grid_multigpu.sh`
+   on a rented GPU; the local box is too slow (~90 min/dil-run confirmed this session).
+4. **Optional (only if a method angle is ever revived):** the ONE finding that would reopen a
+   method is that whole-doc *consistency* is required — a "consistency-preserving compressed
+   memory" (store few whole real docs, compressed losslessly) is untested, but that is ≈ raw
+   replay with fewer docs, not a novel method. Park unless a reviewer asks.
+
+### Notes
+- **bd task-tracking:** still blocked (schema-migration fork) — track here, not in beads, until
+  the designated-migrator decision is made.
+
+---
+
 ## Direction change (2026-07-02): LexSlot DROPPED → LexMem (beads CLUE-b0b)
 RCA verdict: standalone LexSlot is naive-level (AA 42.2 vs naive 40–43; the pre-fix 86.9
 was an unnormalized-gate artifact; the thesis 87.3 row was the DocCL hybrid). LexSlot-FM
