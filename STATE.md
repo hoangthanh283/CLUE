@@ -1,6 +1,36 @@
 # STATE
 
-## ACTIVE (2026-07-10): DIRECTION PIVOT → method-led ICML paper "SLR"
+## ACTIVE (2026-07-10 late): SLR falsified → successor idea "Consistency Law → PLaR/CoLaR"
+
+SLR/AGLR/coreset all FALSIFIED (see GATE-0 FINAL below) but proved the **consistency law**
+(whole-doc (feature,position,label) binding is the necessary replay ingredient; +27 AA single-var
+control). Successor idea (wiki `ideas/2026-07-10-consistency-law-replay.md`): keep consistency,
+remove/shrink private storage —
+- **PLaR (proxy latent replay):** bank pseudo-labeled PUBLIC docs (WildReceipt) as whole-doc
+  frozen-trunk latents; ZERO private bytes. Implemented (`doccl/methods/proxy_latent_replay.py`,
+  3 tests green, registered).
+  **First run (dil 5ep, 5 docs, τ=0): AA 45.8 [FUNSD 40.2, SROIE 4.1, CORD 93.1]** — beats every
+  falsified marginal (36.7–41.9; FUNSD retention 40.2 vs their 14–29 = the consistency effect is
+  real on public docs) but below real-private-doc replay at same count (d4=63.8) and below the
+  ≥70 gate. Mid-task SROIE still collapses.
+  **d50 RESULT: AA 57.2 [FUNSD 73.3, SROIE 5.1, CORD 93.3]** — the count lever WORKS where
+  pseudo-labels are informative: FUNSD 40.2→**73.3** (ABOVE private-doc d4's 60.8!). But SROIE
+  stays dead (5.1). **Diagnosis: class density.** FUNSD labels are dense (most form tokens are
+  question/answer → proxies carry rich signal); SROIE has 4 sparse entity types → argmax
+  pseudo-labels on receipts ≈ 99% "O" → replay carries no SROIE-class gradient.
+  **Fix built + OVERNIGHT RUN IN FLIGHT** (`_run_plar_d50_soft`, run `bgyu4vvbk`): `soft_labels`
+  — bank the head's full logit distribution per token (dark knowledge, banked once → drift-free),
+  replay with soft-CE (`soft_T`); every masked token then carries boundary info even where argmax
+  says "O" (DER-style). 5 unit tests green (incl. soft-loss-increases-under-head-perturbation and
+  plastic-only-gradient invariants). Read `results/dil_proxy_latent_replay_seed42_d50_soft/`
+  in the morning. If SROIE recovers → PLaR is a live ICML method ("replay is free"); if not →
+  next knobs: soft_T=2, mixed pool (XFUND+WildReceipt), convergence budget, class-balanced
+  replay weighting.
+- **CoLaR (compressed latent replay):** per-DOC SVD is low-rank (r64=87.7%, r128=95.2% measured —
+  unlike the full-rank pooled space) → 6–12× private-latent compression preserving whole-doc
+  binding. NOT built yet; next after PLaR verdict.
+
+## SUPERSEDED same-day (kept for the record): DIRECTION PIVOT → method-led ICML paper "SLR"
 
 **This supersedes the 2026-07-04 "diagnostic + falsification, NOT a method paper" lock recorded
 lower in this file.** Trigger: Exp #5 latent replay (dil AA 87.3 / BWT −2.3, ≈ ER-200, −1.4 from
