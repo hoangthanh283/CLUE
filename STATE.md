@@ -230,7 +230,27 @@ numbers recorded here but re-run to regenerate the artifact if needed for the pa
 (3) `replay_memory_bytes` only persists for runs AFTER the instrumentation (spectral/aglr/coreset
 have it; the old latent ref doesn't) — the 5ep latent re-run will capture it.
 
-## ACTIVE (2026-07-11): deep dive on the two 87.3 rows — TWO RUNS CHAINED OVERNIGHT (task bldaw8zmb)
+## ACTIVE (2026-07-11 pm): "reduce d50 → d5/d0" for latent replay k4 — 3-run chain IN FLIGHT
+
+User directive: shrink k4/d50 (87.3, ~163 MB) toward d5 (78.2, ~16 MB) or d0, possibly via
+lexical/latent memory. Critical constraint from our own chain: marginal memories are falsified —
+only selection / compression / augmentation / public-substitution / isolation+replay doors remain.
+Three hypotheses → three runs chained (task `bpmugeger`, ~8.5h, grid budget unless noted):
+1. **E1 — H1 coverage-not-count:** `latent_replay` + NEW `doc_selection: kcenter` knob (greedy
+   farthest-point over per-doc mean latents, pool=100; default `random` byte-identical). k4/d5
+   → `dil_latent_replay_seed42_k4_kc` vs random-d5 76.0 (s42). If ≥ ~83, selection closes half
+   the gap for free.
+2. **E2 — H2 bytes-not-docs:** NEW method `colar` (CoLaR): per-DOC rank-r SVD of banked latents
+   (whole-doc binding preserved; per-doc r64 = 87.7% var measured). k4/d50/r64 →
+   `dil_colar_seed42_k4_d50` vs raw d50 87.3 at ~28 MB (below raw-d5 bytes ~16MB? factors ≈
+   0.19 MB/doc × 150 = 28.4 MB — 5.7×; +int8 later → ~14 MB). Target: ≥ ~85.
+3. **E3 — H3 d0-private:** PLaR@k4 relaunch (killed at final eval last night; banking had
+   completed, histograms still 7/9 tags). 5ep → vs k8's 58.9. Tests the generic-interface
+   coverage fix.
+Both prior threads' pending runs (lexslot-off verification) queue AFTER this chain — the killed
+`bldaw8zmb` chain never reached it. `docs/RESULTS_LEDGER_DIL.md` is the reference table.
+
+## SUPERSEDED (2026-07-11 am): deep dive on the two 87.3 rows — chain was KILLED (task bldaw8zmb)
 
 User picked latent-replay(k4/d50) + LexSlot-hybrid as directions. Deep dive (full write-up:
 `CL4IE/wiki/analyses/2026-07-11-two-87point3-rows-deep-dive.md`) found:

@@ -1,0 +1,13 @@
+name: colar
+# Compressed Latent Replay: latent_replay with per-DOCUMENT rank-r SVD storage. Keeps the
+# whole-doc (feature,position,label) binding the consistency law requires (never pools
+# across docs) while shrinking bytes ~5.7x at r=64 (per-doc variance measured: r64=87.7%,
+# r128=95.2%). Target: d50 accuracy at ~d5 bytes. rank_r sweeps the accuracy/bytes Pareto.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8      # freeze layers <k after task 0 (run E2 uses k=4 via CLI override)
+docs_per_task: 5      # E2 uses 50 via CLI override
+replay_batch_size: 4
+rank_r: 64            # per-doc SVD rank (>= min(seq,d) = near-lossless)
