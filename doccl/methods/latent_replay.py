@@ -217,12 +217,22 @@ class LatentReplay(NaiveFineTune):
         )
 
     def _capture_task(self, train_loader: DataLoader) -> None:
-        """Bank layer-k activations for the first ``docs_per_task`` docs (the
-        loader shuffles, so this is a random draw — the fixed per-task quota
-        matches the retention-curve ER points, not reservoir sampling)."""
+        """Bank layer-k activations for ``docs_per_task`` docs.
+
+        ``doc_selection: random`` (default, byte-identical to all prior runs): the first
+        docs from the shuffled loader — a random draw matching the retention-curve ER points.
+
+        ``doc_selection: kcenter``: gather a candidate pool (``selection_pool`` docs), then
+        greedy k-center (farthest-point) selection on per-doc mean latents — picks the
+        docs_per_task docs that best COVER the task's feature region. Tests the hypothesis
+        that random-d5's gap to d50 (78.2 vs 87.3 on dil/k4) is coverage, not count.
+        """
         was_training = self.model.training
         self.model.eval()
-        stored = 0
+        selection = str(self.config.get("doc_selection", "random"))
+        pool_cap = int(self.config.get("selection_pool", 100)) if selection == "kcenter" else 0
+        quota = self.docs_per_task if selection == "random" else max(pool_cap, self.docs_per_task)
+        candidates: list[dict] = []
         with torch.no_grad():
             for batch in train_loader:
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
@@ -235,9 +245,9 @@ class LatentReplay(NaiveFineTune):
                 finally:
                     self._capture = None
                 for i in range(hidden.shape[0]):
-                    if stored >= self.docs_per_task:
+                    if len(candidates) >= quota:
                         break
-                    self.store.append(
+                    candidates.append(
                         {
                             "hidden": hidden[i],
                             "bbox": batch["bbox"][i].cpu(),
@@ -245,17 +255,46 @@ class LatentReplay(NaiveFineTune):
                             "labels": batch["labels"][i].cpu(),
                         }
                     )
-                    stored += 1
-                if stored >= self.docs_per_task:
+                if len(candidates) >= quota:
                     break
         if was_training:
             self.model.train()
+        if selection == "kcenter" and len(candidates) > self.docs_per_task:
+            picked = self._kcenter_select(candidates, self.docs_per_task)
+        else:
+            picked = candidates[: self.docs_per_task]
+        self.store.extend(picked)
         log.info(
-            "latent_replay: banked %d docs (store=%d, ~%.1f MB fp16)",
-            stored,
+            "latent_replay: banked %d docs (store=%d, ~%.1f MB fp16, selection=%s/pool=%d)",
+            len(picked),
             len(self.store),
             sum(d["hidden"].numel() for d in self.store) * 2 / 1e6,
+            selection,
+            len(candidates),
         )
+
+    @staticmethod
+    def _kcenter_select(candidates: list[dict], k: int) -> list[dict]:
+        """Greedy k-center (farthest-point) over per-doc mean latents of real text tokens.
+        Deterministic: seed = the doc nearest the pool centroid, then repeatedly add the
+        doc farthest from the selected set. Maximizes feature-region coverage."""
+        means = torch.stack(
+            [
+                d["hidden"][: d["attention_mask"].shape[0]][d["attention_mask"].bool()]
+                .float()
+                .mean(0)
+                for d in candidates
+            ]
+        )  # (N, d)
+        centroid = means.mean(0, keepdim=True)
+        first = int(torch.cdist(means, centroid).squeeze(1).argmin())
+        chosen = [first]
+        dist = torch.cdist(means, means[first : first + 1]).squeeze(1)  # (N,)
+        while len(chosen) < min(k, len(candidates)):
+            nxt = int(dist.argmax())
+            chosen.append(nxt)
+            dist = torch.minimum(dist, torch.cdist(means, means[nxt : nxt + 1]).squeeze(1))
+        return [candidates[i] for i in chosen]
 
     def memory_bytes(self) -> int:
         """Raw replay-buffer footprint in bytes — the x-axis of the SLR memory Pareto

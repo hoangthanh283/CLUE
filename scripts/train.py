@@ -27,6 +27,7 @@ from doccl.eval.metrics import CLMetricsTracker, compute_per_class_f1
 from doccl.methods.aglr_replay import AGLRReplay
 from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
+from doccl.methods.colar import CoLaR
 from doccl.methods.coreset_memory import CoresetMemory
 from doccl.methods.cuber import CUBER
 from doccl.methods.der import DERpp
@@ -223,6 +224,9 @@ METHOD_REGISTRY = {
     # PLaR: whole-doc latent replay from a pseudo-labeled PUBLIC proxy pool (WildReceipt) —
     # zero private storage; consistency-law-prescribed successor to the falsified variants.
     "proxy_latent_replay": ProxyLatentReplay,
+    # CoLaR: latent_replay with per-DOCUMENT rank-r SVD storage — d50 coverage at ~d5 bytes
+    # (whole-doc binding preserved; per-doc matrices ARE low-rank though the pooled space isn't).
+    "colar": CoLaR,
     # LexMem v3b: v3 with lambda retuned (1000 -> 300; CKA 0.999 was over-stiff,
     # SROIE 51) + hard exclusion of prior-task slots from selection (Jaccard
     # 0.31 slot overwrite drove task-1 forgetting 51 -> 12).
@@ -451,6 +455,21 @@ def main(cfg: DictConfig) -> None:
             run_name += "_ctrl"
         elif docs != 5:
             run_name += f"_d{docs}"
+        if cfg.method.get("doc_selection", "random") == "kcenter":
+            run_name += "_kc"
+    elif cfg.method.name == "colar":
+        # CoLaR axes: split depth, docs, per-doc SVD rank, selection. Canonical k=8/d=5/r=64.
+        split_k = cfg.method.get("split_layer_k", 8)
+        docs = cfg.method.get("docs_per_task", 5)
+        rank = cfg.method.get("rank_r", 64)
+        if split_k != 8:
+            run_name += f"_k{split_k}"
+        if docs != 5:
+            run_name += f"_d{docs}"
+        if rank != 64:
+            run_name += f"_r{rank}"
+        if cfg.method.get("doc_selection", "random") == "kcenter":
+            run_name += "_kc"
     elif cfg.method.name == "spectral_memory":
         # SLR axes: split depth and spectral rank. Canonical is k=8 / rank=16 (no suffix);
         # the Gate-1 Pareto sweep varies rank ("_r<N>"), rank=0 is the no-replay control.
@@ -819,6 +838,7 @@ def main(cfg: DictConfig) -> None:
         "aglr_replay",
         "coreset_memory",
         "proxy_latent_replay",
+        "colar",
         "fisher_mask",
     }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
