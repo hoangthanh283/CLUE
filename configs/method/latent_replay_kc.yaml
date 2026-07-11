@@ -1,0 +1,15 @@
+name: latent_replay
+# latent_replay with k-center (farthest-point) document selection instead of a random
+# draw: pool `selection_pool` candidate docs, pick the docs_per_task that best COVER the
+# task's latent region (greedy k-center on per-doc mean latents). Tests H1 (coverage, not
+# count) for the d50->d5 reduction: selected-d5 vs random-d5 (76.0 @ k4/s42).
+# New option file because configs/method/latent_replay.yaml is immutable ground truth.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8     # E1 runs k=4 via CLI override
+docs_per_task: 5
+replay_batch_size: 4
+doc_selection: kcenter
+selection_pool: 100  # candidate docs scanned before selection (~110 MB transient RAM)
