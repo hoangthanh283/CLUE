@@ -230,6 +230,25 @@ numbers recorded here but re-run to regenerate the artifact if needed for the pa
 (3) `replay_memory_bytes` only persists for runs AFTER the instrumentation (spectral/aglr/coreset
 have it; the old latent ref doesn't) — the 5ep latent re-run will capture it.
 
+## ACTIVE (2026-07-11): deep dive on the two 87.3 rows — TWO RUNS CHAINED OVERNIGHT (task bldaw8zmb)
+
+User picked latent-replay(k4/d50) + LexSlot-hybrid as directions. Deep dive (full write-up:
+`CL4IE/wiki/analyses/2026-07-11-two-87point3-rows-deep-dive.md`) found:
+1. **latent k4/d50 is genuine**: final FUNSD 88.8 > at-learning 86.3 (positive backward transfer
+   — the head re-carves the joint optimum); residual gap = SROIE −7 only. Dose-response d1/d5/d50
+   = 61/78/87; depth k2≈k4≫k8 → generic-interface + plasticity effects confounded (k8_d50 queued).
+2. **LexSlot `_off` 87.3 is UNVERIFIED**: `_off` = slot_sharing=off (task-PRIVATE slots at
+   head+late, lexical inference gate, no buffer/teacher/Fisher; shared-slots variant = 42.2). BUT
+   the 3 `_off` runs (Jun 28) PREDATE the gate-normalization fix 90f5a15 (Jun 30) — the
+   unnormalized gate can act as a covert task oracle (multi-head DIL, inflated). The thesis
+   table_main row rests on these pre-fix runs. Pre-fix dir archived (`..._off_prefix_archive`).
+**Overnight chain:** (a) PLaR k4/d50/soft 5ep — does the generic k4 interface fix SROIE coverage
+(vs k8's 58.9/SROIE 7)? → `dil_proxy_latent_replay_seed42_k4_d50_soft`; then (b) **lexslot-off
+VERIFICATION on post-fix code**, grid budget → `dil_lexslot_seed42_off`. Morning: read both; if
+lexslot-off collapses → correct the thesis row + strongest tombstone; if it reproduces → real
+buffer-free positive (parameter-isolation face of the law) → multi-seed immediately.
+Queued next: k8_d50, k4_d200, k4_d50 seeds 7/123, CoLaR r64 on k4/d50, slots+replay combo cell.
+
 **Full results ledger (all dil approaches/baselines, disk-verified): `docs/RESULTS_LEDGER_DIL.md`.**
 Note a labeling correction recorded there: the latent-replay 87.3 headline is the **k=4/50-doc**
 run; the matched-count 5ep anchor used for this week's comparisons is k8/d4 = 63.8 (unchanged).
