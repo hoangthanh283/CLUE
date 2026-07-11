@@ -230,6 +230,10 @@ numbers recorded here but re-run to regenerate the artifact if needed for the pa
 (3) `replay_memory_bytes` only persists for runs AFTER the instrumentation (spectral/aglr/coreset
 have it; the old latent ref doesn't) — the 5ep latent re-run will capture it.
 
+**Full results ledger (all dil approaches/baselines, disk-verified): `docs/RESULTS_LEDGER_DIL.md`.**
+Note a labeling correction recorded there: the latent-replay 87.3 headline is the **k=4/50-doc**
+run; the matched-count 5ep anchor used for this week's comparisons is k8/d4 = 63.8 (unchanged).
+
 ## ==== GATE-0 FINAL: buffer-free feature replay FALSIFIED for doc-IE (2026-07-10) ====
 
 Complete ladder (dil, k=8, 5ep), AA / SROIE-final-F1 / mem:
