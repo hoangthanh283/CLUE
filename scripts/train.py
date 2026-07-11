@@ -480,8 +480,11 @@ def main(cfg: DictConfig) -> None:
         if mpc != 8:
             run_name += f"_m{mpc}"
     elif cfg.method.name == "proxy_latent_replay":
-        # PLaR axes: proxy docs per task, confidence floor, pool. Canonical d=5/tau=0/
-        # wildreceipt (no suffix).
+        # PLaR axes: split depth, proxy docs per task, confidence floor, pool. Canonical
+        # k=8/d=5/tau=0/wildreceipt (no suffix).
+        split_k = cfg.method.get("split_layer_k", 8)
+        if split_k != 8:
+            run_name += f"_k{split_k}"
         docs = cfg.method.get("docs_per_task", 5)
         tau = cfg.method.get("pseudo_conf_tau", 0.0)
         pool = cfg.method.get("proxy_dataset", "wildreceipt")
