@@ -230,7 +230,53 @@ numbers recorded here but re-run to regenerate the artifact if needed for the pa
 (3) `replay_memory_bytes` only persists for runs AFTER the instrumentation (spectral/aglr/coreset
 have it; the old latent ref doesn't) — the 5ep latent re-run will capture it.
 
-## ACTIVE (2026-07-11 pm): "reduce d50 → d5/d0" for latent replay k4 — 3-run chain IN FLIGHT
+## ==== THREAD CLOSED (2026-07-12 pm): CoLaR r128 = LOSSLESS 2.7× — d50 accuracy at 60 MB ====
+
+**CoLaR k4/d50/r128 (grid): AA 87.6 / BWT −1.7, row3 [89.2, 76.3, 97.2], 60.4 MB** — MATCHES raw
+d50 (87.3 / −2.2 / 163 MB) on every cell; BWT slightly better. The per-doc-variance prediction
+held exactly (r128 = 95.2% var → full AA; r64 = 87.7% → −6.7 AA). **Final Pareto (dil, k4):**
+raw-d50 87.3@163MB · **CoLaR-r128 87.6@60MB** · CoLaR-r64 80.6@32MB · d5 76-78@16MB · naive 41@0.
+The d50→d5/d0 answer: docs can't be cut (E1: selection ≈ random; E3: public-proxy d0 caps ~57);
+**bytes CAN — losslessly to 2.7×, lossy dial to 5×.** Untested cheap multiplier: int8 on the
+factors (~2× more → r128 @ ~30 MB). For the paper: single-seed/single-scenario — needs seeds 7/123
++ cil_cord on Vast.ai. CoLaR = the constructive leg of the consistency-law finding (whole-doc unit
+compression preserves the binding; the falsified marginals are the control group).
+
+**NOW RUNNING: lexslot-off VERIFICATION** (post-gate-fix code, grid, task `bzxun4oo3`) — decides
+whether the thesis table_main 87.3 LexSlot row is real or a pre-fix task-oracle artifact.
+
+## SUPERSEDED — E2 RESULT (2026-07-12): CoLaR r64 = AA 80.6 @ 32 MB — compression is a real but lossy dial
+
+CoLaR k4/d50/r64 (grid): **AA 80.6 / BWT −12.3, row3 [82.3, SROIE 62.4, 97.1], 32 MB** — sits
+between raw-d50 (87.3 @ 163 MB, −6.7 AA) and random-d5 (76-78 @ 16 MB, +3-5 AA at 2× bytes).
+Compression loss concentrates on the mid-task (SROIE 76.7→62.4), consistent with everything else
+in the program. Exactly on the per-doc-variance prediction (r64 = 87.7% var). **r128 point IN
+FLIGHT** (`_run_e2_r128`, 95.2% var, ~64 MB): ≥85 → Pareto reads "d50 coverage at 2.5× less
+memory, tunable to 5×"; else per-doc SVD is a shallow dial and int8-on-raw is the better lever.
+The d50→d5/d0 thread's final ledger so far: selection NO (E1 77.6), d0-public NO (E3 57.3),
+compression PARTIAL (E2 80.6@r64, r128 pending).
+
+## SUPERSEDED VERDICTS (2026-07-12 am): E3 and E1 falsified their hypotheses; E2 re-running
+
+- **E3 (PLaR@k4, d0-private): FALSIFIED depth hypothesis.** AA 57.3 [68.7, SROIE 5.9, 97.4] ≈ k8's
+  58.9. k4 improves ACQUISITION (SROIE at-learning 82.0, CORD 97.4) but retention structure is
+  identical → PLaR's wall is the POOL CONTENT, not interface depth. d0-at-parity via WildReceipt
+  proxies is bounded ~57-59 across every knob tried (k, count, hard/soft).
+- **E1 (kcenter d5, coverage-not-count): NOT SUPPORTED.** kcenter 77.6 [71.2, 64.5, 97.2] vs
+  random 76.0 [72.6, 57.6, 97.9] (s42) — within random-d5's 3-seed noise (78.2±2.8). Nuance:
+  SROIE retention +6.9 (64.5 vs 57.6) but FUNSD −1.4; selection redistributes, doesn't add.
+  **Count (coverage MASS), not curation, drives the d5→d50 gap.** → The d50→d5 reduction lives
+  or dies on E2 (compression).
+- **E2 (CoLaR) crash ROOT-CAUSED (not OOM):** parent banking-log summed `d["hidden"]` over the
+  whole store, but CoLaR pops "hidden"→us/v for earlier tasks → KeyError at task-1 after_task.
+  Both crashes, same bug; first was misdiagnosed because chain stderr was piped through tail -2.
+  Fixed (format-agnostic count) + 2-task regression test; pushed. **E2 re-running**
+  (`_run_e2_colar_fix`, task bcpeq2ajd, ~3.5h): colar k4/d50/r64, grid → target ≥ ~85 @ ~32 MB.
+  Note from the crashed run's log: replay loss during T1 was ~0.000-0.007 — plausibly normal
+  (task-0 docs still well-classified early), but if E2's AA lands LOW with near-zero replay loss
+  throughout, suspect reconstruction-too-easy/fp16-fidelity and check r128.
+
+## SUPERSEDED (2026-07-11 pm): "reduce d50 → d5/d0" for latent replay k4 — 3-run chain
 
 User directive: shrink k4/d50 (87.3, ~163 MB) toward d5 (78.2, ~16 MB) or d0, possibly via
 lexical/latent memory. Critical constraint from our own chain: marginal memories are falsified —
@@ -249,6 +295,19 @@ Three hypotheses → three runs chained (task `bpmugeger`, ~8.5h, grid budget un
    coverage fix.
 Both prior threads' pending runs (lexslot-off verification) queue AFTER this chain — the killed
 `bldaw8zmb` chain never reached it. `docs/RESULTS_LEDGER_DIL.md` is the reference table.
+
+**Chain incidents (2026-07-11 pm), both recovered:**
+- E1 died at launch: `method.doc_selection=` isn't in the immutable latent_replay.yaml → Hydra
+  struct error → fixed with NEW option file `configs/method/latent_replay_kc.yaml` (committed
+  144a806); E1 re-queued behind E3 (waiter task `bp56bzp6b`).
+- **E2 (colar) died ABRUPTLY** 3s after SROIE's early-stop (ep7 STOP 14:11:03; wandb EOF
+  14:11:06): no Python traceback in the job log → hard SIGKILL signature (likely host OOM-killer;
+  journal not readable). Task-0 leg had worked (banked 50 + **compressed to 10.7 MB vs 54.5 raw,
+  5.1×** — the CoLaR mechanic is proven live). Rerun queued THIRD with full stderr capture
+  (waiter `b7ddipxom` → `scratchpad/e2_full.log`, session 82a55d2e) — my chain's `tail -2` had
+  swallowed the crash output (lesson: never pipe run stderr through tail in chains).
+- Execution order now: **E3 (running, PLaR@k4 5ep) → E1 (kcenter d5, grid) → E2-retry (colar
+  k4/d50, grid, full logs)**. Host RAM at E3-task-2: 6G used / 9G avail.
 
 ## SUPERSEDED (2026-07-11 am): deep dive on the two 87.3 rows — chain was KILLED (task bldaw8zmb)
 
