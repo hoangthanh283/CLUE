@@ -268,7 +268,14 @@ class LatentReplay(NaiveFineTune):
             "latent_replay: banked %d docs (store=%d, ~%.1f MB fp16, selection=%s/pool=%d)",
             len(picked),
             len(self.store),
-            sum(d["hidden"].numel() for d in self.store) * 2 / 1e6,
+            # subclasses may re-format earlier tasks' docs in place (CoLaR pops "hidden"
+            # for SVD factors) — count whatever tensor payload each doc actually holds
+            sum(
+                d["hidden"].numel() if "hidden" in d else d["us"].numel() + d["v"].numel()
+                for d in self.store
+            )
+            * 2
+            / 1e6,
             selection,
             len(candidates),
         )
