@@ -144,6 +144,16 @@ def test_kcenter_selects_for_coverage_and_random_stays_first_n():
     assert len(kc.store) == 2
 
 
+def test_second_task_banking_over_compressed_store():
+    """Regression: banking task 1 while task 0's docs are already compressed (no "hidden"
+    key) must not crash — this KeyError killed two full E2 runs before being caught."""
+    m = _colar(rank=2, docs=2)
+    m._capture_task([_batch(2)])  # task 0 → compressed in place
+    m._capture_task([_batch(2)])  # task 1 banking iterates the mixed store for logging
+    assert len(m.store) == 4
+    assert all("us" in d and "v" in d and "hidden" not in d for d in m.store)
+
+
 def test_kcenter_picks_the_outlier_first_n_misses():
     """Controlled pool: three near-duplicate docs + one far outlier. First-N (random path)
     banks two near-duplicates; k-center MUST cover the outlier — that is its purpose."""
