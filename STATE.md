@@ -242,8 +242,17 @@ factors (~2× more → r128 @ ~30 MB). For the paper: single-seed/single-scenari
 + cil_cord on Vast.ai. CoLaR = the constructive leg of the consistency-law finding (whole-doc unit
 compression preserves the binding; the falsified marginals are the control group).
 
-**NOW RUNNING: lexslot-off VERIFICATION** (post-gate-fix code, grid, task `bzxun4oo3`) — decides
-whether the thesis table_main 87.3 LexSlot row is real or a pre-fix task-oracle artifact.
+**LEXSLOT-OFF VERIFICATION RESULT (2026-07-13): ARTIFACT CONFIRMED.** Post-gate-fix
+slot_sharing=off = **AA 42.4** [FUNSD 24.9, SROIE 5.3, CORD 97.1] — naive-level, identical to the
+soft-sharing standalone (42.2). The pre-fix 88.4 (Jun 28, three seeds) was the UNNORMALIZED
+inference gate acting as a covert task oracle (multi-head DIL by magnitude). So **the thesis
+table_main 87.3 LexSlot row is NOT a real buffer-free result** — it must be corrected. Post-fix
+run at `dil_lexslot_seed42_off`; pre-fix archived at `dil_lexslot_seed42_off_prefix_archive`.
+Impact: (a) LexSlot is now cleanly IN the falsification chain (parameter-isolation + lexical gate
+fails buffer-free — the head still drifts); (b) Finding 3 "only replay grounds the head" is
+STRENGTHENED, not weakened; (c) the TWO 87.3 rows question is resolved — only latent-replay k4/d50
+(and CoLaR-r128, its lossless compression) is a real near-joint buffer-free result. TODO: patch
+`thesis/` table_main + any prose citing the 87.3 LexSlot number; see [[clue-thesis-lexslot-row-source]].
 
 ## SUPERSEDED — E2 RESULT (2026-07-12): CoLaR r64 = AA 80.6 @ 32 MB — compression is a real but lossy dial
 
