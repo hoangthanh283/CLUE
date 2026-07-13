@@ -1,0 +1,21 @@
+name: larm
+# LARM — Lexical-Associative Rewrite Memory. CoLaR (compressed latent replay) fused with a
+# lexically-routed additive feature-rewrite memory M: replay WRITES M's values (keeps them
+# live), OCR-cosine routing READS M (applies a low-rank Δ to the layer-k hidden). "Add, not
+# replace" keeps the whole-doc binding the consistency law requires. Headline runs use k=4/
+# d50/rank_r=128 (CoLaR-lossless) via CLI override, matching the E2 recipe.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8      # freeze layers <k after task 0 (headline uses k=4 via CLI override)
+docs_per_task: 5      # headline uses 50 via CLI override
+replay_batch_size: 4
+rank_r: 64            # CoLaR per-doc SVD rank (headline r128 via CLI override)
+# --- LARM memory ---
+mem_rank: 16          # rank of each cell's low-rank feature correction (down/up)
+mem_tau: 0.1          # softmax temperature for lexical attention over cells / replay weighting
+route_replay: true    # weight replay sampling by cosine(current-task sig, stored sig)
+mem_warmup_steps: 0   # steps to stop-grad the read-path→M (train M from replay first); 0=off
+add_not_replace: true # ADD the routed Δ to real features (consistency-safe). false = Gate-0
+                      # ablation: REPLACE features with Δ (expected to collapse like SLR/AGLR)

@@ -29,6 +29,7 @@ from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.colar import CoLaR
 from doccl.methods.coreset_memory import CoresetMemory
+from doccl.methods.cpfd import CPFD
 from doccl.methods.cuber import CUBER
 from doccl.methods.der import DERpp
 from doccl.methods.doc_merge import DocMerge
@@ -41,7 +42,9 @@ from doccl.methods.fisher_mask import FisherMaskFreeze
 from doccl.methods.gauss_replay import GaussReplay
 from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
+from doccl.methods.is3 import IS3
 from doccl.methods.l2p import L2P
+from doccl.methods.larm import LARM
 from doccl.methods.latent_replay import LatentReplay
 from doccl.methods.lca import LCA
 from doccl.methods.lexmem import LexMem
@@ -49,10 +52,9 @@ from doccl.methods.lexmem_v5 import LexMemV5
 from doccl.methods.lexslot import LexSlot
 from doccl.methods.lexslot_fm import LexSlotFM
 from doccl.methods.lwf import LwF
-from doccl.methods.cpfd import CPFD
-from doccl.methods.is3 import IS3
 from doccl.methods.magmax import MagMax
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
+from doccl.methods.nullspace_analytic import NullSpaceAnalyticCL
 from doccl.methods.o_lora import OLoRA
 from doccl.methods.proxy_latent_replay import ProxyLatentReplay
 from doccl.methods.sd_lora import SDLoRA
@@ -227,6 +229,13 @@ METHOD_REGISTRY = {
     # CoLaR: latent_replay with per-DOCUMENT rank-r SVD storage — d50 coverage at ~d5 bytes
     # (whole-doc binding preserved; per-doc matrices ARE low-rank though the pooled space isn't).
     "colar": CoLaR,
+    # LARM: CoLaR replay fused with a lexically-routed additive feature-rewrite memory (replay
+    # writes the memory values, OCR-cosine routing reads them). Targets BWT×FWT Pareto-dominance.
+    "larm": LARM,
+    # Null-Space Analytic CL: hierarchical lexical memory + gradient projection
+    # + analytic head update. Stores (feature, position, label) tuples per
+    # (task, class); projects backbone gradients to prevent feature drift.
+    "nullspace_analytic": NullSpaceAnalyticCL,
     # LexMem v3b: v3 with lambda retuned (1000 -> 300; CKA 0.999 was over-stiff,
     # SROIE 51) + hard exclusion of prior-task slots from selection (Jaccard
     # 0.31 slot overwrite drove task-1 forgetting 51 -> 12).
@@ -470,6 +479,24 @@ def main(cfg: DictConfig) -> None:
             run_name += f"_r{rank}"
         if cfg.method.get("doc_selection", "random") == "kcenter":
             run_name += "_kc"
+    elif cfg.method.name == "larm":
+        # LARM axes: CoLaR's k/d/rank + memory rank + the ablation switches. Canonical
+        # k=8/d=5/rank_r=64/mem_rank=16/route/add (no suffix).
+        split_k = cfg.method.get("split_layer_k", 8)
+        docs = cfg.method.get("docs_per_task", 5)
+        rank = cfg.method.get("rank_r", 64)
+        if split_k != 8:
+            run_name += f"_k{split_k}"
+        if docs != 5:
+            run_name += f"_d{docs}"
+        if rank != 64:
+            run_name += f"_r{rank}"
+        if cfg.method.get("mem_rank", 16) != 16:
+            run_name += f"_m{cfg.method.get('mem_rank')}"
+        if not cfg.method.get("route_replay", True):
+            run_name += "_noroute"
+        if not cfg.method.get("add_not_replace", True):
+            run_name += "_replace"
     elif cfg.method.name == "spectral_memory":
         # SLR axes: split depth and spectral rank. Canonical is k=8 / rank=16 (no suffix);
         # the Gate-1 Pareto sweep varies rank ("_r<N>"), rank=0 is the no-replay control.
@@ -517,6 +544,21 @@ def main(cfg: DictConfig) -> None:
             run_name += "_tmask"
         if pool != "wildreceipt":
             run_name += f"_{pool}"
+    elif cfg.method.name == "nullspace_analytic":
+        # Axes: projection_mode, samples_per_class, soft_lambda, freeze_backbone.
+        # Canonical: surgery/spc50/lambda0.01/no-freeze (no suffix).
+        mode = cfg.method.get("projection_mode", "surgery")
+        spc = cfg.method.get("samples_per_class", 50)
+        lam = cfg.method.get("soft_lambda", 0.01)
+        freeze = cfg.method.get("freeze_backbone_after_t0", False)
+        if mode != "surgery":
+            run_name += f"_{mode}"
+        if spc != 50:
+            run_name += f"_spc{spc}"
+        if lam != 0.01:
+            run_name += f"_lam{int(round(lam * 100))}"
+        if freeze:
+            run_name += "_freeze"
     elif target_component is not None:
         run_name += f"_{target_component}"
     run = wandb.init(
@@ -839,6 +881,8 @@ def main(cfg: DictConfig) -> None:
         "coreset_memory",
         "proxy_latent_replay",
         "colar",
+        "larm",
+        "nullspace_analytic",
         "fisher_mask",
     }  # noqa: N806
     if cfg.method.name in _STD_FORWARD:
