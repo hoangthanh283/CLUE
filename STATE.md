@@ -242,17 +242,32 @@ factors (~2× more → r128 @ ~30 MB). For the paper: single-seed/single-scenari
 + cil_cord on Vast.ai. CoLaR = the constructive leg of the consistency-law finding (whole-doc unit
 compression preserves the binding; the falsified marginals are the control group).
 
-**LEXSLOT-OFF VERIFICATION RESULT (2026-07-13): ARTIFACT CONFIRMED.** Post-gate-fix
-slot_sharing=off = **AA 42.4** [FUNSD 24.9, SROIE 5.3, CORD 97.1] — naive-level, identical to the
-soft-sharing standalone (42.2). The pre-fix 88.4 (Jun 28, three seeds) was the UNNORMALIZED
-inference gate acting as a covert task oracle (multi-head DIL by magnitude). So **the thesis
-table_main 87.3 LexSlot row is NOT a real buffer-free result** — it must be corrected. Post-fix
-run at `dil_lexslot_seed42_off`; pre-fix archived at `dil_lexslot_seed42_off_prefix_archive`.
-Impact: (a) LexSlot is now cleanly IN the falsification chain (parameter-isolation + lexical gate
-fails buffer-free — the head still drifts); (b) Finding 3 "only replay grounds the head" is
-STRENGTHENED, not weakened; (c) the TWO 87.3 rows question is resolved — only latent-replay k4/d50
-(and CoLaR-r128, its lossless compression) is a real near-joint buffer-free result. TODO: patch
-`thesis/` table_main + any prose citing the 87.3 LexSlot number; see [[clue-thesis-lexslot-row-source]].
+**LEXSLOT VERIFICATION — MY 42.4 RESULT WAS THE WRONG CONFIG (corrected 2026-07-13, user caught it).**
+The archived 87.3/88.4 row is **LexSlot slots layered on the FULL DocCL machinery**: git shows at
+the run date (Jun 27, commit c1c6f19) `class LexSlot(DocCL)` inheriting CE + KD + reservoir-replay
++ depth-Fisher; the archived hparams confirm **use_replay=True, buffer_size=200, kd_alpha=1.0,
+lambda_=2000**. After the 2026-07-02 RCA the class was refactored to `LexSlot(NaiveFineTune)` —
+stripped to STANDALONE (no buffer/KD/Fisher) to isolate the slots' own effect. My "verification"
+ran that standalone class (`method=lexslot`, current config use_replay-absent) → 42.4, which only
+re-confirms the already-known "slots ALONE ≈ naive" RCA. It says NOTHING about the real hybrid row.
+**Corrections to my prior claims:** (a) 87.3 is NOT standalone LexSlot; (b) 87.3 is NOT buffer-free
+— it uses a 200-exemplar replay buffer (so it's DocCL-family, buffer-based); (c) whether it's a
+pre-fix unnormalized-gate artifact is STILL OPEN — untested, not falsified.
+
+**RESOLVED — the 87.3 row is REAL (buffer-based hybrid); my "artifact" claim was wrong.** The three
+`_off` seed runs on disk are the pre-fix DocCL-HYBRID: seed42=88.4 [87.2,80.7,97.3], seed123=86.3
+[85.6,76.7,96.8], seed7=87.2 [85.3,81.7,94.8] — all use_replay=True, buffer=200. Mean =
+**87.3 ± 1.1**, exactly reproducing table_main. I had OVERWRITTEN seed42 with a wrong-config
+standalone re-run (42.4); **RESTORED from archive** (parked the bad run at
+`dil_lexslot_seed42_off_STANDALONE_wrongconfig`). The 3-seed evidence is intact again.
+
+**Corrected status of LexSlot:** (a) 87.3 is a genuine near-joint result of DocCL+slots; (b) it is
+**buffer-based** (200 exemplars), NOT buffer-free — so the chapter-7 "without storing any past data"
+PROSE is factually wrong and must be corrected to "small-buffer (200 exemplars)"; the NUMBER stays;
+(c) still-open (low priority): re-run the hybrid on POST-gate-fix code to confirm the normalized gate
+doesn't move ~87 — plausibly it doesn't (buffer carries retention), but untested. (d) standalone
+LexSlot ≈ naive was already the RCA finding; that is separate from this row and unchanged.
+See [[clue-thesis-lexslot-row-source]].
 
 ## SUPERSEDED — E2 RESULT (2026-07-12): CoLaR r64 = AA 80.6 @ 32 MB — compression is a real but lossy dial
 
