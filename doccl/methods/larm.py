@@ -82,11 +82,15 @@ class RewriteMemory(nn.Module):
             return torch.zeros_like(h)
         keymat = torch.stack(self.keys).to(h.device)  # (C, V)
         alpha = F.softmax((q @ keymat.T) / self.tau, dim=-1)  # (B, C)
-        delta = torch.zeros_like(h)
-        for c in range(len(self.keys)):
-            # per-cell low-rank shift, scaled by this doc's attention weight to cell c
-            shift = (h @ self.down[c]) @ self.up[c]  # (B, L, d)
-            delta = delta + alpha[:, c].view(-1, 1, 1) * shift
+        # Vectorised over cells (was a C-iteration Python loop — matters at the 150-cell d50
+        # headline). Contract alpha into the r-space projection BEFORE the up-projection so we
+        # never materialise the (B,C,L,d) per-cell tensor: Δ = ((Σ_c α·(h@down_c)) )@up  — but
+        # up differs per cell, so weight in r-space then sum-project per cell via einsum.
+        down = torch.stack(list(self.down))  # (C, d, r)
+        up = torch.stack(list(self.up))  # (C, r, d)
+        hd = torch.einsum("bld,cdr->bclr", h, down)  # (B, C, L, r)
+        hd = hd * alpha.view(alpha.shape[0], alpha.shape[1], 1, 1)  # weight each cell in r-space
+        delta = torch.einsum("bclr,crd->bld", hd, up)  # (B, L, d), summed over cells
         return delta
 
 
