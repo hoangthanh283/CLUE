@@ -9,20 +9,33 @@ paper reverts to the pre-pivot **diagnostic + falsification** framing, now sharp
 are the new *terminal level* of the falsification chain, with a clean single-variable mechanism
 figure (consistency ablation: 4 whole docs AA 63.8 vs 4 decoupled carriers AA 36.7).
 
-### Next Up (diagnostic-paper writing + evidence hygiene)
-1. **Write-up DONE** (2026-07-10): Finding 3b added to the findings doc; SLR idea page marked
-   falsified; STATE/ROADMAP reverted. Next: fold Finding 3b into the thesis/paper falsification
-   section when drafting that chapter.
-2. **Fair-ladder re-runs (before the paper table):** latent_replay @ 5ep docs=5 (the on-disk
-   `dil_latent_replay_seed42` is stale 1-epoch AA 64.9, not the converged 87.3); regenerate the
-   rm'd `dil_coreset_memory_seed42` (4-carrier) artifact. All cheap; do on Vast.ai with the grid.
-3. **Multi-backbone generalization grid** (the pre-pivot priority, still open): does the
-   forgetting locus + the negative result transfer across LiLT/BROS/BERT? `run_grid_multigpu.sh`
-   on a rented GPU; the local box is too slow (~90 min/dil-run confirmed this session).
-4. **Optional (only if a method angle is ever revived):** the ONE finding that would reopen a
-   method is that whole-doc *consistency* is required — a "consistency-preserving compressed
-   memory" (store few whole real docs, compressed losslessly) is untested, but that is ≈ raw
-   replay with fewer docs, not a novel method. Park unless a reviewer asks.
+### Scope decision (2026-07-13): diagnostic-led, FULLY SCOPED ("B+")
+A game-theoretic acceptance analysis (real 2025 venue data — `EXPLORE.md` §6) settled the venue
+strategy: **diagnostic + falsification, multi-seed × multi-scenario × multi-backbone.** P(accept)
+ordering B+ 22–30% > diagnostic-as-is 12–18% > method-paper 8–12% at ICML/CVPR (AAAI +~5–8pp). The
++12pp B→B+ jump is the critical path below and is **compute, not new research** — re-runs of
+existing code on Vast.ai. CoLaR is the *constructive control*, PLaR the *bounded-negative*, not
+method contributions.
+
+### Next Up (the B+ critical path, priority order)
+1. **B+ generalization grid — THE +12pp MOVE (critical path).** Every headline row at **3 seeds
+   (42/7/123) × {CIL-CORD, DIL, mixed} × {LayoutLMv3, LiLT, BROS, BERT}**. This closes the
+   correctness/generality gate that bounds a diagnostic paper (a reviewer's "a negative result on
+   ONE setup is not a finding"). The ICML-2024 architectural-perspective diagnostic that DID land
+   was architecture-general; ours must match. `run_grid_multigpu.sh` on Vast.ai (local box ~90
+   min/dil-run — too slow).
+2. **Evidence hygiene (blocks the paper table).** Clean grid re-run of the stale 1-epoch
+   `dil_latent_replay_seed42` (64.9 → ~87 converged); regenerate the deleted 4-carrier
+   `dil_coreset_memory_seed42`; CoLaR seeds 7/123 + cil_cord; int8-on-factors probe (~30 MB @ r128).
+3. **Write-up.** Fold Finding 3b + the consistency-law single-variable figure (4 whole docs 63.8 vs
+   4 decoupled carriers 36.7) into the thesis/paper falsification chapter. Position CoLaR as the
+   constructive control (proves negatives weren't effort-limited), PLaR as the bounded-negative
+   (coverage-limited proxy replay).
+4. **LexSlot prose correction (correctness hygiene — a reviewer WILL catch it).** The 87.3 row is
+   REAL but **buffer-based (200 exemplars, the DocCL-hybrid)** — verified this session (seeds 42/7/123
+   = 88.4/87.2/86.3, all use_replay=True). Chapter-7's "buffer-free / without storing any past data"
+   is factually wrong → change to "small-buffer (200 exemplars)". The number stands; only the framing
+   is corrected. (Standalone LexSlot ≈ naive 42.2 is a separate config, unchanged.)
 
 ### Notes
 - **bd task-tracking:** still blocked (schema-migration fork) — track here, not in beads, until
