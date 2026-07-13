@@ -1,6 +1,15 @@
 # Findings: The Anatomy of Forgetting in Multimodal Document IE
 
-**Date:** 2026-07-02 (v5 reframe added 2026-07-04)
+> **Positioning (2026-07-13).** This paper is **diagnostic + falsification, fully scoped ("B+")**
+> — every headline claim multi-seed × multi-scenario × multi-backbone (venue/acceptance rationale
+> in `EXPLORE.md` §6, critical path in `ROADMAP.md`). Two later results slot into the argument, not
+> as method contributions: **CoLaR** (per-doc SVD compressed latent replay, dil r128 = 87.6 @ 60 MB,
+> lossless 2.7×) is the *constructive control* — compression that respects whole-document consistency
+> works while every marginal summary collapses, proving the negatives are not effort-limited;
+> **PLaR** (public-proxy replay, zero private bytes, ~59 AA) is a *bounded-success negative*
+> (coverage-limited). See Finding 3b for the consistency-law mechanism they bracket.
+
+**Date:** 2026-07-02 (v5 reframe added 2026-07-04; positioning 2026-07-13)
 **Status:** Consolidated articulation of the full research program (diagnostic pilot →
 8 proposed/ported methods → falsification chain). This is the argument spine of the
 analysis paper. **Framing decision (2026-07-04): this is a DIAGNOSTIC + FALSIFICATION
