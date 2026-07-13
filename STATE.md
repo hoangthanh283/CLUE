@@ -230,6 +230,38 @@ numbers recorded here but re-run to regenerate the artifact if needed for the pa
 (3) `replay_memory_bytes` only persists for runs AFTER the instrumentation (spectral/aglr/coreset
 have it; the old latent ref doesn't) — the 5ep latent re-run will capture it.
 
+## LARM (fuse CoLaR replay + lexical routing) — GATE 0 PARTIAL FAIL (2026-07-13)
+
+Built `LARM(CoLaR)` (`doccl/methods/larm.py`): a lexically-keyed low-rank feature-correction memory
+M, READ additively at layer k (routed by OCR sig), WRITTEN by replay CE. 6 unit tests green,
+vectorized, committed `e3d7efa`/`f21456e`.
+
+**Gate 0 ADD result (dil k4/d5 grid): AA 66.3 / BWT −34.4, row3 [60.5, 40.7, 97.7] — WORSE than its
+own CoLaR/latent_replay baseline (76.0 / −19.3 / [72.6, 57.6, 97.9]).** So the "add, not replace"
+safety claim is FALSE: the memory is not a helpful-or-no-op; it actively HURTS retention.
+
+**Diagnosis (localized, mechanism clear):** LARM LEARNS each task fine (diag [87.3,82.8,97.7] ≈
+CoLaR) — the damage is to RETENTION (row3). Root cause: **the additive correction is trained against
+the plastic layers' state AT the time each task was learned, but applied at eval through plastic
+layers that have since drifted.** Replay refreshes the correction relative to the FROZEN trunk
+(below k); the drift is in the PLASTIC layers (above k) that consume the corrected features — the
+correction and its consumer sit on opposite sides of the plasticity boundary. **LARM inherited
+exactly LexSlot's staleness weakness, one layer up.** (Ruled out: cross-task routing leak — on dil's
+disjoint vocab the softmax router correctly puts ~99.9% mass on same-task cells, verified.)
+
+**GATE 0 COMPLETE: LARM REPLACE = AA 32.6 (collapsed below naive), vs ADD 66.3 vs CoLaR 76.0.**
+Proven: (1) add > replace (consistency law holds directionally — replacing whole-doc features is
+catastrophic); (2) but add < CoLaR (the layer-k fusion is a net negative; correction desyncs from
+the drifting head). A legitimate negative result: LARM-at-layer-k doesn't work, mechanism known.
+
+**Fix hypotheses (if LARM is worth continuing):** (a) gate the memory OFF at eval / detach its
+contribution to old-task eval once the head has moved; (b) put the rewrite where the head reads it
+consistently — i.e. correct at the classifier-INPUT (post-plastic) not layer-k (pre-plastic), so no
+plastic drift sits between correction and head; (c) make the correction itself replay-refit on the
+CURRENT plastic state (re-derive up-factors each task from replayed activations run through the
+current head). Option (b) is the cleanest — it moves the rewrite above the drift. Decide with user;
+this may reduce LARM to "CoLaR + a head-input lexical adapter," a different (simpler) method.
+
 ## ==== THREAD CLOSED (2026-07-12 pm): CoLaR r128 = LOSSLESS 2.7× — d50 accuracy at 60 MB ====
 
 **CoLaR k4/d50/r128 (grid): AA 87.6 / BWT −1.7, row3 [89.2, 76.3, 97.2], 60.4 MB** — MATCHES raw
