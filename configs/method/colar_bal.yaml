@@ -1,0 +1,16 @@
+name: colar_bal
+# CoLaR + soft-target (dark-knowledge) replay loss. Same axes as colar (split_layer_k,
+# docs_per_task, rank_r, doc_selection) plus soft-label knobs. Banks per-doc logits
+# SVD-compressed at rank_r alongside hiddens; replays with temperature-scaled soft CE
+# so sparse-entity tasks (SROIE) are not starved by all-"O" argmax labels.
+# soft_labels=false → byte-identical to colar.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8          # freeze layers <k after task 0 (headline runs use k=4 via CLI)
+docs_per_task: 5          # headline uses 50 via CLI override
+replay_batch_size: 4
+rank_r: 64                # per-doc SVD rank for BOTH hidden and logit factors
+soft_labels: true         # dark-knowledge replay (the fix); false == plain colar
+soft_T: 2.0               # distillation temperature

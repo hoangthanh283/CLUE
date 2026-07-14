@@ -28,6 +28,7 @@ from doccl.methods.aglr_replay import AGLRReplay
 from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.colar import CoLaR
+from doccl.methods.colar_bal import CoLaRBal
 from doccl.methods.coreset_memory import CoresetMemory
 from doccl.methods.cpfd import CPFD
 from doccl.methods.cuber import CUBER
@@ -229,6 +230,8 @@ METHOD_REGISTRY = {
     # CoLaR: latent_replay with per-DOCUMENT rank-r SVD storage — d50 coverage at ~d5 bytes
     # (whole-doc binding preserved; per-doc matrices ARE low-rank though the pooled space isn't).
     "colar": CoLaR,
+    # CoLaR-Bal: CoLaR + soft-target replay (dark knowledge) to protect sparse classes (SROIE)
+    "colar_bal": CoLaRBal,
     # LARM: CoLaR replay fused with a lexically-routed additive feature-rewrite memory (replay
     # writes the memory values, OCR-cosine routing reads them). Targets BWT×FWT Pareto-dominance.
     "larm": LARM,
@@ -466,7 +469,7 @@ def main(cfg: DictConfig) -> None:
             run_name += f"_d{docs}"
         if cfg.method.get("doc_selection", "random") == "kcenter":
             run_name += "_kc"
-    elif cfg.method.name == "colar":
+    elif cfg.method.name in ("colar", "colar_bal"):
         # CoLaR axes: split depth, docs, per-doc SVD rank, selection. Canonical k=8/d=5/r=64.
         split_k = cfg.method.get("split_layer_k", 8)
         docs = cfg.method.get("docs_per_task", 5)
@@ -881,6 +884,7 @@ def main(cfg: DictConfig) -> None:
         "coreset_memory",
         "proxy_latent_replay",
         "colar",
+        "colar_bal",
         "larm",
         "nullspace_analytic",
         "fisher_mask",
