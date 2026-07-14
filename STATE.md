@@ -251,8 +251,25 @@ disjoint vocab the softmax router correctly puts ~99.9% mass on same-task cells,
 
 **GATE 0 COMPLETE: LARM REPLACE = AA 32.6 (collapsed below naive), vs ADD 66.3 vs CoLaR 76.0.**
 Proven: (1) add > replace (consistency law holds directionally — replacing whole-doc features is
-catastrophic); (2) but add < CoLaR (the layer-k fusion is a net negative; correction desyncs from
-the drifting head). A legitimate negative result: LARM-at-layer-k doesn't work, mechanism known.
+catastrophic); (2) but add < CoLaR (the layer-k fusion is a net negative). Mechanism NOT yet fully
+pinned — see below (two wrong confident calls in a row; STOP asserting, TEST).
+
+**BUG-FIX ATTEMPT (2026-07-14): the softmax→clamped-cosine gate fix did NOT recover LARM.**
+Fixed run (dil k4/d5 grid): **AA 62.7 / BWT −39.4, row3 [63.5, SROIE 27.1, 97.6]** — still far
+below CoLaR 76.0, ~same as buggy 66.3. So the softmax-null-option bug was NOT the whole cause
+(my "fix confirmed" prediction was wrong — 2nd confident-wrong call). What the fix DID do (verified
+on realistic dense keys): cross-task foreign leakage dropped to ~0.03 mass. But total gate mass
+stays ~1.0 because a self-matching doc has cosine ~0.96 to its OWN cell → `clamp(min=1)` never
+triggers → the in-domain correction fires at ~full strength on every eval doc. So the damage is
+NOT cross-task routing; it's that the **in-domain learned correction itself is wrong at final-eval
+time** (candidate: stale vs the drifted head — the drift hypothesis, now with SOME evidence but
+STILL UNPROVEN). diag [87.3,82.0,97.6] = learns each task fine; row3 destroyed = retention only.
+
+**DECISIVE DISCRIMINATOR NEEDED (do not guess again):** run LARM with memory ON at train, OFF at
+eval (`mem_eval_off` flag). If eval-off → ~76: the learned correction is wrong at eval (drift) →
+fixable. If eval-off still ~63: damage is during TRAINING (memory corrupted plastic weights/replay)
+→ different fix. This one run splits the remaining hypotheses. GPU is free; fix is committed
+(ca4e19e); do NOT conclude LARM's fate until this run decides.
 
 **Fix hypotheses (if LARM is worth continuing):** (a) gate the memory OFF at eval / detach its
 contribution to old-task eval once the head has moved; (b) put the rewrite where the head reads it
