@@ -105,6 +105,34 @@ def test_memory_read_zero_when_empty_and_untrained():
     assert torch.allclose(mem.read(h, q), torch.zeros_like(h))  # zero-init up => no-op
 
 
+def test_null_match_query_gets_zero_correction():
+    """THE regression test. A doc matching NO stored cell must get ~zero correction. The
+    original softmax gate forced mass=1 onto foreign cells and injected a spurious
+    correction (norm ~0.1) — the bug that made LARM worse than both CoLaR and LexSlot.
+    The clamped-cosine + mass-cap gate must return ~0 for an orthogonal query, and a
+    nonzero correction for a matching one, concentrated on the matched cell.
+    """
+    torch.manual_seed(0)
+    mem = RewriteMemory(vocab_size=V, d=D, rank=3, tau=0.1)
+    # two cells with disjoint one-hot-ish keys, both TRAINED (nonzero up)
+    k0 = torch.zeros(V)
+    k0[0] = 1.0
+    k1 = torch.zeros(V)
+    k1[1] = 1.0
+    for k in (k0, k1):
+        mem.add_cell(k, "cpu")
+    with torch.no_grad():
+        for c in range(2):
+            mem.up[c].copy_(torch.randn(3, D))
+    h = torch.randn(4, L, D)
+    # query orthogonal to BOTH keys → must produce ~zero correction (no forced foreign shift)
+    q_null = torch.zeros(1, V)
+    q_null[0, 5] = 1.0
+    assert mem.read(h[:1], q_null).norm() < 1e-4, "null-match query got a spurious correction"
+    # query == key0 → nonzero correction (the memory fires for a matching doc)
+    assert mem.read(h[:1], k0.unsqueeze(0)).norm() > 1e-3
+
+
 def test_capture_banks_sigs_and_creates_cells():
     m = _larm(docs=2)
     m._capture_task([_batch(2)])
