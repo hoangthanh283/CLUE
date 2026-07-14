@@ -48,7 +48,10 @@ class RewriteMemory(nn.Module):
 
     Cells: L2-normalised OCR key ``K[c]`` (V,), low-rank factors ``down[c]`` (d, r) and
     ``up[c]`` (r, d) with ``up`` zero-init so a fresh/untrained cell is an exact no-op.
-    Read: attention ``α = softmax(q·Kᵀ/τ)`` over cells → additive low-rank rewrite of ``h``.
+    Read: a **clamped-cosine gate with mass-capped normalisation** (LexSlot-style,
+    null-option-preserving) over cells → additive low-rank rewrite of ``h``. A doc that
+    matches no cell gets ~zero correction (a softmax would instead force a spurious foreign
+    correction — the regression fixed here).
     """
 
     def __init__(self, vocab_size: int, d: int, rank: int, tau: float):
@@ -76,20 +79,27 @@ class RewriteMemory(nn.Module):
     def read(self, h: torch.Tensor, q: torch.Tensor) -> torch.Tensor:
         """Routed additive correction. h: (B, L, d); q: (B, V) L2-normalised. Returns Δh (B,L,d).
 
-        Δh = Σ_c α[:,c] · (h @ down_c) @ up_c, with α = softmax(q @ Kᵀ / τ). Zero when empty.
+        Δh = Σ_c g[:,c] · (h @ down_c) @ up_c, with a **clamped-cosine gate with mass-capped
+        normalisation** (LexSlot-style, NULL-OPTION-PRESERVING) — NOT softmax attention:
+            raw = (q @ Kᵀ).clamp(min=0)                # true cosine in [0,1]; non-neg bags
+            g   = raw / raw.sum(-1, keepdim=True).clamp(min=1)   # only DIVIDE when mass>1
+        A doc matching NO cell → raw≈0 → g≈0 → Δ≈0 (unlike softmax, which forces mass=1 onto
+        foreign cells and injects a spurious correction — the regression that made LARM worse
+        than both parents). A strongly-matching doc's cells share one unit of correction; a
+        single perfect match keeps ~full weight. Zero when empty.
         """
         if not self.keys:
             return torch.zeros_like(h)
         keymat = torch.stack(self.keys).to(h.device)  # (C, V)
-        alpha = F.softmax((q @ keymat.T) / self.tau, dim=-1)  # (B, C)
+        raw = (q @ keymat.T).clamp(min=0)  # (B, C) cosine in [0,1]
+        gate = raw / raw.sum(dim=-1, keepdim=True).clamp(min=1.0)  # cap mass at 1; no up-norm
         # Vectorised over cells (was a C-iteration Python loop — matters at the 150-cell d50
-        # headline). Contract alpha into the r-space projection BEFORE the up-projection so we
-        # never materialise the (B,C,L,d) per-cell tensor: Δ = ((Σ_c α·(h@down_c)) )@up  — but
-        # up differs per cell, so weight in r-space then sum-project per cell via einsum.
+        # headline). Weight the r-space projection per cell, then sum-project via einsum so we
+        # never materialise the (B,C,L,d) per-cell tensor.
         down = torch.stack(list(self.down))  # (C, d, r)
         up = torch.stack(list(self.up))  # (C, r, d)
         hd = torch.einsum("bld,cdr->bclr", h, down)  # (B, C, L, r)
-        hd = hd * alpha.view(alpha.shape[0], alpha.shape[1], 1, 1)  # weight each cell in r-space
+        hd = hd * gate.view(gate.shape[0], gate.shape[1], 1, 1)  # gate each cell in r-space
         delta = torch.einsum("bclr,crd->bld", hd, up)  # (B, L, d), summed over cells
         return delta
 
@@ -164,11 +174,12 @@ class LARM(CoLaR):
 
     def _stash_query(self, _module, _args, kwargs):
         ids = kwargs.get("input_ids")
-        # replay forward uses dummy_ids and sets _replay_query explicitly; skip stashing then
+        # replay forward uses dummy_ids and sets _replay_query explicitly; skip stashing +
+        # counting then (else _step double-counts, mistiming the warmup guard).
         if self._replay_query is None and torch.is_tensor(ids):
             self._cur_query = self._query_of(ids)
-        if self.model.training:
-            self._step += 1
+            if self.model.training:
+                self._step += 1
         return None
 
     def evaluate(self, eval_loaders):
