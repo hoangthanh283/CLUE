@@ -17,6 +17,13 @@ ordering B+ 22–30% > diagnostic-as-is 12–18% > method-paper 8–12% at ICML/
 existing code on Vast.ai. CoLaR is the *constructive control*, PLaR the *bounded-negative*, not
 method contributions.
 
+### RESUME HERE (2026-07-14 KT): CoLaR + LexSlot integration
+Next session builds **design A = LexSlot slots on top of CoLaR replay** (slots at head+late, above
+the drift; raw-cosine gate, null-preserving — fixes both LARM failure modes). Full handoff:
+**`docs/KT_2026-07-14_colar_lexslot.md`**. Order: C (confirm LexSlot+DocCL 88.4 post-gate-fix) → A
+(build slots-on-CoLaR, beat CoLaR r128 87.6) → B (replay-refit slots, if A works). LARM FAILED (all
+variants 32–66 AA); do NOT rebuild it — read KT §4 for why.
+
 ### Next Up (the B+ critical path, priority order)
 1. **B+ generalization grid — THE +12pp MOVE (critical path).** Every headline row at **3 seeds
    (42/7/123) × {CIL-CORD, DIL, mixed} × {LayoutLMv3, LiLT, BROS, BERT}**. This closes the
