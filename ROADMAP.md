@@ -17,7 +17,15 @@ ordering B+ 22–30% > diagnostic-as-is 12–18% > method-paper 8–12% at ICML/
 existing code on Vast.ai. CoLaR is the *constructive control*, PLaR the *bounded-negative*, not
 method contributions.
 
-### RESUME HERE (2026-07-16 pm): READ-SIDE memory — read Gate 0/1 results
+### RESUME HERE (2026-07-16 eve): Forgetting RCA — read Tier B, write Tier C
+GPU queue order: seed sweep → read-side gate chain → RCA baselines chain
+(`results/rca/chain.log`). Next session: (1) read `results/rca/dil_*_seed42_rca.json`
+(modality-ablated rows, confusion flows, per-baseline displacement locus); (2) write
+`docs/RCA_FORGETTING_BASELINES_2026-07.md` (Tier A findings already in STATE.md: ER not
+degenerate — M5/Q6 answered; class-asymmetric KEY/HEADER extinction; one-boundary
+collapse signatures); (3) re-brainstorm method design against the RCA.
+
+### QUEUED (2026-07-16 pm): READ-SIDE memory — read Gate 0/1 results
 `scripts/run_readside_gate01.sh` is running detached (waits for the seed sweep, then Gate 0 probe →
 colar_knn λ={0.3,1.0} k4/d50/r128 s42 → colar_meta m1/m3 k8/d50/r128). Next session: read
 `results/gate0_knn_probe.json`, the colar_knn metrics vs CoLaR 87.6/[89.2,76.3,97.2] (bar:

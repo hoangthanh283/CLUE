@@ -1,6 +1,33 @@
 # STATE
 
-## ACTIVE (2026-07-16 pm): READ-SIDE memory for CoLaR — kNN readout + metaplastic weights (built, runs queued)
+## ACTIVE (2026-07-16 eve): Deep forgetting RCA of baselines (Tier A DONE — two findings; Tier B queued)
+
+**User pivot:** before more method design, RCA the baselines' forgetting patterns + the
+multimodal correlation. Plan: `/home/thanh/.claude/plans/let-s-find-a-way-humming-flurry.md`.
+
+**Tier A (artifact mining, commits b688682) — findings from 223 per-class runs + 308 matrices:**
+1. **M5/Q6 ANSWERED — ER is NOT label-degenerate** (reviewer's suspicion refuted): er KEY-F1
+   87.2 ≈ AA 86.8; er_cflat KEY 89.3. The degeneracy signature (KEY dead, VALUE carries AA)
+   instead marks the FAILING methods: naive & lwf & the whole falsified buffer-free chain show
+   **TOTAL KEY+HEADER extinction (F1=0.0)** while VALUE survives ~47. Forgetting is
+   class-asymmetric; aggregate AA hides it. LwF protects nothing (KEY 0.0 despite distillation).
+   → `results/rca/a1_*.csv`, `a1_summary.md`.
+2. **Forgetting is one-boundary collapse, not decay:** naive −75.6 F1 at the first boundary
+   then +7.9 RECOVERY; family signatures differ (penalty dampens ×4 to −19.5; replay flattens
+   to −1..−4; prompts: small immediate but ongoing leak — immediate_share <0.6).
+   → `results/rca/a2_*.csv`, `a2_signature.png`.
+3. **A3 null confirmed mechanically:** 0/196 tb dirs have displacement scalars
+   (tensorboard.diagnostics never enabled) → per-baseline locus requires Tier B. → `a3_verdict.md`.
+
+**Tier B (commit 2b5645f, QUEUED detached** `scripts/run_rca_baselines.sh` behind the read-side
+chain, log `results/rca/chain.log`): core-6 {naive, ewc, lwf, er, der_pp, colar} dil seed42,
+per-boundary probes: modality-ablated eval (train FULL, eval {FULL, TEXT_ONLY, TEXT_LAYOUT,
+IMAGE_LAYOUT}) + per-class F1 + token confusion (new `doccl/eval/confusion.py`) +
+Fisher displacement per component/depth. Output `results/rca/dil_<m>_seed42_rca.json` (n=1 seed,
+provisional). **Tier C next session:** write `docs/RCA_FORGETTING_BASELINES_2026-07.md` from
+A+B, then re-brainstorm methods against the RCA.
+
+## QUEUED (2026-07-16 pm): READ-SIDE memory for CoLaR — kNN readout + metaplastic weights (built, runs queued)
 
 **New direction (user-chosen, brainstormed):** every dead memory attempt (LARM, LexSlot-on-CoLaR,
 nullspace_analytic) was a training-time WRITE — the redistribution law governs exactly that lever
