@@ -19,13 +19,24 @@ multimodal correlation. Plan: `/home/thanh/.claude/plans/let-s-find-a-way-hummin
 3. **A3 null confirmed mechanically:** 0/196 tb dirs have displacement scalars
    (tensorboard.diagnostics never enabled) → per-baseline locus requires Tier B. → `a3_verdict.md`.
 
-**Tier B (commit 2b5645f, QUEUED detached** `scripts/run_rca_baselines.sh` behind the read-side
-chain, log `results/rca/chain.log`): core-6 {naive, ewc, lwf, er, der_pp, colar} dil seed42,
-per-boundary probes: modality-ablated eval (train FULL, eval {FULL, TEXT_ONLY, TEXT_LAYOUT,
-IMAGE_LAYOUT}) + per-class F1 + token confusion (new `doccl/eval/confusion.py`) +
-Fisher displacement per component/depth. Output `results/rca/dil_<m>_seed42_rca.json` (n=1 seed,
-provisional). **Tier C next session:** write `docs/RCA_FORGETTING_BASELINES_2026-07.md` from
-A+B, then re-brainstorm methods against the RCA.
+**Tier B (commit 2b5645f, PROMOTED 2026-07-16 eve** — read-side gate chain KILLED before it
+produced anything; queue is now seed sweep → RCA chain, log `results/rca/chain.log`): core-6
+{naive, ewc, lwf, er, der_pp, colar} dil seed42, per-boundary probes: modality-ablated eval
+(train FULL, eval {FULL, TEXT_ONLY, TEXT_LAYOUT, IMAGE_LAYOUT}) + per-class F1 + token confusion
+(new `doccl/eval/confusion.py`) + Fisher displacement per component/depth. Output
+`results/rca/dil_<m>_seed42_rca.json` (n=1 seed, provisional).
+
+**Pre-registration + synthesis shipped (2026-07-16 eve, commits cab6c3a + 5ae2131):**
+- `docs/RCA_HYPOTHESES_2026-07.md` — H1 modality-asymmetric drift (a: text / b: layout-vision),
+  H2 head/label interference (modality-independent), H3 late-layer integration drift, H4
+  recency/logit bias; decision rules against the Tier B JSON schema written BEFORE data exists
+  (mask-validity guard ≥20 F1, method strata, H2/H4 disambiguation, QA sroie-vs-cord overlap).
+- `scripts/rca_synthesize.py` (+ fixture test) — reads the 6 JSONs, emits
+  `results/rca/c_modality_deltas.csv`, `c_confusion_flow.csv`, `c_displacement_vs_signature.csv`
+  + 2 figures. Ready to run the moment Tier B lands.
+**Tier C next session:** smoke-check naive (FULL AA ≈ 40 ± 3 vs head_refit_oracle 39.56), run
+`rca_synthesize.py`, adjudicate H1–H4 per the pre-registered rules in
+`docs/RCA_FORGETTING_BASELINES_2026-07.md`, then re-brainstorm methods against the RCA.
 
 ## QUEUED (2026-07-16 pm): READ-SIDE memory for CoLaR — kNN readout + metaplastic weights (built, runs queued)
 
