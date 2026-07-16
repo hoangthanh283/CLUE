@@ -18,15 +18,20 @@ existing code on Vast.ai. CoLaR is the *constructive control*, PLaR the *bounded
 method contributions.
 
 ### RESUME HERE (2026-07-16 eve): Forgetting RCA — read Tier B, write Tier C
-GPU queue order: seed sweep → read-side gate chain → RCA baselines chain
-(`results/rca/chain.log`). Next session: (1) read `results/rca/dil_*_seed42_rca.json`
-(modality-ablated rows, confusion flows, per-baseline displacement locus); (2) write
-`docs/RCA_FORGETTING_BASELINES_2026-07.md` (Tier A findings already in STATE.md: ER not
-degenerate — M5/Q6 answered; class-asymmetric KEY/HEADER extinction; one-boundary
-collapse signatures); (3) re-brainstorm method design against the RCA.
+GPU queue order (RCA PROMOTED — read-side chain killed, see below): seed sweep → RCA
+baselines chain (`results/rca/chain.log`). Hypotheses are PRE-REGISTERED in
+`docs/RCA_HYPOTHESES_2026-07.md` and the synthesis script is ready. Next session:
+(1) smoke-check `results/rca/dil_naive_seed42_rca.json` (FULL AA ≈ 40 ± 3);
+(2) `uv run python scripts/rca_synthesize.py` → `results/rca/c_*.csv/png`;
+(3) write `docs/RCA_FORGETTING_BASELINES_2026-07.md` adjudicating H1–H4 by the
+pre-registered decision rules (SUPPORTED/PARTIAL/REFUTED, actual numbers);
+(4) relaunch the read-side chain (below); (5) re-brainstorm method design against the RCA.
 
 ### QUEUED (2026-07-16 pm): READ-SIDE memory — read Gate 0/1 results
-`scripts/run_readside_gate01.sh` is running detached (waits for the seed sweep, then Gate 0 probe →
+**Chain KILLED 2026-07-16 eve to promote the RCA chain (user decision; it had produced zero
+artifacts). Relaunch AFTER the RCA chain finishes:**
+`nohup setsid bash scripts/run_readside_gate01.sh > results/readside_gate01.log 2>&1 & disown`
+(resume-safe). Original scope: `scripts/run_readside_gate01.sh` (waits for GPU chains, then Gate 0 probe →
 colar_knn λ={0.3,1.0} k4/d50/r128 s42 → colar_meta m1/m3 k8/d50/r128). Next session: read
 `results/gate0_knn_probe.json`, the colar_knn metrics vs CoLaR 87.6/[89.2,76.3,97.2] (bar:
 non-redistributive SROIE gain), and the colar_meta m1-vs-CoLaR control BEFORE m3. If R1 signals
