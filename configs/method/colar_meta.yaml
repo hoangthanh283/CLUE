@@ -1,0 +1,20 @@
+name: colar_meta
+# CoLaR + Benna-Fusi multi-timescale metaplastic consolidation on the plastic bucket
+# (layers >=k + head), composed with replay. Memory in the weight DYNAMICS: each plastic
+# param carries m-1 slow anchor buffers that diffuse toward the weight after every
+# optimizer step, damping fast drift. FALSIFICATION-RISK TRACK: EWC (closest per-weight-
+# state precedent here) already failed. meta_m=1 is the byte-identical-to-CoLaR control —
+# it MUST reproduce CoLaR's numbers before any m>=2 result is read.
+# VRAM: (m-1) fp32 buffers on plastic params — k=8: ~227 MB at m=3; k=4 ~454 MB (tight).
+# Run k=8 first for headroom.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64
+meta_m: 3             # Benna-Fusi timescale levels (1 = no-op control == CoLaR)
+meta_g_base: 2.0      # geometric growth of per-level timescale
+meta_eta: 0.01        # diffusion strength per optimizer step (calibration knob)
