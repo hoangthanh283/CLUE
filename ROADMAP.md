@@ -17,12 +17,18 @@ ordering B+ 22–30% > diagnostic-as-is 12–18% > method-paper 8–12% at ICML/
 existing code on Vast.ai. CoLaR is the *constructive control*, PLaR the *bounded-negative*, not
 method contributions.
 
-### RESUME HERE (2026-07-14 KT): CoLaR + LexSlot integration
-Next session builds **design A = LexSlot slots on top of CoLaR replay** (slots at head+late, above
-the drift; raw-cosine gate, null-preserving — fixes both LARM failure modes). Full handoff:
-**`docs/KT_2026-07-14_colar_lexslot.md`**. Order: C (confirm LexSlot+DocCL 88.4 post-gate-fix) → A
-(build slots-on-CoLaR, beat CoLaR r128 87.6) → B (replay-refit slots, if A works). LARM FAILED (all
-variants 32–66 AA); do NOT rebuild it — read KT §4 for why.
+### RESUME HERE (2026-07-16 pm): READ-SIDE memory — read Gate 0/1 results
+`scripts/run_readside_gate01.sh` is running detached (waits for the seed sweep, then Gate 0 probe →
+colar_knn λ={0.3,1.0} k4/d50/r128 s42 → colar_meta m1/m3 k8/d50/r128). Next session: read
+`results/gate0_knn_probe.json`, the colar_knn metrics vs CoLaR 87.6/[89.2,76.3,97.2] (bar:
+non-redistributive SROIE gain), and the colar_meta m1-vs-CoLaR control BEFORE m3. If R1 signals
+(λ>0 beats λ=0 by real margin), build R3 `colar_mbpa` per the plan
+(`/home/thanh/.claude/plans/let-s-find-a-way-humming-flurry.md`). See STATE.md ACTIVE block.
+
+### SUPERSEDED (2026-07-14 KT, killed 2026-07-16 am): CoLaR + LexSlot integration
+Design A (slots-on-CoLaR) killed by the redistribution law — CoLaR has no slack to harvest
+(STATE.md "PRIOR ACTIVE"). Handoff kept for reference: `docs/KT_2026-07-14_colar_lexslot.md`.
+LARM FAILED (all variants 32–66 AA); do NOT rebuild it — read KT §4 for why.
 
 ### Next Up (the B+ critical path, priority order)
 1. **B+ generalization grid — THE +12pp MOVE (critical path).** Every headline row at **3 seeds

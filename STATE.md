@@ -1,6 +1,34 @@
 # STATE
 
-## ACTIVE (2026-07-16): Retention is REDISTRIBUTIVE under compressed replay — CoLaR is on the frontier
+## ACTIVE (2026-07-16 pm): READ-SIDE memory for CoLaR — kNN readout + metaplastic weights (built, runs queued)
+
+**New direction (user-chosen, brainstormed):** every dead memory attempt (LARM, LexSlot-on-CoLaR,
+nullspace_analytic) was a training-time WRITE — the redistribution law governs exactly that lever
+class. Untested territory: READ the store at inference. Two assets nobody used: (1) layers <k are
+frozen after task 0, so layer-k features are drift-free forever ⇒ CoLaR's SVD store is a stable
+token-level labeled DATASTORE (LARM's stale-correction failure cannot occur below k); (2) forgetting
+is head-localized (Finding 1) ⇒ replace the forgetting locus with a memory read.
+
+**Shipped (commits dcedb94, 8ee7abd, tests 348 green):**
+- `colar_knn` (R1): eval-time blend p=(1−λ)·softmax(head)+λ·kNN-vote over banked layer-k tokens
+  (`doccl/methods/latent_datastore.py` shared view, zero extra bytes; λ=0 ≡ CoLaR, λ=1 = pure
+  memory head). Training untouched ⇒ any gain is non-redistributive by construction.
+- `colar_meta` (M1): Benna–Fusi m-level metaplastic consolidation on the plastic bucket, composed
+  with replay (new no-op `_post_optimizer_step` hook in LatentReplay). FALSIFICATION-RISK track
+  (EWC precedent); m=1 control must reproduce CoLaR before m=3 is read.
+- `scripts/gate0_knn_probe.py`: NO-training layer-k kNN separability probe (pretrained trunk =
+  conservative lower bound). Go/no-go for R1.
+- R3 (`colar_mbpa`, MbPA-style episodic head adaptation) is designed in the plan but NOT built —
+  conditional on R1 Gate 1 signal.
+
+**Queued detached** (`scripts/run_readside_gate01.sh`, PID survives session, log
+`results/readside_gate01.log`): waits for the seed sweep → Gate 0 probe → if ≥2/3 tasks best-F1≥20:
+colar_knn λ=0.3 + λ=1.0 at k4/d50/r128 seed42 → colar_meta m1/m3 pair at k8/d50/r128.
+**Gate 1 bar:** AA ≥ 87.6 with FUNSD not below 89.2 AND SROIE above 76.3 (non-redistributive win);
+SROIE↑/FUNSD↓ 1:1 = just another frontier point, log plainly. λ=0 baseline = existing colar r128 run.
+Plan file: `/home/thanh/.claude/plans/let-s-find-a-way-humming-flurry.md`.
+
+## PRIOR ACTIVE (2026-07-16): Retention is REDISTRIBUTIVE under compressed replay — CoLaR is on the frontier
 
 **Last decision:** do NOT build CoLaR+LexSlot (the KT doc's plan A). Killed on evidence, not opinion.
 
