@@ -29,6 +29,7 @@ from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.colar import CoLaR
 from doccl.methods.colar_bal import CoLaRBal
+from doccl.methods.colar_knn import CoLaRKNN
 from doccl.methods.coreset_memory import CoresetMemory
 from doccl.methods.cpfd import CPFD
 from doccl.methods.cuber import CUBER
@@ -232,6 +233,9 @@ METHOD_REGISTRY = {
     "colar": CoLaR,
     # CoLaR-Bal: CoLaR + soft-target replay (dark knowledge) to protect sparse classes (SROIE)
     "colar_bal": CoLaRBal,
+    # CoLaR-kNN: read-side memory — CoLaR's store doubles as a drift-free labeled datastore
+    # (layers <k frozen), blended with the head as a kNN readout at eval. Training untouched.
+    "colar_knn": CoLaRKNN,
     # LARM: CoLaR replay fused with a lexically-routed additive feature-rewrite memory (replay
     # writes the memory values, OCR-cosine routing reads them). Targets BWT×FWT Pareto-dominance.
     "larm": LARM,
@@ -469,8 +473,9 @@ def main(cfg: DictConfig) -> None:
             run_name += f"_d{docs}"
         if cfg.method.get("doc_selection", "random") == "kcenter":
             run_name += "_kc"
-    elif cfg.method.name in ("colar", "colar_bal"):
+    elif cfg.method.name in ("colar", "colar_bal", "colar_knn"):
         # CoLaR axes: split depth, docs, per-doc SVD rank, selection. Canonical k=8/d=5/r=64.
+        # colar_knn adds the readout blend weight (canonical lambda=0.3, no suffix).
         split_k = cfg.method.get("split_layer_k", 8)
         docs = cfg.method.get("docs_per_task", 5)
         rank = cfg.method.get("rank_r", 64)
@@ -482,6 +487,12 @@ def main(cfg: DictConfig) -> None:
             run_name += f"_r{rank}"
         if cfg.method.get("doc_selection", "random") == "kcenter":
             run_name += "_kc"
+        if cfg.method.name == "colar_knn":
+            lam = cfg.method.get("knn_lambda", 0.3)
+            if lam != 0.3:
+                run_name += f"_lam{int(round(lam * 100))}"
+            if cfg.method.get("knn_class_balance", False):
+                run_name += "_cb"
     elif cfg.method.name == "larm":
         # LARM axes: CoLaR's k/d/rank + memory rank + the ablation switches. Canonical
         # k=8/d=5/rank_r=64/mem_rank=16/route/add (no suffix).
@@ -885,6 +896,9 @@ def main(cfg: DictConfig) -> None:
         "proxy_latent_replay",
         "colar",
         "colar_bal",
+        # colar_knn: per-class F1 here reflects the PARAMETRIC head only (save_per_class_f1
+        # runs its own model forward, bypassing method.evaluate's kNN blend) — known gap.
+        "colar_knn",
         "larm",
         "nullspace_analytic",
         "fisher_mask",
