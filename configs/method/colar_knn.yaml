@@ -1,0 +1,20 @@
+name: colar_knn
+# CoLaR + non-parametric kNN readout over its own store at eval time (read-side memory).
+# Layer-k features are drift-free (layers <k frozen after task 0), so the banked factors
+# double as a stable token-level labeled datastore. Blend in probability space:
+# p = (1-lambda)*softmax(head) + lambda*p_knn. Training identical to CoLaR; adds zero
+# buffer bytes (memory_bytes inherited). knn_lambda=0 == CoLaR exactly; knn_lambda=1 is
+# the pure-memory-head ablation. knn_tau=0 -> uniform vote. knn_class_balance divides
+# vote mass by per-label datastore counts (counters O-domination, e.g. SROIE).
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8      # freeze layers <k after task 0 (headline runs use k=4 via CLI)
+docs_per_task: 5      # headline runs use 50 via CLI
+replay_batch_size: 4
+rank_r: 64            # per-doc SVD rank (headline runs use 128 via CLI)
+knn_lambda: 0.3       # readout blend weight (0 = pure parametric, 1 = pure kNN)
+knn_top_k: 20
+knn_tau: 0.1
+knn_class_balance: false
