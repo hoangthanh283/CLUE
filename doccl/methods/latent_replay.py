@@ -140,6 +140,7 @@ class LatentReplay(NaiveFineTune):
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.trainable_parameters(), max_grad_norm)
                 optimizer.step()
+                self._post_optimizer_step()
 
                 total_loss += float(loss.item())
                 n_steps += 1
@@ -155,6 +156,10 @@ class LatentReplay(NaiveFineTune):
             loss=total_loss / max(n_steps, 1),
             n_steps=n_steps,
         )
+
+    def _post_optimizer_step(self) -> None:
+        """Hook fired after each optimizer.step() — no-op here; CoLaRMeta's
+        metaplastic consolidator overrides it (avoids forking the training loop)."""
 
     def _replay_forward(self, replay: dict[str, torch.Tensor]):
         """Full wrapper forward with the stored hidden injected at layer k."""
