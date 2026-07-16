@@ -17,26 +17,27 @@ ordering B+ 22–30% > diagnostic-as-is 12–18% > method-paper 8–12% at ICML/
 existing code on Vast.ai. CoLaR is the *constructive control*, PLaR the *bounded-negative*, not
 method contributions.
 
-### RESUME HERE (2026-07-16 eve): Forgetting RCA — read Tier B, write Tier C
-GPU queue order (RCA PROMOTED — read-side chain killed, see below): seed sweep → RCA
-baselines chain (`results/rca/chain.log`). Hypotheses are PRE-REGISTERED in
-`docs/RCA_HYPOTHESES_2026-07.md` and the synthesis script is ready. Next session:
-(1) smoke-check `results/rca/dil_naive_seed42_rca.json` (FULL AA ≈ 40 ± 3);
-(2) `uv run python scripts/rca_synthesize.py` → `results/rca/c_*.csv/png`;
-(3) write `docs/RCA_FORGETTING_BASELINES_2026-07.md` adjudicating H1–H4 by the
-pre-registered decision rules (SUPPORTED/PARTIAL/REFUTED, actual numbers);
-(4) relaunch the read-side chain (below); (5) re-brainstorm method design against the RCA.
+### RESUME HERE (2026-07-17): RCA COMPLETE — verdicts in; read-side chain running
+**RCA Tier C is DONE:** `docs/RCA_FORGETTING_BASELINES_2026-07.md` — H1 PARTIAL,
+**H2 SUPPORTED, H4 SUPPORTED, H3 REFUTED**. Root cause: readout-recency on a
+class-asymmetric substrate (head logit geometry snaps to last task's label distribution;
+never-re-exercised classes KEY/HEADER extinguish mask-uniformly; trunk drift front-loaded
+but functionally minor; no modality pathway is the culprit). Method implications §
+"Method-design implications" — notably: cheap logit-prior recalibration baseline (test
+before any new method), targeted minority-class replay, read-side memory premise
+independently re-derived, colar_meta predicted to FAIL (treat its queued run as the
+falsification test).
+Next session: (1) read read-side results (`results/gate0_knn_probe.json`, colar_knn λ runs
+vs CoLaR 87.6/[89.2,76.3,97.2], colar_meta m1 control BEFORE m3); (2) 3-seed conservation
+verdict is IN (base 87.8 = bal 87.8 > kc 87.0; no lever beats base at any seed) — fold into
+STATE/paper as Finding 3c; (3) re-brainstorm method design against the RCA; (4) consider
+the H4 falsification quickies (frozen-trunk naive; logit-prior correction).
 
-### QUEUED (2026-07-16 pm): READ-SIDE memory — read Gate 0/1 results
-**Chain KILLED 2026-07-16 eve to promote the RCA chain (user decision; it had produced zero
-artifacts). Relaunch AFTER the RCA chain finishes:**
-`nohup setsid bash scripts/run_readside_gate01.sh > results/readside_gate01.log 2>&1 & disown`
-(resume-safe). Original scope: `scripts/run_readside_gate01.sh` (waits for GPU chains, then Gate 0 probe →
-colar_knn λ={0.3,1.0} k4/d50/r128 s42 → colar_meta m1/m3 k8/d50/r128). Next session: read
-`results/gate0_knn_probe.json`, the colar_knn metrics vs CoLaR 87.6/[89.2,76.3,97.2] (bar:
-non-redistributive SROIE gain), and the colar_meta m1-vs-CoLaR control BEFORE m3. If R1 signals
+### RUNNING (relaunched 2026-07-17 after RCA): READ-SIDE memory chain
+`scripts/run_readside_gate01.sh` (log `results/readside_gate01.log`): Gate 0 probe →
+colar_knn λ={0.3,1.0} k4/d50/r128 s42 → colar_meta m1/m3 k8/d50/r128. If R1 signals
 (λ>0 beats λ=0 by real margin), build R3 `colar_mbpa` per the plan
-(`/home/thanh/.claude/plans/let-s-find-a-way-humming-flurry.md`). See STATE.md ACTIVE block.
+(`/home/thanh/.claude/plans/let-s-find-a-way-humming-flurry.md`).
 
 ### SUPERSEDED (2026-07-14 KT, killed 2026-07-16 am): CoLaR + LexSlot integration
 Design A (slots-on-CoLaR) killed by the redistribution law — CoLaR has no slack to harvest

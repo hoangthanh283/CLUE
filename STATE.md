@@ -1,6 +1,27 @@
 # STATE
 
-## ACTIVE (2026-07-16 eve): Deep forgetting RCA of baselines (Tier A DONE — two findings; Tier B queued)
+## ACTIVE (2026-07-17): RCA COMPLETE — readout-recency is the root cause; read-side chain running
+
+**Tier B landed + Tier C adjudicated** (`docs/RCA_FORGETTING_BASELINES_2026-07.md`, pre-registered
+rules applied as written): **H2 SUPPORTED** (KEY extinction mask-uniform — naive/lwf KEY F1 = 0.0
+under EVERY valid mask; replay stratum clean, er KEY 85.8/91.3), **H4 SUPPORTED** (off-diagonal
+confusion mass tracks the LAST-trained task's labels: →O 0.96–0.98 after SROIE, rotates to →VALUE
+0.93 after CORD; naive's +7.9 gradual recovery = CORD re-exercising VALUE), **H3 REFUTED** (trunk
+displacement FRONT-loaded: naive early 0.70 vs late 0.03 — weight motion ≠ functional drift ≠
+damage locus), **H1 PARTIAL** (eval spread passes but both directional mechanisms fail in weight
+space — text embed moves LEAST, head dwarfs all embeds ×300; "multimodal correlation" reduces to
+text being the head's dominant evidence stream).
+**Root cause: readout-recency on a class-asymmetric substrate.** Coheres with F1, head-refit
+oracle, F3. Implications: attack the readout (read-side premise re-derived independently);
+logit-prior recalibration = mandatory cheap baseline; targeted minority-class replay; colar_meta
+predicted to FAIL (its queued run = the falsification test). Caveats: Tier B n=1 seed; colar row
+= canonical k8/d5/r64 not headline.
+**3-seed conservation verdict IN:** base 87.8 = colar_bal 87.8 > kcenter 87.0; no lever beats base
+at any seed; redistribution softer than seed-42 suggested (bal: SROIE +1.8 for FUNSD −0.5).
+**Read-side chain relaunched** (Gate 0 probe → colar_knn λ runs → colar_meta m1/m3),
+log `results/readside_gate01.log`.
+
+## DONE (2026-07-16 eve): Deep forgetting RCA of baselines (Tier A DONE — two findings; Tier B queued)
 
 **User pivot:** before more method design, RCA the baselines' forgetting patterns + the
 multimodal correlation. Plan: `/home/thanh/.claude/plans/let-s-find-a-way-humming-flurry.md`.
