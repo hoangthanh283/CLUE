@@ -1,6 +1,39 @@
 # STATE
 
-## ACTIVE (2026-07-10 late): SLR falsified → successor idea "Consistency Law → PLaR/CoLaR"
+## ACTIVE (2026-07-16): Retention is REDISTRIBUTIVE under compressed replay — CoLaR is on the frontier
+
+**Last decision:** do NOT build CoLaR+LexSlot (the KT doc's plan A). Killed on evidence, not opinion.
+
+Chased CoLaR r128's one hole (SROIE 76.3 vs joint 83.4 = the whole AA gap) with two independent,
+already-in-code levers. Both hit the target; neither improves AA; they don't stack. Full table +
+reasoning in `EXPLORE.md` §7.
+
+| dil k4/d50/r128 s42 | AA | BWT | [FUNSD, SROIE, CORD] |
+|---|---|---|---|
+| CoLaR r128 (base) | **87.6** | −1.7 | [89.2, **76.3**, 97.2] |
+| + kcenter | 86.8 | −2.6 | [84.5, 78.9, 96.9] |
+| CoLaR-Bal (soft) | 87.1 | −2.7 | [84.0, **79.9**, 97.4] |
+| CoLaR-Bal + kcenter | 87.3 | −2.5 | [86.0, 78.6, 97.3] |
+
+**The law:** SROIE rises only by spending over-held FUNSD (~1:1). FUNSD's 89.2 is *above* the joint
+oracle's 87.9 — surplus that is load-bearing, not headroom. Generalizes E1's selection-redistributes
+result to a mechanistically unrelated lever (loss shape) and to their combination.
+
+**Why LexSlot helped DocCL but won't help CoLaR:** DocCL (84.7) sat *below* the frontier — slack on
+every task, so LexSlot's buffer-backed capacity lifted all three at once (FUNSD/SROIE +4.7, CORD +2.0).
+That row is also buffer-based (200 exemplars + KD + Fisher; standalone LexSlot = 42.2). CoLaR is on
+the frontier and already replays. Same tool, different regime, opposite payoff.
+
+**Shipped:** `doccl/methods/colar_bal.py` + config + 4 tests (commit e44e42b) — soft-target replay
+for compressed latent replay. Literature gap (nobody reweights the reconstructed gradient of
+compressed replay for minority classes); mechanism works (SROIE +3.6), conservation caps it.
+
+**Blocked on / next:** the law is **PROVISIONAL — seed 42 only, dil only, LayoutLMv3 only**. The
+86.8–87.6 band sits inside the ±1.1 joint seed sd. Seeds 7/123 running detached
+(`scripts/run_seeds_conservation.sh` → `results/run_seeds.log`). Read those 6 runs before writing
+the law into the paper. If the band survives 3 seeds → Finding 3c in the diagnostic chain.
+
+## SUPERSEDED (2026-07-10 late): SLR falsified → successor idea "Consistency Law → PLaR/CoLaR"
 
 SLR/AGLR/coreset all FALSIFIED (see GATE-0 FINAL below) but proved the **consistency law**
 (whole-doc (feature,position,label) binding is the necessary replay ingredient; +27 AA single-var

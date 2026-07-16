@@ -218,3 +218,53 @@ framing already locked in `CLAUDE.md`.
   Perspective" (ICML 2024)** — a diagnostic forgetting paper that landed, and was
   architecture-general/multi-dataset. Ours must match that generality; CL×document-understanding is
   otherwise an empty intersection at CVPR/ICML.
+
+---
+
+## 7. Retention is REDISTRIBUTIVE under compressed replay (2026-07-14/16, seed 42, PROVISIONAL)
+
+**Question:** CoLaR r128 under-holds the sparse-entity mid-task (SROIE 76.3 vs joint 83.4) — that
+gap IS the whole AA gap. Can a targeted fix close it?
+
+Two independent levers, both aimed at SROIE, both already in-code:
+- `doc_selection=kcenter` (coverage-mass; inherited config knob, ZERO new code)
+- **CoLaR-Bal** (`colar_bal.py`, commit e44e42b) — soft-target replay: bank per-doc logits
+  SVD-compressed at `rank_r`, replay with temperature-scaled soft CE instead of ~99%-"O" argmax
+  labels. Reuses `ProxyLatentReplay._replay_forward`. `soft_labels=false` == byte-identical CoLaR.
+
+| run (dil k4/d50/r128, s42) | AA | BWT | row3 [FUNSD, SROIE, CORD] |
+|---|---|---|---|
+| CoLaR r128 (base) | **87.6** | −1.7 | [89.2, **76.3**, 97.2] |
+| + kcenter | 86.8 | −2.6 | [84.5, **78.9**, 96.9] |
+| CoLaR-Bal (soft) | 87.1 | −2.7 | [84.0, **79.9**, 97.4] |
+| CoLaR-Bal + kcenter | 87.3 | −2.5 | [86.0, **78.6**, 97.3] |
+| joint (oracle) | 89.7 | 0.0 | [87.9, 83.4, 97.7] |
+
+**Both levers hit the predicted target: SROIE 76.3 → 78.9 (kcenter) / → 79.9 (soft, best).**
+**Neither improves AA.** Each lift is paid for ~1:1 out of over-held FUNSD (89.2 → 84.0); AA stays
+in an 86.8–87.6 band and BWT degrades. **The levers do not stack**: the combo's SROIE (78.6) is
+*below* soft-CE alone (79.9) — combining redistributes *differently*, not *more*.
+
+**Finding: total retention under compressed latent replay is (near-)conserved — SROIE rises only by
+spending FUNSD. Baseline CoLaR r128 already sits on the redistribution frontier.** This generalizes
+E1's "selection only redistributes retention (SROIE +6.9, FUNSD −1.4)" from doc-selection to a
+second, mechanistically unrelated lever (loss shape), and to their combination.
+
+**Why FUNSD's 89.2 was never free slack:** it is *above* the joint oracle's 87.9 — the head
+re-carves the joint optimum (§5a). That surplus is load-bearing, not headroom.
+
+**Consequence — this kills the "CoLaR + LexSlot" direction on evidence** (the KT doc's plan A,
+`docs/KT_2026-07-14_colar_lexslot.md`). LexSlot lifted DocCL (84.7 → 87.3, every task gained:
+FUNSD +4.7, SROIE +4.7, CORD +2.0) because DocCL sat *below* the frontier with slack everywhere —
+and because that row is buffer-based (200 exemplars + KD + Fisher; standalone LexSlot = 42.2).
+CoLaR is *on* the frontier, already replays, and has no slack to supply. A third mechanism drawing
+on the same FUNSD surplus cannot beat a conservation that already capped two. Not built.
+
+**Novelty note (lit sweep 2026-07-14):** no prior work reweights the *reconstructed* gradient of
+compressed/SVD latent replay for minority classes. CoLaR-Bal is that gap — kept as evidence, and
+the mechanism works (SROIE +3.6); it is the *conservation* that caps it, not the mechanism.
+
+**⚠ PROVISIONAL — single seed (42), single scenario (dil), single backbone.** The 86.8–87.6 band is
+inside the ±1.1 seed sd the ledger reports for joint, so "conserved" is *consistent with* the data,
+not established. Seeds 7/123 queued (`scripts/run_seeds_conservation.sh`) — do not publish the law
+until the band survives 3 seeds.
