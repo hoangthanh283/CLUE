@@ -64,6 +64,13 @@ retrain live on GPU) after a ~5 h deadlock, root-caused and fixed:
   task list tracks: monitor → adjudicate (strictly per amended prereg) → write results +
   push.
 
+**Deep RCA extension implemented (2026-07-17 pm):** `scripts/rca_deep_dive.py` adds the
+paper-facing CPU consolidation pass over Tier-B JSONs and writes `results/rca/d_*.csv` +
+`d_summary.md`. Focused test added in `tests/test_rca_aggregation.py`. Current summary
+keeps the RCA verdict intact: failing methods concentrate final old-task extinctions and
+the strongest cells snap to the just-trained marginal; modality-mask table remains a
+quantification layer, not a new mechanism.
+
 **READ-SIDE GATE 1+2 RESULTS (2026-07-17, adjudicated against the pre-written bar):**
 - **colar_meta m3 = AA 79.48, BWT −5.62, row [84.7, 65.2, 88.6]** vs m1 control 85.85 and
   CoLaR 87.6: metaplastic consolidation is dose-dependently harmful (m1 −1.75 → m3 −8.1).

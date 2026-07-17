@@ -30,7 +30,7 @@ is the culprit). Method implications §
 before any new method), targeted minority-class replay, read-side memory premise
 independently re-derived, colar_meta predicted to FAIL (treat its queued run as the
 falsification test).
-Next session: (1) read read-side results (`results/gate0_knn_probe.json`, colar_knn λ runs
+Next session: (0) rerun `uv run python scripts/rca_deep_dive.py` after any new RCA JSON lands; (1) read read-side results (`results/gate0_knn_probe.json`, colar_knn λ runs
 vs CoLaR 87.6/[89.2,76.3,97.2], colar_meta m1 control BEFORE m3 — colar_meta m1 was
 training as of 07-17 ~08:00); (2) read kill-test results (`results/rca/killtests/readout_fixes.md`
 + the three new `dil_*_seed42_rca.json`) and adjudicate STRICTLY by
