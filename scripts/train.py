@@ -56,6 +56,7 @@ from doccl.methods.lexslot import LexSlot
 from doccl.methods.lexslot_fm import LexSlotFM
 from doccl.methods.lwf import LwF
 from doccl.methods.magmax import MagMax
+from doccl.methods.marginal_methods import LogitAdjust, MarginalAnchor
 from doccl.methods.naive import JointMultiTask, NaiveFineTune
 from doccl.methods.nullspace_analytic import NullSpaceAnalyticCL
 from doccl.methods.o_lora import OLoRA
@@ -153,6 +154,10 @@ def load_fwt_baselines(scenario, baseline_csv: Path) -> list[float] | None:
 METHOD_REGISTRY = {
     "naive": NaiveFineTune,
     "joint": JointMultiTask,
+    # RCA kill-tests #4/#5 (docs/RCA_KILLTESTS_PREREG_2026-07.md): marginal-anchored
+    # training objectives storing only per-task gold label marginals (9 floats/task).
+    "marginal_kl": MarginalAnchor,
+    "logit_adjust": LogitAdjust,
     "ewc": EWC,
     "lwf": LwF,
     "er": ER,
@@ -890,6 +895,8 @@ def main(cfg: DictConfig) -> None:
     _STD_FORWARD = {
         "naive",
         "joint",
+        "marginal_kl",
+        "logit_adjust",
         "ewc",
         "lwf",
         "er",

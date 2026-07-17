@@ -1,0 +1,10 @@
+# RCA kill-test #5 (docs/RCA_KILLTESTS_PREREG_2026-07.md): balanced-softmax logit
+# adjustment — train CE on logits + tau*(log q_task - log q_cum) so raw logits estimate
+# the posterior under the cumulative seen prior. Buffer-free structural anti-snap test.
+# Pre-registered: tau fixed at 1.0 for the verdict, no tuning.
+name: logit_adjust
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+tau: 1.0
