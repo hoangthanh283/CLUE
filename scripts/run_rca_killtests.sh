@@ -3,8 +3,11 @@
 # chain (read-side gate, train.py, other rca runners), resume-safe per output artifact.
 # Launch detached:  nohup setsid bash scripts/run_rca_killtests.sh > results/rca/killtests/chain.log 2>&1 &
 cd "$(dirname "$0")/.."
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 mkdir -p results/rca/killtests
+# Self-duplication guard (code-review fix): flock releases on exit/crash, no pidfile needed.
+exec 9>results/rca/killtests/.chain.lock
+flock -n 9 || { echo "already running (lock held) — exiting"; exit 0; }
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 while pgrep -f "run_readside_gate01.sh" > /dev/null; do sleep 300; done
 while pgrep -f "gate0_knn_probe.py" > /dev/null; do sleep 300; done

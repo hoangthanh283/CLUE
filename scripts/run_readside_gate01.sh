@@ -6,6 +6,9 @@
 # track). Resume-safe: skips any run whose metrics.json exists.
 # Launch detached:  nohup setsid bash scripts/run_readside_gate01.sh > results/readside_gate01.log 2>&1 &
 cd "$(dirname "$0")/.."
+# Self-duplication guard (code-review fix): flock releases on exit/crash.
+exec 9>results/.readside_gate01.lock
+flock -n 9 || { echo "already running (lock held) — exiting"; exit 0; }
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 while pgrep -f "run_seeds_conservation.sh" > /dev/null; do sleep 300; done
