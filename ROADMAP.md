@@ -17,7 +17,17 @@ ordering B+ 22–30% > diagnostic-as-is 12–18% > method-paper 8–12% at ICML/
 existing code on Vast.ai. CoLaR is the *constructive control*, PLaR the *bounded-negative*, not
 method contributions.
 
-### RESUME HERE (2026-07-17): RCA COMPLETE — verdicts in; read-side chain running
+### RESUME HERE (2026-07-17 eve): KILL-TESTS ADJUDICATED — write-up next
+All 5 kill-tests complete + verified (STATE.md ACTIVE block; RCA doc kill-test sections).
+Headline: every cheap correction is a registered null; re-exercise is the only lever;
+per-doc EM dead as method-chapter headline (fallback framing pre-written in the prereg).
+Next: (1) fold kill-test suite + read-side closure into thesis falsification chapter;
+(2) decide method-chapter shape (negative-result suite + CoLaR control vs replay-adjacent
+evidence-store method); (3) resume the B+ grid critical path below. Follow-ups: λ-sweep
+for marginal_kl (unregistered), weight-geometry probe if "directions" claim is wanted,
+train.py run-name/hydra-dir mismatch (session task #4).
+
+### DONE (2026-07-17): RCA COMPLETE — verdicts in; read-side chain closed
 **RCA Tier C is DONE + verification-amended:** `docs/RCA_FORGETTING_BASELINES_2026-07.md` —
 **H2 SUPPORTED, H4 SUPPORTED-AS-AMENDED (H4′ marginal snap), H3 REFUTED, H1 REFUTED as
 mechanism, QA not supported**. Root cause: readout-marginal snap on a class-asymmetric
