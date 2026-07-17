@@ -47,7 +47,28 @@ Outputs land in `results/rca/killtests/` + `results/rca/dil_{naive_frozen,margin
 flock now prevents future duplicates, but the live pair predates it — if two train.py
 appear simultaneously, kill the newer.
 
-**READ-SIDE GATE 1 RESULTS (2026-07-17 pm, adjudicated against the pre-written bar):**
+**KILL-TESTS EXECUTION STATUS (2026-07-17 15:20): chain RUNNING** (readout-suite naive
+retrain live on GPU) after a ~5 h deadlock, root-caused and fixed:
+- **Postmortem:** a leftover launcher shell's cmdline contained the strings both chains'
+  `pgrep -f` guards watch (`scripts/train.py`, `run_readside_gate01`) → the duplicate
+  read-side instance never exited, the kill-tests chain waited on it. Killed the zombie;
+  chains flowed immediately. **Rule going forward: never echo watched script names into
+  long-lived shells; prefer flock guards (already added to both chain scripts) over
+  pgrep-cmdline matching for NEW scripts.**
+- **m3 output-dir mismatch:** train.py saved colar_meta m3 to the run-name dir (no `_m3`
+  suffix — m3 is the config default) while the chain's resume-check watched the hydra dir.
+  Verified artifacts copied to `results/dil_colar_meta_seed42_d50_r128_m3/` (train.log in
+  that dir proves provenance). Follow-up filed (session task #4; move to bd when unblocked).
+- **Monitoring now stall-proof:** completion watcher (fires on COMPLETE marker or chain
+  death) + stall detector (fires if chain alive but chain.log frozen > 60 min). Session
+  task list tracks: monitor → adjudicate (strictly per amended prereg) → write results +
+  push.
+
+**READ-SIDE GATE 1+2 RESULTS (2026-07-17, adjudicated against the pre-written bar):**
+- **colar_meta m3 = AA 79.48, BWT −5.62, row [84.7, 65.2, 88.6]** vs m1 control 85.85 and
+  CoLaR 87.6: metaplastic consolidation is dose-dependently harmful (m1 −1.75 → m3 −8.1).
+  **RCA prediction (colar_meta fails) CONFIRMED.** Read-side direction fully closed:
+  both tracks (kNN blend, metaplasticity) are clean negatives.
 - **colar_knn λ=0.3: AA 87.64, row [89.2, 76.5, 97.2]** vs λ=0 CoLaR 87.6 [89.2, 76.3, 97.2].
   Formal bar (AA ≥ 87.6, FUNSD not below 89.2, SROIE > 76.3) is met — at the boundary:
   +0.04 AA, +0.2 SROIE, n=1 seed. The ROADMAP's "beats λ=0 by REAL margin" clause FAILS.
