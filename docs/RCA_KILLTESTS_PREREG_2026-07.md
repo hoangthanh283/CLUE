@@ -64,8 +64,11 @@ deployability (a document is its own calibration batch).
    - SURVIVAL bar: KEY or HEADER final F1 > 20 (H2's own survival threshold) → genuine
      buffer-free method signal.
    - MANDATORY acquisition check: at-learning FULL F1 per task within 5 pts of naive's
-     (88.5/84.0/97.6 diag) — an EWC-style acquisition regression (sroie 41.9) voids any
-     retention gain.
+     diag. [CORRECTION 2026-07-17 eve, at adjudication: the reference hard-coded here
+     pre-run (88.5/84.0/97.6, taken from matrix.npy of a different naive run) was stale —
+     Tier B naive's actual at-learning diagonal is 87.8/82.5/96.1. The logit_adjust guard
+     passes under either reference; recorded per pre-registration discipline.] An
+     EWC-style acquisition regression (sroie 41.9) voids any retention gain.
    - Training-time adjustment uses logits + τ(log q_task − log q_cum) inside the CE only
      (predict with raw logits ⇒ posterior under the cumulative prior); τ = 1.0 first, no
      tuning before the verdict.

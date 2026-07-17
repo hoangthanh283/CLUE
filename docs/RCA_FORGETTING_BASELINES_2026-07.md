@@ -196,6 +196,17 @@ verdict is not "calibration algorithm weak"; the final head has already annihila
 recoverable mass. Test-time marginal correction is closed. Any positive method must keep
 old classes alive during training or re-exercise them with task-consistent evidence.
 
+Precision notes (adversarial verification, 5 independent recomputation agents — all
+numbers above reproduce exactly): (a) per the amended prereg's own branch wording, the
+sub-1e-3 saturation routes to "information destroyed pre-correction — family verdict
+deferred, mechanism untested": the tested eval-time mechanisms are dead for THIS artifact,
+but the rule reserves judgment on eval-time correction applied to a head whose mass
+survives (e.g. after a training-time keep-alive). (b) Scope qualifier on
+"irrecoverable": funsd-KEY shows a real partial recovery under marginal_match (0.0 → 16.4
+F1) — masked in the pooled number because the same forced marginal degrades VALUE/O
+elsewhere (sroie collapses to all-O: O-acc 100%, F1 0.0). HEADER (both tasks) and
+sroie-KEY recover nothing under any variant.
+
 
 ## Kill-test partial result: frozen-trunk naive is acquisition-invalid (2026-07-17 pm)
 
@@ -207,6 +218,44 @@ frozen pretrained trunk (at-learning 41.4 / 47.7 / 68.4). Therefore this test do
 confirm pure-head causality. It still supports the practical lesson that old-class
 extinction can occur with the trunk fixed, but it cannot be used as a clean effect-size
 match to the standard naive baseline.
+
+## Kill-test results: training-time marginal objectives are nulls too (2026-07-17 eve)
+
+Both training-time anti-snap objectives ran at the registered settings (no tuning) and
+changed essentially nothing — numbers adversarially verified against the raw JSONs:
+
+**marginal_kl** (CE + KL anchoring the batch output marginal to the PRIOR-task mixture,
+λ=1): at-learning 88.0/79.0/96.3; final row 17.8/3.2/96.3, AA 39.14 ≈ naive. KEY/HEADER
+final F1 = 0.0 — the pre-registered H2-terminal-case reading HOLDS (the >20 refutation
+never fires). The H4′-fixability side moves in the predicted direction but negligibly:
+funsd VALUE 18.0 → 26.5 (+8.5), funsd O-recall 0% → 3.1%. AA landed below the 45–55
+sanity window; per the amended rule this gates a mechanism-level adjudication, so the
+verdict is **provisional NULL**: one candidate explanation is resolved (the anchor is
+correctly inactive at task 0 and excludes the current task — verified in code), two remain
+open (KL-vs-CE gradient scale at λ=1; batch-size-2 Monte-Carlo noise in the batch
+marginal). A λ-sweep would be an unregistered follow-up, not a re-adjudication.
+
+**logit_adjust** (balanced-softmax CE under the cumulative seen prior, τ=1): at-learning
+86.0/82.9/96.0 — within 5 pts of Tier B naive's actual diagonal 87.8/82.5/96.1 on every
+task, so the mandatory acquisition guard PASSES (no EWC-style plasticity damage; note the
+prereg's hard-coded reference "88.5/84.0/97.6" was stale — corrected here, verdict
+unaffected under either reference). Survival bar FAILS: KEY/HEADER final F1 = 0.0 vs the
+>20 threshold; final AA 36.9. Balanced-softmax at τ=1 does not prevent the snap. Verdict:
+**no buffer-free signal at the registered setting** ("family closed" is deliberately NOT
+claimed — τ=1 is one point on the family's curve, and rule 4 registered only the binary
+signal/no-signal outcome).
+
+**Consolidated kill-test verdict (n=1 seed, provisional):** the readout-marginal snap is a
+*symptom*, not an invertible mechanism. The trained head collapses predicted probability
+mass on under-exercised classes to ~1e-5–1e-6 (a prediction-mass statistic; weight-space
+geometry was not measured), which (i) no eval-time diagonal reweighting recovers in
+aggregate, (ii) marginal-level training objectives at registered strength do not prevent,
+and (iii) old-class extinction reproduces with the trunk frozen — while the head-refit
+oracle (55.3, a FRESH probe on frozen features) shows the representation-level information
+survives. The damage lives in what the existing head does with surviving features, and the
+only registered intervention that prevents it remains task-consistent re-exercise
+(replay stratum: er/der_pp/colar clean everywhere). This closes the "did you try cheap
+recalibration" reviewer hole with a registered null.
 
 ## Deep-dive artifact pass (implemented 2026-07-17 pm)
 
@@ -226,12 +275,17 @@ quantifying mask sensitivity, not changing the H1 verdict.
 
 ## Method-design implications (input to the next brainstorm)
 
-1. **Attack the readout, not the trunk.** Consistent with the queued read-side direction
-   (colar_knn kNN head is snap-immune by construction: banked KEY tokens cannot be
-   overwritten by logit drift). The RCA independently re-derives that design's premise.
-2. **Cheap marginal-recalibration baseline (from H4′):** per-task label-prior correction of
-   the head at eval — near-zero cost, and every fancy method must beat it. If it recovers
-   most of naive's drop it is a paper finding on its own.
+1. **Attack the readout, not the trunk — but not by blending or recalibrating.**
+   ADJUDICATED 2026-07-17: the read-side blend is a no-signal (colar_knn λ=0.3 inert,
+   λ=1.0 destructive), and every marginal correction/objective is a null (kill-tests
+   above). What remains open on the readout side is *replacing* the damaged readout with
+   one whose old-class evidence cannot be overwritten (the head-refit oracle's 55.3 is
+   the existence proof) — any such method must store or reconstruct per-class evidence,
+   which is replay-adjacent by construction.
+2. **Cheap marginal-recalibration baseline: ADJUDICATED — registered null.** No cheap fix
+   exists (best pooled recovery −0.1 AA); replay's value is NOT replicable by prior
+   correction. This is now a paper finding (closes the standard reviewer hole), not a
+   pending baseline.
 3. **Class re-exercise is the active ingredient of replay** — er's KEY survival (85.8) with
    200 exemplars suggests targeted minority-class replay (KEY/HEADER-rich selection) could
    match full replay at a fraction of the bytes; but note SROIE's 3.7% KEY share was NOT

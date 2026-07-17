@@ -1,6 +1,40 @@
 # STATE
 
-## ACTIVE (2026-07-17 pm): Kill-tests queued — brainstorm done, top-5 implemented, DOUBLY REVIEWED
+## ACTIVE (2026-07-17 eve): KILL-TESTS COMPLETE + ADJUDICATED — all corrections are nulls; re-exercise is the only lever
+
+**All 5 kill-tests ran and were adjudicated against the amended prereg, every verdict
+adversarially verified (5 independent recomputation agents; 2 of my draft verdicts were
+corrected by them — full detail in `docs/RCA_FORGETTING_BASELINES_2026-07.md` kill-test
+sections):**
+- **Readout suite: KILLED as tested, family verdict "deferred — information destroyed
+  pre-correction"** (best pooled recovery −0.1 AA; saturation: KEY mass ~7e-6, 2–3 orders
+  below the 1e-3 branch threshold). Per-doc EM headline is dead; pre-written fallback
+  framing applies. Scope note: funsd-KEY partially recovers (0→16.4) under marginal_match
+  but pooled worsens (sroie degenerates to all-O).
+- **Frozen-trunk: NOT CONFIRMED as clean causality** (3 of 4 conjunctive clauses fail;
+  O-collapse is LESS under frozen trunk (13.3% vs 0.0%) = the escape-hatch direction;
+  acquisition-invalid: cord at-learning 68.4). Old-class extinction DOES reproduce with
+  trunk fixed; effect-size match to naive is confounded.
+- **marginal_kl: provisional NULL** (KEY/HEADER 0.0 → H2 terminal case holds; H4′-direction
+  movement negligible: VALUE +8.5, O-recall 0→3.1%; AA 39.1 below sanity window — open:
+  KL/CE scale at λ=1, batch-2 MC noise; anchor code verified correct).
+- **logit_adjust: no buffer-free signal at τ=1** (survival bar 0.0 vs >20; acquisition
+  guard PASSES — at-learning within 5 of naive's actual 87.8/82.5/96.1; prereg's stale
+  hard-coded reference corrected in-place with a dated note).
+- **Consolidated (n=1, provisional): the snap is a SYMPTOM, not an invertible mechanism.**
+  The head collapses predicted mass on under-exercised classes to ~1e-5 (prediction-mass
+  statistic; weight geometry unmeasured); no eval-time reweighting recovers it in
+  aggregate, marginal-level training objectives don't prevent it, extinction reproduces
+  with frozen trunk, features survive (head-refit 55.3). **Only task-consistent
+  re-exercise (replay) prevents it.** Paper gain: the "did you try cheap recalibration"
+  hole is closed with a REGISTERED NULL.
+**Next: fold into thesis/paper (falsification chapter + method-chapter reframe per the
+pre-written fallback), then the B+ grid critical path. The method-chapter bet: per-doc EM
+is dead as headline; honest options = negative-result chapter around the kill-test suite
++ CoLaR as constructive control, or a replay-adjacent evidence-store method (the only
+open readout lever).**
+
+## DONE (2026-07-17 pm): Kill-tests queued — brainstorm done, top-5 implemented, DOUBLY REVIEWED
 
 **Method brainstorm (judged workflow: 4 lenses → novelty audit → 2 adversarial judges →
 synthesis) produced a top-5 shortlist; all implemented + PRE-REGISTERED
