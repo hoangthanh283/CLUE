@@ -159,6 +159,19 @@ def test_displacement_profile_and_join_drops_no_rows(tmp_path):
     assert len(joined2) == 1 and joined2.immediate_share.isna().all()
 
 
+def test_marginal_snap_hand_computed():
+    s = rca_synthesize.marginal_snap(_tier_b_json())
+    assert len(s) == 1  # boundary 1, old task 0 only
+    row = s.iloc[0]
+    # forgot matrix: O-row [10,0,0,0,0] -> O fully retained
+    assert row.o_row_acc == 1.0
+    # pred column sums [14,1,1,17,11]/44 -> top1 = B-VALUE
+    assert row.pred_top1 == "B-VALUE"
+    # trained (task 1) gold = identity*10 -> uniform marginal; cos = 1/(||pred||*sqrt(5))
+    assert abs(row.cos_pred_vs_trained_gold - 0.798) < 0.001
+    assert 0 < row.cos_pred_vs_own_gold <= 1
+
+
 def test_trunk_frozen_flag():
     data = _tier_b_json()
     data["boundaries"][1]["displacement_by_depth"] = {"head": 9.0}  # colar-style frozen trunk

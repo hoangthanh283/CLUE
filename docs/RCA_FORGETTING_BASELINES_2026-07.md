@@ -1,122 +1,219 @@
 # RCA: root causes of forgetting in multimodal doc-IE baselines (Tier C verdicts)
 
-**Date:** 2026-07-17. **Adjudicates** the pre-registered hypotheses in
-`docs/RCA_HYPOTHESES_2026-07.md` (registered 2026-07-16 BEFORE any Tier B data) against
-Tier A artifacts (`results/rca/a1_*`, `a2_*`, 3 seeds) and Tier B instrumented runs
+**Date:** 2026-07-17 (amended same day after adversarial verification — 16-agent
+adjudication/verification pass; every load-bearing number independently recomputed from the
+raw JSONs). **Adjudicates** the pre-registered hypotheses in `docs/RCA_HYPOTHESES_2026-07.md`
+(registered 2026-07-16 BEFORE any Tier B data) against Tier A artifacts (`results/rca/a1_*`,
+`a2_*`, 3 seeds) and Tier B instrumented runs
 (`results/rca/dil_{naive,ewc,lwf,er,der_pp,colar}_seed42_rca.json`; synthesis
-`results/rca/c_*.csv`). Decision rules applied **as written**; every number below is in a
-named artifact.
+`results/rca/c_*.csv`). Decision rules applied **as written**; deviations flagged inline.
 
-**Smoke check passed:** naive final FULL AA 37.9 (pre-registered bar 40 ± 3, cf.
-head-refit oracle 39.6). Strata (FULL mean old-task Drop, `c_modality_deltas.csv`):
-high-forgetting = naive 76.4, lwf 73.9, ewc 43.1, colar 28.9; replay control = er 2.2,
-der_pp 1.2. ⚠ colar ran at its CANONICAL config (k8/d5/r64), not the headline
-k4/d50/r128 — it lands in the high stratum here; do not compare to the 87.6 grid row.
+**Smoke check passed:** naive final FULL AA 37.9 (pre-registered bar 40 ± 3, cf. head-refit
+oracle 39.6). Strata (FULL mean old-task Drop, `c_modality_deltas.csv`): high-forgetting =
+naive 76.4, lwf 73.9, ewc 43.1, colar 28.9; replay control = er 2.2, der_pp 1.2. ⚠ colar ran
+at its CANONICAL config (k8/d5/r64), not the headline k4/d50/r128 — it lands in the high
+stratum here; do not compare to the 87.6 grid row.
+
+**Schema fact (affects several rules below):** SROIE has ZERO HEADER gold tokens (row totals
+0 at every boundary) — HEADER exists only in FUNSD; CORD has neither KEY nor HEADER and is
+99.8% VALUE / 0.2% O at token level; SROIE is 84.8% O / 11.5% VALUE / 3.7% KEY.
 
 ## Verdicts
 
 | Hypothesis | Verdict | One-line reason |
 |---|---|---|
-| H1 modality-asymmetric drift | **PARTIAL** | Eval-space spread passes (≥10 pts, consistent), but BOTH directional mechanisms fail in weight space |
-| H2 head/label-space interference | **SUPPORTED** | All three predictions pass |
-| H3 late-layer integration drift | **REFUTED** | Trunk displacement is front-loaded (early ≫ late) in naive/lwf/der_pp/er |
-| H4 recency/logit bias | **SUPPORTED** | Off-diagonal mass tracks the LAST-trained task's label distribution; replay stratum clean |
+| H1 modality-asymmetric drift | **REFUTED (as mechanism)** | Both directional sub-mechanisms fail in eval AND weight space; the raw-scale "spread" that formally passes is a baseline-floor artifact |
+| H2 head/label-space interference | **SUPPORTED** | All three predictions pass (verified; scope notes below) |
+| H3 late-layer integration drift | **REFUTED** | Trunk displacement is front-loaded (early ≫ late) in naive/lwf; prediction (ii) untestable under the validity guard |
+| H4 recency/logit bias | **SUPPORTED as amended (H4′)** | As-registered falsifier was drafted with a flaw (O both dominant label and falsifier target); the amended marginal-snap test is decisive |
+| QA sroie-vs-funsd (exploratory) | **NOT SUPPORTED** | No receipts-overlap signature; the asymmetry is explained by the marginal snap + at-learning differences |
 
-### H1 — PARTIAL (formal pass, mechanism fails)
+### H1 — REFUTED as mechanism
 
-Eval space (`c_modality_deltas.csv`, valid old-task masks): spread between max- and
-min-drop mask = naive 52.3, lwf 51.3, ewc 33.8, colar 29.6 — all ≥ 10, same direction
-(text-including masks `full`/`text_layout` drop 43–76 pts; `image_layout` drops only
-12–24). Formally the pre-registered threshold passes.
+Eval space (`c_modality_deltas.csv`, valid old-task masks): raw spread between max- and
+min-drop mask = naive 52.3, lwf 51.3, ewc 33.8 — formally ≥ 10. But the direction matches
+NEITHER sub-mechanism: `image_layout` is the *minimum*-drop mask in 3/3 (H1b predicted
+maximum), and `text_only` is guard-invalid in 2/3 methods (at-learning 1.7–15.4) so H1a's
+eval test is information-starved. The raw spread is a floor artifact: `image_layout`
+at-learning is only ~20–26, so it has little room to fall. **Normalized retention
+(final/at-learning) collapses the story**: naive spread 4.7pp (image_layout 6.1%, full
+10.1%, text_layout 10.8% retained — lockstep annihilation), lwf 11.3pp, ewc 20.7pp with the
+worst mask *reversing* (text_layout for ewc vs image_layout for naive/lwf) — no coherent
+single-modality direction on either scale.
 
-Weight space (`c_displacement_vs_signature.csv`) kills both sub-mechanisms:
-- **H1a (text-drift): REFUTED.** `text_word_embed` displacement is 2–4 orders of
-  magnitude SMALLER than the layout/image embeds (naive b1: text 1.9e-10 vs layout
-  7.0e-8, image 6.6e-8), and the head dwarfs all embeds (2.3e-5, ~300× the largest embed).
-- **H1b (layout/vision decay): REFUTED.** predicted `image_layout` drops most — it drops
-  LEAST everywhere.
+Weight space kills both sub-mechanisms directly (`c_displacement_vs_signature.csv`):
+- **H1a (text-drift):** `text_word_embed` is the SMALLEST of the three modality embeds in
+  5/6 method×boundary checks and never largest (naive b1: text 1.9e-10 vs layout 7.0e-8,
+  image 6.6e-8).
+- **H1b (layout/vision decay):** predicted `image_layout` drops most — it drops LEAST
+  everywhere.
+- One more nail: the trunk group that moves most is **layernorm** — 2.4–20.9× the largest
+  modality embed and 262–10,055× `text_word_embed` — i.e. what actually moves is not any
+  modality pathway at all.
 
-Caveat (floor effect): `image_layout` at-learning F1 is only ~20–25, so its small
-absolute drop partly reflects less room to fall. Honest synthesis: the modality
-correlation is real but lives in WHAT the head loses (text-carried evidence — the
-dominant F1 mass), not WHERE parameters drift. H1-as-mechanism is superseded by H2+H4.
+Note on rule semantics: the pre-registered falsifier ("spread < 10 = lockstep") is not
+literally met on the raw scale, but the prediction clause requires a *consistent direction
+matching H1a or H1b*, which fails everywhere; the normalized supplement shows even the raw
+spread is confounded. Honest synthesis: the modality correlation lives in WHAT the head
+loses (text-carried evidence = the dominant F1 mass), not WHERE parameters drift.
 
 ### H2 — SUPPORTED
 
-1. KEY extinction is mask-uniform (per-mask `per_class` in the Tier B JSONs): naive and
-   lwf final-boundary KEY F1 = **0.0 under every valid mask** on funsd AND sroie. The H1
-   escape hatch (survival ≥ 20 under some mask) never fires.
+1. KEY extinction is mask-uniform (per-mask `per_class` in the Tier B JSONs): naive and lwf
+   final-boundary KEY F1 = **0.0 under every valid mask** on funsd AND sroie. The escape
+   hatch (survival ≥ 20 under some mask while dead under FULL) never fires — checked across
+   all methods and masks. HEADER is testable only on funsd (SROIE schema has none): 0.0
+   under every valid mask for naive/lwf.
 2. Confusion flow (`c_confusion_flow.csv`, final boundary, gold KEY/HEADER, old tasks):
-   naive/lwf off-diagonal mass → O+VALUE = **1.00** (top-2 columns absorb 1.00);
-   ewc 0.91.
-3. Replay stratum clean: er retains 0.83, der_pp 0.89 of gold KEY/HEADER mass
-   on-diagonal; er's final KEY F1 85.8 (funsd) / 91.3 (sroie).
+   naive/lwf off-diagonal mass → VALUE-tags = **1.00** (O share 0.00 at the final boundary);
+   8 of 9 method×entity cells pass the >50% VALUE-capture threshold (sole failure:
+   ewc-HEADER 32.7%).
+3. Replay stratum clean: er retains 0.79–0.99 of gold KEY mass on-diagonal (final KEY F1
+   85.8 funsd / 91.3 sroie), der_pp 0.87–0.99; their small residuals go to O (ordinary
+   errors, not capture).
+
+Scope note: predictions (i)/(ii) were registered for naive/lwf only; ewc (also
+high-forgetting, Drop 43.1) behaves intermediately (funsd KEY 24.9, HEADER 38.4 at final —
+partial survival), so extinction is not homogeneous within the stratum.
 
 ### H3 — REFUTED
 
-Trunk `displacement_by_depth` (head excluded, colar excluded post-freeze per
-pre-registered caveat): naive early 0.70/0.64 vs late 0.03/0.03 (b1/b2); lwf 0.69/0.56
-vs 0.05/0.09 — **front-loaded**, meeting the falsification criterion (≥2 high-forgetting
-methods early ≥ late). ewc is the one late-heavy method (late 0.48/0.35 — its Fisher
-penalty anchors early weights). Tension worth a paper sentence: weight displacement is
-front-loaded while the CKA prior says functional drift grows with depth — small early
-weight motion amplifies through depth; "where weights move" ≠ "where function changes",
-and neither is where the damage is read out (the head).
+Trunk `displacement_by_depth` (head excluded, colar excluded post-freeze per pre-registered
+caveat): naive early 0.70/0.64 vs late 0.03/0.03 (b1/b2); lwf 0.69/0.56 vs 0.05/0.09 —
+**front-loaded**, meeting the falsification criterion (≥2 high-forgetting methods
+early ≥ late). ewc is the one late-leaning method (late 0.48/0.35, though strict
+late>mid>early fails even there — its Fisher penalty anchors what task 0 used). Prediction
+(ii) (`image_layout` vs `text_only` drops) is **untestable as registered**: the validity
+guard eliminates all 6 comparisons. Tension worth a paper sentence: weight displacement is
+front-loaded while the CKA prior says functional drift grows with depth — "where weights
+move" ≠ "where function changes", and neither is where damage is read out (the head).
 
-### H4 — SUPPORTED
+### H4 — SUPPORTED as amended (H4′); as-registered rule was flawed
 
-1. Boundary 1 (just trained SROIE, ~99% O): old-task (funsd) gold KEY off-diagonal mass
-   → **O at 0.96–0.98 top-1** for naive/lwf/ewc — O IS SROIE's dominant label, i.e. the
-   flow tracks the last-trained distribution, not a static prior.
-2. Boundary 2 (just trained CORD, VALUE-rich): flow rotates to VALUE capture — e.g.
-   colar sroie-KEY → I-VALUE 0.71 + B-VALUE 0.23 (to_VALUE = 0.93); naive/lwf
-   O+VALUE = 1.00.
-3. Replay stratum: no concentration collapse (retained 0.83–0.89).
-4. Disambiguators (pre-registered): (b) a2 gradual term = **+7.9 recovery** for naive
-   when CORD re-exercises VALUE, while KEY (absent from CORD) stays at 0.0 — monotone
-   loss exactly for never-re-exercised classes; (c) captured mass goes to labels trained
-   LAST, rotating per boundary (O → VALUE) — the H4 signature, on top of H2's
-   schema-frequency substrate. H2 and H4 co-hold at different loci, as pre-registered.
+**Transparency first.** The pre-registered falsifier said "concentrated in O only with no
+dominant-label capture" falsifies H4 — drafted assuming O ≠ the new task's dominant label.
+At boundary 1 the just-trained task (SROIE) is **84.8% O**, and old-task off-diagonal mass
+goes to O at 91–98% (naive/lwf/ewc). Read literally, the falsifier fires; read through
+prediction (i) ("labels dominant in task b's training data"), O IS the dominant label and
+the same data supports H4. The drafting flaw makes the as-registered verdict ambiguous, so
+we adjudicate the amended, sharper test below and mark this deviation openly.
+
+**H4′ (amended, decisive): the head's output marginal on old-task inputs snaps to the
+just-trained task's gold label marginal** (`c_marginal_snap.csv`; cos = cosine similarity
+of marginals under FULL; selected cells):
+
+| method | cell | cos→just-trained | cos→own gold | O-row acc |
+|---|---|---|---|---|
+| naive | b1 funsd | **0.997** | 0.599 | 0.96 |
+| naive | b2 funsd | **0.865** | 0.670 | 0.00 |
+| naive | b2 sroie | **0.937** | 0.105 | 0.00 |
+| lwf | b1 funsd | **0.998** | 0.616 | 0.96 |
+| lwf | b2 sroie | **0.925** | 0.105 | 0.00 |
+| ewc | b1 funsd | **0.979** | 0.786 | 0.87 |
+| ewc | b2 funsd | 0.712 | **0.921** | 0.72 |
+| ewc | b2 sroie | **0.986** | 0.129 | 0.02 |
+| er | b1 funsd | 0.701 | **0.998** | 0.81 |
+| er | b2 sroie | 0.096 | **1.000** | 0.99 |
+| der_pp | b2 sroie | 0.093 | **1.000** | 0.99 |
+| colar | b2 sroie | 0.166 | **0.997** | 0.90 |
+
+Failing methods track the last-trained marginal in every cell (naive predicts 95% O on
+funsd at b1, then 100% VALUE at b2); replay methods stay locked to the old task's own gold
+everywhere. The snap direction *rotates with the schedule* (O after SROIE → VALUE after
+CORD) — recency, not a static prior.
+
+**The snap explains three otherwise-puzzling observations:**
+1. **O-collapse (invisible to seqeval per-class F1):** naive/lwf O-row accuracy on old
+   tasks is exactly **0.00%** at the final boundary (every true-O token predicted as a
+   VALUE tag), while er/der_pp/colar keep 76–99%. O dies at b2, not b1 — because at b1 the
+   snap direction WAS O (funsd O-acc 80.5 → 96.2 → 0.0 for naive). Entity extinction (b1)
+   and O-collapse (b2) are the same mechanism pointed at different marginals, resolving the
+   apparent two-schedule puzzle.
+2. **a2's "+7.9 gradual recovery" for naive is not healing** — it is VALUE F1 partially
+   returning (funsd VALUE 7.1 → 18.0) because the b2 snap direction happens to overlap
+   funsd's own VALUE mass; KEY/HEADER (absent from CORD) stay at 0.0. Monotone loss exactly
+   for never-re-exercised classes, as pre-registered in disambiguator (b).
+3. **EWC's protection is task-0-biased:** it resists the snap for funsd (b2 cos→own 0.921)
+   but snaps completely on sroie (0.986 vs 0.129, O-acc 2.4%) — its Fisher anchor was
+   estimated when task 0 was the whole world, and its sroie at-learning was already
+   crippled (41.9 FULL vs 82.5 for naive/er: the quadratic penalty impaired *acquisition*,
+   a distinct stability-plasticity failure worth its own sentence).
+
+**Weight-space anchor (from `displacement_by_group`):** classifier displacement exceeds the
+entire summed trunk by 8.3×/16.5× (naive b1/b2), 24.2×/497.9× (lwf) — the "damage lives in
+the head" claim is direct, not inferred. ewc is the exception (0.9–1.5×: the penalty pins
+the head, displacement migrates trunk-ward — Finding-2 migration — and it still forgets
+43 pts).
+
+**H2 vs H4′:** both hold at different loci, as pre-registered. H2 names WHICH classes die
+permanently (those the later schedule under-exercises — schema exclusion, e.g. CORD's zero
+KEY, is the terminal case; SROIE's 3.7% KEY share already failed to keep funsd-KEY alive at
+b1, so heavy skew suffices). H4′ names WHERE the mass goes (the last marginal) and WHY the
+collapse is one-boundary-shaped.
+
+### QA (pre-registered exploratory) — receipts-overlap NOT supported
+
+"sroie forgotten more than funsd" is robust only in absolute final F1 (all 5 methods);
+under the Drop framing it reverses for ewc (funsd 48.7 > sroie 37.4) because ewc's sroie
+at-learning was already 41.9. Two operationalizations of "sroie's confusion is more
+CORD-shaped than funsd's" both fail in 3/5 methods (naive/lwf are tied at cos ≈ 1.0 — total
+collapse is generic, carrying no domain signature). The asymmetry needs no
+domain-similarity story: sroie is 84.8% O, and the b2 snap (100% VALUE) destroys O-heavy
+tasks hardest.
 
 ## Root-cause statement (n=1 seed, dil, LayoutLMv3 — provisional)
 
-**Forgetting in these baselines is a readout-recency phenomenon on a class-asymmetric
-substrate.** The shared head's logit geometry snaps to each new task's label
-distribution (H4); classes the later tasks never re-exercise (KEY, HEADER) are
-extinguished mask-uniformly (H2, Tier A: extinction to F1=0.0 with VALUE surviving);
-trunk weight drift is front-loaded but functionally minor (H3 refuted), and no modality
-pathway is the culprit (H1 mechanisms refuted) — the "multimodal correlation" reduces to
-text being the head's dominant evidence stream. This is fully consistent with F1
-(head-localized), the head-refit oracle (features survive: pooled 55.3 vs trained-head
-39.6), and F3 (only replay grounds the head).
+**Forgetting in these baselines is a readout-marginal snap on a class-asymmetric
+substrate.** After each task, the shared head's output marginal on old inputs realigns to
+the just-trained task's label marginal (cos 0.87–1.00 for failing methods vs 0.99–1.00 to
+own-gold for replay); classes the later schedule under-exercises (KEY, HEADER — and O once
+CORD's marginal excludes it) are extinguished mask-uniformly; trunk weight drift is
+front-loaded but functionally minor (head/trunk displacement 8–500×), and no modality
+pathway is the culprit — the "multimodal correlation" reduces to text being the head's
+dominant evidence stream. Fully consistent with F1 (head-localized), the head-refit oracle
+(features survive: pooled 55.3 vs trained-head 39.6), and F3 (only replay grounds the head).
 
-**Falsification tests for the statement:** (i) a frozen-trunk naive run must reproduce
-near-identical extinction (head-only cause) — cheap, not yet run; (ii) logit-bias
-correction alone (recalibrate head priors per task, no feature change) must recover a
-large fraction of the one-boundary drop; (iii) multi-seed repeat of Tier B for the
-load-bearing numbers.
+**Falsification tests for the statement:** (i) frozen-trunk naive must reproduce
+near-identical extinction (cheap, not yet run); (ii) logit/marginal recalibration alone (no
+feature change) must recover a large fraction of the one-boundary drop — the snap is a
+marginal shift, so a per-task label-prior correction attacks it directly; (iii) multi-seed
+repeat of Tier B for the load-bearing numbers.
 
 ## Method-design implications (input to the next brainstorm)
 
 1. **Attack the readout, not the trunk.** Consistent with the queued read-side direction
-   (colar_knn kNN head is extinction-immune by construction: banked KEY tokens cannot be
+   (colar_knn kNN head is snap-immune by construction: banked KEY tokens cannot be
    overwritten by logit drift). The RCA independently re-derives that design's premise.
-2. **Class re-exercise is the active ingredient of replay** — er's KEY survival (85.8)
-   with only 200 exemplars suggests targeted minority-class replay (KEY/HEADER-rich doc
-   selection) could match full replay at a fraction of the bytes; ties to CoLaR-Bal's
-   soft-CE result (SROIE +1.8 over 3 seeds).
-3. **Cheap logit-prior correction** (H4): per-task label-frequency recalibration of the
-   head at eval — a near-zero-cost baseline every fancy method must beat; if it recovers
-   most of naive's drop, it is a paper finding on its own.
-4. **Don't invest in trunk-protection mechanisms** (penalty/metaplastic on trunk): H3
-   refuted + ewc's late-heavy displacement still forgets 43 pts — colar_meta (M1) is
-   predicted to fail; treat its queued run as the falsification test.
+2. **Cheap marginal-recalibration baseline (from H4′):** per-task label-prior correction of
+   the head at eval — near-zero cost, and every fancy method must beat it. If it recovers
+   most of naive's drop it is a paper finding on its own.
+3. **Class re-exercise is the active ingredient of replay** — er's KEY survival (85.8) with
+   200 exemplars suggests targeted minority-class replay (KEY/HEADER-rich selection) could
+   match full replay at a fraction of the bytes; but note SROIE's 3.7% KEY share was NOT
+   enough for cross-domain KEY retention — re-exercise must hit the old task's
+   distribution, not just the label.
+4. **Don't invest in trunk-protection mechanisms:** H3 refuted + ewc's trunk-ward
+   displacement still forgets 43 pts AND impairs acquisition (sroie 41.9) — colar_meta (M1)
+   is predicted to fail; treat its queued run as the falsification test.
 
 ## Caveats
 
-- Tier B is n=1 seed / dil / LayoutLMv3; Tier A per-class findings are 3-seed.
-- colar row = canonical k8/d5/r64, NOT the headline recipe.
-- colar displacement is head-only after task 0 (backbone frozen) — excluded from H3.
-- `text_only` mask mostly invalid (at-learning < 20) — text-drift eval test relies on
-  `text_layout` vs `image_layout` contrast.
-- Prompt/LoRA families not instrumented (out of Tier B scope).
+- Tier B is n=1 seed / dil / LayoutLMv3; Tier A per-class findings are 3-seed. Verdicts
+  provisional until the load-bearing numbers repeat.
+- colar row = canonical k8/d5/r64, NOT the headline recipe; colar displacement is head-only
+  after task 0 (backbone frozen) — excluded from H3.
+- `text_only` mostly guard-invalid (at-learning < 20); H1a's eval test rests on the
+  weight-space evidence. Replay methods show small nonzero `image_layout` at-learning on
+  sroie (0.2–1.3) where naive/ewc/lwf sit at exactly 0.0 — an acquisition-side curiosity
+  outside the pre-registered scope.
+- `rel_pos_bias` displacement is exactly 0.0 in every method/boundary — instrumentation
+  note (likely non-trainable or unused in this checkpoint config), not a finding.
+- Confusion-flow/marginal analyses use the FULL mask (per `rca_synthesize.py`); per-mask
+  extinction claims come from the per-mask `per_class` fields.
+- Prompt/LoRA families not instrumented (out of Tier B scope; the uniform probe is
+  dishonest for prompt methods — see hypotheses doc).
+- Verification provenance: adjudicated by 5 independent agents, each verdict checked by 2
+  adversarial verifiers (numeric reproduction + methodology), plus a completeness critic;
+  corrections folded in (H1 verdict tightened PARTIAL→REFUTED-as-mechanism, H4
+  as-registered ambiguity disclosed, SROIE-HEADER schema fact, O-collapse, head/trunk
+  ratios, ewc acquisition failure, SROIE gold O share corrected 99%→84.8%).

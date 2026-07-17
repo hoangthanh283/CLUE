@@ -2,20 +2,29 @@
 
 ## ACTIVE (2026-07-17): RCA COMPLETE — readout-recency is the root cause; read-side chain running
 
-**Tier B landed + Tier C adjudicated** (`docs/RCA_FORGETTING_BASELINES_2026-07.md`, pre-registered
-rules applied as written): **H2 SUPPORTED** (KEY extinction mask-uniform — naive/lwf KEY F1 = 0.0
-under EVERY valid mask; replay stratum clean, er KEY 85.8/91.3), **H4 SUPPORTED** (off-diagonal
-confusion mass tracks the LAST-trained task's labels: →O 0.96–0.98 after SROIE, rotates to →VALUE
-0.93 after CORD; naive's +7.9 gradual recovery = CORD re-exercising VALUE), **H3 REFUTED** (trunk
-displacement FRONT-loaded: naive early 0.70 vs late 0.03 — weight motion ≠ functional drift ≠
-damage locus), **H1 PARTIAL** (eval spread passes but both directional mechanisms fail in weight
-space — text embed moves LEAST, head dwarfs all embeds ×300; "multimodal correlation" reduces to
-text being the head's dominant evidence stream).
-**Root cause: readout-recency on a class-asymmetric substrate.** Coheres with F1, head-refit
-oracle, F3. Implications: attack the readout (read-side premise re-derived independently);
-logit-prior recalibration = mandatory cheap baseline; targeted minority-class replay; colar_meta
-predicted to FAIL (its queued run = the falsification test). Caveats: Tier B n=1 seed; colar row
-= canonical k8/d5/r64 not headline.
+**Tier B landed + Tier C adjudicated, then AMENDED after a 16-agent adversarial verification
+pass** (`docs/RCA_FORGETTING_BASELINES_2026-07.md`; every load-bearing number independently
+recomputed): **H2 SUPPORTED** (KEY extinction mask-uniform — naive/lwf KEY F1 = 0.0 under EVERY
+valid mask; replay stratum clean, er KEY 85.8/91.3), **H4 SUPPORTED AS AMENDED (H4′ marginal
+snap)** — the as-registered falsifier had a drafting flaw (O is both SROIE's dominant label,
+84.8% not 99%, and the falsifier target); the decisive amended test: the head's output marginal
+on old tasks snaps to the just-trained task's gold marginal (cos 0.997/0.998 naive/lwf at b1 vs
+0.60 to own gold; replay stays 0.99–1.00 to own gold; `results/rca/c_marginal_snap.csv`).
+**H3 REFUTED** (trunk displacement FRONT-loaded: naive early 0.70 vs late 0.03), **H1 REFUTED
+as mechanism** (raw spread is a baseline-floor artifact — normalized retention spread 4.7pp for
+naive = lockstep annihilation; text embed moves LEAST 5/6; layernorm moves most, 262–10,055×
+text embed), **QA NOT SUPPORTED** (no receipts-overlap signature).
+New verified findings the snap explains: **O-collapse** (naive/lwf O-row acc exactly 0.00% at
+final — invisible to seqeval; O dies at b2 not b1 because the b1 snap direction WAS O);
++7.9 "recovery" = snap rotation, not healing; **EWC protection is task-0-biased** (funsd resists,
+sroie snaps 0.986 — and ewc's sroie at-learning was crippled 41.9 vs 82.5: acquisition failure);
+head/trunk displacement 8–500× (ewc ~1× = Finding-2 migration, still forgets 43 pts).
+**Root cause: readout-marginal snap on a class-asymmetric substrate.** Coheres with F1,
+head-refit oracle, F3. Implications: attack the readout (read-side premise re-derived
+independently); marginal/logit-prior recalibration = mandatory cheap baseline; targeted
+minority-class replay (but SROIE's 3.7% KEY share was NOT enough — re-exercise must hit the old
+distribution); colar_meta predicted to FAIL (its queued run = the falsification test).
+Caveats: Tier B n=1 seed; colar row = canonical k8/d5/r64 not headline.
 **3-seed conservation verdict IN:** base 87.8 = colar_bal 87.8 > kcenter 87.0; no lever beats base
 at any seed; redistribution softer than seed-42 suggested (bal: SROIE +1.8 for FUNSD −0.5).
 **Read-side chain relaunched** (Gate 0 probe → colar_knn λ runs → colar_meta m1/m3),

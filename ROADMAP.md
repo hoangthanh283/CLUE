@@ -18,11 +18,14 @@ existing code on Vast.ai. CoLaR is the *constructive control*, PLaR the *bounded
 method contributions.
 
 ### RESUME HERE (2026-07-17): RCA COMPLETE — verdicts in; read-side chain running
-**RCA Tier C is DONE:** `docs/RCA_FORGETTING_BASELINES_2026-07.md` — H1 PARTIAL,
-**H2 SUPPORTED, H4 SUPPORTED, H3 REFUTED**. Root cause: readout-recency on a
-class-asymmetric substrate (head logit geometry snaps to last task's label distribution;
-never-re-exercised classes KEY/HEADER extinguish mask-uniformly; trunk drift front-loaded
-but functionally minor; no modality pathway is the culprit). Method implications §
+**RCA Tier C is DONE + verification-amended:** `docs/RCA_FORGETTING_BASELINES_2026-07.md` —
+**H2 SUPPORTED, H4 SUPPORTED-AS-AMENDED (H4′ marginal snap), H3 REFUTED, H1 REFUTED as
+mechanism, QA not supported**. Root cause: readout-marginal snap on a class-asymmetric
+substrate (the head's output marginal on old tasks snaps to the just-trained task's gold
+marginal, cos ≈ 1.0 for failing methods — `results/rca/c_marginal_snap.csv`;
+never-re-exercised classes KEY/HEADER extinguish mask-uniformly; O collapses too (0.00%,
+invisible to seqeval); trunk drift front-loaded but functionally minor; no modality pathway
+is the culprit). Method implications §
 "Method-design implications" — notably: cheap logit-prior recalibration baseline (test
 before any new method), targeted minority-class replay, read-side memory premise
 independently re-derived, colar_meta predicted to FAIL (treat its queued run as the

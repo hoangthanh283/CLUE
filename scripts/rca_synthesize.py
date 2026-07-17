@@ -118,6 +118,42 @@ def confusion_flow(data: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def marginal_snap(data: dict) -> pd.DataFrame:
+    """H4-amended test: does the head's output marginal on OLD tasks snap to the
+    just-trained task's gold label marginal?
+
+    Per (boundary b >= 1, old task t < b), FULL mask: cosine of the predicted-label
+    marginal on task t vs (a) the just-trained task b's gold marginal and (b) task t's
+    own gold marginal, plus O-row accuracy (invisible to seqeval per-class F1).
+    """
+    labels: list[str] = data["labels"]
+    o_col = labels.index("O")
+    rows = []
+    for b, boundary in enumerate(data["boundaries"]):
+        if b == 0:
+            continue
+        trained = np.asarray(boundary["eval"][str(b)]["full"]["confusion"], dtype=float)
+        trained_gold = trained.sum(axis=1) / trained.sum()
+        for t in range(b):
+            conf = np.asarray(boundary["eval"][str(t)]["full"]["confusion"], dtype=float)
+            pred = conf.sum(axis=0) / conf.sum()
+            own_gold = conf.sum(axis=1) / conf.sum()
+            o_row = conf[o_col]
+            cos = lambda a, c: float(a @ c / (np.linalg.norm(a) * np.linalg.norm(c)))  # noqa: E731
+            rows.append(
+                {
+                    "method": data["method"],
+                    "boundary": b,
+                    "task_idx": t,
+                    "cos_pred_vs_trained_gold": cos(pred, trained_gold),
+                    "cos_pred_vs_own_gold": cos(pred, own_gold),
+                    "o_row_acc": o_row[o_col] / o_row.sum() if o_row.sum() else np.nan,
+                    "pred_top1": labels[int(np.argmax(pred))],
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 def displacement_profile(data: dict) -> pd.DataFrame:
     """Depth-profile shares + modality-embed displacement per boundary (H1/H3).
 
@@ -192,11 +228,13 @@ def main(rca_dir: str | Path = "results/rca") -> None:
 
     deltas = pd.concat([modality_deltas(r) for r in runs], ignore_index=True)
     flow = pd.concat([confusion_flow(r) for r in runs], ignore_index=True)
+    snap = pd.concat([marginal_snap(r) for r in runs], ignore_index=True)
     profile = pd.concat([displacement_profile(r) for r in runs], ignore_index=True)
     joined = join_signature(profile, rca_dir / "a2_family_signature.csv")
 
     deltas.to_csv(rca_dir / "c_modality_deltas.csv", index=False)
     flow.to_csv(rca_dir / "c_confusion_flow.csv", index=False)
+    snap.to_csv(rca_dir / "c_marginal_snap.csv", index=False)
     joined.to_csv(rca_dir / "c_displacement_vs_signature.csv", index=False)
     fig_modality_drop(deltas, rca_dir / "c_fig_modality_drop.png")
     fig_displacement_vs_signature(joined, rca_dir / "c_fig_displacement_vs_signature.png")
