@@ -179,6 +179,23 @@ feature change) must recover a large fraction of the one-boundary drop — the s
 marginal shift, so a per-task label-prior correction attacks it directly; (iii) multi-seed
 repeat of Tier B for the load-bearing numbers.
 
+
+## Deep-dive artifact pass (implemented 2026-07-17 pm)
+
+`scripts/rca_deep_dive.py` is the CPU-only consolidation pass for this RCA. It reads the
+Tier-B JSONs and emits `results/rca/d_class_extinction.csv`, `d_task_mask_drops.csv`,
+`d_multimodal_summary.csv`, `d_marginal_snap_extended.csv`, `d_locus_summary.csv`, and
+`d_summary.md`. No training or new instrumentation is hidden in this step; it is a
+paper-facing repackaging of the already adjudicated Tier-B probes.
+
+Current seed-42 summary: final old-task extinctions under the FULL valid task mask are
+concentrated in failing methods (naive: FUNSD HEADER/KEY and SROIE KEY/VALUE; lwf: FUNSD
+HEADER/KEY and SROIE KEY; ewc: SROIE VALUE). The strongest snap cells remain the old-task
+inputs whose predicted marginal matches the just-trained task far more than their own gold
+marginal (ewc b2/sroie 0.986 vs 0.129; naive b2/sroie 0.937 vs 0.105; lwf b2/sroie 0.925
+vs 0.105). The multimodal summary keeps the same at-learning mask guard; it is for
+quantifying mask sensitivity, not changing the H1 verdict.
+
 ## Method-design implications (input to the next brainstorm)
 
 1. **Attack the readout, not the trunk.** Consistent with the queued read-side direction

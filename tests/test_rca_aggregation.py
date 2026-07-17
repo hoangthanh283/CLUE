@@ -26,6 +26,7 @@ def _load(name):
 
 rca_per_class = _load("rca_per_class")
 rca_matrix_dynamics = _load("rca_matrix_dynamics")
+rca_deep_dive = _load("rca_deep_dive")
 
 
 def _ledger():
@@ -115,3 +116,68 @@ def test_trajectory_skips_upper_triangle_and_aa_crosscheck_passes():
     assert len(traj) == 3  # (0,0), (1,0), (1,1) — NaN future cell dropped
     cc = rca_matrix_dynamics.aa_crosscheck(runs)
     assert not cc.mismatch.any()
+
+
+def _deep_run():
+    labels = ["O", "B-KEY", "B-VALUE"]
+    task0_conf = [[10, 0, 0], [0, 8, 0], [0, 0, 20]]
+    task0_snapped = [[0, 0, 10], [0, 0, 8], [0, 0, 20]]
+    task1_conf = [[0, 0, 1], [0, 0, 1], [0, 0, 98]]
+    pc0 = {"KEY": {"f1": 80.0, "support": 8}, "VALUE": {"f1": 90.0, "support": 20}}
+    pc0_final = {"KEY": {"f1": 0.0, "support": 8}, "VALUE": {"f1": 20.0, "support": 20}}
+    pc1 = {"KEY": {"f1": 0.0, "support": 1}, "VALUE": {"f1": 95.0, "support": 98}}
+    return {
+        "method": "naive",
+        "labels": labels,
+        "masks": ["full"],
+        "boundaries": [
+            {
+                "after_task": 0,
+                "task_name": "funsd",
+                "eval": {"0": {"full": {"f1": 85.0, "per_class": pc0, "confusion": task0_conf}}},
+            },
+            {
+                "after_task": 1,
+                "task_name": "sroie",
+                "displacement_by_depth": {
+                    "input": 1.0,
+                    "early": 2.0,
+                    "mid": 3.0,
+                    "late": 4.0,
+                    "head": 20.0,
+                },
+                "displacement_by_group": {
+                    "text_word_embed": 1.0,
+                    "layout_2d_pos_embed": 2.0,
+                    "image_patch_embed": 3.0,
+                    "layernorm": 10.0,
+                },
+                "eval": {
+                    "0": {"full": {"f1": 10.0, "per_class": pc0_final, "confusion": task0_snapped}},
+                    "1": {"full": {"f1": 95.0, "per_class": pc1, "confusion": task1_conf}},
+                },
+            },
+        ],
+    }
+
+
+def test_deep_dive_extracts_extinction_snap_and_locus():
+    run = _deep_run()
+    classes = rca_deep_dive.class_extinction(run)
+    key = classes[
+        (classes.boundary == 1) & (classes.task_idx == 0) & (classes["class"] == "KEY")
+    ].iloc[0]
+    assert key.at_learning_f1 == 80.0
+    assert key.drop_from_at_learning == 80.0
+    assert bool(key.extinct)
+
+    snap = rca_deep_dive.marginal_snap(run).iloc[0]
+    assert snap.pred_top1 == "B-VALUE"
+    assert snap.cos_pred_vs_trained_gold > snap.cos_pred_vs_own_gold
+
+    loci = rca_deep_dive.locus_summary(run).iloc[0]
+    assert loci.head_trunk_ratio == 2.0
+    assert loci.max_modality_embed == "image_patch_embed"
+
+    summary = rca_deep_dive.multimodal_summary(rca_deep_dive.task_mask_drops(run)).iloc[0]
+    assert summary.mean_drop == 75.0
