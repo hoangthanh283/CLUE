@@ -1,6 +1,6 @@
 # STATE
 
-## ACTIVE (2026-07-17 pm): Kill-tests queued — brainstorm done, top-5 implemented
+## ACTIVE (2026-07-17 pm): Kill-tests queued — brainstorm done, top-5 implemented, DOUBLY REVIEWED
 
 **Method brainstorm (judged workflow: 4 lenses → novelty audit → 2 adversarial judges →
 synthesis) produced a top-5 shortlist; all implemented + PRE-REGISTERED
@@ -8,21 +8,44 @@ synthesis) produced a top-5 shortlist; all implemented + PRE-REGISTERED
 `scripts/run_rca_killtests.sh` behind the read-side chain (~3.5 GPU-h):**
 1. **Readout suite** (`rca_readout_fixes.py`): naive retrain + logit dump, then
    marginal-match oracle / prior-ratio one-step / per-doc Saerens–Latinne EM (task-ID-FREE
-   — a doc's ~512 tokens are its own calibration batch; strongest novelty per audit).
-   SUPPORT bar: >15 AA pts recovery; KILL readout-repair family if <5.
+   — a doc's ~512 tokens are its own calibration batch). SUPPORT bar: pooled AA AND
+   AA_old(funsd,sroie) both >15 pts recovery; cord non-regression ≤2; KILL family if <5
+   pooled — split by the saturation check (KEY/HEADER prob mass ≥/< 1e-3 distinguishes
+   "mechanism dead" from "information destroyed pre-correction").
 2. **Frozen-trunk naive** (`--freeze-trunk`): pure-head causality; CONFIRM if extinction/
    O-collapse/snap-cos match full naive ±5 F1 / cos 0.02.
-3. **marginal_kl** (KL-to-seen-mixture, 9 floats/task): H4′-vs-H2 disentangler; expected
-   AA 45–55 with KEY/HEADER staying dead.
+3. **marginal_kl** (KL to PRIOR-task mixture, 9 floats/task): H4′-vs-H2 disentangler;
+   adjudicable rule = KEY/HEADER >20 refutes H2 terminal case; AA 45–55 is sanity only.
 4. **logit_adjust** (balanced softmax under cumulative prior, buffer-free): survival bar
    KEY/HEADER >20; MUST check at-learning F1 (EWC-style acquisition regression voids it).
 Killed by judges: OT recalibration (no mixed eval stream), DoLa layer-contrast (head is the
-damaged locus), head-only replay (decoupled-carrier risk). Gated: Bayesian last-layer
-behind a 2-line head-only-EWC ablation; NCM head waits for colar_knn results.
+damaged locus), head-only replay (decoupled-carrier risk — kill reasoning flagged as weak,
+revisit next brainstorm). Gated: Bayesian last-layer behind a 2-line head-only-EWC
+ablation; NCM head waits for colar_knn results.
 Outputs land in `results/rca/killtests/` + `results/rca/dil_{naive_frozen,marginal_kl,logit_adjust}_seed42_rca.json`
 (rca_synthesize.py picks them up). Adjudicate strictly by the prereg doc.
+
+**Adversarial reviews BOTH DONE before any kill-test executed (commits f79ac0b + afd26e9):**
+- **Plan red-team** (4 attack angles → adjudicator): survives-with-amendments. Caught:
+  marginal_kl mixture included the CURRENT task (self-anchor no-op at task 0, 1/(t+1)
+  dilution — CRITICAL, silently changed what rule 3 tests; fixed to prior-only); KILL-rule
+  blind spot (added saturation split); rule-1 CORD dilution (added AA_old + guard); AA
+  45–55 demoted to sanity check; novelty framing corrected (logit_adjust = Menon/Ren
+  mechanism in a new fixed-head-DIL regime; per_doc_em = Saerens–Latinne 2002 at document
+  granularity — delta is the calibration unit, closest prior TTLSA arXiv:2211.15646);
+  per-doc-EM terminal-case fallback framing PRE-WRITTEN in the prereg. Stale premise
+  retired: **colar_knn λ=1.0 landed at AA 46.24 / BWT −6.51 — far below CoLaR 87.6; a pure
+  kNN head is NOT a hedge** (λ=0.3 + colar_meta still pending).
+- **Code review** (4 dimensions, findings adversarially verified): 2 real bugs beyond the
+  red-team overlap — **per_doc_em zero-prior fixed point** (π init from CORD marginal with
+  exact-zero KEY/HEADER locked those classes at 0 forever regardless of document evidence;
+  reproduced in fp64; Laplace-smoothed + regression test) and **no self-duplication guard
+  on chain scripts** (flock added to run_rca_killtests.sh + run_readside_gate01.sh via
+  mv-replace so running instances keep their old inode). Earlier fp16 hazards (logit dump
+  flooring extinct probs; KL underflow-NaN under Turing fp16 autocast) fixed in f79ac0b.
 ⚠ A duplicate parked `run_readside_gate01.sh` instance exists (kill was permission-blocked);
-it should skip-and-exit naturally, but if two train.py appear simultaneously, kill the newer.
+flock now prevents future duplicates, but the live pair predates it — if two train.py
+appear simultaneously, kill the newer.
 
 ## DONE (2026-07-17 am): RCA COMPLETE — readout-marginal snap is the root cause; read-side chain running
 
