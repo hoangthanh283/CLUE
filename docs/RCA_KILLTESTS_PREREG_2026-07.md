@@ -24,14 +24,26 @@ deployability (a document is its own calibration batch).
 
 ## Decision rules
 
-1. **Readout suite (a/b/c) on retrained naive** (final-boundary logits, funsd+sroie, FULL):
+1. **Readout suite (a/b/c) on retrained naive** (final-boundary logits, ALL 3 tasks pooled
+   — matching the RCA's AA convention — plus old-tasks-only, FULL mask):
+   *(amended 2026-07-17 post red-team, before any run executed)*
    - Smoke gate: retrained naive final FULL AA must be 37.9 ± 2 (else stop — retrain drift).
-   - **SUPPORT** if best variant recovers > 15 AA pts (37.9 → ≥ ~53; head-refit ceiling 55.3
-     is the reference — recovery at/near it means the snap is ~the whole readout deficit).
-   - **KILL the readout-repair family** if best variant recovers < 5 pts.
+   - **SUPPORT** requires BOTH: (i) pooled AA of the best variant recovers > 15 pts
+     (37.9 → ≥ ~53; head-refit ceiling 55.3 is the reference), AND (ii) AA_old =
+     mean(funsd, sroie) recovers > 15 pts from its own uncorrected value. Report both.
+   - **Non-regression guard:** cord F1 must not drop > 2 pts under any variant.
+   - **KILL the readout-repair family** if best variant's pooled AA recovers < 5 pts —
+     split by the pre-registered **saturation check**: mean uncorrected KEY/HEADER
+     probability mass on old-task tokens ≥ 1e-3 → "correction mechanism ineffective on
+     live logits" (family dead); < 1e-3 → "information destroyed pre-correction" (needs a
+     training-time intervention; family verdict deferred, mechanism untested).
    - Per-class prediction: VALUE and O recover strongly; KEY/HEADER recover only where the
      final model still assigns them non-trivial probability mass — CORD-era logits may have
      annihilated them (H2 terminal case). Report KEY/HEADER recovered-F1 explicitly.
+   - Numerics guard: prior_ratio uses a Laplace-smoothed denominator (α=1e-4; CORD's gold
+     marginal has exact-zero KEY/HEADER mass) and its max weight is reported; > 1e4 flags
+     the variant's KEY/HEADER numbers as numerically fragile — read them only alongside
+     per_doc_em's.
    - (c) vs (a): (c) landing within 5 AA pts of (a) = task-ID-free correction is viable
      (method-chapter candidate). (c) failing while (a)/(b) work = information bottleneck,
      not mechanism failure.
@@ -39,10 +51,15 @@ deployability (a document is its own calibration batch).
    if KEY/HEADER extinction (final F1 < 5), O-collapse (O-row acc < 5%), and snap-cos
    (within 0.02) match full naive at the final boundary, with final AA within ±5.
    Materially less extinction → trunk contributes; hedge the root-cause statement.
-3. **marginal_kl (training-time KL anchor, stores 9 floats/task):** expected AA 45–55.
-   The pre-registered dissociation: recovery concentrated on O/VALUE confusions (H4′ =
-   marginal-fixable) while KEY/HEADER stay < 5 (H2 = zero-re-exercise extinction is not a
-   marginal problem). KEY/HEADER > 20 would REFUTE that part of H2's terminal-case reading.
+3. **marginal_kl (training-time KL anchor, stores 9 floats/task):** the KL target is the
+   mixture of PRIOR-task marginals only (current task excluded — its marginal is what CE
+   already pulls toward; amended post red-team, which caught the current-task-inclusive
+   implementation as a bug before any run). The AA 45–55 window is a SANITY CHECK
+   (like the smoke gate), NOT part of the verdict — outside it, investigate before
+   adjudicating. The adjudicable rule is the dissociation: recovery concentrated on
+   O/VALUE confusions (H4′ = marginal-fixable) while KEY/HEADER stay < 5 (H2 =
+   zero-re-exercise extinction is not a marginal problem). KEY/HEADER > 20 would REFUTE
+   that part of H2's terminal-case reading.
 4. **logit_adjust (balanced-softmax / cumulative-prior adjustment, buffer-free):**
    - SURVIVAL bar: KEY or HEADER final F1 > 20 (H2's own survival threshold) → genuine
      buffer-free method signal.
@@ -53,6 +70,22 @@ deployability (a document is its own calibration batch).
      (predict with raw logits ⇒ posterior under the cumulative prior); τ = 1.0 first, no
      tuning before the verdict.
 5. All n=1 seed — verdicts provisional; only multi-seed if a verdict becomes load-bearing.
+
+## Novelty framing (red-team-corrected, before results)
+
+- `logit_adjust` = known mechanism (Menon et al. ICLR'21 logit adjustment / Ren et al.
+  NeurIPS'20 balanced softmax — cited in the code docstring), tested in a new fixed-head
+  DIL regime. NOT a novel mechanism claim.
+- `per_doc_em` = Saerens–Latinne (2002) EM at document granularity; the delta is the
+  calibration-unit size (~512 tokens/doc, task-ID-free), not the algorithm. Closest
+  test-time precedent: TTLSA (arXiv:2211.15646).
+- **Pre-written fallback framing for per-doc EM** (so the headline is honest regardless of
+  numbers): it is a zero-byte, task-ID-free result for the RECOVERABLE subset
+  (marginal-snap-caused, non-extinguished classes). H2's terminal case (KEY/HEADER at the
+  final boundary) is an explicit non-goal — it requires re-exercise, not recalibration.
+  A terminal-case method would be replay-adjacent, not this.
+- BiC/WA/IL2M inapplicability to fixed-head DIL: verified clean (all require a
+  new-class-introduction event this scenario lacks).
 
 ## Runs & artifacts
 

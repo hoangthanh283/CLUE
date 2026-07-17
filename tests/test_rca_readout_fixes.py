@@ -38,8 +38,18 @@ def _synthetic(n=2000, prior_s=(0.7, 0.2, 0.1), prior_t=(0.1, 0.2, 0.7)):
 
 def test_prior_ratio_is_exact_bayes_inverse():
     snapped, true, _, ps, pt = _synthetic()
-    corrected = rrf.prior_ratio(snapped, q_old=pt, q_last=ps)
+    corrected = rrf.prior_ratio(snapped, q_old=pt, q_last=ps, alpha=0.0)
     assert np.allclose(corrected, true, atol=1e-10)  # exact algebraic identity
+
+
+def test_prior_ratio_smoothing_bounds_degenerate_weights():
+    # CORD-style degenerate denominator: q_last has exact-zero mass on a class
+    q_old = np.array([0.35, 0.05, 0.60])
+    q_last = np.array([0.002, 0.0, 0.998])
+    w_raw = q_old / q_last.clip(min=1e-8)
+    w_smooth = rrf.prior_ratio_weights(q_old, q_last, alpha=1e-4)
+    assert w_raw.max() > 1e6  # the hazard the smoothing exists for
+    assert w_smooth.max() < 1e4  # bounded after Laplace smoothing
 
 
 def test_marginal_match_recovers_target_marginal():
