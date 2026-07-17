@@ -51,18 +51,23 @@ class MarginalAnchor(NaiveFineTune):
         self.task_marginals.append(gold_marginal(train_loader, n))
 
     def _mixture(self) -> torch.Tensor:
-        return torch.stack(self.task_marginals).mean(0)
+        # PRIOR tasks only (red-team fix): anchoring to a mixture containing the CURRENT
+        # task would self-anchor at task 0 and dilute the old-task protection 1/(t+1) —
+        # the current task's marginal is what the CE term already pulls toward.
+        return torch.stack(self.task_marginals[:-1]).mean(0)
 
     def _loss(self, outputs, batch) -> torch.Tensor:
         labels = batch["labels"]
         valid = labels != -100
-        if not valid.any() or len(self.task_marginals) == 0:
-            return outputs.loss
-        probs = F.softmax(outputs.logits[valid], dim=-1)
+        if not valid.any() or len(self.task_marginals) <= 1:
+            return outputs.loss  # task 0: nothing to protect yet — plain CE
+        # float32: under fp16 autocast (Turing box) extinct-class probs underflow and
+        # clamp(1e-8) rounds to 0 in half precision -> log(0) = -inf -> NaN loss.
+        probs = F.softmax(outputs.logits[valid].float(), dim=-1)
         batch_marginal = probs.mean(0).clamp(min=_EPS)
         target = self._mixture().to(batch_marginal.device).clamp(min=_EPS)
         # KL(target || batch_marginal): mode-covering — punishes zeroing any class the
-        # seen-task mixture still contains (the snap's signature failure).
+        # prior-task mixture still contains (the snap's signature failure).
         kl = (target * (target.log() - batch_marginal.log())).sum()
         return outputs.loss + self.config.get("lambda_kl", 1.0) * kl
 

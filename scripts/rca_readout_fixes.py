@@ -91,7 +91,10 @@ def stage_train(seed: int = 42, batch_size: int = 2) -> None:
                 lab = batch["labels"]
                 for row_p, row_l in zip(p, lab, strict=True):  # one row = one document
                     keep = row_l != -100
-                    probs.append(row_p[keep].cpu().numpy().astype(np.float16))
+                    # float32 (red-team fix): fp16 floors extinct-class probs (<6e-8) to
+                    # exactly 0, which no downstream correction can resurrect — that would
+                    # conflate "correction failed" with "information destroyed at storage".
+                    probs.append(row_p[keep].cpu().numpy().astype(np.float32))
                     golds.append(row_l[keep].cpu().numpy().astype(np.int16))
                     docs.append(np.full(int(keep.sum()), doc, dtype=np.int32))
                     doc += 1
@@ -140,8 +143,19 @@ def marginal_match(probs: np.ndarray, q_target: np.ndarray, iters: int = 50) -> 
     return reweight(probs, w)
 
 
-def prior_ratio(probs: np.ndarray, q_old: np.ndarray, q_last: np.ndarray) -> np.ndarray:
-    return reweight(probs, q_old / q_last.clip(min=_EPS))
+def prior_ratio(
+    probs: np.ndarray, q_old: np.ndarray, q_last: np.ndarray, alpha: float = 1e-4
+) -> np.ndarray:
+    """One-step reweight by q_old/q_last. Laplace-smooth the DENOMINATOR (red-team fix):
+    q_last = CORD's marginal has exact-zero KEY/HEADER mass — a bare epsilon clip yields
+    ~1e5-1e7 weights that amplify numerical noise into spurious argmax flips."""
+    q_last_s = (q_last + alpha) / (q_last + alpha).sum()
+    return reweight(probs, q_old / q_last_s)
+
+
+def prior_ratio_weights(q_old: np.ndarray, q_last: np.ndarray, alpha: float = 1e-4) -> np.ndarray:
+    q_last_s = (q_last + alpha) / (q_last + alpha).sum()
+    return q_old / q_last_s
 
 
 def per_doc_em(
@@ -177,6 +191,10 @@ def stage_correct() -> None:
         "| task | variant | F1 | KEY | HEADER | VALUE | O-acc |",
         "|---|---|---|---|---|---|---|",
     ]
+    entity_cols = {
+        e: [i for i, tag in enumerate(labels) if "-" in tag and tag.split("-", 1)[1] == e]
+        for e in ("KEY", "HEADER")
+    }
     for t in range(n_tasks):
         d = np.load(OUT_DIR / f"naive_logits_task{t}.npz")
         probs, golds, docs = d["probs"].astype(np.float64), d["labels"], d["docs"]
@@ -187,6 +205,18 @@ def stage_correct() -> None:
             "per_doc_em": per_doc_em(probs, docs, q_last),
         }
         results[str(t)] = {}
+        if t < n_tasks - 1:  # old tasks: pre-registered saturation + weight diagnostics
+            # Saturation check (red-team fix): distinguishes "correction mechanism
+            # ineffective" from "KEY/HEADER mass already destroyed in the stored logits"
+            # — the two KILL readings with opposite method-chapter implications.
+            results[str(t)]["diagnostics"] = {
+                f"uncorrected_{e.lower()}_prob_mass": float(probs[:, cols].sum(1).mean())
+                for e, cols in entity_cols.items()
+            }
+            w = prior_ratio_weights(q[t], q_last)
+            results[str(t)]["diagnostics"]["prior_ratio_max_weight"] = float(w.max())
+            if w.max() > 1e4:
+                lines.append(f"⚠ task {t}: prior_ratio max weight {w.max():.1e} > 1e4")
         for name, p in variants.items():
             preds = p.argmax(-1)
             f1 = compute_token_f1(preds.tolist(), golds.tolist(), id_to_label)
@@ -205,11 +235,19 @@ def stage_correct() -> None:
                 f"| {meta['task_names'][t]} | {name} | {f1['f1']:.1f} | {key:.1f} "
                 f"| {hdr:.1f} | {val:.1f} | {o_acc*100:.1f} |"
             )
-    # Headline: corrected AA per variant (mean over tasks).
+    # Headline (amended prereg rule 1): pooled AA AND old-tasks-only AA per variant,
+    # plus the cord non-regression guard (≤ 2 pts drop under any variant).
     for name in ("uncorrected", "marginal_match", "prior_ratio", "per_doc_em"):
         aa = float(np.mean([results[str(t)][name]["f1"] for t in range(n_tasks)]))
+        aa_old = float(np.mean([results[str(t)][name]["f1"] for t in range(n_tasks - 1)]))
+        cord_delta = (
+            results[str(n_tasks - 1)][name]["f1"] - results[str(n_tasks - 1)]["uncorrected"]["f1"]
+        )
         results.setdefault("AA", {})[name] = aa
-        lines.append(f"| **AA** | {name} | {aa:.1f} | | | | |")
+        results.setdefault("AA_old", {})[name] = aa_old
+        results.setdefault("cord_delta", {})[name] = float(cord_delta)
+        guard = "" if cord_delta >= -2.0 else " ⚠cord-regression"
+        lines.append(f"| **AA / AA_old** | {name} | {aa:.1f} / {aa_old:.1f}{guard} | | | | |")
     (OUT_DIR / "readout_fixes.json").write_text(json.dumps(results, indent=2, default=float))
     (OUT_DIR / "readout_fixes.md").write_text("\n".join(lines) + "\n")
     log.info("AA per variant: %s", results["AA"])
