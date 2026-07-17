@@ -64,6 +64,19 @@ retrain live on GPU) after a ~5 h deadlock, root-caused and fixed:
   task list tracks: monitor → adjudicate (strictly per amended prereg) → write results +
   push.
 
+**Frozen-trunk kill-test IN (2026-07-17 pm):** old-class extinction repeats (FUNSD
+HEADER/KEY = 0.0, SROIE KEY = 0.0), but the preregistered match fails: final AA 28.3 vs
+full naive 37.8, driven by poor acquisition under a frozen pretrained trunk (diag
+41.4/47.7/68.4). Verdict: acquisition-invalid for pure-head causality; useful only as
+"extinction can happen with fixed trunk," not a clean effect-size confirmation.
+
+**Readout kill-test result IN (2026-07-17 pm):** retrained naive smoke-passed (AA
+39.78). Eval-time marginal repair is a clean negative: marginal-match/prior-ratio/per-doc
+EM give AA 38.58/39.70/39.60 vs uncorrected 39.78; AA_old stays ~11. Saturation split: old
+KEY/HEADER prob mass is <1e-3 (~4e-6--7e-6 KEY, <7e-7 HEADER), so the head has already
+annihilated recoverable mass. Test-time readout correction is closed; next viable lever
+must prevent extinction during training or re-exercise old classes.
+
 **Deep RCA extension implemented (2026-07-17 pm):** `scripts/rca_deep_dive.py` adds the
 paper-facing CPU consolidation pass over Tier-B JSONs and writes `results/rca/d_*.csv` +
 `d_summary.md`. Focused test added in `tests/test_rca_aggregation.py`. Current summary

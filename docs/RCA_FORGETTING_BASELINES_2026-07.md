@@ -180,6 +180,34 @@ marginal shift, so a per-task label-prior correction attacks it directly; (iii) 
 repeat of Tier B for the load-bearing numbers.
 
 
+
+## Kill-test partial result: eval-time readout repair is dead (2026-07-17 pm)
+
+Readout-suite retrain passed the smoke gate (`results/rca/killtests/train_meta.json`):
+final FULL row FUNSD 18.6 / SROIE 3.9 / CORD 96.8, pooled AA 39.78 (registered gate
+37.9 ± 2). The correction stage then failed the preregistered support bar: best pooled AA
+was 39.78 uncorrected, with marginal-match 38.58, prior-ratio 39.70, and per-doc EM
+39.60; old-task AA stayed ~11 and never recovered. CORD non-regression held, so the
+negative is not from sacrificing the new task.
+
+Saturation split decides the mechanism: uncorrected old-task KEY/HEADER probability mass is
+~4e-6--7e-6 for KEY and <7e-7 for HEADER, far below the 1e-3 live-logit threshold. So the
+verdict is not "calibration algorithm weak"; the final head has already annihilated the
+recoverable mass. Test-time marginal correction is closed. Any positive method must keep
+old classes alive during training or re-exercise them with task-consistent evidence.
+
+
+## Kill-test partial result: frozen-trunk naive is acquisition-invalid (2026-07-17 pm)
+
+`dil_naive_frozen_seed42_rca.json` repeats the old-class extinction pattern (final FUNSD
+HEADER/KEY = 0.0, SROIE KEY = 0.0), but fails the preregistered comparability bar: final
+FULL row is FUNSD 11.9 / SROIE 4.7 / CORD 68.4, AA 28.3, versus full naive 13.1 / 4.4 /
+96.1, AA 37.8. The miss is not less forgetting; it is poor acquisition under a fully
+frozen pretrained trunk (at-learning 41.4 / 47.7 / 68.4). Therefore this test does not
+confirm pure-head causality. It still supports the practical lesson that old-class
+extinction can occur with the trunk fixed, but it cannot be used as a clean effect-size
+match to the standard naive baseline.
+
 ## Deep-dive artifact pass (implemented 2026-07-17 pm)
 
 `scripts/rca_deep_dive.py` is the CPU-only consolidation pass for this RCA. It reads the
