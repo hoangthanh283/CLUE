@@ -6,6 +6,7 @@ Joint: upper bound — multi-task training on union of all task data. Oracle.
 
 These two bracket the "forgetting gap" that motivates CL.
 """
+
 from __future__ import annotations
 
 import torch
@@ -21,6 +22,10 @@ class NaiveFineTune(ContinualMethod):
     """Sequential fine-tuning, no CL. Lower bound."""
 
     name = "naive"
+
+    def _loss(self, outputs, batch) -> torch.Tensor:
+        """Training-loss hook — subclasses override to reshape the objective."""
+        return outputs.loss
 
     def train_task(
         self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None
@@ -45,7 +50,7 @@ class NaiveFineTune(ContinualMethod):
                 optimizer.zero_grad()
                 with self._amp_autocast():
                     outputs = self.model(**batch)
-                    loss = outputs.loss
+                    loss = self._loss(outputs, batch)
                 self._amp_backward_step(loss, optimizer, self.trainable_parameters(), max_grad_norm)
                 total_loss += float(loss.item())
                 n_steps += 1

@@ -48,6 +48,7 @@ from doccl.methods.der import DERpp
 from doccl.methods.er import ER
 from doccl.methods.ewc import EWC
 from doccl.methods.lwf import LwF
+from doccl.methods.marginal_methods import LogitAdjust, MarginalAnchor
 from doccl.methods.naive import NaiveFineTune
 from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
 from doccl.pilot.run_pilot import set_seed
@@ -63,6 +64,9 @@ METHOD_CLASSES = {
     "er": ER,
     "der_pp": DERpp,
     "colar": CoLaR,
+    # RCA kill-tests #4/#5 (docs/RCA_KILLTESTS_PREREG_2026-07.md)
+    "marginal_kl": MarginalAnchor,
+    "logit_adjust": LogitAdjust,
 }
 EVAL_MASKS = (
     ModalityMask.FULL,
@@ -108,6 +112,7 @@ def run_one_method(
     gradient_checkpointing: bool = True,
     num_workers: int = 0,
     fisher_n_samples: int = 200,
+    freeze_trunk: bool = False,
 ) -> dict:
     set_seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -121,6 +126,9 @@ def run_one_method(
     model = model.to(device)
     if gradient_checkpointing:
         model.enable_gradient_checkpointing()
+    if freeze_trunk:
+        # RCA kill-test #3: head-only training from task 0 — pure-head causality probe.
+        model.freeze_backbone()
     method = METHOD_CLASSES[method_name](model, config)
     method.amp_enabled = device.type == "cuda"
 
@@ -180,7 +188,8 @@ def run_one_method(
 
         # Crash-safe: persist after every boundary (a 3-task run is hours on the 2060).
         result = {
-            "method": method_name,
+            "method": f"{method_name}_frozen" if freeze_trunk else method_name,
+            "freeze_trunk": freeze_trunk,
             "seed": seed,
             "scenario": "dil",
             "labels": labels0,
@@ -210,6 +219,7 @@ def main() -> None:
     ap.add_argument("--gradient-checkpointing", action="store_true")
     ap.add_argument("--num-workers", type=int, default=0)
     ap.add_argument("--fisher-samples", type=int, default=200)
+    ap.add_argument("--freeze-trunk", action="store_true")
     ap.add_argument("--output", type=Path, required=True)
     args = ap.parse_args()
     run_one_method(
@@ -220,6 +230,7 @@ def main() -> None:
         gradient_checkpointing=args.gradient_checkpointing,
         num_workers=args.num_workers,
         fisher_n_samples=args.fisher_samples,
+        freeze_trunk=args.freeze_trunk,
     )
 
 

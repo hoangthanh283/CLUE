@@ -1,0 +1,9 @@
+# RCA kill-test #4 (docs/RCA_KILLTESTS_PREREG_2026-07.md): naive + KL anchor pulling the
+# batch output marginal toward the mixture of seen-task gold marginals (9 floats/task).
+# H4'-vs-H2 disentangler: expected to fix O/VALUE confusion, not KEY/HEADER extinction.
+name: marginal_kl
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+lambda_kl: 1.0
