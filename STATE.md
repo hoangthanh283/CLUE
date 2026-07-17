@@ -47,6 +47,24 @@ Outputs land in `results/rca/killtests/` + `results/rca/dil_{naive_frozen,margin
 flock now prevents future duplicates, but the live pair predates it — if two train.py
 appear simultaneously, kill the newer.
 
+**READ-SIDE GATE 1 RESULTS (2026-07-17 pm, adjudicated against the pre-written bar):**
+- **colar_knn λ=0.3: AA 87.64, row [89.2, 76.5, 97.2]** vs λ=0 CoLaR 87.6 [89.2, 76.3, 97.2].
+  Formal bar (AA ≥ 87.6, FUNSD not below 89.2, SROIE > 76.3) is met — at the boundary:
+  +0.04 AA, +0.2 SROIE, n=1 seed. The ROADMAP's "beats λ=0 by REAL margin" clause FAILS.
+  **Verdict: NO SIGNAL** — the kNN blend is inert at λ=0.3 and destructive at λ=1.0
+  (AA 46.24; pure kNN head ≈ gate0 probe quality 44–68 F1, far below the trained head).
+  **Do NOT build R3 (colar_mbpa).** Mechanistic read: blending in a weaker reader cannot
+  fix the snap — consistent with the RCA (the fix must repair the readout, not average it
+  with a noisier one).
+- **colar_meta m1 control: AA 85.85 [87.7, 75.4, 94.4]** — fails to reproduce CoLaR
+  (−1.75 AA): the metaplastic machinery costs performance even at m=1. m3 (training now)
+  is therefore ambiguous-by-construction; per the pre-registered control rule, read m3
+  only as consistent/inconsistent with the RCA's colar_meta-will-fail prediction, not as
+  a clean effect size.
+- gate0 probe (pretrained-trunk lower bound): best per-task kNN F1 funsd 55.8 / sroie 67.8
+  (k8_top20/top5 softmax) — passed the ≥20 go bar, but the ceiling it implies explains the
+  λ=1.0 collapse.
+
 ## DONE (2026-07-17 am): RCA COMPLETE — readout-marginal snap is the root cause; read-side chain running
 
 **Tier B landed + Tier C adjudicated, then AMENDED after a 16-agent adversarial verification

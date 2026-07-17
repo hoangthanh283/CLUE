@@ -39,11 +39,15 @@ training as of 07-17 ~08:00); (2) read kill-test results (`results/rca/killtests
 at any seed) — fold into STATE/paper as Finding 3c; (4) then decide the method-chapter bet
 (per-doc EM is the headline candidate if its kill-test lands near the task-ID oracle).
 
-### RUNNING (relaunched 2026-07-17 after RCA): READ-SIDE memory chain
-`scripts/run_readside_gate01.sh` (log `results/readside_gate01.log`): Gate 0 probe →
-colar_knn λ={0.3,1.0} k4/d50/r128 s42 → colar_meta m1/m3 k8/d50/r128. If R1 signals
-(λ>0 beats λ=0 by real margin), build R3 `colar_mbpa` per the plan
-(`/home/thanh/.claude/plans/let-s-find-a-way-humming-flurry.md`).
+### READ-SIDE memory chain — GATE 1 ADJUDICATED (2026-07-17 pm): NO SIGNAL, R3 not built
+Results (vs CoLaR λ=0: 87.6 [89.2, 76.3, 97.2]): colar_knn λ=0.3 = 87.64 [89.2, 76.5,
+97.2] — formal bar edge-met but "real margin" clause fails (+0.04 AA, +0.2 SROIE, n=1);
+λ=1.0 = 46.24 (destructive; pure kNN ≈ gate0 probe ceiling). colar_meta m1 control =
+85.85 — fails to reproduce CoLaR (−1.75), so m3 (still training) reads only as
+consistent/inconsistent with the RCA fail-prediction. **R3 (colar_mbpa) is NOT built —
+gate closed.** Read-side-as-blending is dead; the RCA kill-tests (marginal corrections)
+attack the same readout locus directly and supersede this direction. Full verdict in
+STATE.md ACTIVE block.
 
 ### SUPERSEDED (2026-07-14 KT, killed 2026-07-16 am): CoLaR + LexSlot integration
 Design A (slots-on-CoLaR) killed by the redistribution law — CoLaR has no slack to harvest
