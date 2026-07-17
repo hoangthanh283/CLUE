@@ -1,6 +1,30 @@
 # STATE
 
-## ACTIVE (2026-07-17): RCA COMPLETE — readout-recency is the root cause; read-side chain running
+## ACTIVE (2026-07-17 pm): Kill-tests queued — brainstorm done, top-5 implemented
+
+**Method brainstorm (judged workflow: 4 lenses → novelty audit → 2 adversarial judges →
+synthesis) produced a top-5 shortlist; all implemented + PRE-REGISTERED
+(`docs/RCA_KILLTESTS_PREREG_2026-07.md`, commit 6d3f019) and queued as
+`scripts/run_rca_killtests.sh` behind the read-side chain (~3.5 GPU-h):**
+1. **Readout suite** (`rca_readout_fixes.py`): naive retrain + logit dump, then
+   marginal-match oracle / prior-ratio one-step / per-doc Saerens–Latinne EM (task-ID-FREE
+   — a doc's ~512 tokens are its own calibration batch; strongest novelty per audit).
+   SUPPORT bar: >15 AA pts recovery; KILL readout-repair family if <5.
+2. **Frozen-trunk naive** (`--freeze-trunk`): pure-head causality; CONFIRM if extinction/
+   O-collapse/snap-cos match full naive ±5 F1 / cos 0.02.
+3. **marginal_kl** (KL-to-seen-mixture, 9 floats/task): H4′-vs-H2 disentangler; expected
+   AA 45–55 with KEY/HEADER staying dead.
+4. **logit_adjust** (balanced softmax under cumulative prior, buffer-free): survival bar
+   KEY/HEADER >20; MUST check at-learning F1 (EWC-style acquisition regression voids it).
+Killed by judges: OT recalibration (no mixed eval stream), DoLa layer-contrast (head is the
+damaged locus), head-only replay (decoupled-carrier risk). Gated: Bayesian last-layer
+behind a 2-line head-only-EWC ablation; NCM head waits for colar_knn results.
+Outputs land in `results/rca/killtests/` + `results/rca/dil_{naive_frozen,marginal_kl,logit_adjust}_seed42_rca.json`
+(rca_synthesize.py picks them up). Adjudicate strictly by the prereg doc.
+⚠ A duplicate parked `run_readside_gate01.sh` instance exists (kill was permission-blocked);
+it should skip-and-exit naturally, but if two train.py appear simultaneously, kill the newer.
+
+## DONE (2026-07-17 am): RCA COMPLETE — readout-marginal snap is the root cause; read-side chain running
 
 **Tier B landed + Tier C adjudicated, then AMENDED after a 16-agent adversarial verification
 pass** (`docs/RCA_FORGETTING_BASELINES_2026-07.md`; every load-bearing number independently

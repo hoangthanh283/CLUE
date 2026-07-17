@@ -31,10 +31,13 @@ before any new method), targeted minority-class replay, read-side memory premise
 independently re-derived, colar_meta predicted to FAIL (treat its queued run as the
 falsification test).
 Next session: (1) read read-side results (`results/gate0_knn_probe.json`, colar_knn λ runs
-vs CoLaR 87.6/[89.2,76.3,97.2], colar_meta m1 control BEFORE m3); (2) 3-seed conservation
-verdict is IN (base 87.8 = bal 87.8 > kc 87.0; no lever beats base at any seed) — fold into
-STATE/paper as Finding 3c; (3) re-brainstorm method design against the RCA; (4) consider
-the H4 falsification quickies (frozen-trunk naive; logit-prior correction).
+vs CoLaR 87.6/[89.2,76.3,97.2], colar_meta m1 control BEFORE m3 — colar_meta m1 was
+training as of 07-17 ~08:00); (2) read kill-test results (`results/rca/killtests/readout_fixes.md`
++ the three new `dil_*_seed42_rca.json`) and adjudicate STRICTLY by
+`docs/RCA_KILLTESTS_PREREG_2026-07.md` — extend the RCA doc with a Kill-tests section;
+(3) 3-seed conservation verdict is IN (base 87.8 = bal 87.8 > kc 87.0; no lever beats base
+at any seed) — fold into STATE/paper as Finding 3c; (4) then decide the method-chapter bet
+(per-doc EM is the headline candidate if its kill-test lands near the task-ID oracle).
 
 ### RUNNING (relaunched 2026-07-17 after RCA): READ-SIDE memory chain
 `scripts/run_readside_gate01.sh` (log `results/readside_gate01.log`): Gate 0 probe →
