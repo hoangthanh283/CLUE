@@ -69,6 +69,17 @@ def test_per_doc_em_improves_without_task_id():
     assert acc_c > acc_s + 0.05  # EM recovers real accuracy, no task-ID used
 
 
+def test_per_doc_em_escapes_zero_prior_fixed_point():
+    # CORD-style source prior: exact zero on class 1; the doc's own tokens carry strong
+    # class-1 evidence. Unsmoothed EM locks class 1 at 0 forever (0/eps weight at iter 1).
+    q_source = np.array([0.5, 0.0, 0.5])
+    probs = np.tile(np.array([[0.2, 0.6, 0.2]]), (100, 1))
+    docs = np.zeros(100, dtype=int)
+    out = rrf.per_doc_em(probs, docs, q_source, iters=10)
+    assert out[:, 1].min() > 0.0  # column not annihilated
+    assert (out.argmax(-1) == 1).all()  # document evidence wins
+
+
 def test_reweight_renormalizes():
     p = np.array([[0.5, 0.5, 0.0]])
     out = rrf.reweight(p, np.array([2.0, 1.0, 1.0]))

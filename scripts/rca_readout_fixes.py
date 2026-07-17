@@ -159,18 +159,24 @@ def prior_ratio_weights(q_old: np.ndarray, q_last: np.ndarray, alpha: float = 1e
 
 
 def per_doc_em(
-    probs: np.ndarray, docs: np.ndarray, q_source: np.ndarray, iters: int = 5
+    probs: np.ndarray, docs: np.ndarray, q_source: np.ndarray, iters: int = 5, alpha: float = 1e-4
 ) -> np.ndarray:
-    """Saerens–Latinne EM per document: re-estimate the doc's own marginal, task-ID-free."""
+    """Saerens–Latinne EM per document: re-estimate the doc's own marginal, task-ID-free.
+
+    q_source is Laplace-smoothed (code-review fix): an exact-zero source-prior class
+    (CORD emits no KEY/HEADER) makes pi[c]=0 a permanent EM fixed point — the weight
+    pi[c]/q_source[c] is 0 at iteration 1 and stays 0 regardless of document evidence.
+    """
+    q_source = (q_source + alpha) / (q_source + alpha).sum()
     out = np.empty_like(probs, dtype=np.float64)
     for d in np.unique(docs):
         idx = docs == d
         p = probs[idx].astype(np.float64)
         pi = q_source.copy()
         for _ in range(iters):
-            post = reweight(p, pi / q_source.clip(min=_EPS))
+            post = reweight(p, pi / q_source)
             pi = post.mean(0)
-        out[idx] = reweight(p, pi / q_source.clip(min=_EPS))
+        out[idx] = reweight(p, pi / q_source)
     return out
 
 
