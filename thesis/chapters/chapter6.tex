@@ -552,15 +552,17 @@ every method is CIL-CORD, where even the joint oracle reaches only $33.3$ AA: pa
 $60$ fine-grained CORD classes into one growing head is an intrinsically difficult
 multi-class problem, independent of forgetting.
 Fifth, and most important for this thesis, the proposed \textbf{LexSlot}
-(the isolated, buffer-free slot memory, mean over three seeds on the domain-incremental
+(the isolated slot memory, paired with a compact 200-exemplar replay buffer in its headline
+configuration, mean over three seeds on the domain-incremental
 scenario) \emph{approaches replay-level accuracy} (LexSlot $87.3$ vs ER $87.9$, DER++ $88.0$,
 within $\sim$1 point, and the oracle's $88.7$) while \emph{forgetting less than the plain
 replay methods} (LexSlot BWT $-2.3$ vs ER $-2.8$, DER++ $-3.4$; \S\ref{sec:results-lexslot}),
-and it does so \emph{without a replay buffer}---its protection comes structurally from freezing
-each task's slots rather than rehearsing stored inputs. The honest reading is that LexSlot's
+and it does so with an order-of-magnitude smaller exemplar budget than the plain replay
+baselines---slot isolation carries most of the protection structurally, with the small buffer
+supplying the rest. The honest reading is that LexSlot's
 diagnosis-driven head/late targeting is competitive with---rather than exceeding---data replay
 on the domain shift, with the chief advantage being qualitative: replay-level retention at a
-parameter-efficient, buffer-free cost. LexSlot is so far measured on the domain-incremental
+parameter-efficient cost with a fraction of the exemplar budget. LexSlot is so far measured on the domain-incremental
 scenario and LayoutLMv3 (the multi-scenario and multi-backbone confirmation is the pending grid,
 \S\ref{sec:results-lexslot}), so the broader columns of Table~\ref{tab:main-comparison} are
 carried by the baselines.
@@ -586,7 +588,8 @@ adaptation recovers the naive lower bound only where the output space is fixed.
   baselines (L2P, DualPrompt, CODA-Prompt) are \emph{measured} (mean\,$\pm$\,std over
   three seeds); replay matches the oracle and the frozen-backbone
   prompt methods nearly fail on this dense token-level task. \textbf{LexSlot} (the
-  buffer-free isolated-slot method, \S\ref{sec:method-lexslot}) approaches replay-level AA on
+  isolated-slot method with a compact 200-exemplar replay buffer,
+  \S\ref{sec:method-lexslot}) approaches replay-level AA on
   DIL ($87.3$, within $\sim$1 point of ER/DER++) measured over three seeds; it is so far
   evaluated on DIL/LayoutLMv3 only, with the multi-backbone confirmation the pending grid
   (\S\ref{sec:results-lexslot}, Chapter~\ref{ch:conclusions}). Cells marked ``--'' denote
@@ -626,7 +629,7 @@ adaptation recovers the naive lower bound only where the output space is fixed.
   on the three scenarios, grouped by scenario, with the naive lower bound and the joint
   upper bound for reference. Both replay methods (ER, DER++) reach the joint ceiling on
   DIL; the measured \textbf{LexSlot} approaches it ($87.3$ vs the oracle's $88.7$ on DIL,
-  $\sim$1 point short and within a point of replay) buffer-free
+  $\sim$1 point short and within a point of replay) with a compact 200-exemplar buffer
   (Table~\ref{tab:main-comparison}).}
   \label{fig:aa-bars}
 \end{figure}
@@ -635,13 +638,13 @@ adaptation recovers the naive lower bound only where the output space is fixed.
   \centering
   \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{lexslot_dil_bars.pdf}
   \caption[LexSlot versus replay versus oracle on DIL]{Focused comparison of the proposed
-  \textbf{LexSlot} (isolated, buffer-free) against the strongest baselines and the joint
+  \textbf{LexSlot} (isolated slot memory with a compact 200-exemplar replay buffer) against the strongest baselines and the joint
   oracle on the domain-incremental scenario (mean over three seeds, error bars $\pm$std).
   \emph{Top:} average entity-F1---LexSlot ($87.3$) approaches replay (ER $87.9$, DER++ $88.0$,
   C-Flat++ $88.4$) and the oracle ($88.7$), within $\sim$1 point, and far exceeds naive
   ($41.3$). \emph{Bottom:} backward transfer---LexSlot ($-2.3$) forgets less than the plain
   replay methods (ER $-2.8$, DER++ $-3.4$), bettered only by C-Flat++ ($-1.8$). LexSlot reaches
-  this buffer-free.}
+  this with an order-of-magnitude smaller exemplar budget than the plain replay methods.}
   \label{fig:lexslot-bars}
 \end{figure}
 
@@ -651,7 +654,7 @@ adaptation recovers the naive lower bound only where the output space is fixed.
   \caption[DIL close-up: LexSlot approaches the oracle]{Domain-incremental (DIL) close-up,
   measured average accuracy per method with the joint-oracle level marked (dashed). LexSlot
   ($87.3$) approaches the oracle ($88.7$) and the replay methods (ER $87.9$,
-  DER++ $88.0$) buffer-free, within $\sim$1 point of both; EWC, LwF, and naive trail far
+  DER++ $88.0$) with a compact 200-exemplar buffer, within $\sim$1 point of both; EWC, LwF, and naive trail far
   behind. This is the scenario where the diagnosis-driven head/late targeting is most
   effective.}
   \label{fig:dil-closeup}
@@ -674,9 +677,10 @@ the current one, which is why its accuracy collapses on the growing CIL-CORD hea
 ($0.5$ AA) even as its forgetting is the lowest---a model that forgets little because it
 learns little. The measured LexSlot drives DIL forgetting to $-2.3$---\emph{below} the plain replay
 methods ($-2.8$ to $-3.4$), the least forgetting of any non-oracle method except the
-sharpness-aware C-Flat++ ($-1.8$)---and does so buffer-free; its other-scenario forgetting
+sharpness-aware C-Flat++ ($-1.8$)---and does so with a fraction of the plain replay methods'
+exemplar budget; its other-scenario forgetting
 is the pending grid (\S\ref{sec:results-lexslot}). LexSlot's forgetting profile on the domain
-shift thus slightly improves on replay's while needing no rehearsal buffer.
+shift thus slightly improves on replay's while needing an order of magnitude fewer stored exemplars.
 
 \paragraph{Forward transfer.} Forward transfer measures performance on a task
 \emph{before} any of its data is seen, relative to a from-scratch single-task baseline:
@@ -706,7 +710,8 @@ baselines.
   the replay family (ER, DER++, C-Flat++) and \textbf{LexSlot} drive DIL forgetting to
   near zero \emph{while remaining accurate}; LexSlot's DIL BWT ($-2.3 \pm 1.2$, three seeds) is
   better than the plain replay methods (ER $-2.8$, DER++ $-3.4$), with only
-  the sharpness-aware C-Flat++ ($-1.8$) lower---and it achieves this buffer-free.}
+  the sharpness-aware C-Flat++ ($-1.8$) lower---and it achieves this with a compact
+  200-exemplar buffer, an order of magnitude smaller than the plain replay methods'.}
   \label{tab:bwt-comparison}
   \begin{tabular}{lccc}
     \toprule
@@ -795,13 +800,17 @@ H\textsubscript{target}/H\textsubscript{head} of \S\ref{sec:method-component-hyp
 \label{sec:results-lexslot}
 
 The proposed remedy, \textbf{LexSlot} (\S\ref{sec:method-lexslot}), protects the
-diagnosed head/late locus with an \emph{isolated, buffer-free slot memory}. On the domain-incremental scenario (LayoutLMv3, three seeds) the
-isolated configuration reaches \textbf{AA $87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$}.
+diagnosed head/late locus with an \emph{isolated slot memory}, and its headline configuration
+pairs that isolation with a compact 200-exemplar replay buffer (the DocCL-hybrid setting). On the domain-incremental scenario (LayoutLMv3, three seeds) the
+isolated configuration reaches \textbf{AA $87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$}
+(seeds 42/7/123: $88.4$/$87.2$/$86.3$).
 Two readings stand out. First, its accuracy \emph{approaches the replay methods} (ER $87.9$, DER++
 $88.0$, C-Flat++ $88.4$) and the joint oracle ($88.7$) on DIL---within about a point, the seeds
 overlapping---and clearly exceeds the head/late consolidation probe ($84.7$,
-\S\ref{sec:results-key-ablation}), \emph{without a replay buffer}: the protection
-comes structurally from freezing each task's slots, not from rehearsing stored inputs. Second, its
+\S\ref{sec:results-key-ablation}), with an order-of-magnitude smaller replay buffer than the
+plain replay methods: most of the protection
+comes structurally from freezing each task's slots, with the small buffer closing the remaining gap.
+Second, its
 forgetting ($-2.3$) is \emph{lower than the plain replay methods} (ER $-2.8$, DER++ $-3.4$),
 with only the sharpness-aware C-Flat++ ($-1.8$) below it. So LexSlot is competitive
 with replay on accuracy and better than plain replay on forgetting, at a qualitatively lower memory
@@ -864,7 +873,8 @@ head-only variant is a natural future simplification. The remaining scope is the
 (LiLT/BROS/BERT) confirmation, still the pending grid, and class-incremental learning is a known
 hard case for the lexical gate (same-dataset sessions collapse the signature contrast). What the
 present evidence establishes is that the head/late diagnosis admits a \emph{second},
-mechanistically distinct remedy that on a domain shift is competitive with replay buffer-free,
+mechanistically distinct remedy that on a domain shift is competitive with replay at a small
+fraction of its exemplar budget,
 with lower forgetting than the plain replay methods---supporting the thesis's central claim that
 localising forgetting is a practical instrument for \emph{designing} continual methods, not just
 one method.
@@ -974,13 +984,15 @@ number of \emph{trainable parameters}, essentially identical across these method
 collected across heterogeneous hardware and batch sizes during the grid and so are
 \emph{indicative rather than strictly comparable}: replay's buffers and second
 forward/backward pass add genuine memory and time (ER and DER++ carry a replay buffer,
-and DER++ additionally caches output logits). The proposed \textbf{LexSlot} is the
-parameter-efficient outlier in the opposite direction: it \emph{freezes} the backbone and
+and DER++ additionally caches output logits). The proposed \textbf{LexSlot} is
+parameter-efficient in the opposite direction: it \emph{freezes} the backbone and
 trains only a small slot memory (head logit-slots $+$ low-rank late-layer adapters, a $\sim$1--2\%
 parameter overhead over the frozen backbone; hyperparameters in
-Appendix~\ref{app:hyperparameters}), and stores \emph{no} replay buffer at all---so its standing
+Appendix~\ref{app:hyperparameters}), and its headline configuration pairs that frozen-backbone
+slot memory with a compact 200-exemplar replay buffer, an order of magnitude smaller than the
+plain replay methods' buffers---so its standing
 advantage is qualitative: replay-level retention on the domain shift (\S\ref{sec:results-lexslot})
-with a frozen backbone and no rehearsal data. Its CIL-CORD wall-clock/memory numbers are not in
+with a frozen backbone and a small fraction of the rehearsal data. Its CIL-CORD wall-clock/memory numbers are not in
 this table (LexSlot is measured on DIL so far). ``Run'' denotes one full continual scenario.
 
 \begin{table}[!htbp]
@@ -992,7 +1004,8 @@ this table (LexSlot is measured on DIL so far). ``Run'' denotes one full continu
   peak-memory were collected across heterogeneous hardware and batch sizes during the grid, so
   they are indicative, not strictly comparable: replay's buffers add real memory. The proposed
   LexSlot (\S\ref{sec:results-lexslot}) instead freezes the backbone and trains only a small slot
-  memory with no replay buffer; its CIL-CORD cost is not listed (measured on DIL so far).}
+  memory, paired with a compact 200-exemplar replay buffer (an order of magnitude smaller than
+  the plain replay methods'); its CIL-CORD cost is not listed (measured on DIL so far).}
   \label{tab:compute}
   % Auto-loaded from generated/table_compute.tex; the inline table below mirrors the numbers.
   \IfFileExists{generated/table_compute.tex}{\input{generated/table_compute}}{%
@@ -1119,9 +1132,10 @@ intervention, which also explains \emph{why} replay is so effective below
     \node[note, fill=gray!8, below=4mm of mech.south, anchor=north]
       {\textbf{The diagnosis-grounded alternative.} Because the locus is output-facing, a
        mechanism that targets the head/late layers \emph{directly}---the proposed
-       \textbf{LexSlot}, an isolated slot memory---matches replay-level accuracy on DIL
+       \textbf{LexSlot}, an isolated slot memory paired with a compact 200-exemplar replay
+       buffer---matches replay-level accuracy on DIL
        ($87.3$ vs the oracle's $88.7$) and forgets \emph{less} than the plain replay methods
-       ($-2.3$ vs $-2.8$/$-3.4$), \emph{without storing any past data}. By contrast EWC
+       ($-2.3$ vs $-2.8$/$-3.4$), \emph{with an order-of-magnitude smaller exemplar budget}. By contrast EWC
        constrains all weights broadly (partial help, mainly under domain shift) and LwF
        distils old-class logits that decay as the head grows (no measurable benefit here).};
   \end{tikzpicture}
@@ -1130,8 +1144,8 @@ intervention, which also explains \emph{why} replay is so effective below
   explains its empirical win (both ER and DER++ reach DIL BWT $\approx 0$). The
   diagnosis-grounded method --- LexSlot, an isolated slot memory at the head/late layers ---
   approaches the oracle and replay on the DIL forgetting gap ($87.3$ vs the oracle's $88.7$),
-  forgets less than the plain replay methods, and does so \emph{without storing any data}
-  (frozen backbone, buffer-free).}
+  forgets less than the plain replay methods, and does so \emph{with a compact 200-exemplar buffer}
+  (frozen backbone, an order-of-magnitude smaller exemplar budget than plain replay).}
   \label{fig:replay-mechanism}
 \end{figure}
 
@@ -1171,7 +1185,7 @@ reported; everything else---including C-Flat++ (\texttt{er\_cflat}), the depth-t
 probe, and the cross-lingual scenario---is measured over three
 seeds. The proposed LexSlot is measured on DIL/LayoutLMv3 (3 seeds); its other-scenario and
 multi-backbone confirmation is the pending grid. The qualitative conclusions---replay strongest,
-LexSlot approaching replay on the DIL gap buffer-free, and the depth-targeting probe
+LexSlot approaching replay on the DIL gap with a small fraction of the exemplar budget, and the depth-targeting probe
 confirming the head/late locus---do not depend on the unrun cells.
 (ii) Each scenario uses
 a single fixed task order in the main grid; the pilot showed order materially affects
@@ -1197,6 +1211,7 @@ $|\mathrm{BWT}|$ across backbones is underpowered at three seeds, so we claim a 
 \emph{location} of forgetting, not a shared \emph{amount}. None of these undercut the
 robust findings---forgetting is a depth/head phenomenon \emph{across architectures},
 replay (ER/DER++) is the strongest remedy and matches the joint
-oracle on domain-incremental learning while LexSlot approaches that gap buffer-free, and forgetting
+oracle on domain-incremental learning while LexSlot approaches that gap with an order-of-magnitude
+smaller replay buffer, and forgetting
 is near zero under pure language shift but catastrophic under output-space growth---but
 they delimit how far the exact numbers should be pushed.

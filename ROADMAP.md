@@ -17,7 +17,14 @@ ordering B+ 22–30% > diagnostic-as-is 12–18% > method-paper 8–12% at ICML/
 existing code on Vast.ai. CoLaR is the *constructive control*, PLaR the *bounded-negative*, not
 method contributions.
 
-### RESUME HERE (2026-07-17 eve): KILL-TESTS ADJUDICATED — write-up next
+### RESUME HERE (2026-07-18): thesis structural reframe + grid launch
+(1) Execute `docs/THESIS_METHOD_CHAPTER_REFRAME_2026-07.md` (session task #5) — resolve
+[EXAMINER] annotations, rewrite ch3 §3.4 / ch6 §6.1.5 / title / ch1 / ch7. Buffer-free
+correctness pass is DONE (25+ sites, builds 125 pp). (2) USER: rent Vast.ai box →
+`docs/BPLUS_GRID_PLAN_2026-07.md` paste-ready (355 cells, ≈293 GPU-h, ~$88–147).
+(3) After grid: analyze_results.py → ingest_to_thesis.py → backbone tables.
+
+### DONE (2026-07-17 eve): KILL-TESTS ADJUDICATED — write-up next
 All 5 kill-tests complete + verified (STATE.md ACTIVE block; RCA doc kill-test sections).
 Headline: every cheap correction is a registered null; re-exercise is the only lever;
 per-doc EM dead as method-chapter headline (fallback framing pre-written in the prereg).

@@ -100,8 +100,8 @@ The thesis pursues the following concrete objectives:
         (Chapter~\ref{ch:results}, \S\ref{sec:results-diagnosis}).
   \item \textbf{Derive and evaluate a mechanism-targeted remedy.} Propose a
         \gls{cl} method whose mechanism is concentrated on the dominant-forgetting
-        component identified by the diagnosis---LexSlot, a buffer-free isolated slot
-        memory at the head/late locus---and evaluate it against ten
+        component identified by the diagnosis---LexSlot, an isolated slot
+        memory at the head/late locus paired with a compact 200-exemplar replay buffer---and evaluate it against ten
         baselines spanning the major method families
         (Chapters~\ref{ch:methodology} and~\ref{ch:results}).
   \item \textbf{Establish a reproducible benchmark.} Release the FCS-CL benchmark
@@ -130,8 +130,8 @@ The thesis pursues the following concrete objectives:
   \item \textbf{LexSlot, a mechanism-targeted continual-learning remedy} whose target
         is \emph{derived from} the diagnosis rather than chosen \emph{a priori},
         concentrating its effort on the dominant-forgetting locus---the classifier head
-        and late encoder layers---with a buffer-free, isolated slot memory gated by a
-        drift-immune lexical signature;
+        and late encoder layers---with an isolated slot memory, gated by a
+        drift-immune lexical signature and paired with a compact 200-exemplar replay buffer;
   \item the \textbf{FCS-CL benchmark} together with reproducible diagnostic
         tooling---unified scenarios, baselines, configurations, and
         instrumentation---to support like-for-like comparison.
@@ -174,20 +174,22 @@ the diagnosis---which localises forgetting in the classifier head and late encod
 layers---we design \textbf{LexSlot}, a method that protects exactly that locus with an
 \emph{isolated slot memory}: small additive, zero-initialised slot adapters at the head and
 late layers over a frozen backbone, where each task owns and writes \emph{only its own} slots,
-so earlier tasks are protected structurally with no replay buffer and no consolidation penalty
-to tune. A drift-immune lexical signature (OCR vocabulary overlap) governs an optional sharing
-axis, but the measurement selects \emph{isolation}. The contribution is the diagnosis-driven
-decision of \emph{where} the capacity attaches, isolated by a placement ablation
+so earlier tasks are protected structurally with no consolidation penalty to tune. The headline
+configuration pairs this slot isolation with a compact 200-exemplar replay buffer (the
+DocCL-hybrid setting); a drift-immune lexical signature (OCR vocabulary overlap) governs an
+optional sharing axis, but the measurement selects \emph{isolation}. The contribution is the
+diagnosis-driven decision of \emph{where} the capacity attaches, isolated by a placement ablation
 (head-only, head/late, uniform) that tests whether targeting the diagnosed locus beats uniform
 treatment. Measured over three seeds on domain-incremental learning, LexSlot reaches AA
-$87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$---approaching replay buffer-free
-(within $\sim$1 point of ER/DER++ and the oracle's $88.7$), and forgetting \emph{less} than the
-plain replay methods. We report this honestly: LexSlot is competitive with replay without a
-buffer rather than beating the strongest replay variant, and it is so far evaluated on the
+$87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$---approaching full-replay retention
+(within $\sim$1 point of ER/DER++ and the oracle's $88.7$) with an order-of-magnitude smaller
+exemplar budget, and forgetting \emph{less} than the
+plain replay methods. We report this honestly: LexSlot is competitive with replay at a small
+fraction of its exemplar budget rather than beating the strongest replay variant, and it is so far evaluated on the
 domain-incremental scenario and one backbone, with the multi-scenario and multi-backbone
 confirmation the pending grid. The honest contribution is thus that diagnosis-driven head/late
-targeting closes most of the forgetting gap on a domain shift buffer-free, competitive
-with---rather than beating---data replay.
+targeting closes most of the forgetting gap on a domain shift with a compact 200-exemplar buffer, competitive
+with---rather than beating---full-scale data replay.
 
 \noindent\textbf{The FCS-CL benchmark and reproducible tooling.} We provide a
 unified \gls{cl} benchmark over three public document datasets with three
@@ -201,7 +203,7 @@ domain-incremental learning (AA $\approx 88$ vs the oracle's $88.7$, backward tr
 $\approx 0$; read with per-class F1, as the unified schema is VALUE-dominant), EWC
 sharply curbing forgetting under a domain shift, and LwF giving little benefit in this
 dense token-classification setting. This strong-baseline context is what the
-diagnosis-grounded LexSlot must match buffer-free.
+diagnosis-grounded LexSlot must match with its small replay buffer.
 
 \section{Overview of the Dissertation}
 \label{sec:intro-overview}

@@ -100,16 +100,18 @@ $-54.8$, though at an accuracy cost); and LwF tracks the naive lower bound throu
 its distilled old-class logits decay once the growing head stops reinforcing them.
 
 Its second contribution is \textbf{LexSlot}, a head/late-targeted method whose target is
-derived directly from the diagnosis: an isolated, buffer-free slot memory placed at the
+derived directly from the diagnosis: an isolated slot memory placed at the
 classifier head and late encoder layers over a frozen backbone, where each task writes only its
-own slots so earlier tasks are protected structurally, with no rehearsal buffer and no
-consolidation penalty to tune. Measured over three seeds on domain-incremental learning, LexSlot
+own slots so earlier tasks are protected structurally, with no consolidation penalty
+to tune; its headline configuration pairs this isolation with a compact 200-exemplar replay
+buffer. Measured over three seeds on domain-incremental learning, LexSlot
 \emph{approaches replay-level accuracy} (AA $87.3 \pm 1.0$ vs the oracle's $88.7$, within
 $\sim$1 point of ER/DER++) while forgetting \emph{less} than the plain replay methods (backward
-transfer $-2.3$ versus $-2.8$/$-3.4$)---all without storing any past data. The honest finding is
+transfer $-2.3$ versus $-2.8$/$-3.4$)---with an order-of-magnitude smaller exemplar budget than
+the plain replay methods. The honest finding is
 that diagnosis-driven head/late targeting is competitive with---but does not exceed---data replay
 on the domain shift, with the chief advantage being qualitative: replay-level retention
-buffer-free. A depth-targeting probe supports the locus as a budget-placement claim (a fixed
+at a small fraction of the exemplar budget. A depth-targeting probe supports the locus as a budget-placement claim (a fixed
 consolidation budget recovers $\sim$85 AA when concentrated on the head/late locus but
 under-fits and collapses to $42.6$ AA when spread uniformly across depth---though the uniform
 variant forgets no more, it simply cannot fit the tasks), and LexSlot's own placement ablation
@@ -127,7 +129,7 @@ remedy---which the prior, fragmented literature lacked.
 \label{sec:concl-future}
 
 The convergence-trained grid is now complete, and the measured result is that
-the head/late-targeted LexSlot approaches replay buffer-free on the domain shift, forgetting
+the head/late-targeted LexSlot approaches replay with a compact 200-exemplar buffer on the domain shift, forgetting
 less than the plain replay methods---competitive with but not beating the strongest replay
 variant---while the depth-targeting probe and LexSlot's placement ablation support
 H\textsubscript{target} and H\textsubscript{head}. The
