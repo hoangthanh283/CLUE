@@ -75,12 +75,12 @@ NUM_WORKERS="${NUM_WORKERS:-4}"
 GRAD_CKPT="${GRAD_CKPT:-false}"
 SEEDS="${SEEDS:-42 123 7}"
 SCENARIOS="${SCENARIOS:-cil_cord dil mixed dil_xlingual cil_wildreceipt}"
-CORE_METHODS="${CORE_METHODS:-naive joint ewc lwf er der_pp}"
-PROMPT_METHODS="${PROMPT_METHODS:-l2p dualprompt coda_prompt o_lora}"
+CORE_METHODS="${CORE_METHODS-naive joint ewc lwf er der_pp}"
+PROMPT_METHODS="${PROMPT_METHODS-l2p dualprompt coda_prompt o_lora}"
 # 2025 "currency" baselines — run AFTER DocCL (lowest priority tier).
 # Includes 2024 NER-CL baselines (is3, cpfd) and the ECCV-2024/ICLR-2025 PTM baselines
 # (magmax, sd_lora) that complete the table for top-tier submission.
-CURRENCY_METHODS="${CURRENCY_METHODS:-er_cflat cl_lora magmax sd_lora is3 cpfd}"
+CURRENCY_METHODS="${CURRENCY_METHODS-er_cflat cl_lora magmax sd_lora is3 cpfd}"
 # BERT text-only external comparator (model=bert_base, naive method) — classical tier.
 RUN_BERT="${RUN_BERT:-1}"
 # Secondary-backbone GENERALIZATION study. The main grid runs LayoutLMv3 (the implicit

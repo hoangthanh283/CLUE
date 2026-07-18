@@ -382,7 +382,8 @@ The diagnosis localises forgetting to a specific region of the network---the cla
 head and late encoder layers (Chapter~\ref{ch:results})---without prescribing how to protect
 it. This thesis derives one remedy from that measurement: \textbf{LexSlot}
 (\S\ref{sec:method-lexslot}), a parameter-efficient, isolated \emph{slot memory} placed at the
-diagnosed head/late locus that needs no replay buffer. The motivation, design-space analysis,
+diagnosed head/late locus, paired in its headline configuration with a compact 200-exemplar
+replay buffer. The motivation, design-space analysis,
 and selection criterion below (\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection})
 fix \emph{where} a mechanism should attach; LexSlot is the mechanism we put there.
 
@@ -718,7 +719,8 @@ contrast, and complementary metrics---per-token CKA, per-group importance, an
 old-task-Fisher-weighted displacement (the forgetting localiser), and the
 forgetting matrix---that together localise forgetting by depth, stream, and head.
 From that measurement we derive a single head/late-targeted remedy, \textbf{LexSlot}: an
-isolated, buffer-free slot memory placed at the diagnosed locus and gated by a drift-immune
-lexical signature, whose \emph{target} follows from the diagnosis under a pre-registered,
+isolated slot memory placed at the diagnosed locus, gated by a drift-immune
+lexical signature and paired with a compact 200-exemplar replay buffer in its headline
+configuration, whose \emph{target} follows from the diagnosis under a pre-registered,
 adequately powered decision rule. The next chapter describes how this methodology is realised in
 software.

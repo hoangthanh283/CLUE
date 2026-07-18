@@ -1,6 +1,25 @@
 # STATE
 
-## ACTIVE (2026-07-17 eve): KILL-TESTS COMPLETE + ADJUDICATED — all corrections are nulls; re-exercise is the only lever
+## ACTIVE (2026-07-18): Thesis reframe underway + B+ grid audited & ready (user gate: rent box)
+
+**(b) Method chapter:** decision executed — chapter becomes *diagnostic-driven design +
+pre-registered falsification, CoLaR as constructive control*. Design + drafted prose +
+examiner annotations: `docs/THESIS_METHOD_CHAPTER_REFRAME_2026-07.md` (scout found the
+LexSlot-as-headline framing threads through title page + ch1/ch3/ch6/ch7 — reframe is
+thesis-wide). **DONE now: the ~25-site "buffer-free"→"small-buffer (200 exemplars)"
+correctness pass across ch1/3/6/7** (the 87.3 row is the DocCL-hybrid w/ 200 exemplars;
+per-seed 88.4/87.2/86.3 now cited; grep-clean; thesis builds 125 pp, no new errors).
+REMAINING (session task #5): the structural rewrite per the design doc — resolve every
+[EXAMINER] annotation first (esp. the frozen-trunk-causality overclaim in one outline
+cell). Note: the "stale early-stopping prose" memory was itself stale — ch4/5/6 already
+describe the convergence protocol correctly.
+**(c) B+ grid:** audited plan `docs/BPLUS_GRID_PLAN_2026-07.md` — 355 missing cells
+(LiLT 103, BROS 126 = zero coverage, BERT 117, LM3-lexslot 9), ≈293 GPU-h ≈ $88–147.
+Empty-override bug (`${VAR:-}` on CORE/PROMPT/CURRENCY_METHODS) FIXED in
+run_grid_multigpu.sh + setup_remote.sh, DRY_RUN-verified. **Blocked on user renting the
+Vast.ai box (task #6); commands are paste-ready.**
+
+## DONE (2026-07-17 eve): KILL-TESTS COMPLETE + ADJUDICATED — all corrections are nulls; re-exercise is the only lever
 
 **All 5 kill-tests ran and were adjudicated against the amended prereg, every verdict
 adversarially verified (5 independent recomputation agents; 2 of my draft verdicts were

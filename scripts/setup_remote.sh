@@ -194,8 +194,8 @@ export GPUS JOBS_PER_GPU BATCH_SIZE NUM_WORKERS
 #   - DocCL depth-ablation across ALL 5 scenarios (not just cil_cord) -> the fullest study
 # All defaults below stay overridable from the environment (e.g. ABLATION_SCENARIOS=cil_cord
 # for the lighter ablation, or RUN_ABLATION=0 to skip it).
-export CORE_METHODS="${CORE_METHODS:-naive joint ewc lwf er der_pp}"
-export PROMPT_METHODS="${PROMPT_METHODS:-l2p dualprompt coda_prompt o_lora}"
+export CORE_METHODS="${CORE_METHODS-naive joint ewc lwf er der_pp}"
+export PROMPT_METHODS="${PROMPT_METHODS-l2p dualprompt coda_prompt o_lora}"
 export RUN_DOCCL="${RUN_DOCCL:-1}"
 export RUN_ABLATION="${RUN_ABLATION:-1}"
 # Scenario partition: defaults to ALL 5, but a caller (e.g. setup_vastai.sh, or a
