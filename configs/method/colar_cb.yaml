@@ -1,0 +1,13 @@
+name: colar_cb
+# RCA-balanced CoLaR: equal loss mass per task, then inverse-frequency weighting
+# within replay. Per-document SVD storage stays byte-identical to plain CoLaR.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64
+replay_balance_power: 0.5
+replay_task_balance: true
