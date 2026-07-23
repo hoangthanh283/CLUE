@@ -1,6 +1,19 @@
 # STATE
 
-## ACTIVE (2026-07-18): Thesis reframe underway + B+ grid audited & ready (user gate: rent box)
+## ACTIVE (2026-07-23): BERT slice running locally; sweep-up chain armed
+
+Local BERT slice (117 cells) launched 07-23 12:54 (`results/bert_slice_grid.log`,
+resume-safe, durable R2 sync). Ops notes: dispatcher got SIGSTOPped once (3h stall —
+fixed, detached auto-CONT guard now running, `results/grid_guard.log`); root disk was
+100% full (freed 15G: MCP logs + playwright; uv cache prune pending grid-release of its
+lock); 8 EWC-on-BERT cells OOM'd from VRAM contention with the concurrent
+colar_cb/nullspace sweep (task-2 Fisher+Adam burst vs their 3GB; mixed_ewc_seed7 passed
+in a gap = contention proven, not a bug). **Sweep-up chain armed** (detached,
+`results/bert_sweepup.log`): waits grid-drain + 15min GPU-idle, then relaunches the same
+resume-safe command — only failed/missing cells re-run. Rented box: run
+`BACKBONES="lilt bros"` per docs/BPLUS_GRID_PLAN_2026-07.md (BERT is local).
+
+## DONE (2026-07-18): Thesis reframe underway + B+ grid audited & ready (user gate: rent box)
 
 **(b) Method chapter:** decision executed — chapter becomes *diagnostic-driven design +
 pre-registered falsification, CoLaR as constructive control*. Design + drafted prose +
