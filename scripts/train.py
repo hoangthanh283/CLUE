@@ -29,6 +29,7 @@ from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.colar import CoLaR
 from doccl.methods.colar_bal import CoLaRBal
+from doccl.methods.colar_cb import CoLaRCB
 from doccl.methods.colar_knn import CoLaRKNN
 from doccl.methods.colar_meta import CoLaRMeta
 from doccl.methods.colar_wsvd import CoLaRWSVD
@@ -240,6 +241,8 @@ METHOD_REGISTRY = {
     "colar": CoLaR,
     # CoLaR-Bal: CoLaR + soft-target replay (dark knowledge) to protect sparse classes (SROIE)
     "colar_bal": CoLaRBal,
+    # CoLaR-CB: same bytes; balances old-task mass and sparse-label replay gradients.
+    "colar_cb": CoLaRCB,
     # CoLaR-WSVD: same CoLaR bytes, entity-weighted compression error allocation.
     "colar_wsvd": CoLaRWSVD,
     # CoLaR-kNN: read-side memory — CoLaR's store doubles as a drift-free labeled datastore
@@ -485,7 +488,7 @@ def main(cfg: DictConfig) -> None:
             run_name += f"_d{docs}"
         if cfg.method.get("doc_selection", "random") == "kcenter":
             run_name += "_kc"
-    elif cfg.method.name in ("colar", "colar_bal", "colar_wsvd", "colar_knn"):
+    elif cfg.method.name in ("colar", "colar_bal", "colar_cb", "colar_wsvd", "colar_knn"):
         # CoLaR axes: split depth, docs, per-doc SVD rank, selection. Canonical k=8/d=5/r=64.
         # colar_knn adds the readout blend weight (canonical lambda=0.3, no suffix).
         split_k = cfg.method.get("split_layer_k", 8)
@@ -503,6 +506,10 @@ def main(cfg: DictConfig) -> None:
             ew = cfg.method.get("svd_entity_weight", 4.0)
             if ew != 4.0:
                 run_name += f"_ew{int(round(ew * 10))}"
+        if cfg.method.name == "colar_cb":
+            power = cfg.method.get("replay_balance_power", 0.5)
+            if power != 0.5:
+                run_name += f"_p{int(round(power * 100))}"
         if cfg.method.name == "colar_knn":
             lam = cfg.method.get("knn_lambda", 0.3)
             if lam != 0.3:
@@ -932,6 +939,7 @@ def main(cfg: DictConfig) -> None:
         "proxy_latent_replay",
         "colar",
         "colar_bal",
+        "colar_cb",
         "colar_wsvd",
         # colar_knn: per-class F1 here reflects the PARAMETRIC head only (save_per_class_f1
         # runs its own model forward, bypassing method.evaluate's kNN blend) — known gap.

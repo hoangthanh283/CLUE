@@ -13,6 +13,7 @@ import torch
 from torch import nn
 
 from doccl.methods.colar import CoLaR
+from doccl.methods.colar_cb import CoLaRCB
 from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.latent_replay import LatentReplay
 
@@ -120,6 +121,39 @@ def test_compressed_footprint_below_raw():
     raw_bytes_equiv = 2 * (L * D) * 2  # what the raw store would hold, fp16
     factor_bytes = sum((d["us"].numel() + d["v"].numel()) * 2 for d in m.store)
     assert factor_bytes < raw_bytes_equiv
+
+
+def test_class_balanced_replay_changes_loss_without_extra_bytes():
+    torch.manual_seed(0)
+    m = CoLaRCB(
+        _Wrapper(),
+        {
+            "split_layer_k": K,
+            "docs_per_task": 2,
+            "replay_batch_size": 2,
+            "rank_r": 2,
+            "replay_balance_power": 0.5,
+        },
+    )
+    batch = _batch(2)
+    batch["labels"].fill_(0)
+    batch["labels"][0, 0] = 1
+    m._capture_task([batch])
+    replay = m._sample_replay()
+    plain = CoLaR._replay_forward(m, replay).loss
+    balanced = m._replay_forward(replay).loss
+    assert balanced != plain
+    assert m.memory_bytes() == CoLaR.memory_bytes(m)
+
+
+def test_task_balanced_replay_equalizes_old_task_mass():
+    plain = _colar()
+    balanced = _colar()
+    balanced.config["replay_task_balance"] = True
+    assert plain._replay_loss_scale(2) == 1.0
+    assert balanced._replay_loss_scale(0) == 1.0
+    assert balanced._replay_loss_scale(1) == 1.0
+    assert balanced._replay_loss_scale(2) == 2.0
 
 
 def test_kcenter_selects_for_coverage_and_random_stays_first_n():
