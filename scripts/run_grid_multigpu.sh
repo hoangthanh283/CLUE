@@ -319,8 +319,8 @@ add_job() { JOBS+=("$1|$2"); }
 # CORE_BEFORE_DOCCL = methods that should run BEFORE DocCL (the cheap/medium baselines).
 # CORE_AFTER_DOCCL  = heavy core methods to run AFTER DocCL (der_pp, the heaviest replay).
 # Both derive from CORE_METHODS so overriding CORE_METHODS still works; der_pp is split out.
-CORE_BEFORE_DOCCL="${CORE_BEFORE_DOCCL:-naive joint ewc lwf er}"
-CORE_AFTER_DOCCL="${CORE_AFTER_DOCCL:-der_pp}"
+CORE_BEFORE_DOCCL="${CORE_BEFORE_DOCCL-naive joint ewc lwf er}"
+CORE_AFTER_DOCCL="${CORE_AFTER_DOCCL-der_pp}"
 
 add_singletask() {
   # Single-task baselines (provide b_i for FWT). One dataset per single scenario.

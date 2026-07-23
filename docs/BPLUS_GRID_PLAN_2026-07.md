@@ -4,7 +4,7 @@ Requirement (ROADMAP critical path): headline rows at 3 seeds (42/7/123) ×
 {cil_cord, dil, mixed} × {LayoutLMv3, LiLT, BROS, BERT}. Plan audited against the live
 repo (DRY_RUN + .done set-diff by an independent agent); the empty-override script bug it
 found (`${VAR:-}` vs `${VAR-}`) is FIXED in `run_grid_multigpu.sh` + `setup_remote.sh`
-(commit this doc's commit), so the commands below now plan exactly what they say.
+(commit this doc's commit), so the commands below now plan exactly what they say. RE-VERIFIED LIVE 2026-07-23: planned 387 unique cells, 32 already .done on disk (23 LiLT + 9 BERT pilots — auto-skipped), 355 missing confirmed. Second bug layer fixed same day: CORE_BEFORE_DOCCL/CORE_AFTER_DOCCL had independent hardcoded defaults (lines 322-323) ignoring CORE_METHODS; commands below now pass them explicitly.
 
 ## Missing cells (vs 263 `.done` markers on disk)
 
@@ -27,7 +27,7 @@ card at batch 8 + AMP; halves wall-clock with 2 GPUs via `GPUS="0 1"`).
 ```bash
 # Step 1 — LayoutLMv3 lexslot gap (small)
 SCENARIOS="cil_cord dil mixed" RUN_LEXSLOT=1 RUN_DOCCL=0 RUN_ABLATION=0 RUN_BERT=0 \
-  RUN_SINGLETASK=0 CORE_METHODS="" PROMPT_METHODS="" CURRENCY_METHODS="" BACKBONES="" \
+  RUN_SINGLETASK=0 CORE_METHODS="" CORE_BEFORE_DOCCL="" CORE_AFTER_DOCCL="" PROMPT_METHODS="" CURRENCY_METHODS="" BACKBONES="" \
   GPUS="0" JOBS_PER_GPU=2 BATCH_SIZE=8 AMP=1 \
   bash scripts/run_grid_multigpu.sh
 
@@ -35,7 +35,7 @@ SCENARIOS="cil_cord dil mixed" RUN_LEXSLOT=1 RUN_DOCCL=0 RUN_ABLATION=0 RUN_BERT
 SCENARIOS="cil_cord dil mixed" BACKBONES="lilt bros bert" \
   BACKBONE_METHODS="naive joint ewc lwf er der_pp l2p dualprompt coda_prompt o_lora cl_lora er_cflat doccl lexslot" \
   RUN_SINGLETASK=0 RUN_BERT=0 RUN_DOCCL=0 RUN_LEXSLOT=0 RUN_ABLATION=0 \
-  CORE_METHODS="" PROMPT_METHODS="" CURRENCY_METHODS="" \
+  CORE_METHODS="" CORE_BEFORE_DOCCL="" CORE_AFTER_DOCCL="" PROMPT_METHODS="" CURRENCY_METHODS="" \
   GPUS="0 1" JOBS_PER_GPU=2 BATCH_SIZE=8 NUM_WORKERS=2 AMP=1 \
   bash scripts/run_grid_multigpu.sh
 
