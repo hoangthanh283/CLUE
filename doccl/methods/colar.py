@@ -63,11 +63,15 @@ class CoLaR(LatentReplay):
             sum(d["us"].shape[0] * d["v"].shape[1] for d in self.store) * 2 / 1e6,
         )
 
+    def _sample_indices(self) -> list[int]:
+        """Indices for one replay batch; variants may stratify this selection."""
+        return random.sample(range(len(self.store)), min(self.replay_batch_size, len(self.store)))
+
     def _sample_replay(self) -> dict[str, torch.Tensor] | None:
         """Sample docs and reconstruct their hiddens from the per-doc factors."""
         if not self.store:
             return None
-        docs = random.sample(self.store, min(self.replay_batch_size, len(self.store)))
+        docs = [self.store[i] for i in self._sample_indices()]
         hidden = torch.stack(
             [(d["us"].float() @ d["v"].float()).to(torch.float16) for d in docs]
         )  # (b, seq, d)

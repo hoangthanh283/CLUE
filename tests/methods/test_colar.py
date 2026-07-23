@@ -146,14 +146,27 @@ def test_class_balanced_replay_changes_loss_without_extra_bytes():
     assert m.memory_bytes() == CoLaR.memory_bytes(m)
 
 
-def test_task_balanced_replay_equalizes_old_task_mass():
+def test_task_balanced_replay_equalizes_old_task_mass_and_sampling():
     plain = _colar()
-    balanced = _colar()
-    balanced.config["replay_task_balance"] = True
+    balanced = CoLaRCB(
+        _Wrapper(),
+        {
+            "split_layer_k": K,
+            "docs_per_task": 3,
+            "replay_batch_size": 4,
+            "rank_r": 2,
+            "replay_task_balance": True,
+        },
+    )
+    balanced.store = [{} for _ in range(6)]
+    balanced._store_task_ids = [0, 0, 0, 1, 1, 1]
+    picked = balanced._sample_indices()
     assert plain._replay_loss_scale(2) == 1.0
     assert balanced._replay_loss_scale(0) == 1.0
     assert balanced._replay_loss_scale(1) == 1.0
     assert balanced._replay_loss_scale(2) == 2.0
+    assert [balanced._store_task_ids[i] for i in picked].count(0) == 2
+    assert [balanced._store_task_ids[i] for i in picked].count(1) == 2
 
 
 def test_kcenter_selects_for_coverage_and_random_stays_first_n():
