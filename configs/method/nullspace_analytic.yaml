@@ -1,0 +1,12 @@
+name: nullspace_analytic
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+samples_per_class: 50
+projection_freq: 20
+projection_mode: surgery
+soft_lambda: 0.01
+freeze_backbone_after_t0: false
+probe_batches: 2
+analytic_head: true
