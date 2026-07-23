@@ -13,6 +13,7 @@ import torch
 from torch import nn
 
 from doccl.methods.colar import CoLaR
+from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.latent_replay import LatentReplay
 
 D, L, NL, N_LAYERS, K = 16, 6, 4, 4, 2
@@ -171,3 +172,46 @@ def test_kcenter_picks_the_outlier_first_n_misses():
     vals = {float(d["hidden"][0, 0]) for d in picked}
     assert 10.0 in vals  # the outlier is covered
     assert len(picked) == 2
+
+
+def _colar_wsvd(rank=2, docs=2, entity_weight=4.0):
+    torch.manual_seed(0)
+    return CoLaRWSVD(
+        _Wrapper(),
+        {
+            "split_layer_k": K,
+            "docs_per_task": docs,
+            "replay_batch_size": 2,
+            "rank_r": rank,
+            "svd_entity_weight": entity_weight,
+        },
+    )
+
+
+def test_wsvd_spends_rank_on_entity_rows():
+    hidden = torch.tensor([[0.0, 4.0], [3.0, 0.0], [3.0, 0.0], [3.0, 0.0]])
+    labels = torch.tensor([1, 0, 0, 0])  # first row is entity, others are O
+    us_plain, v_plain = CoLaRWSVD._weighted_factors(hidden, labels, rank=1, entity_weight=1.0)
+    us_weighted, v_weighted = CoLaRWSVD._weighted_factors(
+        hidden, labels, rank=1, entity_weight=50.0
+    )
+    plain_err = ((us_plain.float() @ v_plain.float()) - hidden)[0].norm()
+    weighted_err = ((us_weighted.float() @ v_weighted.float()) - hidden)[0].norm()
+    assert weighted_err < plain_err
+
+    hidden_with_visual = torch.cat([hidden, torch.ones(2, 2)], dim=0)
+    us, v = CoLaRWSVD._weighted_factors(hidden_with_visual, labels, rank=1, entity_weight=4.0)
+    assert (us.float() @ v.float()).shape == hidden_with_visual.shape
+
+
+def test_wsvd_uses_colar_factor_footprint():
+    m = _colar_wsvd(rank=2, docs=2, entity_weight=4.0)
+    m._capture_task([_batch(2)])
+    d = m.store[0]
+    assert set(d) == {"us", "v", "bbox", "attention_mask", "labels"}
+    assert d["us"].shape == (L, 2) and d["v"].shape == (2, D)
+    assert m.memory_bytes() == sum(
+        (doc["us"].numel() + doc["v"].numel()) * 2
+        + (doc["bbox"].numel() + doc["attention_mask"].numel() + doc["labels"].numel()) * 8
+        for doc in m.store
+    )
