@@ -31,8 +31,12 @@ SCENARIOS="cil_cord dil mixed" RUN_LEXSLOT=1 RUN_DOCCL=0 RUN_ABLATION=0 RUN_BERT
   GPUS="0" JOBS_PER_GPU=2 BATCH_SIZE=8 AMP=1 \
   bash scripts/run_grid_multigpu.sh
 
-# Step 2 — secondary backbones (the real B+ move: 346 cells)
-SCENARIOS="cil_cord dil mixed" BACKBONES="lilt bros bert" \
+# Step 2 — secondary backbones. SPLIT DECISION 2026-07-23: BERT slice (117 cells)
+# runs LOCALLY (launched, results/bert_slice_grid.log) — rented box does LiLT+BROS
+# ONLY (229 cells, ~190 GPU-h) to avoid double-running BERT. Both sync .done state
+# through the R2 bucket (durable resume), but do NOT rely on live dedup — keep the
+# backbone split disjoint.
+SCENARIOS="cil_cord dil mixed" BACKBONES="lilt bros" \
   BACKBONE_METHODS="naive joint ewc lwf er der_pp l2p dualprompt coda_prompt o_lora cl_lora er_cflat doccl lexslot" \
   RUN_SINGLETASK=0 RUN_BERT=0 RUN_DOCCL=0 RUN_LEXSLOT=0 RUN_ABLATION=0 \
   CORE_METHODS="" CORE_BEFORE_DOCCL="" CORE_AFTER_DOCCL="" PROMPT_METHODS="" CURRENCY_METHODS="" \
