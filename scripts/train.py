@@ -31,6 +31,7 @@ from doccl.methods.colar import CoLaR
 from doccl.methods.colar_bal import CoLaRBal
 from doccl.methods.colar_knn import CoLaRKNN
 from doccl.methods.colar_meta import CoLaRMeta
+from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.coreset_memory import CoresetMemory
 from doccl.methods.cpfd import CPFD
 from doccl.methods.cuber import CUBER
@@ -239,6 +240,8 @@ METHOD_REGISTRY = {
     "colar": CoLaR,
     # CoLaR-Bal: CoLaR + soft-target replay (dark knowledge) to protect sparse classes (SROIE)
     "colar_bal": CoLaRBal,
+    # CoLaR-WSVD: same CoLaR bytes, entity-weighted compression error allocation.
+    "colar_wsvd": CoLaRWSVD,
     # CoLaR-kNN: read-side memory — CoLaR's store doubles as a drift-free labeled datastore
     # (layers <k frozen), blended with the head as a kNN readout at eval. Training untouched.
     "colar_knn": CoLaRKNN,
@@ -482,7 +485,7 @@ def main(cfg: DictConfig) -> None:
             run_name += f"_d{docs}"
         if cfg.method.get("doc_selection", "random") == "kcenter":
             run_name += "_kc"
-    elif cfg.method.name in ("colar", "colar_bal", "colar_knn"):
+    elif cfg.method.name in ("colar", "colar_bal", "colar_wsvd", "colar_knn"):
         # CoLaR axes: split depth, docs, per-doc SVD rank, selection. Canonical k=8/d=5/r=64.
         # colar_knn adds the readout blend weight (canonical lambda=0.3, no suffix).
         split_k = cfg.method.get("split_layer_k", 8)
@@ -496,6 +499,10 @@ def main(cfg: DictConfig) -> None:
             run_name += f"_r{rank}"
         if cfg.method.get("doc_selection", "random") == "kcenter":
             run_name += "_kc"
+        if cfg.method.name == "colar_wsvd":
+            ew = cfg.method.get("svd_entity_weight", 4.0)
+            if ew != 4.0:
+                run_name += f"_ew{int(round(ew * 10))}"
         if cfg.method.name == "colar_knn":
             lam = cfg.method.get("knn_lambda", 0.3)
             if lam != 0.3:
@@ -627,8 +634,8 @@ def main(cfg: DictConfig) -> None:
         num_labels=n_init_labels,
     )
     # Pre-populate label maps for first task
-    model.label_to_id = {l: i for i, l in enumerate(scenario.tasks[0].label_set)}
-    model.id_to_label = {i: l for l, i in model.label_to_id.items()}
+    model.label_to_id = {label: i for i, label in enumerate(scenario.tasks[0].label_set)}
+    model.id_to_label = {i: label for label, i in model.label_to_id.items()}
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
@@ -694,9 +701,9 @@ def main(cfg: DictConfig) -> None:
         # Expand classifier to cover ALL labels across all tasks
         all_labels: list[str] = []
         for t in scenario.tasks:
-            for l in t.label_set:
-                if l not in model.label_to_id and l not in all_labels:
-                    all_labels.append(l)
+            for label in t.label_set:
+                if label not in model.label_to_id and label not in all_labels:
+                    all_labels.append(label)
         if all_labels:
             model.expand_classifier(all_labels)
             model = model.to(device)
@@ -775,7 +782,7 @@ def main(cfg: DictConfig) -> None:
         log.info("=== Task %d/%d: %s ===", task_idx + 1, len(scenario.tasks), task.task_name)
 
         # Expand classifier for new labels in this task
-        new_labels = [l for l in task.label_set if l not in model.label_to_id]
+        new_labels = [label for label in task.label_set if label not in model.label_to_id]
         if new_labels:
             log.info("Expanding classifier with %d new labels", len(new_labels))
             model.expand_classifier(new_labels)
@@ -892,7 +899,7 @@ def main(cfg: DictConfig) -> None:
     # Standard-forward methods only (prompt/LoRA methods have a custom forward).
     # er_cflat uses ER's standard model forward (no PEFT/prompts) → eligible.
     # cl_lora is PEFT-wrapped (custom forward) → excluded, like o_lora.
-    _STD_FORWARD = {
+    _std_forward = {
         "naive",
         "joint",
         "marginal_kl",
@@ -925,6 +932,7 @@ def main(cfg: DictConfig) -> None:
         "proxy_latent_replay",
         "colar",
         "colar_bal",
+        "colar_wsvd",
         # colar_knn: per-class F1 here reflects the PARAMETRIC head only (save_per_class_f1
         # runs its own model forward, bypassing method.evaluate's kNN blend) — known gap.
         "colar_knn",
@@ -933,7 +941,7 @@ def main(cfg: DictConfig) -> None:
         "nullspace_analytic",
         "fisher_mask",
     }  # noqa: N806
-    if cfg.method.name in _STD_FORWARD:
+    if cfg.method.name in _std_forward:
         try:
             save_per_class_f1(out_dir, model, eval_loaders_seen, device)
         except Exception as e:  # never fail a run over a diagnostic

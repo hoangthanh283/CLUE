@@ -1,0 +1,12 @@
+name: colar_wsvd
+# CoLaR with entity-weighted per-document SVD. Same whole-document factors and byte
+# footprint as CoLaR; only the compression error allocation changes.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64
+svd_entity_weight: 4.0

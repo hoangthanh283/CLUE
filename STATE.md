@@ -19,6 +19,14 @@ Empty-override bug (`${VAR:-}` on CORE/PROMPT/CURRENCY_METHODS) FIXED in
 run_grid_multigpu.sh + setup_remote.sh, DRY_RUN-verified. **Blocked on user renting the
 Vast.ai box (task #6); commands are paste-ready.**
 
+**CoLaR-WSVD candidate (2026-07-18):** implemented `method=colar_wsvd` as a strict CoLaR
+ablation: same per-document factors and bytes, entity-token rows weighted in the SVD
+objective. DIL seed42 k4/d50/r128 result = **87.08 AA / 60.4 MB**, final row
+85.90/78.13/97.21. This is below CoLaR 87.58 (89.19/76.30/97.25) and near CoLaR-Bal
+87.11. Read: weighting buys SROIE (+1.84 micro; KEY +1.50, VALUE +1.80) but steals FUNSD
+retention (−3.30), so it is a negative ablation, not a new headline. Do not spend more on
+row reweighting unless paired with a constraint that prevents task-0 capacity theft.
+
 ## DONE (2026-07-17 eve): KILL-TESTS COMPLETE + ADJUDICATED — all corrections are nulls; re-exercise is the only lever
 
 **All 5 kill-tests ran and were adjudicated against the amended prereg, every verdict
