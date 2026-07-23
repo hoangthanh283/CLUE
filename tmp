@@ -1,0 +1,33 @@
+the DocCL grid
+
+scripts/launch.sh
+
+
+# At SSH prompt:
+apt-get install -y git curl
+git clone https://github.com/hoangthanh283/CLUE.git 2>&1 | tail -15 && cd CLUE && git checkout doccl
+bash scripts/setup_remote.sh
+# GPU: 0 | JOBS_PER_GPU: 2 | BATCH_SIZE: 8
+
+apt-get install -y git curl htop vim tmux   # drop gpustat; use pip for that
+apt-get install -y python3-pip 2>&1 | tail -8; echo "=== verify ==="; python3 -m pip --version
+python3 -m pip install --no-cache-dir gpustat 2>&1 | tail -12
+
+cd ~/CLUE && git pull && rm -f results/logs/*.log && bash scripts/setup_remote.sh
+
+bash scripts/sync_results_to_r2.sh          # prompts for R2 creds, pushes local .done → R2
+bash scripts/sync_results_to_r2.sh --list   # prompts, then shows what's in R2
+bash scripts/sync_results_to_r2.sh --pull   # prompts, pulls R2 → local
+bash scripts/sync_results_to_r2.sh --pull tensorboard --logdir results
+
+SCENARIOS="cil_cord dil" RUN_SINGLETASK=0 BATCH_SIZE=16 JOBS_PER_GPU=4 AMP=1 bash scripts/setup_remote.sh
+
+pkill -9 -f run_grid_multigpu; pkill -9 -f scripts/train.py; sleep 3
+
+
+# One-time bootstrap (installs deps, checks GPU). Answer blank to W&B prompt.
+GPUS=0 JOBS_PER_GPU=8 BATCH_SIZE=16 GRAD_CKPT=false GPU_VRAM_BUDGET_GB=46 \
+  WANDB_MODE=offline bash scripts/setup_remote.sh     # → runs the FULL grid (873 jobs, ~2-3 days)
+
+# OR, the fast path — LexSlot only, all 4 backbones (69 jobs, ~5-7h):
+JOBS=8 bash scripts/run_lexslot_grid.sh

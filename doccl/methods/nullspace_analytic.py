@@ -154,6 +154,20 @@ class NullSpaceAnalyticCL(NaiveFineTune):
             self._hook_handle.remove()
         self._register_head_hook()
 
+        # Detect CIL: if classifier expanded (more outputs than task 0's label set),
+        # disable analytic head — single linear head can't satisfy multiple label spaces.
+        if task.task_id > 0:
+            n_classes = self.model.model.classifier.out_features
+            task0_labels = len(self.memory.memory.get(0, {}))
+            if n_classes > task0_labels + 1 and self.analytic_head:  # +1 for O class
+                log.info(
+                    "nullspace_analytic: disabling analytic head for CIL "
+                    "(%d classes > %d task-0 labels + O)",
+                    n_classes,
+                    task0_labels,
+                )
+                self.analytic_head = False
+
     def train_task(
         self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None
     ) -> TrainMetrics:
@@ -364,13 +378,15 @@ class NullSpaceAnalyticCL(NaiveFineTune):
     def _analytic_head_update(self) -> None:
         """Compute head weights via least squares: W = lstsq(X, Y).
 
-        Re-extracts features from stored raw inputs using current backbone to avoid
-        stale feature drift. Falls back to stored features if raw inputs unavailable.
+        Uses ONLY the current task's stored features to avoid CIL label masking
+        corruption (where out-of-session entities are mapped to O in earlier tasks).
+        Re-extracts features from stored raw inputs using current backbone.
 
         Soft constraint: adds λ||W - W_old||² regularization to allow
         small drift and improve conditioning.
         """
-        raw_batches = self.memory.get_all_raw_batches()
+        current_task_id = max(self.memory.memory.keys())
+        raw_batches = self.memory.raw_batches.get(current_task_id, [])
         if raw_batches:
             x_all, y_all = self._reextract_features(raw_batches)
             if x_all is None or x_all.shape[0] == 0:
@@ -404,7 +420,8 @@ class NullSpaceAnalyticCL(NaiveFineTune):
             self.model.model.classifier.weight.copy_(w_new)
             self.model.model.classifier.bias.zero_()
         log.info(
-            "nullspace_analytic: head updated via lstsq (%d samples, lambda=%.4f)",
+            "nullspace_analytic: head updated via lstsq (task %d, %d samples, lambda=%.4f)",
+            current_task_id,
             x_all.shape[0],
             self.soft_lambda,
         )
