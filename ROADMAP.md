@@ -24,6 +24,15 @@ correctness pass is DONE (25+ sites, builds 125 pp). (2) USER: rent Vast.ai box 
 `docs/BPLUS_GRID_PLAN_2026-07.md` paste-ready (355 cells, ≈293 GPU-h, ~$88–147).
 (3) After grid: analyze_results.py → ingest_to_thesis.py → backbone tables.
 
+### EXPLORATORY SIDE GATE (2026-07-23): continual DocRE salient-entity graph replay
+CPU-only memory builder + synthetic test are implemented. After the active grid drains:
+obtain Re-DocRED task JSON; run equal-byte random vs graph-salient construction; then train
+the same DREEAM replay baseline on both outputs. Continue only if graph selection improves
+relation/motif coverage and macro-F1/BWT at equal bytes. Next test intact-document graph
+selection against isolated evidence/triples; adaptive realignment comes only after that
+passes. Keep this outside the current paper's B+ critical path.
+
+
 ### DONE (2026-07-17 eve): KILL-TESTS ADJUDICATED — write-up next
 All 5 kill-tests complete + verified (STATE.md ACTIVE block; RCA doc kill-test sections).
 Headline: every cheap correction is a registered null; re-exercise is the only lever;

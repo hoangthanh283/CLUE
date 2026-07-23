@@ -1,5 +1,16 @@
 # STATE
 
+## ACTIVE (2026-07-23): Continual DocRE salient-graph replay gate implemented
+
+Added CPU-only `scripts/docre_graph_replay_gate.py`. It emits random and graph-salient
+DocRED replay memories under an exact serialized-byte budget after every task. The greedy
+selector covers rare relations, relation-conditioned entity-type pairs, cross-sentence
+relations, and bridge entities while retaining intact raw documents.
+`tests/test_docre_graph_replay_gate.py` pins byte limits, graph coverage, and preservation.
+
+Real Re-DocRED/DREEAM runs wait for the active GPU grids to drain because another dataset
+job would violate the one-dataset-builder RAM rule. This remains outside the locked paper.
+
 ## ACTIVE (2026-07-23): BERT slice running locally; sweep-up chain armed
 
 Local BERT slice (117 cells) launched 07-23 12:54 (`results/bert_slice_grid.log`,
