@@ -19,7 +19,13 @@ fixed, detached auto-CONT guard now running, `results/grid_guard.log`); root dis
 100% full (freed 15G: MCP logs + playwright; uv cache prune pending grid-release of its
 lock); 8 EWC-on-BERT cells OOM'd from VRAM contention with the concurrent
 colar_cb/nullspace sweep (task-2 Fisher+Adam burst vs their 3GB; mixed_ewc_seed7 passed
-in a gap = contention proven, not a bug). **Sweep-up chain armed** (detached,
+in a gap = contention proven, not a bug). **07-24 06:59 DRAIN DECISION:** overnight fails hit 35/35 (all contention-OOM — every
+core method beyond naive/joint died while the concurrent sweep held ~3GB; remaining 70
+queue cells were heavier still). Grid deliberately drained (done cells safe, 21+ on disk);
+the sweep now has the card solo. Ops note: direct shell kills exit 144 here — use detached
+setsid scripts for any process control; also `pgrep -f` guards are poisoned by any
+persistent shell whose CMDLINE mentions the script (killed one such poisoner; keep guard
+loops in FILES, not bash -c strings). **Sweep-up chain armed** (detached,
 `results/bert_sweepup.log`): waits grid-drain + 15min GPU-idle, then relaunches the same
 resume-safe command — only failed/missing cells re-run. Rented box: run
 `BACKBONES="lilt bros"` per docs/BPLUS_GRID_PLAN_2026-07.md (BERT is local).
