@@ -11,7 +11,19 @@ relations, and bridge entities while retaining intact raw documents.
 Real Re-DocRED/DREEAM runs wait for the active GPU grids to drain because another dataset
 job would violate the one-dataset-builder RAM rule. This remains outside the locked paper.
 
-## ACTIVE (2026-07-23): BERT slice running locally; sweep-up chain armed
+## ACTIVE (2026-07-27): BERT slice ~68/126, sped up to 3 GPU slots
+
+Sweep-up relaunch (07-24 18:49, solo card) ran clean: 0 failures vs 35 under contention.
+Slow phase 07-25→27 was the prompt/adapter tail (l2p/dualprompt take 1–3h/cell to the
+100ep cap). 07-27 23:37: **restarted at JOBS_PER_GPU=3** — remaining 58 cells are mostly
+light (~0.85G: cl_lora/coda_prompt/o_lora/dualprompt), 27 heavier (er_cflat/doccl/lexslot
+~2G). 3 light = 2.0G/6.1G (huge headroom); worst case 3 heavy ≈ 6.5G may OOM — those
+retry free, and a **mop-up chain** (armed, `results/bert_sweepup.log`) does a final safe
+2-slot pass for any survivors, then logs "BERT SLICE COMPLETE". VRAM ceiling per method
+measured (ewc 2.9G is realistic max; the 6.2G "naive" reading is a pre-grad-ckpt outlier).
+ETA now ~1 day. Rented box for LiLT+BROS still the open user gate.
+
+Superseded 07-23 note: ## ACTIVE (2026-07-23): BERT slice running locally; sweep-up chain armed
 
 Local BERT slice (117 cells) launched 07-23 12:54 (`results/bert_slice_grid.log`,
 resume-safe, durable R2 sync). Ops notes: dispatcher got SIGSTOPped once (3h stall —
