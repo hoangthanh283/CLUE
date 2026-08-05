@@ -11,36 +11,23 @@ relations, and bridge entities while retaining intact raw documents.
 Real Re-DocRED/DREEAM runs wait for the active GPU grids to drain because another dataset
 job would violate the one-dataset-builder RAM rule. This remains outside the locked paper.
 
-## ACTIVE (2026-07-27): BERT slice ~68/126, sped up to 3 GPU slots
+## ACTIVE (2026-08-05): BERT slice DONE (126/126); LiLT+BROS bootstrap ready for rented box
 
-Sweep-up relaunch (07-24 18:49, solo card) ran clean: 0 failures vs 35 under contention.
-Slow phase 07-25→27 was the prompt/adapter tail (l2p/dualprompt take 1–3h/cell to the
-100ep cap). 07-27 23:37: **restarted at JOBS_PER_GPU=3** — remaining 58 cells are mostly
-light (~0.85G: cl_lora/coda_prompt/o_lora/dualprompt), 27 heavier (er_cflat/doccl/lexslot
-~2G). 3 light = 2.0G/6.1G (huge headroom); worst case 3 heavy ≈ 6.5G may OOM — those
-retry free, and a **mop-up chain** (armed, `results/bert_sweepup.log`) does a final safe
-2-slot pass for any survivors, then logs "BERT SLICE COMPLETE". VRAM ceiling per method
-measured (ewc 2.9G is realistic max; the 6.2G "naive" reading is a pre-grad-ckpt outlier).
-ETA now ~1 day. Rented box for LiLT+BROS still the open user gate.
+**BERT slice COMPLETE — 126/126, 0 missing.** Long haul (~9 days local, RTX 2060 6GB):
+key lessons baked into ops — DocCL on BERT needs ~5.5G alone so it MUST run 1-slot on a
+6GB card (2-slot silently OOM-looped ~16h before caught); er_cflat (SAM) × cil_cord is the
+single heaviest combo; 3-slot RAM ceiling is real (each job ~4G RSS vs 14G cap). None of
+these apply on a 24GB rental. Backbone tables still stale (Jun 29) — regenerate with
+analyze_results.py once LiLT/BROS land.
 
-Superseded 07-23 note: ## ACTIVE (2026-07-23): BERT slice running locally; sweep-up chain armed
+**User renting the box (08-05).**  is the paste-ready
+one-shot: git pull (MUST — grid-script fixes) → uv sync → the scoped LiLT+BROS launch
+(252 planned = 126 lilt + 126 bros, DRY_RUN-verified clean, ~23 pre-done skip). On 24GB run
+doccl at 2 slots (the 1-slot workaround is 6GB-only). BERT excluded — slices disjoint.
+~3 days, ~00. After: pull results → analyze_results.py → ingest_to_thesis.py.
 
-Local BERT slice (117 cells) launched 07-23 12:54 (`results/bert_slice_grid.log`,
-resume-safe, durable R2 sync). Ops notes: dispatcher got SIGSTOPped once (3h stall —
-fixed, detached auto-CONT guard now running, `results/grid_guard.log`); root disk was
-100% full (freed 15G: MCP logs + playwright; uv cache prune pending grid-release of its
-lock); 8 EWC-on-BERT cells OOM'd from VRAM contention with the concurrent
-colar_cb/nullspace sweep (task-2 Fisher+Adam burst vs their 3GB; mixed_ewc_seed7 passed
-in a gap = contention proven, not a bug). **07-24 06:59 DRAIN DECISION:** overnight fails hit 35/35 (all contention-OOM — every
-core method beyond naive/joint died while the concurrent sweep held ~3GB; remaining 70
-queue cells were heavier still). Grid deliberately drained (done cells safe, 21+ on disk);
-the sweep now has the card solo. Ops note: direct shell kills exit 144 here — use detached
-setsid scripts for any process control; also `pgrep -f` guards are poisoned by any
-persistent shell whose CMDLINE mentions the script (killed one such poisoner; keep guard
-loops in FILES, not bash -c strings). **Sweep-up chain armed** (detached,
-`results/bert_sweepup.log`): waits grid-drain + 15min GPU-idle, then relaunches the same
-resume-safe command — only failed/missing cells re-run. Rented box: run
-`BACKBONES="lilt bros"` per docs/BPLUS_GRID_PLAN_2026-07.md (BERT is local).
+Thesis reframe (#5, CPU-only, examiner-annotated design ready) is the parallel work item.
+
 
 ## DONE (2026-07-18): Thesis reframe underway + B+ grid audited & ready (user gate: rent box)
 
