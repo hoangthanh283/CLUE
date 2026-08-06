@@ -33,6 +33,7 @@ from doccl.methods.colar_cb import CoLaRCB
 from doccl.methods.colar_knn import CoLaRKNN
 from doccl.methods.colar_meta import CoLaRMeta
 from doccl.methods.colar_wsvd import CoLaRWSVD
+from doccl.methods.colaslot import CoLaSlot
 from doccl.methods.coreset_memory import CoresetMemory
 from doccl.methods.cpfd import CPFD
 from doccl.methods.cuber import CUBER
@@ -239,6 +240,9 @@ METHOD_REGISTRY = {
     # CoLaR: latent_replay with per-DOCUMENT rank-r SVD storage — d50 coverage at ~d5 bytes
     # (whole-doc binding preserved; per-doc matrices ARE low-rank though the pooled space isn't).
     "colar": CoLaR,
+    # CoLaR + isolated additive slots: tests whether task-specific capacity can break
+    # the compressed-replay retention frontier before adding lexical routing.
+    "colaslot": CoLaSlot,
     # CoLaR-Bal: CoLaR + soft-target replay (dark knowledge) to protect sparse classes (SROIE)
     "colar_bal": CoLaRBal,
     # CoLaR-CB: same bytes; balances old-task mass and sparse-label replay gradients.
@@ -488,7 +492,14 @@ def main(cfg: DictConfig) -> None:
             run_name += f"_d{docs}"
         if cfg.method.get("doc_selection", "random") == "kcenter":
             run_name += "_kc"
-    elif cfg.method.name in ("colar", "colar_bal", "colar_cb", "colar_wsvd", "colar_knn"):
+    elif cfg.method.name in (
+        "colar",
+        "colaslot",
+        "colar_bal",
+        "colar_cb",
+        "colar_wsvd",
+        "colar_knn",
+    ):
         # CoLaR axes: split depth, docs, per-doc SVD rank, selection. Canonical k=8/d=5/r=64.
         # colar_knn adds the readout blend weight (canonical lambda=0.3, no suffix).
         split_k = cfg.method.get("split_layer_k", 8)
@@ -938,6 +949,7 @@ def main(cfg: DictConfig) -> None:
         "coreset_memory",
         "proxy_latent_replay",
         "colar",
+        "colaslot",
         "colar_bal",
         "colar_cb",
         "colar_wsvd",
