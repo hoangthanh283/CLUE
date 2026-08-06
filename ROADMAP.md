@@ -75,10 +75,14 @@ gate closed.** Read-side-as-blending is dead; the RCA kill-tests (marginal corre
 attack the same readout locus directly and supersede this direction. Full verdict in
 STATE.md ACTIVE block.
 
-### SUPERSEDED (2026-07-14 KT, killed 2026-07-16 am): CoLaR + LexSlot integration
-Design A (slots-on-CoLaR) killed by the redistribution law — CoLaR has no slack to harvest
-(STATE.md "PRIOR ACTIVE"). Handoff kept for reference: `docs/KT_2026-07-14_colar_lexslot.md`.
-LARM FAILED (all variants 32–66 AA); do NOT rebuild it — read KT §4 for why.
+### REOPENED (2026-08-06): CoLaR + isolated-slot capacity gate
+The 2026-07-16 cancellation overgeneralized from two shared-capacity levers; slots-on-CoLaR
+was never run. `method=colaslot` now implements the minimum clean test: CoLaR replay plus
+ungated isolated slots, without LARM's layer-k rewrite, LexSlot's conflicting freeze map,
+or broken lexical routing over dummy replay IDs. Run DIL/LayoutLMv3 k4/d50/r128 for seeds
+42/7/123 on the rented GPU. GO: AA ≥88.5, SROIE ≥80, FUNSD ≥87, CORD ≥97. NO-GO:
+<0.5 AA gain or FUNSD↔SROIE redistribution; then do not build routing. Historical handoff:
+`docs/KT_2026-07-14_colar_lexslot.md`. LARM remains closed (32–66 AA).
 
 ### Next Up (the B+ critical path, priority order)
 1. **B+ generalization grid — THE +12pp MOVE (critical path).** Every headline row at **3 seeds

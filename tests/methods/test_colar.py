@@ -12,9 +12,11 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from doccl.methods.base import EarlyStopper
 from doccl.methods.colar import CoLaR
 from doccl.methods.colar_cb import CoLaRCB
 from doccl.methods.colar_wsvd import CoLaRWSVD
+from doccl.methods.colaslot import CoLaSlot
 from doccl.methods.latent_replay import LatentReplay
 
 D, L, NL, N_LAYERS, K = 16, 6, 4, 4, 2
@@ -41,7 +43,9 @@ class _Wrapper(nn.Module):
         hf = nn.Module()
         hf.layoutlmv3 = inner
         hf.classifier = nn.Linear(D, NL)
+        hf.config = type("Config", (), {"vocab_size": 10})()
         self.model = hf
+        self.num_layers = N_LAYERS
         self.processor = type("P", (), {"tokenizer": type("T", (), {"pad_token_id": 1})()})()
 
     def freeze_backbone(self):
@@ -121,6 +125,65 @@ def test_compressed_footprint_below_raw():
     raw_bytes_equiv = 2 * (L * D) * 2  # what the raw store would hold, fp16
     factor_bytes = sum((d["us"].numel() + d["v"].numel()) * 2 for d in m.store)
     assert factor_bytes < raw_bytes_equiv
+
+
+def _colaslot(**overrides):
+    config = {
+        "split_layer_k": K,
+        "docs_per_task": 2,
+        "replay_batch_size": 2,
+        "rank_r": 2,
+        "freeze_lower": False,
+        "infer_gate": False,
+        "slot_depth": "head_late",
+        "slot_sharing": "off",
+        "n_tasks": 3,
+        "n_slots_head": 6,
+        "n_slots_late": 6,
+        "repr_rank": 2,
+    }
+    config.update(overrides)
+    return CoLaSlot(_Wrapper(), config)
+
+
+def test_colaslot_uses_colar_freeze_map_and_unique_optimizer_params():
+    m = _colaslot(split_layer_k=1)
+    assert m.slot_sharing == "off"
+    m._apply_freeze_map()
+    layers = m._encoder_layers()
+    assert all(not p.requires_grad for p in layers[0].parameters())
+    assert all(p.requires_grad for layer in layers[1:] for p in layer.parameters())
+    params = m.trainable_parameters()
+    assert len(params) == len({id(p) for p in params})
+
+
+def test_colaslot_slots_participate_in_replay_and_early_stop_restore():
+    m = _colaslot()
+    m._apply_freeze_map()
+    m._capture_task([_batch(2)])
+    m._replay_forward(m._sample_replay()).loss.backward()
+    assert m.head_slots.proj.grad is not None and m.head_slots.proj.grad.abs().sum() > 0
+    assert any(
+        rs.up.grad is not None and rs.up.grad.abs().sum() > 0 for rs in m.late_slots.values()
+    )
+
+    stopper = EarlyStopper()
+    stopper.step(1.0, m.model, epoch=0)
+    saved = m.head_slots.proj.detach().clone()
+    with torch.no_grad():
+        m.head_slots.proj.add_(1.0)
+    stopper.restore_best(m.model)
+    assert torch.equal(m.head_slots.proj, saved)
+
+
+def test_colaslot_rejects_known_broken_composition_modes():
+    for bad in ({"infer_gate": True}, {"freeze_lower": True}):
+        try:
+            _colaslot(**bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"expected invalid CoLaSlot config to fail: {bad}")
 
 
 def test_class_balanced_replay_changes_loss_without_extra_bytes():

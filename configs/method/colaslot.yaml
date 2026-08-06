@@ -1,0 +1,24 @@
+name: colaslot
+
+# CoLaR replay: headline gate uses k4/d50/r128 via CLI overrides.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64
+
+# Minimal capacity test: match the historical useful cell (isolated, ungated slots).
+# CoLaR owns the freeze map; lexical routing waits until replay stores routing evidence.
+freeze_lower: false
+infer_gate: false
+slot_depth: head_late
+slot_sharing: "off"
+share_threshold: 0.5
+n_tasks: 6
+n_slots_head: 48
+n_slots_late: 18
+repr_rank: 16
+lexical_signal: ocr

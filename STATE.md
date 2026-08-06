@@ -1,5 +1,21 @@
 # STATE
 
+## ACTIVE (2026-08-06): CoLaSlot clean capacity gate implemented; headline run pending
+
+The earlier “CoLaR + LexSlot cannot beat the redistribution frontier” decision was an
+untested extrapolation: k-center and balanced replay redistribute shared capacity, while
+task-isolated slots add capacity. Added `method=colaslot`, the minimum decisive cell:
+CoLaR replay + ungated, gradient-isolated head/late slots. It preserves CoLaR's freeze map,
+registers slots in model checkpoints so early stopping restores them, and rejects the two
+known-invalid compositions (LexSlot lower-layer freezing and lexical routing over CoLaR's
+dummy replay token IDs). Hydra composition caught and fixed YAML `off`→boolean coercion.
+
+CPU validation: 388 fast tests pass; focused Ruff/Black clean. Repository-wide Ruff/Black
+remain red on pre-existing unrelated files (270 Ruff findings; 48 Black targets).
+Headline gate is NOT run locally: DIL/LayoutLMv3 k4/d50/r128 belongs on the rented GPU.
+GO requires AA ≥88.5, SROIE ≥80, FUNSD ≥87, CORD ≥97 across seeds 42/7/123; <0.5 AA
+gain or another FUNSD↔SROIE exchange closes slots before any lexical-routing work.
+
 ## ACTIVE (2026-07-23): Continual DocRE salient-graph replay gate implemented
 
 Added CPU-only `scripts/docre_graph_replay_gate.py`. It emits random and graph-salient
