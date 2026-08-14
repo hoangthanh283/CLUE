@@ -1,0 +1,48 @@
+{
+  "as_of": "2026-08-07T00:07:32Z",
+  "population": {
+    "train_documents": {
+      "FUNSD": 149,
+      "SROIE": 626,
+      "CORD": 800
+    },
+    "eval_documents": {
+      "FUNSD": 50,
+      "SROIE": 347,
+      "CORD": 100
+    }
+  },
+  "raw_router": {
+    "definition": "Existing sparse_doc_vectors(input_ids); padding and special IDs included",
+    "task_cosine": [
+      [1.0000008, 0.9963683, 0.9938937],
+      [0.9963688, 0.9999995, 0.9889550],
+      [0.9938934, 0.9889553, 1.0000001]
+    ],
+    "top1_accuracy": {
+      "FUNSD": 0.50,
+      "SROIE": 0.5619596542,
+      "CORD": 1.0,
+      "weighted": 0.6438631791
+    }
+  },
+  "masked_router": {
+    "definition": "Bag of token IDs weighted by attention_mask with IDs 0, 1, and 2 excluded",
+    "task_cosine": [
+      [1.0000002, 0.8183661, 0.4908594],
+      [0.8183661, 1.0000008, 0.4904171],
+      [0.4908594, 0.4904171, 1.0000002]
+    ],
+    "top1_accuracy": {
+      "FUNSD": 1.0,
+      "SROIE": 1.0,
+      "CORD": 0.88,
+      "weighted": 0.9758551308
+    },
+    "mean_own_minus_best_foreign_cosine": {
+      "FUNSD": 0.1126066750,
+      "SROIE": 0.1428218422,
+      "CORD": 0.2994132826
+    }
+  }
+}

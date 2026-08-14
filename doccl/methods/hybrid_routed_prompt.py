@@ -49,7 +49,11 @@ __all__ = ["HybridRoutedPrompt", "HybridPromptPool", "sparse_doc_vectors"]
 
 
 def sparse_doc_vectors(
-    input_ids: torch.Tensor, vocab_size: int, idf: torch.Tensor | None = None
+    input_ids: torch.Tensor,
+    vocab_size: int,
+    idf: torch.Tensor | None = None,
+    attention_mask: torch.Tensor | None = None,
+    ignored_token_ids: tuple[int, ...] = (),
 ) -> torch.Tensor:
     """Bag-of-token-ids vector per document, optionally IDF-weighted, L2-normalised.
 
@@ -57,6 +61,8 @@ def sparse_doc_vectors(
         input_ids: (B, L) long token ids.
         vocab_size: width V of the output vectors (the backbone vocab size).
         idf: optional (V,) inverse-document-frequency weights; ones if None.
+        attention_mask: optional (B, L) mask; zero positions do not contribute.
+        ignored_token_ids: token ids (for example tokenizer special ids) to exclude.
 
     Returns:
         (B, V) float — each row is the (idf-weighted) term-frequency over the
@@ -67,7 +73,12 @@ def sparse_doc_vectors(
     # scatter_add term frequencies; clamp (out-of-place — never mutate the caller's
     # batch tensor) guards against any id ≥ vocab_size.
     ids = input_ids.clamp(0, vocab_size - 1)
-    counts.scatter_add_(1, ids, torch.ones_like(ids, dtype=counts.dtype))
+    weights = torch.ones_like(ids, dtype=counts.dtype)
+    if attention_mask is not None:
+        weights = weights * attention_mask.to(device=ids.device, dtype=counts.dtype)
+    for token_id in ignored_token_ids:
+        weights = weights * (input_ids != token_id)
+    counts.scatter_add_(1, ids, weights)
     if idf is not None:
         counts = counts * idf.unsqueeze(0)
     return F.normalize(counts, dim=-1)

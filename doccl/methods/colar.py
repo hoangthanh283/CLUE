@@ -67,24 +67,31 @@ class CoLaR(LatentReplay):
         """Indices for one replay batch; variants may stratify this selection."""
         return random.sample(range(len(self.store)), min(self.replay_batch_size, len(self.store)))
 
+    def _stack_replay(self, docs: list[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
+        """Reconstruct a specified set of stored documents as one replay batch."""
+        replay = {
+            "hidden": torch.stack(
+                [(doc["us"].float() @ doc["v"].float()).to(torch.float16) for doc in docs]
+            ),
+            "bbox": torch.stack([doc["bbox"] for doc in docs]),
+            "attention_mask": torch.stack([doc["attention_mask"] for doc in docs]),
+            "labels": torch.stack([doc["labels"] for doc in docs]),
+        }
+        if "input_ids" in docs[0]:
+            replay["input_ids"] = torch.stack([doc["input_ids"] for doc in docs])
+        return replay
+
     def _sample_replay(self) -> dict[str, torch.Tensor] | None:
         """Sample docs and reconstruct their hiddens from the per-doc factors."""
         if not self.store:
             return None
-        docs = [self.store[i] for i in self._sample_indices()]
-        hidden = torch.stack(
-            [(d["us"].float() @ d["v"].float()).to(torch.float16) for d in docs]
-        )  # (b, seq, d)
-        return {
-            "hidden": hidden,
-            "bbox": torch.stack([d["bbox"] for d in docs]),
-            "attention_mask": torch.stack([d["attention_mask"] for d in docs]),
-            "labels": torch.stack([d["labels"] for d in docs]),
-        }
+        return self._stack_replay([self.store[i] for i in self._sample_indices()])
 
     def memory_bytes(self) -> int:
         total = 0
         for d in self.store:
             total += (d["us"].numel() + d["v"].numel()) * 2  # fp16 factors
             total += (d["bbox"].numel() + d["attention_mask"].numel() + d["labels"].numel()) * 8
+            if "input_ids" in d:
+                total += d["input_ids"].numel() * 8
         return total

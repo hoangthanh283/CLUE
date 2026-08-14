@@ -1,0 +1,31 @@
+name: colaslot_ra
+
+# CoLaR main learner. Gate 0 overrides k/d/r/epochs on the CLI.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64
+
+# Retention-only head residuals: never read or optimized during normal CoLaR training.
+freeze_lower: false
+infer_gate: true
+store_input_ids: true
+routing_mode: hard_top1
+route_margin: 0.05
+slot_depth: head_only
+slot_sharing: "off"
+share_threshold: 0.5
+n_tasks: 6
+n_slots_head: 48
+n_slots_late: 18
+repr_rank: 16
+lexical_signal: ocr
+
+# Refit prior-owner slots to acquisition logits (dark knowledge), with foreign nulling.
+refit_epochs: 10
+refit_lr: 1.0e-3
+refit_null_weight: 1.0

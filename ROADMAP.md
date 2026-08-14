@@ -75,14 +75,26 @@ gate closed.** Read-side-as-blending is dead; the RCA kill-tests (marginal corre
 attack the same readout locus directly and supersede this direction. Full verdict in
 STATE.md ACTIVE block.
 
-### REOPENED (2026-08-06): CoLaR + isolated-slot capacity gate
-The 2026-07-16 cancellation overgeneralized from two shared-capacity levers; slots-on-CoLaR
-was never run. `method=colaslot` now implements the minimum clean test: CoLaR replay plus
-ungated isolated slots, without LARM's layer-k rewrite, LexSlot's conflicting freeze map,
-or broken lexical routing over dummy replay IDs. Run DIL/LayoutLMv3 k4/d50/r128 for seeds
-42/7/123 on the rented GPU. GO: AA ≥88.5, SROIE ≥80, FUNSD ≥87, CORD ≥97. NO-GO:
-<0.5 AA gain or FUNSD↔SROIE redistribution; then do not build routing. Historical handoff:
-`docs/KT_2026-07-14_colar_lexslot.md`. LARM remains closed (32–66 AA).
+### CLOSED (2026-08-14): CoLaSlot-RF/RA post-task residual refits
+Matched d5/r64 seed-42 runs preserve an identical slot-free CoLaR trajectory. RF produces
+near-zero hard-label gradients and is exactly inert at final evaluation. RA's acquisition-logit
+anchor restores strong gradients but changes the final row by [-0.29, -0.99, 0.00], or
+-0.43 AA; SROIE loses precision with unchanged recall. Both fail the preregistered gate, so
+no d50/r128 or multi-seed expansion. Next permitted gate is support-bounded: an entity/class
+residual may activate only after held-out replay evidence shows positive entity F1 with
+non-negative precision; all unsupported corrections stay exactly zero. Do not add another
+router, residual rank, or dense-anchor sweep before that falsification test passes.
+
+### CLOSED (2026-08-08): CoLaSlot-R scalar-abstention follow-up
+CoLaSlot-R d5/r64 improves CoLaR by +14.02 AA and -20.45 AF, but CORD -0.84 fails the
+domain guardrail. Training-only 5-fold calibration found no usable global margin: 0.05 has
+92.47% coverage but only 97.71% accepted accuracy on CORD; the zero-error 0.326 threshold
+has 0% FUNSD/SROIE coverage. No 0.001-grid threshold meets >=50% coverage and >=99%
+accepted accuracy for every seen stage/domain. **No cheap rerun, d50/r128, or extra seeds for CoLaSlot-R.**
+Reopening requires a materially different router or a decoupled slot lifecycle that makes wrong
+routes non-destructive, with a new preregistration; do not continue scalar threshold sweeps or
+tune against final test F1. Evidence:
+`results/gates/colaslot_r_margin_feasibility_seed42.json`.
 
 ### Next Up (the B+ critical path, priority order)
 1. **B+ generalization grid — THE +12pp MOVE (critical path).** Every headline row at **3 seeds

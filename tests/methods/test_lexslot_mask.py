@@ -61,9 +61,9 @@ def test_slot_mask_off_isolates():
     assert torch.allclose(m, torch.tensor([0.0, 0.0, 1.0, 1.0]), atol=1e-6)
 
 
-def test_slot_mask_unclaimed_slot_is_trainable():
+def test_slot_mask_unclaimed_slots_stay_silent():
     slot_owner = [0, -1, -1]  # slots 1,2 unclaimed
     S = torch.tensor([[1.0, 0.3], [0.3, 1.0]])  # noqa: N806
     m = slot_trainable_mask(1, slot_owner, S, sharing="soft", threshold=0.5)
-    # slot0 owned by task0 -> S[1,0]=0.3 ; slots 1,2 unclaimed -> 1.0 (claimable)
-    assert torch.allclose(m, torch.tensor([0.3, 1.0, 1.0]), atol=1e-6)
+    # slot0 is softly shared; unclaimed capacity stays silent until claimed.
+    assert torch.allclose(m, torch.tensor([0.3, 0.0, 0.0]), atol=1e-6)
