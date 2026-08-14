@@ -80,10 +80,14 @@ class CoLaSlotFD(CoLaSlotRO):
         denominator = valid.sum().clamp_min(1) * values.shape[-1]
         return (values.square() * valid).sum() / denominator
 
+    def _head_delta(self, feats: torch.Tensor) -> torch.Tensor:
+        """Head residual hook point; FDP only changes how existing slots are mixed."""
+        return self.head_slots.logits_delta(feats)
+
     def _online_owner_loss(self, owner: int, docs: list[dict[str, torch.Tensor]]) -> torch.Tensor:
         replay = self._stack_replay(docs)
         logits = self._replay_forward(replay).logits
-        owner_delta = self.head_slots.logits_delta(self._cur_feats)
+        owner_delta = self._head_delta(self._cur_feats)
         teacher = self._teacher_logits[owner].to(device=logits.device, dtype=logits.dtype)
         labels = replay["labels"].to(logits.device)
         valid = replay["attention_mask"].to(logits.device).bool() & labels.ne(-100)
@@ -97,9 +101,7 @@ class CoLaSlotFD(CoLaSlotRO):
         if self._current_feats is not None and self._current_mask is not None:
             self._set_owner_gate(self._current_feats.shape[0], self._current_feats.device, owner)
             null_losses.append(
-                self._masked_square_mean(
-                    self.head_slots.logits_delta(self._current_feats), self._current_mask
-                )
+                self._masked_square_mean(self._head_delta(self._current_feats), self._current_mask)
             )
         for foreign_owner, feats in self._teacher_feats.items():
             if foreign_owner == owner:
@@ -107,7 +109,7 @@ class CoLaSlotFD(CoLaSlotRO):
             self._set_owner_gate(feats.shape[0], feats.device, owner)
             null_losses.append(
                 self._masked_square_mean(
-                    self.head_slots.logits_delta(feats), self._teacher_masks[foreign_owner]
+                    self._head_delta(feats), self._teacher_masks[foreign_owner]
                 )
             )
         null_loss = torch.stack(null_losses).mean()

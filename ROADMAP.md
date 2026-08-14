@@ -75,18 +75,18 @@ gate closed.** Read-side-as-blending is dead; the RCA kill-tests (marginal corre
 attack the same readout locus directly and supersede this direction. Full verdict in
 STATE.md ACTIVE block.
 
-### RUNNING (2026-08-15): boundary-RNG-matched CoLaSlot-FD gate
-Normal CoLaR/current forwards remain slot-free. For each sampled replay owner, FD snapshots
-centered logits before the base update and fits only that owner's head rows after the update,
-on entity tokens. Current, foreign-owner, and same-owner O support target zero residual.
-Launch 1 was stopped for auxiliary RNG contamination. Launch 2 reproduced CoLaR through task 0,
-then diverged at replay-active task 1. Launch 3 separated routing IDs from model replay IDs but
-reproduced the same 77.3097, falsifying that hypothesis. The actual remaining confound was the
-extra base-only diagnostic evaluation: each unshuffled DataLoader iterator consumed global Torch
-RNG and shifted the next-task shuffle/dropout stream. That diagnostic now restores CPU Torch RNG;
-routing/model-ID and boundary-evaluation invariants are covered by regressions (24 focused / 401
-fast tests pass). Relaunch one clean d5/r64 seed-42 gate under the existing GO rule; require task-0
-and task-1 trajectory reproduction and do not sweep any mechanism knob.
+### RUNNING (2026-08-15): CoLaSlot-FDP token-pathway gate; FD closed
+The fully matched FD run reproduces CoLaR exactly but changes AA by only +0.00285 and old-domain
+mean by +0.00427 while adding 55.6% runtime. Routing is already zero-error on accepted FUNSD/SROIE
+documents; measured drift is real, but a fixture shows the linear head residual cannot cancel it
+while remaining null on unsupported tokens. LR increases plateau and removing null becomes
+unstable, so FD and its optimizer/null sweeps are closed.
+
+FDP changes one thing: inside the existing lexically selected owner block, rank-one slot pathways
+are reweighted per token by their own squared activation energy. It adds no parameters or memory
+and leaves the matched CoLaR/FD lifecycle intact. Run only the d5/r64 seed-42 gate. Require AA
+>= +0.5, old-domain mean >= +1.0, every domain >= -0.5, and no old-domain precision regression.
+Only a pass unlocks d50/r128 seed 42 and then seeds 7/123; otherwise close the direction.
 
 ### CLOSED (2026-08-15): CoLaSlot-RO online hard-label gate
 RO preserves the exact same-state base trajectory but changes final domains by only
@@ -129,8 +129,8 @@ tune against final test F1. Evidence:
 3. **Write-up.** DONE for the thesis (2026-08-15, ch6 §6.6 + backbone/ch7 refresh — see STATE);
    the PAPER-side fold of Finding 3b + consistency-law figure remains. CoLaR positioned as the
    constructive control, PLaR as the bounded-negative.
-   CoLaSlot-RF/RA/RO are closed same-state NO-GOs; no additional seeds. CoLaSlot-FD is the
-   active functional-drift gate and must pass its same-state cheap cell before any expansion.
+   CoLaSlot-RF/RA/RO/FD are closed same-state NO-GOs; no additional seeds. CoLaSlot-FDP is the
+   active token-pathway gate and must pass its same-state cheap cell before any expansion.
 4. **LexSlot prose correction (correctness hygiene — a reviewer WILL catch it).** The 87.3 row is
    REAL but **buffer-based (200 exemplars, the DocCL-hybrid)** — verified this session (seeds 42/7/123
    = 88.4/87.2/86.3, all use_replay=True). Chapter-7's "buffer-free / without storing any past data"

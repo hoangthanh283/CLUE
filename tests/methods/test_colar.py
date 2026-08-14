@@ -19,6 +19,7 @@ from doccl.methods.colar_cb import CoLaRCB
 from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.colaslot import CoLaSlot
 from doccl.methods.colaslot_fd import CoLaSlotFD
+from doccl.methods.colaslot_fdp import CoLaSlotFDP
 from doccl.methods.colaslot_ra import CoLaSlotRA
 from doccl.methods.colaslot_rf import CoLaSlotRF
 from doccl.methods.colaslot_ro import CoLaSlotRO
@@ -249,6 +250,21 @@ def _colaslot_fd(**overrides):
         **overrides,
     )
     return CoLaSlotFD(_Wrapper(), config)
+
+
+def _colaslot_fdp(**overrides):
+    config = _colaslot_config(
+        infer_gate=True,
+        store_input_ids=True,
+        routing_mode="hard_top1",
+        route_margin=0.05,
+        slot_depth="head_only",
+        online_lr=1e-2,
+        online_weight_decay=0.0,
+        functional_null_weight=1.0,
+        **overrides,
+    )
+    return CoLaSlotFDP(_Wrapper(), config)
 
 
 def test_colaslot_uses_colar_freeze_map_and_unique_optimizer_params():
@@ -519,6 +535,35 @@ def test_colaslot_fd_tracks_function_drift_and_keeps_colar_frozen():
         for name, parameter in m.model.named_parameters()
         if name in base_before
     )
+
+
+def test_colaslot_fdp_routes_each_token_by_owner_pathway_energy():
+    m = _colaslot_fdp()
+    task = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
+    batch = _batch(2, seed=17)
+    m.before_task(task, [batch])
+    m.after_task(task, [batch])
+    m._set_owner_gate(1, m.device, 0)
+
+    feats = torch.zeros(1, 2, D, device=m.device)
+    feats[0, 0, :2] = torch.tensor([3.0, 1.0], device=m.device)
+    feats[0, 1, :2] = torch.tensor([1.0, 3.0], device=m.device)
+    with torch.no_grad():
+        m.head_slots.values.zero_()
+        m.head_slots.proj.zero_()
+        m.head_slots.values[0, 0] = 1
+        m.head_slots.values[1, 1] = 1
+        m.head_slots.proj[0, 1] = 1
+        m.head_slots.proj[1, 2] = 1
+
+    linear = m.head_slots.logits_delta(feats)
+    routed = m._head_delta(feats)
+    assert routed[0, 0, 1] / routed[0, 0, 2] > linear[0, 0, 1] / linear[0, 0, 2]
+    assert routed[0, 1, 2] / routed[0, 1, 1] > linear[0, 1, 2] / linear[0, 1, 1]
+
+    m._set_owner_gate(1, m.device, None)
+    abstained = m._head_delta(feats)
+    assert torch.isfinite(abstained).all() and torch.count_nonzero(abstained) == 0
 
 
 def test_colaslot_rejects_known_broken_composition_modes():
