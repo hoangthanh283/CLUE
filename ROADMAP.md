@@ -113,10 +113,11 @@ tune against final test F1. Evidence:
 2. **Evidence hygiene (blocks the paper table).** Clean grid re-run of the stale 1-epoch
    `dil_latent_replay_seed42` (64.9 → ~87 converged); regenerate the deleted 4-carrier
    `dil_coreset_memory_seed42`; CoLaR seeds 7/123 + cil_cord; int8-on-factors probe (~30 MB @ r128).
-3. **Write-up.** Fold Finding 3b + the consistency-law single-variable figure (4 whole docs 63.8 vs
-   4 decoupled carriers 36.7) into the thesis/paper falsification chapter. Position CoLaR as the
-   constructive control (proves negatives weren't effort-limited), PLaR as the bounded-negative
-   (coverage-limited proxy replay).
+3. **Write-up.** DONE for the thesis (2026-08-15, ch6 §6.6 + backbone/ch7 refresh — see STATE);
+   the PAPER-side fold of Finding 3b + consistency-law figure remains. CoLaR positioned as the
+   constructive control, PLaR as the bounded-negative.
+   Follow-ups: run the CoLaSlot-RF dual slots-on/off eval before treating its gate PASS as real;
+   RF next seeds only after that.
 4. **LexSlot prose correction (correctness hygiene — a reviewer WILL catch it).** The 87.3 row is
    REAL but **buffer-based (200 exemplars, the DocCL-hybrid)** — verified this session (seeds 42/7/123
    = 88.4/87.2/86.3, all use_replay=True). Chapter-7's "buffer-free / without storing any past data"
