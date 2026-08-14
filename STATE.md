@@ -21,18 +21,31 @@ Per-method BERT cells are tight (sd ≤5): dil er_cflat 78.3 / er 77.1 / der_pp 
 naive 39.4 / ewc 46.6; prompt-LoRA 34–39. bert lexslot (standalone soft) 37.96 ≈ naive —
 standalone-≈-naive finding reproduces off LayoutLMv3.
 
-## NEXT GATE (2026-08-14): CoLaSlot-RO online replay-only drift tracking
+## NEXT GATE (2026-08-15): CoLaSlot-FD one-step functional-drift cancellation
 
-RF/RA show that post-task residuals are either gradient-starved or unsupported. The final
-isolated mechanism is online timing: keep every normal CoLaR/current forward slot-free, then
-after each CoLaR optimizer step update only the sampled replay owners' residuals with the same
-hard-label replay loss. Base parameters are frozen during this extra eval-mode step, and the
-current owner remains an exact-zero fallback. This tests whether CoLaSlot-R's +14.02 cheap AA
-came from tracking transient drift during later tasks rather than from post-task fitting.
+RO closes hard-label residual fitting at both post-task and online timings. CoLaSlot-FD keeps
+the exact slot-free CoLaR path but records each sampled owner's centered logits immediately
+before the base update, then trains only that owner's head-slot rows to cancel the measured
+one-step decision-logit drift on entity tokens. Same-owner O tokens, the current batch, and
+foreign-owner replay features receive zero-residual targets. This directly tests the
+function-space/low-rank forgetting mechanism without adding memory, rank, routing, or a sweep.
 
 Run one matched DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch slots-on/off gate. GO remains
-AA >= +0.5, old-domain mean >= +1.0, and every domain >= -0.5. Failure closes residual
-timing; do not tune the online LR, router, rank, or run d50/r128.
+AA >= +0.5, old-domain mean >= +1.0, and every domain >= -0.5. Failure closes this residual
+family; do not tune the online LR/null weight or run d50/r128.
+
+## NO-GO (2026-08-15): CoLaSlot-RO online hard-label drift tracking
+
+The matched gate completed with **72.4103 AA / 24.5255 AF / [67.5951, 52.6964, 96.9396]**.
+Its same-state slot-free control is **72.4198 AA / 24.5113 AF /
+[67.6494, 52.6704, 96.9396]**. Delta is **-0.0095 AA**, **-0.0142 old-domain mean**, and
+**[-0.0544, +0.0259, 0.0000]** by domain. The only earlier-stage effect is -0.1973 FUNSD.
+
+Owner hard-label losses average 4.47e-5--2.19e-3; final recall is unchanged, while tiny
+precision shifts cancel. RO uses the same 3,266,040 bytes and peak VRAM as RF but adds
+1,615 seconds (26.9 minutes). Saved JSON and matrix.npy match. The gate fails both improvement
+clauses, closing hard-label head residuals regardless of timing. Evidence:
+`results/dil_colaslot_ro_seed42_k4/`.
 
 ## NO-GO (2026-08-14): retention-only CoLaSlot-RF and acquisition-anchor CoLaSlot-RA
 
@@ -53,8 +66,9 @@ Both fail the preregistered GO rule (AA >= +0.5, old-domain mean >= +1.0, no dom
 -0.5). Do not run d50/r128 or more seeds. Post-task head residuals are closed in their
 current form: hard labels provide no drift signal, while dense logit anchors provide signal
 without document-level support. Any successor must first pass a held-out replay test that
-enables only entity/class corrections with non-negative precision; unsupported residuals must
-remain exactly zero. Full RCA: `docs/reports/colaslot_integration_rca_2026-08-07/report.html`.
+enables only entity/class corrections with non-negative precision; current, foreign, and
+non-entity support must be explicitly driven toward zero. Full RCA:
+`docs/reports/colaslot_integration_rca_2026-08-07/report.html`.
 
 ## ACTIVE (2026-08-08): CoLaSlot-R cheap gate NO-GO; scalar abstention closed
 

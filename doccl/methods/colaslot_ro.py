@@ -90,7 +90,7 @@ class CoLaSlotRO(CoLaSlotRF):
                 active_rows |= mask.bool()
                 self.head_slots.set_grad_mask(mask)
                 self._forced_slot_owner = owner
-                loss = self._replay_forward(self._stack_replay(docs)).loss
+                loss = self._online_owner_loss(owner, docs)
                 loss.backward()
 
                 key = str(self._active_task_id) + ":" + str(owner)
@@ -115,6 +115,10 @@ class CoLaSlotRO(CoLaSlotRF):
                 parameter.requires_grad = requires_grad
             if was_training:
                 self.model.train()
+
+    def _online_owner_loss(self, _owner: int, docs: list[dict[str, torch.Tensor]]) -> torch.Tensor:
+        """Hard-label target used by the RO timing discriminator."""
+        return self._replay_forward(self._stack_replay(docs)).loss
 
     def _refit_prior_slots(self, current_task_id: int) -> None:
         """Online tracking replaces the post-task RF refit."""
