@@ -1,5 +1,27 @@
 # STATE
 
+## DONE (2026-08-15): thesis results update + CoLaSlot-RF gate result IN
+
+**CoLaSlot-RF d5/r64 seed-42 gate (retry2) PASSES its preregistered GO** on the raw numbers:
+AA 72.42 vs matched CoLaR 60.79 (+11.6), final row [67.65, 52.67, 96.94] vs [44.32, 41.34,
+96.71] — every domain above the -0.5 guardrail, old-domain mean >> +1.0. ⚠ The prereg's dual
+slots-on/off evaluation from the same state has NOT been run yet — verdict stays PROVISIONAL
+(n=1, 5-epoch diagnostic budget). Evidence: `results/gates/colaslot_rf_d5_e5_retry2/`.
+First attempt (08-09) died leaving only tb/; retry launched 08-14 19:50 completed same night.
+
+**Thesis results-only update DONE (structural reframe task #5 still separate):** new ch6 §6.6
+(RCA snap verdict, 5 kill-test nulls, latent-replay falsification ladder + consistency control,
+CoLaR control + conservation law + read-side negatives, PLaR, CoLaSlot-R NO-GO + RF provisional);
+backbone section rewritten for the completed BERT slice; ch7 limitations aligned (BERT full grid
+done — replay ordering reproduces text-only; LiLT partial 23 runs; BROS zero). Builds 128 pp.
+**Pipeline fix:** analyze_results.py was renaming ALL bert runs to `bert_textonly`, pooling 14
+methods into one cell (DIL 51.8±18.7 garbage) — now naive-only; bert added to SECONDARY_FAMILIES
+(backbone tables carry the full BERT grid); ingest_to_thesis.py no longer clobbers the
+hand-patched table_main.tex and ships table_backbone_AA → table_backbone_byscenario.tex.
+Per-method BERT cells are tight (sd ≤5): dil er_cflat 78.3 / er 77.1 / der_pp 77.4 / joint 77.2 /
+naive 39.4 / ewc 46.6; prompt-LoRA 34–39. bert lexslot (standalone soft) 37.96 ≈ naive —
+standalone-≈-naive finding reproduces off LayoutLMv3.
+
 ## NEXT GATE (2026-08-14): CoLaSlot-RO online replay-only drift tracking
 
 RF/RA show that post-task residuals are either gradient-starved or unsupported. The final
