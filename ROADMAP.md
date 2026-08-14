@@ -116,8 +116,8 @@ tune against final test F1. Evidence:
 3. **Write-up.** DONE for the thesis (2026-08-15, ch6 §6.6 + backbone/ch7 refresh — see STATE);
    the PAPER-side fold of Finding 3b + consistency-law figure remains. CoLaR positioned as the
    constructive control, PLaR as the bounded-negative.
-   Follow-ups: run the CoLaSlot-RF dual slots-on/off eval before treating its gate PASS as real;
-   RF next seeds only after that.
+   CoLaSlot-RF/RA are closed same-state NO-GOs; no additional seeds. CoLaSlot-RO is the active
+   timing discriminator and must pass its same-state cheap gate before any expansion.
 4. **LexSlot prose correction (correctness hygiene — a reviewer WILL catch it).** The 87.3 row is
    REAL but **buffer-based (200 exemplars, the DocCL-hybrid)** — verified this session (seeds 42/7/123
    = 88.4/87.2/86.3, all use_replay=True). Chapter-7's "buffer-free / without storing any past data"

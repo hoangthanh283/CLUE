@@ -98,6 +98,57 @@
   and leave every unsupported residual exactly zero. This gate must pass before any full
   d50/r128 or multi-seed run. Adding rank, router, or anchor-weight sweeps is not justified.
 
+## 2026-08-15 primary-literature update
+
+- The closest published document benchmark found is *Universal Graph Continual Learning*
+  (TMLR 2023), which converts CORD/SROIE/WildReceipt into graph-unit node classification.
+  Its graph model, class-incremental task construction, labels, and average-performance metric are
+  not comparable to this LayoutLMv3 domain-incremental token-classification protocol. Any SoTA
+  statement here must therefore be explicitly protocol-specific and supported by matched seeds.
+- *Mixture of LoRA Experts for Continual Information Extraction with LLMs* (Findings of EMNLP
+  2025, https://aclanthology.org/2025.findings-emnlp.718/) reports that token-level expert
+  selection and distillation of router/key distributions outperform sentence-level selection in
+  continual IE. LexSlot already has token-dependent slot activations, but chooses the owner block
+  from one document-level OCR cosine; changing that owner router is a separate hypothesis, not a
+  remedy for an unsupported residual.
+- *PASs-MoE* (ACL 2026, https://aclanthology.org/2026.acl-long.1474/) identifies router/expert
+  misaligned co-drift and derives routing weights from each low-rank pathway's own activation
+  energy. `LogitSlots.values` provides the analogous input-side pathway directions, so a
+  pathway-energy router is mechanically available without adding parameters. It is secondary:
+  the matched RA result already shows harm under owner-forced training and localizes it to false
+  positives, while the historical CORD penalty survives routing removal.
+- *Layerwise Proximal Replay* (ICML 2024,
+  https://proceedings.mlr.press/v235/yoo24a.html) stabilizes replay optimization by constraining
+  changes to past hidden activations. This is not the next test: CoLaR's slot-free trajectory is
+  already the matched control, and a transformer-wide optimizer/preconditioner would change the
+  base method rather than isolate the LexSlot integration.
+- *Catastrophic Forgetting is Low-Rank: A Function-Space Theory for Continual Adaptation*
+  (ICML 2026 workshop, https://arxiv.org/abs/2606.18024) predicts old-task output drift from
+  cross-task kernels and finds that its energy concentrates in a small number of output-space
+  modes. The frozen-linear-head result is exact and the nonlinear case is a local approximation.
+  This directly motivates a conditional successor to hard-label RO: measure each base update's
+  replay-logit drift and train the owner slot to cancel that one-step functional change, while
+  keeping the residual zero on current and foreign support. It does not justify more slot rank.
+- Replay-selection proposals are also deprioritized. The project has already observed
+  redistribution rather than a reproducible AA gain from k-center/class-balanced/reweighted
+  replay, so another selector does not address the measured residual false-positive mechanism.
+
+### Mechanism order after CoLaSlot-RO
+
+1. First read RO's same-state slots-on/off deltas, owner-specific online losses, and per-class
+   precision/recall. Do not infer the slot signal from the progress bar's `replay=` field; that is
+   CoLaR's shared replay CE.
+2. If RO is inert, close hard-label head residuals: post-task RF and online RO then agree that the
+   labels provide no useful correction signal. The next eligible target is measured one-step
+   replay-logit drift, not another CE refit.
+3. If RO has retention signal but loses precision/current-domain F1, test one support-bounded
+   online variant: owner CE on owner replay plus an exact-zero residual penalty on the current
+   batch and foreign-owner replay. Reuse the existing head slots and hard lexical route; do not add
+   rank, slots, or a router sweep.
+4. Only if the support-bounded residual passes the cheap matched gate should pathway-energy
+   self-routing be tested as an inference-side ablation. A full d50/r128 run and seeds 7/123 remain
+   forbidden until the cheap gate passes.
+
 ## Historical successor preregistration
 
 - Recommended concept: **CoLaSlot-RF**, a retention-only, post-task head-slot refit.

@@ -1,17 +1,16 @@
 # STATE
 
-## DONE (2026-08-15): thesis results update + CoLaSlot-RF gate result IN
+## DONE (2026-08-15): thesis results update; CoLaSlot-RF record corrected
 
-**CoLaSlot-RF d5/r64 seed-42 gate (retry2) PASSES its preregistered GO** on the raw numbers:
-AA 72.42 vs matched CoLaR 60.79 (+11.6), final row [67.65, 52.67, 96.94] vs [44.32, 41.34,
-96.71] — every domain above the -0.5 guardrail, old-domain mean >> +1.0. ⚠ The prereg's dual
-slots-on/off evaluation from the same state has NOT been run yet — verdict stays PROVISIONAL
-(n=1, 5-epoch diagnostic budget). Evidence: `results/gates/colaslot_rf_d5_e5_retry2/`.
-First attempt (08-09) died leaving only tb/; retry launched 08-14 19:50 completed same night.
+**Correction:** CoLaSlot-RF's raw AA 72.42 was previously compared with an older CoLaR run at
+60.79. Its saved dual evaluation gives the authoritative same-state slot-free control: AA 72.42
+and final row [67.65, 52.67, 96.94], exactly equal to slots-on. RF is inert and fails the GO rule;
+it is not a provisional pass. The detailed RF/RA NO-GO record below owns the verdict. Evidence:
+`results/gates/colaslot_rf_d5_e5_retry2/`.
 
 **Thesis results-only update DONE (structural reframe task #5 still separate):** new ch6 §6.6
 (RCA snap verdict, 5 kill-test nulls, latent-replay falsification ladder + consistency control,
-CoLaR control + conservation law + read-side negatives, PLaR, CoLaSlot-R NO-GO + RF provisional);
+CoLaR control + conservation law + read-side negatives, PLaR, CoLaSlot-R/RF/RA NO-GO);
 backbone section rewritten for the completed BERT slice; ch7 limitations aligned (BERT full grid
 done — replay ordering reproduces text-only; LiLT partial 23 runs; BROS zero). Builds 128 pp.
 **Pipeline fix:** analyze_results.py was renaming ALL bert runs to `bert_textonly`, pooling 14
