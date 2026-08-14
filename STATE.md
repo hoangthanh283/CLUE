@@ -21,39 +21,36 @@ Per-method BERT cells are tight (sd ≤5): dil er_cflat 78.3 / er 77.1 / der_pp 
 naive 39.4 / ewc 46.6; prompt-LoRA 34–39. bert lexslot (standalone soft) 37.96 ≈ naive —
 standalone-≈-naive finding reproduces off LayoutLMv3.
 
-## RUNNING (2026-08-15): boundary-RNG-matched CoLaSlot-FD functional-drift gate
+## RUNNING (2026-08-15): CoLaSlot-FDP token-pathway gate
 
-The first FD launch was stopped during task 1 after a protocol audit found two RNG confounds.
-CoLaSlot initialized random slot keys after model construction and LexSlot made a signature pass
-over the shuffled training loader before epoch 1. Both advanced the global Torch RNG used by
-subsequent shuffling/dropout. The partial run task-0 F1 was 87.7029 versus the current matched
-CoLaR control at 86.9223, so it cannot support an external CoLaR comparison. Its partial log remains
-at results/gates/colaslot_fd_d5_e5.log for audit only.
+The fully RNG-matched FD gate is a decisive NO-GO. It reproduced every archived CoLaR epoch
+checkpoint, so the same-state comparison is exact, but slots-on AA is **60.792444** versus
+**60.789595** slot-free: **+0.002849 AA**, **+0.004273 old-domain mean**, and final-domain
+deltas **[0.000000, +0.008546, 0.000000]**. Runtime rose from 5,286 to 8,224 seconds (+55.6%)
+with no useful return. Evidence: `results/dil_colaslot_fd_seed42_k4/` and
+`results/gates/colaslot_fd_boundaryfix_d5_e5.log`.
 
-CoLaSlot now restores the CPU Torch RNG after auxiliary slot initialization and the signature
-pass. Launch 2 reproduced all five CoLaR task-0 epochs exactly, then its first replay-active
-validation was 77.3097 versus the archived pure-CoLaR value 78.3715. Launch 3 decoupled lexical
-routing IDs from model replay IDs but reproduced the same 77.3097, falsifying the token-ID
-hypothesis; both partial logs remain audit-only at results/gates/colaslot_fd_rngfix_d5_e5.log and
-results/gates/colaslot_fd_matched_d5_e5.log.
+RCA rules out the document router as the old-task bottleneck: at final evaluation it makes zero
+confident errors on FUNSD/SROIE with 92.0%/98.85% coverage. FD measures real centered-logit drift
+(mean MSE 1.34e-3--2.33e-3), while null losses are only 0.99e-6--3.19e-6. A CPU fixture then
+localizes the optimization ceiling: the configured first slot step cancels 0.0017% of a known
+drift; 20--2,000x higher learning rates plateau near 4% cumulative cancellation. Removing the
+support-null term improves one stable point to 13% but diverges at larger rates, matching RA's
+false-positive failure. The shared cause is structural: the owner route is document-level and
+the existing head residual is only a low-rank linear token map, so entity correction conflicts
+with staying zero on O/current support. Another LR/null sweep is closed.
 
-The remaining confound was the extra base-only diagnostic evaluation in CoLaSlot-RF descendants.
-Creating even an unshuffled DataLoader iterator consumes global Torch RNG, so the second pass at a
-task boundary shifted the next-task shuffle/dropout stream. The diagnostic pass now restores CPU
-Torch RNG. Routing/model-ID and real-DataLoader boundary invariants are both pinned; all 24 CoLaR
-tests and the full 401-test non-GPU suite pass. The next run must reproduce both task-0 and
-replay-active task-1 CoLaR trajectories before its slot-on/off delta is admissible.
+The bounded successor is `method=colaslot_fdp`. It keeps CoLaR, FD targets, owner routing,
+parameters, memory, and optimizer unchanged. Within the selected owner block only, it treats each
+rank-one slot as a pathway and softmax-reweights those pathways per token by squared activation
+energy, preserving the original scale when energies are equal. This parameter-free PAS-style
+self-routing is the smallest change that adds the token selectivity supported by the RCA and
+current continual-IE literature.
 
-RO closes hard-label residual fitting at both post-task and online timings. CoLaSlot-FD keeps
-the exact slot-free CoLaR path but records each sampled owner's centered logits immediately
-before the base update, then trains only that owner's head-slot rows to cancel the measured
-one-step decision-logit drift on entity tokens. Same-owner O tokens, the current batch, and
-foreign-owner replay features receive zero-residual targets. This directly tests the
-function-space/low-rank forgetting mechanism without adding memory, rank, routing, or a sweep.
-
-Run one corrected DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch slots-on/off gate. GO remains
-AA >= +0.5, old-domain mean >= +1.0, and every domain >= -0.5. Failure closes this residual
-family; do not tune the online LR/null weight or run d50/r128.
+Run one DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch gate. GO requires AA >= +0.5, old-domain mean
+>= +1.0, every domain >= -0.5, and non-negative micro-precision delta on each old domain.
+Failure closes FDP; success alone permits a matched d50/r128 seed-42 run, then seeds 7/123.
+No SOTA claim is allowed before that full matched multi-seed sequence passes.
 
 ## NO-GO (2026-08-15): CoLaSlot-RO online hard-label drift tracking
 

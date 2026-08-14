@@ -35,6 +35,7 @@ from doccl.methods.colar_meta import CoLaRMeta
 from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.colaslot import CoLaSlot
 from doccl.methods.colaslot_fd import CoLaSlotFD
+from doccl.methods.colaslot_fdp import CoLaSlotFDP
 from doccl.methods.colaslot_ra import CoLaSlotRA
 from doccl.methods.colaslot_rf import CoLaSlotRF
 from doccl.methods.colaslot_ro import CoLaSlotRO
@@ -249,6 +250,7 @@ METHOD_REGISTRY = {
     "colaslot": CoLaSlot,
     "colaslot_r": CoLaSlot,
     "colaslot_fd": CoLaSlotFD,
+    "colaslot_fdp": CoLaSlotFDP,
     "colaslot_ra": CoLaSlotRA,
     "colaslot_rf": CoLaSlotRF,
     "colaslot_ro": CoLaSlotRO,
@@ -508,6 +510,7 @@ def main(cfg: DictConfig) -> None:
         "colaslot",
         "colaslot_r",
         "colaslot_fd",
+        "colaslot_fdp",
         "colaslot_ra",
         "colaslot_rf",
         "colaslot_ro",
@@ -968,6 +971,7 @@ def main(cfg: DictConfig) -> None:
         "colaslot",
         "colaslot_r",
         "colaslot_fd",
+        "colaslot_fdp",
         "colaslot_ra",
         "colaslot_rf",
         "colaslot_ro",
