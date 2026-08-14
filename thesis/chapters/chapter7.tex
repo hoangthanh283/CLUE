@@ -13,9 +13,11 @@ the head and late layers---has been confirmed on three further architectures: th
 unimodal BERT baseline and the LiLT and BROS secondary backbones all reproduce the
 same head-dominant displacement and depth gradient, and a permutation test cannot
 separate their forgetting profiles from LayoutLMv3's ($p=0.38$, $0.51$). What stays
-scoped to LayoutLMv3 is the \emph{full CL benchmark} (the ten-baseline retention
-sweep across all scenarios), whose extension to LiLT and BROS is a compute-bound
-follow-up; the cross-backbone \emph{amount} of forgetting is also left open, as the
+scoped to LayoutLMv3 is now narrower than at first writing: the full retention sweep has
+since been completed on the text-only BERT backbone (three seeds on CIL-CORD, DIL, and
+Mixed), where the replay-dominant ordering reproduces (\S\ref{sec:results-backbone}), and
+partially on LiLT (classical methods on DIL and Mixed); its extension to BROS and the
+remaining LiLT cells is a compute-bound follow-up; the cross-backbone \emph{amount} of forgetting is also left open, as the
 three-seed $|\mathrm{BWT}|$ comparison is underpowered, so the generalisation claim
 is about the \emph{location} of forgetting rather than its magnitude. A second
 architectural limit is orthogonal: because LayoutLMv3 is single-stream, the analysis
@@ -51,7 +53,12 @@ reported; every other baseline cell---including the depth-targeting probe and th
 cross-lingual scenario---is measured over three seeds, and the qualitative conclusions do
 not depend on that one missing cell. Eighth, and most consequentially for the proposed method,
 LexSlot is at present evaluated on the domain-incremental scenario (three seeds) on LayoutLMv3
-only; its multi-backbone (LiLT/BROS/BERT) and other-scenario confirmation is the pending grid,
+only; its multi-backbone and other-scenario confirmation in that configuration is the pending
+grid (the completed BERT slice runs the buffer-free soft-sharing configuration, which lands at
+the naive level there---consistent with the finding that isolation plus the compact buffer,
+not the slot mechanism alone, carries the protection
+(\S\ref{sec:results-lexslot})---so it does not yet confirm the headline configuration off
+LayoutLMv3),
 and its lexical gate is expected to be ineffective on class-incremental learning, where
 same-dataset sessions collapse the signature contrast the gate relies on, so its claims are
 deliberately confined to the domain-shift setting---which is why we frame it as promising rather
