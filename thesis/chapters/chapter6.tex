@@ -886,30 +886,34 @@ one method.
 architecture-general (the head-dominant displacement and the monotonic CKA depth gradient
 reproduce on BERT, LiLT, and BROS). A complementary question is whether the \emph{method
 ordering}---replay $\gg$ regularisation $\gg$ naive---also transfers off LayoutLMv3.
-Table~\ref{tab:backbone-byscenario} reports the secondary-backbone runs available so far:
-the four classical methods on the decoupled-stream LiLT backbone (DIL and Mixed, three seeds),
-and the text-only BERT lower bound across all five scenarios.
-The ordering is preserved on LiLT: replay (ER $85.7$, DER++ $84.4$ on DIL) dominates by a wide
-margin, regularisation (EWC $48.4$) sits in between, and naive ($40.1$) is the floor---the same
-pattern measured on LayoutLMv3 (Table~\ref{tab:main-comparison}), with the absolute replay level a
-few points lower on the smaller-capacity backbone. The text-only BERT baseline tracks the naive
-LayoutLMv3 lower bound across scenarios, confirming the benchmark behaves consistently on a
-unimodal encoder. The coverage is deliberately partial---LiLT is run on the two scenarios the
-secondary grid has reached, and the proposed LexSlot and the BROS backbone are
-\emph{not yet} evaluated here; completing this matrix is the pending grid
+Table~\ref{tab:backbone-byscenario} reports the secondary-backbone runs available:
+the \emph{complete} text-only BERT slice (the full method grid at three seeds on CIL-CORD, DIL,
+and Mixed, plus the naive lower bound on all five scenarios), and the four classical methods on
+the decoupled-stream LiLT backbone (DIL and Mixed, three seeds).
+The ordering is preserved on both secondaries. On LiLT, replay (ER $85.7$, DER++ $84.4$ on DIL)
+dominates by a wide margin, regularisation (EWC $48.4$) sits in between, and naive ($40.1$) is
+the floor---the same pattern measured on LayoutLMv3 (Table~\ref{tab:main-comparison}), with the
+absolute replay level a few points lower on the smaller-capacity backbone. On text-only BERT the
+full grid reproduces the same three-tier structure at a uniformly lower level: replay
+(ER + C-Flat++ $78.3$, DER++ $77.4$, ER $77.1$ on DIL) reaches the joint upper bound measured on
+the same backbone ($77.2$), regularisation barely moves the naive floor (EWC $46.6$ vs.\ naive
+$39.4$), and the prompt/LoRA families remain at or below naive ($34$--$39$)---so the
+replay-dominant ordering, the regularisation gap, \emph{and} the prompt-family failure all
+survive the removal of the layout and vision modalities entirely. Remaining coverage is
+explicit: LiLT is run on the two scenarios the secondary grid has reached, and the BROS backbone
+has no runs yet; completing that matrix is the pending rented-GPU grid
 (Chapter~\ref{ch:conclusions}). What the present rows establish is that the benchmark's central
-empirical ordering is not an artefact of one backbone.
+empirical ordering is not an artefact of one backbone---or of multimodality itself.
 
 \begin{table}[!htbp]
   \centering
-  \caption[Method comparison across backbones]{Average accuracy (AA) of the classical methods on
-  secondary backbones, by scenario (mean\,$\pm$\,std over three seeds; best non-naive per LiLT
-  column in bold). LiLT (decoupled text\,$+$\,layout) is run on DIL and Mixed; the text-only BERT
-  lower bound spans all five scenarios. The replay-dominant ordering of the LayoutLMv3 grid
-  (Table~\ref{tab:main-comparison}) is preserved on LiLT. Cells marked ``--'' are not yet run: the
-  proposed LexSlot, the BROS backbone, and LiLT on the remaining scenarios are
-  the pending grid (Chapter~\ref{ch:conclusions}). \textsuperscript{\ddag}LiLT DER++ on Mixed is
-  the mean of two seeds (one run pending).}
+  \caption[Method comparison across backbones]{Average accuracy (AA) across backbones, by
+  scenario (mean\,$\pm$\,std over three seeds). LiLT (decoupled text\,$+$\,layout) is run on DIL
+  and Mixed; text-only BERT carries the full method grid on CIL-CORD, DIL, and Mixed plus naive
+  on all five scenarios. The replay-dominant ordering of the LayoutLMv3 grid
+  (Table~\ref{tab:main-comparison}) is preserved on both secondaries. Cells marked ``--'' are not
+  yet run: the BROS backbone and LiLT on the remaining scenarios are the pending grid
+  (Chapter~\ref{ch:conclusions}).}
   \label{tab:backbone-byscenario}
   % 5-scenario table is wider than \textwidth; wrap in \resizebox to fit and stay centred.
   \IfFileExists{generated/table_backbone_byscenario.tex}{\resizebox{\textwidth}{!}{\input{generated/table_backbone_byscenario}}}{%
@@ -1083,6 +1087,97 @@ input-representation drift \emph{per se}.
   head-locus forgetting thesis.}
   \label{fig:newscenarios-aa}
 \end{figure}
+
+\section{Extended Falsification Results and the Replay Control}
+\label{sec:results-falsification-ext}
+
+The experiments in this section post-date the main grid and sharpen its central negative
+result. They ask, in sequence: \emph{what exactly} is the mechanism of forgetting
+(a root-cause analysis of the baselines), whether any \emph{cheap} correction of that
+mechanism works (a pre-registered kill-test programme), whether \emph{compressed} replay can
+retain the one intervention that does work (the CoLaR control), and whether task-specific
+capacity can be added on top of it (the CoLaSlot gates). All runs use the DIL stream on
+LayoutLMv3 unless noted; single-seed results are flagged as such.
+
+\paragraph{Root cause: the readout-marginal snap.}
+A per-boundary root-cause analysis of the core baselines (modality-ablated evaluation,
+per-class F1, token confusion, and Fisher displacement at every task boundary) localises the
+failure to the readout. For the failing methods, the head's \emph{output marginal} on old
+tasks snaps to the just-trained task's gold label marginal (cosine $0.997$--$0.998$ for
+naive and LwF at the first boundary, versus $0.60$ to the old task's own marginal); replay
+methods stay at $0.99$--$1.00$ to their own gold marginal. Classes that are never
+re-exercised (\textsc{key}, \textsc{header}) are extinguished to exactly $0.0$ F1 under
+\emph{every} modality mask, and the background \textsc{o} class collapses too (row accuracy
+$0.00\%$, invisible to entity-level F1). Trunk displacement is front-loaded and functionally
+minor, and no modality pathway is the culprit: forgetting here is a \emph{readout-marginal
+snap on a class-asymmetric substrate}, not representation erasure.
+
+\paragraph{Pre-registered kill-tests: every cheap correction is a null.}
+If the snap were merely a mis-calibrated prior, eval-time or marginal-level corrections
+should reverse it. Five kill-tests---registered with explicit support/kill bars before any
+run executed, though we note the registration and adjudication were self-administered rather
+than third-party---close this hole. Eval-time readout repair (marginal matching, prior-ratio
+correction, and per-document EM re-estimation) recovers at best $-0.1$ AA: the saturation
+probe shows the head has already annihilated the recoverable mass (old-class probability
+mass ${\sim}10^{-6}$, two to three orders below the $10^{-3}$ branch threshold), so the
+information is destroyed before any correction can act. Marginal-level \emph{training}
+objectives fare no better: a KL anchor to the prior-task label mixture and a
+balanced-softmax logit adjustment both leave the extinguished classes at $0.0$ F1. A
+frozen-trunk variant reproduces old-class extinction with the trunk fixed, though its poor
+acquisition makes it invalid as a clean effect-size confirmation. The consolidated verdict:
+the snap is a \emph{symptom}, not an invertible transformation---only task-consistent
+re-exercise (replay) prevents it. This closes the ``did you try cheap recalibration''
+objection with registered nulls rather than absence of evidence.
+
+\paragraph{Whole-document consistency is the necessary replay ingredient.}
+Given that only replay works, \emph{what about replay} is load-bearing? A falsification
+ladder over latent replay at a fixed frozen boundary (layer $k=8$) isolates it. Replaying
+\emph{real} banked activations of whole documents retains AA $87.3$ (converged). Every
+summarised variant collapses to naive level: a rank-16 spectral summary of the same store
+reaches $41.9$, per-class Gaussians (full dimension, no truncation) $39.4$, and even
+\emph{real} k-means centroids of the same activations $36.7$---so the failure is not
+synthesis fidelity. The single-variable control makes the mechanism explicit: four whole
+replayed documents retain AA $63.8$ (at a matched five-epoch budget), while the same
+features pasted onto decoupled layout carriers retain $36.7$. The
+(feature, position, label) binding of an intact document is the necessary ingredient;
+summaries that break it fail regardless of how faithful they are pointwise. A bounded
+positive probes the storage side of the same law: replaying pseudo-labelled \emph{public}
+documents (zero private bytes) recovers dense-label tasks (FUNSD $76.1$) but not tasks
+whose feature region the proxy pool does not cover (SROIE ${\sim}7$), topping out at AA
+$58.9$---a coverage-limited partial transfer, not a method.
+
+\paragraph{CoLaR: the constructive control.}
+The negatives above could be effort-limited. CoLaR (compressed latent replay) shows they are
+not: per-\emph{document} rank-$r$ SVD factors respect whole-document binding (unlike the
+pooled feature space, individual documents \emph{are} low-rank), giving AA $87.6$ at
+$60$\,MB ($2.7\times$ smaller than raw replay at equal document count; final-task row
+$[89.2, 76.3, 97.2]$ on FUNSD/SROIE/CORD)---within $1.4$ points of the joint oracle.
+Compression that respects the consistency law works; every marginal summary collapses.
+CoLaR is a \emph{control}, not a claimed contribution. Attempts to improve it obey a
+conservation law: class-balanced replay losses ($87.1$), coverage-based exemplar selection
+($86.8$), their combination ($87.3$), and entity-weighted compression ($87.1$) all trade
+FUNSD surplus for SROIE roughly $1{:}1$ without moving AA; a three-seed check confirms no
+lever beats the base ($87.8$ base $=$ balanced $87.8$ $>$ $k$-center $87.0$). Read-side
+extensions are clean negatives: blending a $k$NN readout over the stored latents is inert at
+$\lambda=0.3$ and destructive at $\lambda=1.0$ (AA $46.2$), and Benna--Fusi metaplastic
+consolidation is dose-dependently harmful ($85.9$ at $m=1$, $79.5$ at $m=3$)---consistent
+with the root cause: the readout must be \emph{repaired by re-exercise}, not averaged with a
+weaker reader or stiffened.
+
+\paragraph{Task-capacity gates on CoLaR (single-seed, provisional).}
+Two pre-registered gates ask whether task-specific head capacity can break the conservation
+law. CoLaSlot-R (owner-routed additive head slots) raises the matched five-epoch, five-document
+baseline by $+14.0$ AA but regresses the final domain (CORD $-0.84$), failing its
+pre-registered no-domain-below$-0.5$ guardrail; an exhaustive test-blind calibration of its
+scalar abstention margin found no threshold giving every domain both ${\geq}50\%$ coverage
+and ${\geq}99\%$ accepted accuracy, closing that design. Its successor CoLaSlot-RF keeps
+training exactly CoLaR-identical and refits frozen owner-specific head residuals only
+\emph{after} each task, reading them only for prior-task routes. On its gate cell (seed 42,
+five documents per task, rank 64), it passes all three pre-registered criteria: AA $72.4$
+versus the matched CoLaR baseline's $60.8$, with every domain improved
+($[67.6, 52.7, 96.9]$ versus $[44.3, 41.3, 96.7]$). This is a single seed at a diagnostic
+budget with the slots-on/off dual evaluation still outstanding, and is reported as a
+provisional gate pass, not a headline result.
 
 \section{Discussion}
 \label{sec:results-discussion}
