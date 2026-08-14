@@ -30,6 +30,7 @@ class CoLaSlot(CoLaR, LexSlot):
             super().__init__(model, config)
         finally:
             torch.random.set_rng_state(rng_state)
+        self._routing_input_ids: torch.Tensor | None = None
 
         # LexSlot keeps slots on the method object. Register them on the model too so
         # EarlyStopper snapshots/restores them with the backbone and classifier.
@@ -43,6 +44,21 @@ class CoLaSlot(CoLaR, LexSlot):
             super().before_task(task, train_loader)
         finally:
             torch.random.set_rng_state(rng_state)
+
+    def _install_infer_gate(self, module, args, kwargs) -> None:
+        if self._routing_input_ids is not None:
+            kwargs = dict(kwargs, input_ids=self._routing_input_ids)
+        super()._install_infer_gate(module, args, kwargs)
+
+    def _replay_forward(self, replay: dict[str, torch.Tensor]):
+        route_ids = replay.get("input_ids")
+        if route_ids is None:
+            return super()._replay_forward(replay)
+        self._routing_input_ids = route_ids.to(self.device)
+        try:
+            return super()._replay_forward({k: v for k, v in replay.items() if k != "input_ids"})
+        finally:
+            self._routing_input_ids = None
 
     def trainable_parameters(self):
         # Slots are registered model children above; returning model parameters avoids

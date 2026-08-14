@@ -79,12 +79,13 @@ STATE.md ACTIVE block.
 Normal CoLaR/current forwards remain slot-free. For each sampled replay owner, FD snapshots
 centered logits before the base update and fits only that owner's head rows after the update,
 on entity tokens. Current, foreign-owner, and same-owner O support target zero residual.
-The first launch was stopped during task 1: random slot initialization plus the shuffled lexical
-signature prepass advanced the global training RNG, so its 87.7029 task-0 F1 was not matched to
-CoLaR at 86.9223. The scoped fix preserves Torch RNG across both auxiliary operations and is covered
-by a shuffled-loader regression test (22 focused / 399 fast tests pass). Relaunch one clean
-d5/r64 seed-42 gate under the existing GO rule; require task-0 trajectory reproduction and do not
-sweep LR, null weight, route, or rank.
+Launch 1 was stopped for auxiliary RNG contamination. Launch 2 reproduced CoLaR through task 0,
+then its first replay epoch differed because stored routing IDs were also fed into LayoutLMv3,
+changing token-derived position/bias state above the injection boundary. Routing now reads real IDs
+through a transient side channel while model replay keeps the original CoLaR dummy IDs. The joint
+invariant is covered by a regression test (23 focused / 400 fast tests pass). Relaunch one clean
+d5/r64 seed-42 gate under the existing GO rule; require task-0 and task-1 trajectory reproduction
+and do not sweep LR, null weight, route, or rank.
 
 ### CLOSED (2026-08-15): CoLaSlot-RO online hard-label gate
 RO preserves the exact same-state base trajectory but changes final domains by only
