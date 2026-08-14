@@ -90,13 +90,27 @@
 
 ## Updated successor decision
 
-- CoLaSlot-RF and CoLaSlot-RA are completed no-gos, not recommendations. The experiment
-  rules out post-task hard-label refit (no signal) and dense acquisition-logit anchoring
-  (unsupported false positives) at the cheap gate.
+- CoLaSlot-RF, CoLaSlot-RA, and CoLaSlot-RO are completed no-gos, not recommendations.
+  Together they rule out hard-label head residuals at post-task and online timings, while
+  dense acquisition anchors provide unsupported false-positive corrections.
 - A further residual is permitted only as a support-bounded falsification test: validate
-  entity/class corrections on held-out replay documents, require non-negative precision,
-  and leave every unsupported residual exactly zero. This gate must pass before any full
+  entity/class corrections, require non-negative precision, and explicitly drive current,
+  foreign-owner, and non-entity support toward zero. This gate must pass before any full
   d50/r128 or multi-seed run. Adding rank, router, or anchor-weight sweeps is not justified.
+
+## 2026-08-15 online hard-label experiment
+
+- CoLaSlot-RO uses the same d5/r64/5-epoch seed-42 cell and the exact RF/RA slot-free
+  trajectory. Slots-on AA is 72.410336 versus same-state AA 72.419807 (-0.009471);
+  AF is 24.525508 versus 24.511302. Final domain deltas are
+  [-0.054351, +0.025940, 0.000000], and old-domain mean delta is -0.014206.
+- The only earlier-stage effect is -0.197335 FUNSD after task 1. At final evaluation,
+  recall is unchanged on every domain; micro precision moves -0.128 FUNSD and +0.031
+  SROIE. The residual is functionally negligible rather than a hidden redistribution.
+- Owner-specific online CE averages are 9.20e-4 (task 1/owner 0), 4.47e-5
+  (task 2/owner 0), and 2.19e-3 (task 2/owner 1). RO and RF both use 3,266,040 bytes and
+  2,424.84 MB peak GPU memory; RO adds 1,615 seconds (26.9 minutes). JSON and matrix.npy
+  agree. The strict gate fails both improvement clauses.
 
 ## 2026-08-15 primary-literature update
 
@@ -133,21 +147,19 @@
   redistribution rather than a reproducible AA gain from k-center/class-balanced/reweighted
   replay, so another selector does not address the measured residual false-positive mechanism.
 
-### Mechanism order after CoLaSlot-RO
+### CoLaSlot-FD preregistration
 
-1. First read RO's same-state slots-on/off deltas, owner-specific online losses, and per-class
-   precision/recall. Do not infer the slot signal from the progress bar's `replay=` field; that is
-   CoLaR's shared replay CE.
-2. If RO is inert, close hard-label head residuals: post-task RF and online RO then agree that the
-   labels provide no useful correction signal. The next eligible target is measured one-step
-   replay-logit drift, not another CE refit.
-3. If RO has retention signal but loses precision/current-domain F1, test one support-bounded
-   online variant: owner CE on owner replay plus an exact-zero residual penalty on the current
-   batch and foreign-owner replay. Reuse the existing head slots and hard lexical route; do not add
-   rank, slots, or a router sweep.
-4. Only if the support-bounded residual passes the cheap matched gate should pathway-energy
-   self-routing be tested as an inference-side ablation. A full d50/r128 run and seeds 7/123 remain
-   forbidden until the cheap gate passes.
+1. Capture each sampled owner's combined centered logits in eval/no-grad mode immediately before
+   the normal CoLaR optimizer step. After the step, freeze CoLaR and train only that owner's
+   existing head-slot rows to cancel the measured decision-logit drift on entity tokens.
+2. Give same-owner O tokens, the current batch, and foreign-owner replay features a zero-residual
+   target. Reuse RO's optimizer setting, hard lexical route, and memory; add no rank, slots,
+   teacher store, or sweep.
+3. The matched cheap gate remains AA >= +0.5, old-domain mean >= +1.0, and every domain >= -0.5.
+   Failure closes the functional residual family. A full d50/r128 run and seeds 7/123 remain
+   forbidden until this gate passes.
+4. Pathway-energy self-routing remains an inference-side ablation only after FD passes; it cannot
+   rescue an unsupported or inert residual.
 
 ## Historical successor preregistration
 

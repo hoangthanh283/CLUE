@@ -34,6 +34,7 @@ from doccl.methods.colar_knn import CoLaRKNN
 from doccl.methods.colar_meta import CoLaRMeta
 from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.colaslot import CoLaSlot
+from doccl.methods.colaslot_fd import CoLaSlotFD
 from doccl.methods.colaslot_ra import CoLaSlotRA
 from doccl.methods.colaslot_rf import CoLaSlotRF
 from doccl.methods.colaslot_ro import CoLaSlotRO
@@ -247,6 +248,7 @@ METHOD_REGISTRY = {
     # the compressed-replay retention frontier before adding lexical routing.
     "colaslot": CoLaSlot,
     "colaslot_r": CoLaSlot,
+    "colaslot_fd": CoLaSlotFD,
     "colaslot_ra": CoLaSlotRA,
     "colaslot_rf": CoLaSlotRF,
     "colaslot_ro": CoLaSlotRO,
@@ -505,6 +507,7 @@ def main(cfg: DictConfig) -> None:
         "colar",
         "colaslot",
         "colaslot_r",
+        "colaslot_fd",
         "colaslot_ra",
         "colaslot_rf",
         "colaslot_ro",
@@ -964,6 +967,7 @@ def main(cfg: DictConfig) -> None:
         "colar",
         "colaslot",
         "colaslot_r",
+        "colaslot_fd",
         "colaslot_ra",
         "colaslot_rf",
         "colaslot_ro",

@@ -75,12 +75,19 @@ gate closed.** Read-side-as-blending is dead; the RCA kill-tests (marginal corre
 attack the same readout locus directly and supersede this direction. Full verdict in
 STATE.md ACTIVE block.
 
-### RUNNING (2026-08-14): CoLaSlot-RO online replay-only drift gate
-One final timing discriminator remains: normal CoLaR/current forwards are slot-free, while
-prior-owner residuals receive one hard-label update on the already-sampled replay batch after
-each base optimizer step. Base parameters are frozen during the extra eval-mode forward, so
-the base trajectory and current-owner fallback remain exact. Run one d5/r64 seed-42 gate with
-the existing GO rule; failure closes residual timing without any LR/router/rank sweep.
+### RUNNING (2026-08-15): CoLaSlot-FD one-step functional-drift gate
+Normal CoLaR/current forwards remain slot-free. For each sampled replay owner, FD snapshots
+centered logits before the base update and fits only that owner's head rows after the update,
+on entity tokens. Current, foreign-owner, and same-owner O support target zero residual.
+Run one d5/r64 seed-42 gate under the existing GO rule; do not sweep LR, null weight, route,
+or rank.
+
+### CLOSED (2026-08-15): CoLaSlot-RO online hard-label gate
+RO preserves the exact same-state base trajectory but changes final domains by only
+[-0.054, +0.026, 0.000], giving -0.009 AA and -0.014 old-domain mean. Owner CE is
+4.47e-5--2.19e-3, recall is unchanged, memory is unchanged, and runtime rises by 26.9 minutes.
+It fails both improvement clauses. Hard-label residual fitting is closed at post-task and
+online timings; FD changes the target to measured one-step function drift.
 
 ### CLOSED (2026-08-14): CoLaSlot-RF/RA post-task residual refits
 Matched d5/r64 seed-42 runs preserve an identical slot-free CoLaR trajectory. RF produces
@@ -116,8 +123,8 @@ tune against final test F1. Evidence:
 3. **Write-up.** DONE for the thesis (2026-08-15, ch6 §6.6 + backbone/ch7 refresh — see STATE);
    the PAPER-side fold of Finding 3b + consistency-law figure remains. CoLaR positioned as the
    constructive control, PLaR as the bounded-negative.
-   CoLaSlot-RF/RA are closed same-state NO-GOs; no additional seeds. CoLaSlot-RO is the active
-   timing discriminator and must pass its same-state cheap gate before any expansion.
+   CoLaSlot-RF/RA/RO are closed same-state NO-GOs; no additional seeds. CoLaSlot-FD is the
+   active functional-drift gate and must pass its same-state cheap cell before any expansion.
 4. **LexSlot prose correction (correctness hygiene — a reviewer WILL catch it).** The 87.3 row is
    REAL but **buffer-based (200 exemplars, the DocCL-hybrid)** — verified this session (seeds 42/7/123
    = 88.4/87.2/86.3, all use_replay=True). Chapter-7's "buffer-free / without storing any past data"
