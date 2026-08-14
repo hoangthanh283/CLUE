@@ -188,9 +188,12 @@ def load_local_runs(results_dir: Path) -> pd.DataFrame:
         # backbones — surface it as a real column so the secondary-backbone study can
         # be tabulated separately instead of silently merging into LayoutLMv3 rows.
         family = d.get("model_family") or "layoutlmv3"
-        if family == "bert":
+        if family == "bert" and method == "naive":
             # BERT-naive is the external text-only comparator in the MAIN table; keep
             # the legacy method rename so it renders as its own baseline row there.
+            # Other BERT-grid methods keep their real name (they feed the backbone
+            # table, not the main table) — renaming them all pooled 14 methods into
+            # one bogus "bert_textonly" cell once the full BERT slice landed.
             method = "bert_textonly"
         rows.append(
             {
@@ -257,7 +260,8 @@ PRIMARY_FAMILY = "layoutlmv3"
 SECONDARY_FAMILIES = [
     "lilt",
     "bros",
-]  # backbone-generalization study (text-only BERT excluded — own row)
+    "bert",
+]  # backbone-generalization study (BERT-naive doubles as the main-table comparator)
 BACKBONE_DISPLAY = {
     "layoutlmv3": "LayoutLMv3",
     "lilt": "LiLT",
@@ -412,6 +416,9 @@ def write_backbone_table(df: pd.DataFrame, output: Path, metric: str = "AA") -> 
     if "model_family" not in df.columns:
         return
     df = df[(df["method"] != "doccl") | _is_full_method(df["target"])]
+    # BERT's naive rows arrive renamed "bert_textonly" (main-table comparator);
+    # inside the backbone table they are just naive-on-BERT.
+    df = df.assign(method=df["method"].replace({"bert_textonly": "naive"}))
     secondary = df[df["model_family"].isin(SECONDARY_FAMILIES)]
     if secondary.empty:
         print(f"No secondary-backbone (LiLT/BROS) runs for {metric}; skipping backbone table.")
