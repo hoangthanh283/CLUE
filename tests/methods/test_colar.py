@@ -62,6 +62,7 @@ class _Wrapper(nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def forward(self, input_ids, bbox, pixel_values=None, attention_mask=None, labels=None):
+        self.last_input_ids = input_ids.detach().clone()
         h = self.model.layoutlmv3.embeddings(input_ids)
         for layer in self.model.layoutlmv3.encoder.layer:
             h = layer(h, attention_mask)[0]
@@ -168,6 +169,27 @@ def test_colaslot_auxiliary_work_preserves_training_rng():
     rng_before = torch.random.get_rng_state()
     method.before_task(TaskInfo(0, "t0", ["O", "KEY", "VALUE"]), loader)
     assert torch.equal(rng_before, torch.random.get_rng_state())
+
+
+def test_colaslot_routes_replay_ids_without_changing_colar_model_input():
+    method = _colaslot(
+        infer_gate=True,
+        store_input_ids=True,
+        routing_mode="hard_top1",
+        slot_depth="head_only",
+    )
+    batch = _batch(2, seed=14)
+    batch["input_ids"].fill_(2)
+    task = TaskInfo(0, "t0", ["O", "KEY", "VALUE"])
+    method.before_task(task, [batch])
+    method.after_task(task, [batch])
+
+    method._replay_forward(method._stack_replay(method.store))
+
+    assert method.model.last_input_ids.eq(method.model.processor.tokenizer.pad_token_id).all()
+    owned = torch.tensor(method.head_slots.slot_owner).eq(0)
+    assert method.head_slots._infer_gate[:, owned].eq(1).all()
+    assert method._routing_input_ids is None
 
 
 def _colaslot_rf(**overrides):
