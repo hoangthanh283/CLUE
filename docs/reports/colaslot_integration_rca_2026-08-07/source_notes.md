@@ -119,6 +119,14 @@
   Its graph model, class-incremental task construction, labels, and average-performance metric are
   not comparable to this LayoutLMv3 domain-incremental token-classification protocol. Any SoTA
   statement here must therefore be explicitly protocol-specific and supported by matched seeds.
+- *AMD-Proj: Adaptive Memory-Driven Selective Gradient Projection for Continual Learning in
+  Document Understanding* (Technologies 2026, https://doi.org/10.3390/technologies14050250) is the
+  closest transformer-based document-CL comparator found. It evaluates LayoutLMv2/v3 on
+  SROIE, FUNSD, CORD, and BuDDIE, but uses task-incremental learning with disjoint label spaces,
+  known task identity at inference, three epochs, and a different four-domain order. The paper
+  explicitly leaves domain- and class-incremental extensions for future work. Its scores therefore
+  cannot establish or refute a result on this shared-nine-label DIL protocol; it narrows any claim
+  to a protocol-specific best rather than an unrestricted document-CL SoTA.
 - *Mixture of LoRA Experts for Continual Information Extraction with LLMs* (Findings of EMNLP
   2025, https://aclanthology.org/2025.findings-emnlp.718/) reports that token-level expert
   selection and distillation of router/key distributions outperform sentence-level selection in
