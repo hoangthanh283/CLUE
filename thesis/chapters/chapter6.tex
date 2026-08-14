@@ -1172,12 +1172,13 @@ pre-registered no-domain-below$-0.5$ guardrail; an exhaustive test-blind calibra
 scalar abstention margin found no threshold giving every domain both ${\geq}50\%$ coverage
 and ${\geq}99\%$ accepted accuracy, closing that design. Its successor CoLaSlot-RF keeps
 training exactly CoLaR-identical and refits frozen owner-specific head residuals only
-\emph{after} each task, reading them only for prior-task routes. On its gate cell (seed 42,
-five documents per task, rank 64), it passes all three pre-registered criteria: AA $72.4$
-versus the matched CoLaR baseline's $60.8$, with every domain improved
-($[67.6, 52.7, 96.9]$ versus $[44.3, 41.3, 96.7]$). This is a single seed at a diagnostic
-budget with the slots-on/off dual evaluation still outstanding, and is reported as a
-provisional gate pass, not a headline result.
+\emph{after} each task, reading them only for prior-task routes. The saved dual evaluation
+shows that its AA $72.4$ and final row $[67.6,52.7,96.9]$ are exactly equal to its own
+same-state slots-off control; the previously cited $60.8$ control came from a different run.
+Hard-label refit losses near $10^{-5}$ explain the null effect. Replacing labels with
+acquisition-logit anchors restores a training signal, but reduces AA by $0.43$ and SROIE by
+$0.99$ through lower precision. Both variants therefore fail the pre-registered gate; no
+full-budget or additional-seed run is warranted.
 
 \section{Discussion}
 \label{sec:results-discussion}
