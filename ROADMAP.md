@@ -75,6 +75,13 @@ gate closed.** Read-side-as-blending is dead; the RCA kill-tests (marginal corre
 attack the same readout locus directly and supersede this direction. Full verdict in
 STATE.md ACTIVE block.
 
+### RUNNING (2026-08-14): CoLaSlot-RO online replay-only drift gate
+One final timing discriminator remains: normal CoLaR/current forwards are slot-free, while
+prior-owner residuals receive one hard-label update on the already-sampled replay batch after
+each base optimizer step. Base parameters are frozen during the extra eval-mode forward, so
+the base trajectory and current-owner fallback remain exact. Run one d5/r64 seed-42 gate with
+the existing GO rule; failure closes residual timing without any LR/router/rank sweep.
+
 ### CLOSED (2026-08-14): CoLaSlot-RF/RA post-task residual refits
 Matched d5/r64 seed-42 runs preserve an identical slot-free CoLaR trajectory. RF produces
 near-zero hard-label gradients and is exactly inert at final evaluation. RA's acquisition-logit

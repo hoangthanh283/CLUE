@@ -36,6 +36,7 @@ from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.colaslot import CoLaSlot
 from doccl.methods.colaslot_ra import CoLaSlotRA
 from doccl.methods.colaslot_rf import CoLaSlotRF
+from doccl.methods.colaslot_ro import CoLaSlotRO
 from doccl.methods.coreset_memory import CoresetMemory
 from doccl.methods.cpfd import CPFD
 from doccl.methods.cuber import CUBER
@@ -248,6 +249,7 @@ METHOD_REGISTRY = {
     "colaslot_r": CoLaSlot,
     "colaslot_ra": CoLaSlotRA,
     "colaslot_rf": CoLaSlotRF,
+    "colaslot_ro": CoLaSlotRO,
     # CoLaR-Bal: CoLaR + soft-target replay (dark knowledge) to protect sparse classes (SROIE)
     "colar_bal": CoLaRBal,
     # CoLaR-CB: same bytes; balances old-task mass and sparse-label replay gradients.
@@ -505,6 +507,7 @@ def main(cfg: DictConfig) -> None:
         "colaslot_r",
         "colaslot_ra",
         "colaslot_rf",
+        "colaslot_ro",
         "colar_bal",
         "colar_cb",
         "colar_wsvd",
@@ -963,6 +966,7 @@ def main(cfg: DictConfig) -> None:
         "colaslot_r",
         "colaslot_ra",
         "colaslot_rf",
+        "colaslot_ro",
         "colar_bal",
         "colar_cb",
         "colar_wsvd",
