@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
 
 from doccl.methods.base import EarlyStopper
 from doccl.methods.colar import CoLaR
@@ -153,6 +154,20 @@ def _colaslot_config(**overrides):
 
 def _colaslot(**overrides):
     return CoLaSlot(_Wrapper(), _colaslot_config(**overrides))
+
+
+def test_colaslot_auxiliary_work_preserves_training_rng():
+    torch.manual_seed(123)
+    wrapper = _Wrapper()
+    rng_before = torch.random.get_rng_state()
+    method = CoLaSlot(wrapper, _colaslot_config())
+    assert torch.equal(rng_before, torch.random.get_rng_state())
+
+    samples = [{key: value[0] for key, value in _batch(1, seed=seed).items()} for seed in range(4)]
+    loader = DataLoader(samples, batch_size=2, shuffle=True, num_workers=0)
+    rng_before = torch.random.get_rng_state()
+    method.before_task(TaskInfo(0, "t0", ["O", "KEY", "VALUE"]), loader)
+    assert torch.equal(rng_before, torch.random.get_rng_state())
 
 
 def _colaslot_rf(**overrides):

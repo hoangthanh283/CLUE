@@ -7,6 +7,8 @@ padding-aware task-block routing, and low-confidence abstention.
 
 from __future__ import annotations
 
+import torch
+
 from doccl.methods.colar import CoLaR
 from doccl.methods.lexslot import LexSlot
 
@@ -23,12 +25,24 @@ class CoLaSlot(CoLaR, LexSlot):
             raise ValueError("colaslot inference routing needs store_input_ids=true")
         if config.get("freeze_lower", False):
             raise ValueError("colaslot must use CoLaR's split-layer freeze map")
-        super().__init__(model, config)
+        rng_state = torch.random.get_rng_state()
+        try:
+            super().__init__(model, config)
+        finally:
+            torch.random.set_rng_state(rng_state)
 
         # LexSlot keeps slots on the method object. Register them on the model too so
         # EarlyStopper snapshots/restores them with the backbone and classifier.
         self.model.add_module("_colaslot_head_slots", self.head_slots)
         self.model.add_module("_colaslot_late_slots", self.late_slots)
+
+    def before_task(self, task, train_loader) -> None:
+        """Keep the shuffled LexSlot signature pass from changing CoLaR training RNG."""
+        rng_state = torch.random.get_rng_state()
+        try:
+            super().before_task(task, train_loader)
+        finally:
+            torch.random.set_rng_state(rng_state)
 
     def trainable_parameters(self):
         # Slots are registered model children above; returning model parameters avoids

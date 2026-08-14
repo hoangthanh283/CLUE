@@ -21,7 +21,19 @@ Per-method BERT cells are tight (sd ≤5): dil er_cflat 78.3 / er 77.1 / der_pp 
 naive 39.4 / ewc 46.6; prompt-LoRA 34–39. bert lexslot (standalone soft) 37.96 ≈ naive —
 standalone-≈-naive finding reproduces off LayoutLMv3.
 
-## NEXT GATE (2026-08-15): CoLaSlot-FD one-step functional-drift cancellation
+## RUNNING (2026-08-15): RNG-matched CoLaSlot-FD functional-drift gate
+
+The first FD launch was stopped during task 1 after a protocol audit found two RNG confounds.
+CoLaSlot initialized random slot keys after model construction and LexSlot made a signature pass
+over the shuffled training loader before epoch 1. Both advanced the global Torch RNG used by
+subsequent shuffling/dropout. The partial run task-0 F1 was 87.7029 versus the current matched
+CoLaR control at 86.9223, so it cannot support an external CoLaR comparison. Its partial log remains
+at results/gates/colaslot_fd_d5_e5.log for audit only.
+
+CoLaSlot now restores the CPU Torch RNG after auxiliary slot initialization and the signature
+pass. A shuffled-DataLoader regression test pins both invariants; all 22 CoLaR tests and the full
+399-test non-GPU suite pass. The corrected gate must reproduce the CoLaR task-0 trajectory before
+its slot-on/off delta is admissible evidence.
 
 RO closes hard-label residual fitting at both post-task and online timings. CoLaSlot-FD keeps
 the exact slot-free CoLaR path but records each sampled owner's centered logits immediately
@@ -30,7 +42,7 @@ one-step decision-logit drift on entity tokens. Same-owner O tokens, the current
 foreign-owner replay features receive zero-residual targets. This directly tests the
 function-space/low-rank forgetting mechanism without adding memory, rank, routing, or a sweep.
 
-Run one matched DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch slots-on/off gate. GO remains
+Run one corrected DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch slots-on/off gate. GO remains
 AA >= +0.5, old-domain mean >= +1.0, and every domain >= -0.5. Failure closes this residual
 family; do not tune the online LR/null weight or run d50/r128.
 
