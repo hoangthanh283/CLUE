@@ -1,5 +1,18 @@
 # STATE
 
+## NEXT GATE (2026-08-14): CoLaSlot-RO online replay-only drift tracking
+
+RF/RA show that post-task residuals are either gradient-starved or unsupported. The final
+isolated mechanism is online timing: keep every normal CoLaR/current forward slot-free, then
+after each CoLaR optimizer step update only the sampled replay owners' residuals with the same
+hard-label replay loss. Base parameters are frozen during this extra eval-mode step, and the
+current owner remains an exact-zero fallback. This tests whether CoLaSlot-R's +14.02 cheap AA
+came from tracking transient drift during later tasks rather than from post-task fitting.
+
+Run one matched DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch slots-on/off gate. GO remains
+AA >= +0.5, old-domain mean >= +1.0, and every domain >= -0.5. Failure closes residual
+timing; do not tune the online LR, router, rank, or run d50/r128.
+
 ## NO-GO (2026-08-14): retention-only CoLaSlot-RF and acquisition-anchor CoLaSlot-RA
 
 Both decoupled successors completed the matched DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch

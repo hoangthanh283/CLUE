@@ -19,6 +19,7 @@ from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.colaslot import CoLaSlot
 from doccl.methods.colaslot_ra import CoLaSlotRA
 from doccl.methods.colaslot_rf import CoLaSlotRF
+from doccl.methods.colaslot_ro import CoLaSlotRO
 from doccl.methods.latent_replay import LatentReplay
 from doccl.types import TaskInfo
 
@@ -181,6 +182,20 @@ def _colaslot_ra(**overrides):
         **overrides,
     )
     return CoLaSlotRA(_Wrapper(), config)
+
+
+def _colaslot_ro(**overrides):
+    config = _colaslot_config(
+        infer_gate=True,
+        store_input_ids=True,
+        routing_mode="hard_top1",
+        route_margin=0.05,
+        slot_depth="head_only",
+        online_lr=1e-2,
+        online_weight_decay=0.0,
+        **overrides,
+    )
+    return CoLaSlotRO(_Wrapper(), config)
 
 
 def test_colaslot_uses_colar_freeze_map_and_unique_optimizer_params():
@@ -351,6 +366,47 @@ def test_colaslot_ra_anchors_acquisition_logits_after_base_drift():
         if name in base_before
     )
     assert m.diagnostic_metrics["refit"]["1:0"]["positive_loss"] > 0
+
+
+def test_colaslot_ro_online_step_changes_only_prior_owner_slots():
+    m = _colaslot_ro()
+    task0 = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
+    task1 = TaskInfo(task_id=1, task_name="t1", label_set=["O", "KEY", "VALUE"])
+    batch0 = _batch(2, seed=10)
+    batch1 = _batch(2, seed=11)
+    batch0["input_ids"].fill_(2)
+    batch1["input_ids"].fill_(3)
+
+    m.before_task(task0, [batch0])
+    m.after_task(task0, [batch0])
+    m.before_task(task1, [batch1])
+    m._online_docs = list(m.store)
+    m._online_optimizer = torch.optim.AdamW(m._slot_parameters(), lr=1e-2, weight_decay=0.1)
+
+    slot_params = m._slot_parameters()
+    inactive_before = [parameter.detach()[2:].clone() for parameter in slot_params]
+    slot_ids = {id(parameter) for parameter in slot_params}
+    base_before = {
+        name: parameter.detach().clone()
+        for name, parameter in m.model.named_parameters()
+        if id(parameter) not in slot_ids
+    }
+    rng_before = torch.random.get_rng_state()
+    m._post_optimizer_step()
+
+    assert torch.equal(rng_before, torch.random.get_rng_state())
+    assert m.model.training
+    assert torch.count_nonzero(m.head_slots.proj[:2]) > 0
+    assert all(
+        torch.equal(before, parameter[2:])
+        for before, parameter in zip(inactive_before, slot_params, strict=True)
+    )
+    assert all(
+        torch.equal(base_before[name], parameter)
+        for name, parameter in m.model.named_parameters()
+        if name in base_before
+    )
+    assert m.diagnostic_metrics["online"]["1:0"]["steps"] == 1
 
 
 def test_colaslot_rejects_known_broken_composition_modes():
