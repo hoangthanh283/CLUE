@@ -202,9 +202,11 @@ class CoLaSlotRF(CoLaSlot):
         expected = set(range(self._active_task_id + 1))
         if self._active_task_id >= 0 and set(eval_loaders) == expected:
             self._slot_reads_enabled = False
+            rng_state = torch.random.get_rng_state()
             try:
                 base = super().evaluate(eval_loaders)
             finally:
+                torch.random.set_rng_state(rng_state)
                 self._slot_reads_enabled = True
             self.diagnostic_metrics["base_only_by_stage"][str(self._active_task_id)] = {
                 str(task_id): metric.f1 for task_id, metric in base.items()

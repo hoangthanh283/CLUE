@@ -382,6 +382,23 @@ def test_colaslot_rf_refits_prior_owner_without_changing_colar():
     assert set(m.diagnostic_metrics["base_only_by_stage"]["1"]) == {"0", "1"}
 
 
+def test_colaslot_rf_diagnostic_evaluation_preserves_training_rng():
+    m = _colaslot_rf()
+    batch = _batch(2, seed=15)
+    task = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
+    m.before_task(task, [batch])
+    m.model.id_to_label = {0: "O", 1: "B-A", 2: "I-A", 3: "B-B"}
+    loader = DataLoader([batch], batch_size=None)
+
+    torch.manual_seed(16)
+    list(loader)
+    expected = torch.random.get_rng_state()
+    torch.manual_seed(16)
+    m.evaluate({0: loader})
+
+    assert torch.equal(torch.random.get_rng_state(), expected)
+
+
 def test_colaslot_ra_anchors_acquisition_logits_after_base_drift():
     m = _colaslot_ra()
     task0 = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
