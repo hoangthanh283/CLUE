@@ -4,7 +4,8 @@
 A task's signature is a sparse bag-of-OCR-tokens vector. Inter-task cosine similarity S
 (measured: SROIE<->CORD 0.31, FUNSD 0.10) decides parameter sharing: when training task t,
 a slot owned by a prior task tau is trainable in proportion to S[t, tau] (soft), above a
-cutoff (hard), or not at all (off). A task's own / unclaimed slots are fully trainable. The
+cutoff (hard), or not at all (off). Only claimed slots are trainable; unclaimed capacity
+stays silent until a task owns it. The
 returned mask scales the slot gradients, so low-S tasks cannot overwrite unrelated slots
 while high-S tasks co-train shared slots.
 """
@@ -41,15 +42,17 @@ def slot_trainable_mask(
 ) -> torch.Tensor:
     """(n_slots,) float mask in [0,1] scaling each slot's gradient for the current task.
 
-    own/unclaimed slot -> 1.0 ; prior-task slot -> soft: S[task_id,owner];
+    own slot -> 1.0; unclaimed slot -> 0.0; prior-task slot -> soft: S[task_id,owner];
     hard: 1.0 if S>=threshold else 0.0 ; off: 0.0.
     """
     n = len(slot_owner)
     m = torch.zeros(n)
     for s in range(n):
         owner = slot_owner[s]
-        if owner == task_id or owner == -1:
+        if owner == task_id:
             m[s] = 1.0
+            continue
+        if owner == -1:
             continue
         if sharing == "off":
             m[s] = 0.0

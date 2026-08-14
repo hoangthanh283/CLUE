@@ -1,20 +1,49 @@
 # STATE
 
-## ACTIVE (2026-08-06): CoLaSlot clean capacity gate implemented; headline run pending
+## NO-GO (2026-08-14): retention-only CoLaSlot-RF and acquisition-anchor CoLaSlot-RA
 
-The earlier “CoLaR + LexSlot cannot beat the redistribution frontier” decision was an
-untested extrapolation: k-center and balanced replay redistribute shared capacity, while
-task-isolated slots add capacity. Added `method=colaslot`, the minimum decisive cell:
-CoLaR replay + ungated, gradient-isolated head/late slots. It preserves CoLaR's freeze map,
-registers slots in model checkpoints so early stopping restores them, and rejects the two
-known-invalid compositions (LexSlot lower-layer freezing and lexical routing over CoLaR's
-dummy replay token IDs). Hydra composition caught and fixed YAML `off`→boolean coercion.
+Both decoupled successors completed the matched DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch
+gate. Their slot-free trajectories are identical, so the comparison isolates the residual:
+CoLaSlot-RF = **72.42 AA / 24.51 AF / [67.65, 52.67, 96.94]**; CoLaSlot-RA =
+**71.99 AA / 25.15 AF / [67.36, 51.68, 96.94]**. The same-state CoLaR fallback is
+**72.42 AA / [67.65, 52.67, 96.94]**.
 
-CPU validation: 388 fast tests pass; focused Ruff/Black clean. Repository-wide Ruff/Black
-remain red on pre-existing unrelated files (270 Ruff findings; 48 Black targets).
-Headline gate is NOT run locally: DIL/LayoutLMv3 k4/d50/r128 belongs on the rented GPU.
-GO requires AA ≥88.5, SROIE ≥80, FUNSD ≥87, CORD ≥97 across seeds 42/7/123; <0.5 AA
-gain or another FUNSD↔SROIE exchange closes slots before any lexical-routing work.
+RF's hard-label refit collapses to positive losses near 1e-5 and its final slot-on scores
+equal the fallback exactly. RA fixes that optimization failure: acquisition-logit MSE losses
+remain 2.82--5.70, but its residual changes final domains by **[-0.29, -0.99, 0.00]**,
+giving **-0.43 AA** and **-0.64 old-domain mean**. SROIE recall is unchanged while
+precision falls 1.19 points, directly identifying false-positive residual overgeneralization
+from five replay documents. RA also costs 4.23% more memory than RF.
+
+Both fail the preregistered GO rule (AA >= +0.5, old-domain mean >= +1.0, no domain below
+-0.5). Do not run d50/r128 or more seeds. Post-task head residuals are closed in their
+current form: hard labels provide no drift signal, while dense logit anchors provide signal
+without document-level support. Any successor must first pass a held-out replay test that
+enables only entity/class corrections with non-negative precision; unsupported residuals must
+remain exactly zero. Full RCA: `docs/reports/colaslot_integration_rca_2026-08-07/report.html`.
+
+## ACTIVE (2026-08-08): CoLaSlot-R cheap gate NO-GO; scalar abstention closed
+
+Implemented `method=colaslot_r`: claim-before-mask owner-only gradients, silent unowned
+slots, original token IDs retained in CoLaR replay, attention-mask/special-ID-aware signatures,
+hard top-1 task-block routing, and scalar-margin abstention to zero slot contribution. The
+historical `method=colaslot` config remains reproducible. Validation: 54 focused tests and
+392 fast tests pass; focused Ruff/Black are clean.
+
+The matched DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch gate completed. CoLaR = **60.79 AA /
+41.05 AF / [44.32, 41.34, 96.71]**; CoLaSlot-R = **74.81 AA / 20.60 AF / [64.31,
+64.27, 95.87]**. Delta = **+14.02 AA / -20.45 AF / [+19.99, +22.93, -0.84]**.
+The large signal fails the preregistered no-domain-below -0.5 guardrail on CORD.
+
+A test-blind 5-fold out-of-fold calibration over all 1,575 training documents closed the
+only permitted scalar-margin follow-up. At margin 0.05, overall coverage is 92.47% and
+accepted accuracy 99.22%, but CORD accepted accuracy is 97.71% (16 errors). The zero-error
+margin 0.326 leaves 0% FUNSD/SROIE coverage. No threshold on the 0.001 grid simultaneously
+gives every seen stage/domain >=50% coverage and >=99% accepted accuracy. Therefore do not
+rerun the cheap cell, d50/r128, or more seeds. Any successor needs either a different router or a slot lifecycle that makes wrong routes
+non-destructive, plus a new preregistration—not another scalar sweep. Evidence:
+`results/gates/colaslot_r_margin_calibration_seed42.json` and
+`results/gates/colaslot_r_margin_feasibility_seed42.json`.
 
 ## ACTIVE (2026-07-23): Continual DocRE salient-graph replay gate implemented
 

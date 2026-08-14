@@ -74,6 +74,18 @@ class LexSlot(NaiveFineTune):
         # Inference lexical gating (the new forward-time mechanism). Default on; an
         # ablation can disable it to isolate the gradient-mask-only regime.
         self.infer_gate = bool(config.get("infer_gate", True))
+        self.routing_mode = str(config.get("routing_mode", "cosine"))
+        self.route_margin = float(config.get("route_margin", 0.0))
+        if self.routing_mode not in {"cosine", "hard_top1"}:
+            raise ValueError(f"lexslot: unsupported routing_mode={self.routing_mode}")
+        if not 0.0 <= self.route_margin <= 1.0:
+            raise ValueError("lexslot: route_margin must be in [0,1]")
+        tokenizer = getattr(getattr(model, "processor", None), "tokenizer", None)
+        special_ids = set(getattr(tokenizer, "all_special_ids", ()) or ())
+        pad_id = getattr(tokenizer, "pad_token_id", None)
+        if pad_id is not None:
+            special_ids.add(int(pad_id))
+        self._ignored_token_ids = tuple(sorted(int(token_id) for token_id in special_ids))
         # Partial freeze: freeze every encoder layer that does NOT carry slots (plus the
         # embeddings), keeping the slot-bearing late layers + classifier head + slots
         # trainable. Keeps slot placement and the trainable set exactly aligned.
@@ -226,38 +238,64 @@ class LexSlot(NaiveFineTune):
             self._sigs_cache_len = len(self._task_sigs)
         return self._sigs_cache
 
-    def _install_infer_gate(self, _module, _args, kwargs) -> None:
-        """Forward pre-hook on the wrapper: install the per-document lexical gate on
-        every slot module before the head / late-layer hooks read it.
+    def _doc_vectors(
+        self, input_ids: torch.Tensor, attention_mask: torch.Tensor | None = None
+    ) -> torch.Tensor:
+        return sparse_doc_vectors(
+            input_ids,
+            self.vocab_size,
+            attention_mask=attention_mask,
+            ignored_token_ids=getattr(self, "_ignored_token_ids", ()),
+        )
 
-        For a batch of documents, each slot owned by task t fires in proportion to
-        cos(sig(doc), sig_t); unclaimed slots fire fully (1.0). The result is a
-        (B, n_slots) tensor stashed on each slot module as ``_infer_gate``; the slot
-        deltas multiply their activation by it. No-op (leaves ``_infer_gate=None``) when
-        ``infer_gate`` is off or no task signature exists yet (task 0 has no prior to
-        gate against, and unclaimed slots default to 1.0 anyway).
+    def _install_infer_gate(self, _module, _args, kwargs) -> None:
+        """Install either cosine gates or a hard task-block route for this batch.
+
+        Hard routing activates only the winning task block. Documents whose top-1
+        margin is too small abstain by zeroing every slot, recovering exact CoLaR.
         """
+        modules = self._all_slot_modules()
+        for mod in modules:
+            mod._infer_gate = None
         if not self.infer_gate:
             return
-        sigs = self._task_sigs_matrix()  # (T, V) on device, or None
+        sigs = self._task_sigs_matrix()
         if sigs is None:
             return
         ids = kwargs.get("input_ids")
         if not torch.is_tensor(ids):
             return
-        # (B, V) L2-normalised doc signatures; cosine = doc @ sigs.T.
-        doc = sparse_doc_vectors(ids, self.vocab_size)  # (B, V) on ids.device
-        cos = doc @ sigs.to(doc.device).T  # (B, T)
-        for mod in self._all_slot_modules():
-            owner = torch.as_tensor(
-                mod.slot_owner, device=cos.device, dtype=torch.long
-            )  # (n_slots,)
-            g = torch.ones(cos.shape[0], mod.n_slots, device=cos.device, dtype=cos.dtype)
+        attention_mask = kwargs.get("attention_mask")
+        doc = self._doc_vectors(ids, attention_mask if torch.is_tensor(attention_mask) else None)
+        cos = doc @ sigs.to(doc.device).T
+
+        if getattr(self, "routing_mode", "cosine") == "hard_top1":
+            best, winner = cos.max(dim=1)
+            if cos.shape[1] == 1:
+                confident = best > 0
+            else:
+                runner_up = cos.topk(2, dim=1).values[:, 1]
+                confident = (best > 0) & ((best - runner_up) > getattr(self, "route_margin", 0.0))
+            for mod in modules:
+                owner = torch.as_tensor(mod.slot_owner, device=cos.device, dtype=torch.long)
+                claimed = owner >= 0
+                gate = torch.zeros(cos.shape[0], mod.n_slots, device=cos.device, dtype=cos.dtype)
+                if claimed.any():
+                    gate[:, claimed] = (
+                        (owner[claimed].unsqueeze(0) == winner.unsqueeze(1))
+                        & confident.unsqueeze(1)
+                    ).to(cos.dtype)
+                mod._infer_gate = gate
+            return
+
+        for mod in modules:
+            owner = torch.as_tensor(mod.slot_owner, device=cos.device, dtype=torch.long)
+            gate = torch.zeros(cos.shape[0], mod.n_slots, device=cos.device, dtype=cos.dtype)
             claimed = owner >= 0
             if claimed.any():
-                idx = owner.clamp(min=0)  # safe gather index for claimed slots
-                g[:, claimed] = cos[:, idx[claimed]]  # (B, n_claimed)
-            mod._infer_gate = g
+                index = owner.clamp(min=0)
+                gate[:, claimed] = cos[:, index[claimed]]
+            mod._infer_gate = gate
 
     def _derive_mask(self, task_id, slot_owner, S):  # noqa: N803
         return slot_trainable_mask(task_id, slot_owner, S, self.slot_sharing, self.share_threshold)
@@ -325,7 +363,14 @@ class LexSlot(NaiveFineTune):
         for batch in train_loader:
             ids = batch["input_ids"]
             if torch.is_tensor(ids):
-                sig += sparse_doc_vectors(ids, self.vocab_size).sum(0).cpu()
+                attention_mask = batch.get("attention_mask")
+                sig += (
+                    self._doc_vectors(
+                        ids, attention_mask if torch.is_tensor(attention_mask) else None
+                    )
+                    .sum(0)
+                    .cpu()
+                )
         # ensure list slot for this task id
         while len(self._task_sigs) <= task.task_id:
             self._task_sigs.append(torch.zeros(self.vocab_size))
@@ -344,9 +389,9 @@ class LexSlot(NaiveFineTune):
             per_task = max(1, mod.n_slots // max(self.n_tasks, 1))
             fresh = [s for s, o in enumerate(mod.slot_owner) if o == -1]
             claim = fresh[:per_task]
+            mod.set_owner(claim, task.task_id)
             mask = self._derive_mask(task.task_id, mod.slot_owner, S)
             mod.set_grad_mask(mask)
-            mod.set_owner(claim, task.task_id)
 
     def after_task(self, task: TaskInfo, train_loader) -> None:
         # Standalone: no KD teacher to deepcopy, no Fisher to accumulate, no buffer to

@@ -109,6 +109,19 @@ def test_sparse_doc_vectors_are_normalized_and_clamp_oov():
     assert vecs[0].argmax().item() == 1
 
 
+def test_sparse_doc_vectors_ignore_padding_and_special_tokens():
+    ids = torch.tensor([[0, 5, 1, 7, 7, 2]])
+    attention_mask = torch.tensor([[1, 1, 1, 0, 0, 1]])
+    vecs = sparse_doc_vectors(
+        ids,
+        V,
+        attention_mask=attention_mask,
+        ignored_token_ids=(0, 1, 2),
+    )
+    assert vecs[0, 5] == 1.0
+    assert vecs[0, [0, 1, 2, 7]].abs().sum() == 0
+
+
 def test_idf_none_before_any_task_then_populated():
     pool = _pool()
     assert pool.idf is None

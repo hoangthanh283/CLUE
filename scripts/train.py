@@ -34,6 +34,8 @@ from doccl.methods.colar_knn import CoLaRKNN
 from doccl.methods.colar_meta import CoLaRMeta
 from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.colaslot import CoLaSlot
+from doccl.methods.colaslot_ra import CoLaSlotRA
+from doccl.methods.colaslot_rf import CoLaSlotRF
 from doccl.methods.coreset_memory import CoresetMemory
 from doccl.methods.cpfd import CPFD
 from doccl.methods.cuber import CUBER
@@ -243,6 +245,9 @@ METHOD_REGISTRY = {
     # CoLaR + isolated additive slots: tests whether task-specific capacity can break
     # the compressed-replay retention frontier before adding lexical routing.
     "colaslot": CoLaSlot,
+    "colaslot_r": CoLaSlot,
+    "colaslot_ra": CoLaSlotRA,
+    "colaslot_rf": CoLaSlotRF,
     # CoLaR-Bal: CoLaR + soft-target replay (dark knowledge) to protect sparse classes (SROIE)
     "colar_bal": CoLaRBal,
     # CoLaR-CB: same bytes; balances old-task mass and sparse-label replay gradients.
@@ -368,6 +373,8 @@ def save_run_metrics(
             if cfg.training.get(k) is not None
         },
     }
+    if hasattr(method, "diagnostic_metrics"):
+        metrics["method_diagnostics"] = method.diagnostic_metrics
     out_dir.mkdir(parents=True, exist_ok=True)
     with open(out_dir / "metrics.json", "w") as f:
         json.dump(metrics, f, indent=2)
@@ -495,6 +502,9 @@ def main(cfg: DictConfig) -> None:
     elif cfg.method.name in (
         "colar",
         "colaslot",
+        "colaslot_r",
+        "colaslot_ra",
+        "colaslot_rf",
         "colar_bal",
         "colar_cb",
         "colar_wsvd",
@@ -950,6 +960,9 @@ def main(cfg: DictConfig) -> None:
         "proxy_latent_replay",
         "colar",
         "colaslot",
+        "colaslot_r",
+        "colaslot_ra",
+        "colaslot_rf",
         "colar_bal",
         "colar_cb",
         "colar_wsvd",

@@ -1,0 +1,155 @@
+# CoLaR + LexSlot integration RCA source notes
+
+## Decision frame
+
+- Question: why did full-capacity CoLaSlot fail to improve CoLaR, and what is the smallest
+  integration that directly addresses the verified failure modes?
+- Audience: technical research/implementation.
+- Controlling comparison: fresh matched seed-42 DIL runs at k4/d50/r128, maximum 10 epochs,
+  identical data, batch size 1, gradient checkpointing, and early stopping.
+- Primary decision metric: final average accuracy (AA). Guardrails: final domain F1 and average
+  forgetting (AF).
+
+## Source authority and conflicts
+
+- The fresh paired metrics control causal interpretation because they share code, seed, data, and
+  runtime. The historical CoLaR 87.58 row remains benchmark context but is not used to estimate the
+  slot effect because the fresh CoLaR control is 86.52.
+- Saved `metrics.json` and `per_class_f1.json` own reported scores. Live code owns implementation
+  behavior. `STATE.md`, `ROADMAP.md`, and the July KT note provide historical intent only.
+
+## Recomputed checks
+
+- AA delta: 86.4820005 - 86.5239595 = -0.0419590 points.
+- Final domain deltas: FUNSD -0.8812730; SROIE +1.6990675; CORD -0.9436715.
+- Forgetting: CoLaR [0.4106926, 6.2692840, 0.0]; CoLaSlot [2.9118196, 4.3730383, 0.0].
+- Slot ownership at each task follows `n_slots_head=48`, `n_slots_late=18`, `n_tasks=6`.
+  `LexSlot.before_task` claims 8 head and 3 late slots per task, but computes the mask while all
+  remaining slots still have owner -1. `slot_trainable_mask` assigns owner -1 a mask of 1.0.
+  Therefore task 0 trains 48/48 head and 18/18 late slots, not only its claimed block.
+- The raw and masked routing probes use every DIL train and eval document. Both use the same
+  task-signature aggregation and top-1 cosine rule; only padding/special-token masking changes.
+
+## 2026-08-08 repaired-integration evidence
+
+- Cheap matched d5/r64/5-epoch CoLaR: AA 60.7895952, AF 41.0471861, final
+  [44.3218852, 41.3393964, 96.7075038].
+- Cheap matched CoLaSlot-R: AA 74.8140276, AF 20.5990209, final
+  [64.3088553, 64.2679901, 95.8652374]. Delta versus CoLaR: AA +14.0244324,
+  AF -20.4481652, final [+19.9869701, +22.9285936, -0.8422665].
+- Acquisition deltas are [+0.2408348, +1.7783985, -0.8422665]. Subtracting those from
+  final deltas attributes [19.7461353, 21.1501951, 0.0] points to reduced post-learning
+  loss. This is 97.2% of the summed final-domain gain.
+- CORD has zero forgetting in both methods. Its -0.8423 regression therefore enters at
+  acquisition, not retention. The same last-task penalty exists with routing disabled:
+  -0.5758 in the cheap ungated run and -0.9437 in the full ungated run. This makes slot/base
+  co-training or direct current-slot contribution the primary locus; routing errors are a
+  secondary amplifier, not a sufficient root cause.
+- CoLaSlot-R versus cheap ungated CoLaSlot changes the final row by
+  [-3.1518919, +12.0434138, -0.2665129]. Hard routing reallocates the retention benefit
+  toward SROIE rather than uniformly improving it.
+- Every saved `metrics.json` matrix was checked against its sibling `matrix.npy`; all five
+  matched runs agree, including NaN positions.
+
+## Training-only routing calibration
+
+- Five-fold out-of-fold calibration covers 1,575 training documents and 2,350 routing
+  decisions across the two-domain and three-domain stages.
+- At margin 0.05, 2,173 decisions are accepted (92.4681% coverage) with 17 errors
+  (99.2177% accepted accuracy). CORD contributes 16 of those errors among 698 accepted
+  decisions, or 97.7077% accepted accuracy.
+- The zero-error margin 0.326 accepts only 421 CORD decisions and no FUNSD or SROIE
+  decisions. No threshold on the 0.001 grid satisfies both at least 50% coverage and at
+  least 99% accepted accuracy for every stage/domain.
+- This calibration uses training documents only and is not a downstream F1 estimate. It
+  closes the global scalar-margin follow-up; it does not rule out a different router or a
+  design that makes wrong routes non-destructive.
+
+## 2026-08-14 post-task refit experiments
+
+- Both successors use the matched DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch cell and save
+  slots-on plus same-state slots-off evaluation after every task. Their slots-off matrices
+  are identical: stage 0 [87.702902], stage 1 [63.196126, 81.639566], and stage 2
+  [67.649424, 52.670441, 96.939556]. This directly isolates the residual effect.
+- CoLaSlot-RF slots-on: AA 72.419807, AF 24.511302, final
+  [67.649424, 52.670441, 96.939556]. It gives a temporary +0.121 FUNSD change at stage 1
+  and exactly zero final change. Positive refit losses are approximately 1e-5: the replay
+  hard labels are already satisfied, so the residual receives no useful drift signal.
+- CoLaSlot-RA stores acquisition-time replay logits and anchors the owner residual to them.
+  Slots-on: AA 71.993560, AF 25.150673, final [67.362784, 51.678339, 96.939556].
+  Relative to the same-state fallback, deltas are [-0.286639, -0.992102, 0.000000],
+  AA -0.426247, and old-domain mean -0.639371. Positive anchor losses of 2.823--5.703
+  confirm that RA fixes RF's missing-gradient failure.
+- The preregistered gate requires AA >= +0.5, old-domain mean >= +1.0, and every domain
+  >= -0.5. RF fails the two improvement clauses; RA fails all three because SROIE is
+  -0.992. RA memory is 3,404,280 bytes versus RF 3,266,040 (+138,240, +4.23%).
+- Per-class comparison localizes RA's final SROIE loss to false positives: micro precision
+  changes -1.186 while recall is identical; KEY and VALUE F1 change -0.125 and -1.028.
+  FUNSD also changes precision and recall in opposing class-specific directions. The anchor
+  therefore has signal but overgeneralizes beyond five stored documents.
+
+## Updated successor decision
+
+- CoLaSlot-RF and CoLaSlot-RA are completed no-gos, not recommendations. The experiment
+  rules out post-task hard-label refit (no signal) and dense acquisition-logit anchoring
+  (unsupported false positives) at the cheap gate.
+- A further residual is permitted only as a support-bounded falsification test: validate
+  entity/class corrections on held-out replay documents, require non-negative precision,
+  and leave every unsupported residual exactly zero. This gate must pass before any full
+  d50/r128 or multi-seed run. Adding rank, router, or anchor-weight sweeps is not justified.
+
+## Historical successor preregistration
+
+- Recommended concept: **CoLaSlot-RF**, a retention-only, post-task head-slot refit.
+  CoLaR trains with slot reads disabled, so its main optimization path and current-domain
+  acquisition are unchanged. After each task, CoLaR is frozen and owner-specific head
+  residuals are fit on current-base replay features. At evaluation, only slots owned by
+  prior tasks may contribute; a route to the current task is a zero-residual CoLaR fallback.
+- Refit old residuals against their owner replay documents and constrain their delta toward
+  zero on current/foreign training documents. This moves safety from an infeasible global
+  confidence threshold into the residual itself and re-anchors the slot after shared-head
+  drift.
+- Existing code provides all required seams: zero-init head residuals in
+  `lexslot_memory.py`, current-state replay features in CoLaR, replay-owner tracking in
+  `colar_cb.py`, and the proven train-mode refit pattern in `lexslot_fm.py`. No new router
+  family or storage object is needed for the first gate.
+
+## Chart map
+
+- `entity_delta_chart`: comparison/ranking, horizontal signed bar; six entity-domain F1 deltas;
+  proves the aggregate is redistribution. Hard two-root palette with signed labels; semantic table
+  fallback retained.
+- `routing_accuracy_chart`: grouped comparison bar; three domains under raw versus masked token
+  signatures; proves padding dominates the current router and that the minimal correction is viable.
+- `scalar_calibration_chart`: grouped comparison bar; five stage/domain cells under raw
+  accuracy, margin-0.05 coverage, and accepted accuracy; shows why the scalar gate cannot
+  satisfy coverage and reliability together. Relaxed three-category palette; exact table retained.
+
+## Required technical-report structure mapping
+
+- Title: `title` block.
+- Technical summary: `summary` block.
+- Key findings with visual evidence: redistribution and router sections plus two charts and two
+  exact tables.
+- Scope/data/metric definitions: `scope` block.
+- Methodology/model specification: `method` and `design` blocks.
+- Limitations/robustness: `limitations` block.
+- Recommended next steps: `experiment` block.
+- Further questions: `questions` block.
+
+## Validation assessment
+
+- Ready to share as an RCA and experiment recommendation, with caveats.
+- Calculations were independently recomputed from both saved metric files.
+- Cheap/full `metrics.json` matrices were reconciled to all sibling `matrix.npy` files, and
+  calibration counts were recomputed from sample sizes and coverage.
+- The routing probe is descriptive and training-free; it validates separability, not downstream AA.
+- Only seed 42 has been run for CoLaSlot and CoLaSlot-R. The repaired run uses the cheap
+  d5/r64 gate, while the full paired run covers only ungated CoLaSlot; cross-budget comparisons
+  are treated as triangulation, not a matched effect estimate.
+- No slots-on versus slots-off evaluation was saved from the repaired checkpoint. The evidence
+  localizes CORD damage to acquisition and shows it survives router removal, but cannot yet
+  separate direct slot readout damage from training-time shared-weight co-adaptation.
+- CoLaSlot-RF and CoLaSlot-RA have run and failed the preregistered cheap gate; see the
+  2026-08-14 experiment section above.
+- No trend chart was used because the evidence consists of discrete method/domain comparisons.

@@ -1,9 +1,8 @@
 """CoLaR with task-isolated additive slots.
 
-This is the smallest clean test of whether task-specific capacity can move CoLaR beyond
-its retention frontier. It intentionally disables lexical inference routing: CoLaR's
-replay pass uses dummy token ids, so routing from ``input_ids`` would train/evaluate the
-stored document under different slot states.
+This composes CoLaR replay with additive slots. The historical ``colaslot`` config keeps
+routing disabled; ``colaslot_r`` opts into stored replay token IDs, strict ownership,
+padding-aware task-block routing, and low-confidence abstention.
 """
 
 from __future__ import annotations
@@ -20,8 +19,8 @@ class CoLaSlot(CoLaR, LexSlot):
     name = "colaslot"
 
     def __init__(self, model, config):
-        if config.get("infer_gate", False):
-            raise ValueError("colaslot inference routing needs original replay input_ids")
+        if config.get("infer_gate", False) and not config.get("store_input_ids", False):
+            raise ValueError("colaslot inference routing needs store_input_ids=true")
         if config.get("freeze_lower", False):
             raise ValueError("colaslot must use CoLaR's split-layer freeze map")
         super().__init__(model, config)

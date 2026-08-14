@@ -38,11 +38,11 @@ def test_derive_mask_soft_grades_by_similarity():
     m = LexSlot.__new__(LexSlot)
     m.slot_sharing = "soft"
     m.share_threshold = 0.5
-    # 4 head slots: 0,1 owned by task0, 2,3 fresh; current task1; S[1,0]=0.3
+    # before_task claims slots 2,3 for task1 before deriving this mask.
     import torch as T  # noqa: N812
 
     S = T.tensor([[1.0, 0.3], [0.3, 1.0]])  # noqa: N806
-    owner = [0, 0, -1, -1]
+    owner = [0, 0, 1, 1]
     mask = m._derive_mask(task_id=1, slot_owner=owner, S=S)
     assert torch.allclose(mask, torch.tensor([0.3, 0.3, 1.0, 1.0]), atol=1e-6)
 
@@ -160,8 +160,6 @@ def test_trainable_parameters_includes_slots():
     assert id(backbone_param) in trainable_ids, "backbone param missing from trainable_parameters()"
 
 
-
-
 def test_lexslot_is_standalone_not_doccl():
     """LexSlot must NOT inherit DocCL (no replay/KD/Fisher). It reuses Naive's plain-CE
     loop via NaiveFineTune."""
@@ -231,7 +229,7 @@ def test_gradient_isolation_zeros_prior_slot_grads():
         ls.proj.copy_(torch.randn(2, 2) * 0.1)
     # Slot 0 owned by task 0; current task is 1; S is identity (off -> prior slots masked 0).
     S = torch.eye(2)  # noqa: N806
-    mask = m._derive_mask(task_id=1, slot_owner=[0, -1], S=S)
+    mask = m._derive_mask(task_id=1, slot_owner=[0, 1], S=S)
     ls.set_grad_mask(mask)  # [0.0, 1.0]
     feats = torch.randn(1, 3, 4)
     ls.logits_delta(feats).pow(2).sum().backward()
@@ -296,6 +294,30 @@ def test_infer_gate_scales_foreign_slot_delta_to_zero():
     assert torch.allclose(d_gated, d_slot0_only, atol=1e-6)
 
 
+def test_hard_top1_routes_only_the_winning_task_block():
+    m = _stub_for_gate()
+    m.routing_mode = "hard_top1"
+    m.route_margin = 0.05
+    ids = torch.tensor([[1, 1, 1, 1], [2, 2, 2, 2]])
+    m._install_infer_gate(None, None, {"input_ids": ids})
+    assert torch.equal(m.head_slots._infer_gate, torch.eye(2))
+
+
+def test_hard_top1_low_margin_abstains_to_zero_slot_delta():
+    m = _stub_for_gate()
+    m.routing_mode = "hard_top1"
+    m.route_margin = 0.05
+    ids = torch.tensor([[1, 2, 1, 2]])
+    m._install_infer_gate(None, None, {"input_ids": ids})
+    assert torch.count_nonzero(m.head_slots._infer_gate) == 0
+
+    with torch.no_grad():
+        m.head_slots.values.copy_(torch.randn_like(m.head_slots.values))
+        m.head_slots.proj.copy_(torch.randn_like(m.head_slots.proj))
+    delta = m.head_slots.logits_delta(torch.randn(1, 3, 4))
+    assert torch.count_nonzero(delta) == 0
+
+
 def test_infer_gate_none_is_byte_identical_to_ungated():
     """When _infer_gate is None (default / infer_gate off), logits_delta == act @ proj
     exactly — the gate change is opt-in and safe."""
@@ -358,4 +380,3 @@ def test_infer_gate_is_bounded_cosine_not_unbounded():
     # Both tasks share token 1 with the doc -> cosines are both ~1 (same direction).
     assert abs(float(g[0, 0]) - 1.0) < 1e-4
     assert abs(float(g[0, 1]) - 1.0) < 1e-4
-

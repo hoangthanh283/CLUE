@@ -17,7 +17,10 @@ from doccl.methods.colar import CoLaR
 from doccl.methods.colar_cb import CoLaRCB
 from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.colaslot import CoLaSlot
+from doccl.methods.colaslot_ra import CoLaSlotRA
+from doccl.methods.colaslot_rf import CoLaSlotRF
 from doccl.methods.latent_replay import LatentReplay
+from doccl.types import TaskInfo
 
 D, L, NL, N_LAYERS, K = 16, 6, 4, 4, 2
 
@@ -127,7 +130,7 @@ def test_compressed_footprint_below_raw():
     assert factor_bytes < raw_bytes_equiv
 
 
-def _colaslot(**overrides):
+def _colaslot_config(**overrides):
     config = {
         "split_layer_k": K,
         "docs_per_task": 2,
@@ -143,7 +146,41 @@ def _colaslot(**overrides):
         "repr_rank": 2,
     }
     config.update(overrides)
-    return CoLaSlot(_Wrapper(), config)
+    return config
+
+
+def _colaslot(**overrides):
+    return CoLaSlot(_Wrapper(), _colaslot_config(**overrides))
+
+
+def _colaslot_rf(**overrides):
+    config = _colaslot_config(
+        infer_gate=True,
+        store_input_ids=True,
+        routing_mode="hard_top1",
+        route_margin=0.05,
+        slot_depth="head_only",
+        refit_epochs=2,
+        refit_lr=1e-2,
+        refit_null_weight=1.0,
+        **overrides,
+    )
+    return CoLaSlotRF(_Wrapper(), config)
+
+
+def _colaslot_ra(**overrides):
+    config = _colaslot_config(
+        infer_gate=True,
+        store_input_ids=True,
+        routing_mode="hard_top1",
+        route_margin=0.05,
+        slot_depth="head_only",
+        refit_epochs=2,
+        refit_lr=1e-2,
+        refit_null_weight=0.0,
+        **overrides,
+    )
+    return CoLaSlotRA(_Wrapper(), config)
 
 
 def test_colaslot_uses_colar_freeze_map_and_unique_optimizer_params():
@@ -174,6 +211,146 @@ def test_colaslot_slots_participate_in_replay_and_early_stop_restore():
         m.head_slots.proj.add_(1.0)
     stopper.restore_best(m.model)
     assert torch.equal(m.head_slots.proj, saved)
+
+
+def test_colaslot_r_claims_before_mask_and_replays_real_token_ids():
+    m = _colaslot(
+        infer_gate=True,
+        store_input_ids=True,
+        routing_mode="hard_top1",
+        route_margin=0.05,
+        slot_depth="head_only",
+    )
+    batch = _batch(2, seed=7)
+    task = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
+    m.before_task(task, [batch])
+
+    assert m.head_slots.slot_owner == [0, 0, -1, -1, -1, -1]
+    assert torch.equal(m.head_slots.grad_mask.cpu(), torch.tensor([1, 1, 0, 0, 0, 0]))
+
+    m._apply_freeze_map()
+    m._capture_task([batch])
+    replay = m._sample_replay()
+    assert replay is not None and "input_ids" in replay
+    m._replay_forward(replay)
+    gate = m.head_slots._infer_gate
+    assert gate is not None
+    assert torch.equal(gate[:, :2], torch.ones_like(gate[:, :2]))
+    assert torch.count_nonzero(gate[:, 2:]) == 0
+
+
+def test_colaslot_rf_normal_path_is_slot_free_and_uses_only_colar_parameters():
+    m = _colaslot_rf()
+    batch = _batch(2, seed=5)
+    task = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
+    m.before_task(task, [batch])
+    with torch.no_grad():
+        m.head_slots.proj.normal_()
+
+    slot_ids = {id(p) for p in m._slot_parameters()}
+    assert slot_ids.isdisjoint(id(p) for p in m.trainable_parameters())
+
+    m._slot_reads_enabled = False
+    with torch.no_grad():
+        slot_free = m.model(**batch).logits
+        m._detach_slot_hooks()
+        base = m.model(**batch).logits
+        m._register_slot_hooks()
+    assert torch.equal(slot_free, base)
+
+
+def test_colaslot_rf_reads_prior_owner_only():
+    m = _colaslot_rf()
+    task0 = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
+    task1 = TaskInfo(task_id=1, task_name="t1", label_set=["O", "KEY", "VALUE"])
+    batch0 = _batch(1, seed=1)
+    batch1 = _batch(1, seed=2)
+    batch0["input_ids"].fill_(2)
+    batch1["input_ids"].fill_(3)
+    m.before_task(task0, [batch0])
+    m.before_task(task1, [batch1])
+
+    ids = torch.stack([batch0["input_ids"][0], batch1["input_ids"][0]])
+    attention = torch.ones_like(ids)
+    m._install_infer_gate(None, None, {"input_ids": ids, "attention_mask": attention})
+    gate = m.head_slots._infer_gate
+    assert gate is not None
+    assert torch.equal(gate[0, :2], torch.ones(2))
+    assert torch.count_nonzero(gate[0, 2:]) == 0
+    assert torch.count_nonzero(gate[1]) == 0
+
+
+def test_colaslot_rf_refits_prior_owner_without_changing_colar():
+    m = _colaslot_rf()
+    task0 = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
+    task1 = TaskInfo(task_id=1, task_name="t1", label_set=["O", "KEY", "VALUE"])
+    batch0 = _batch(2, seed=3)
+    batch1 = _batch(2, seed=4)
+    batch0["input_ids"].fill_(2)
+    batch1["input_ids"].fill_(3)
+
+    m.before_task(task0, [batch0])
+    m.after_task(task0, [batch0])
+    m.before_task(task1, [batch1])
+    slot_ids = {id(p) for p in m._slot_parameters()}
+    base_before = {
+        name: parameter.detach().clone()
+        for name, parameter in m.model.named_parameters()
+        if id(parameter) not in slot_ids
+    }
+    m.after_task(task1, [batch1])
+
+    assert m._store_task_ids == [0, 0, 1, 1]
+    assert torch.count_nonzero(m.head_slots.proj[:2]) > 0
+    assert torch.count_nonzero(m.head_slots.proj[2:]) == 0
+    assert all(
+        torch.equal(base_before[name], parameter)
+        for name, parameter in m.model.named_parameters()
+        if name in base_before
+    )
+    assert "1:0" in m.diagnostic_metrics["refit"]
+    m.model.id_to_label = {0: "O", 1: "B-A", 2: "I-A", 3: "B-B"}
+    m.evaluate({0: [batch0], 1: [batch1]})
+    assert set(m.diagnostic_metrics["base_only_by_stage"]["1"]) == {"0", "1"}
+
+
+def test_colaslot_ra_anchors_acquisition_logits_after_base_drift():
+    m = _colaslot_ra()
+    task0 = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
+    task1 = TaskInfo(task_id=1, task_name="t1", label_set=["O", "KEY", "VALUE"])
+    batch0 = _batch(2, seed=8)
+    batch1 = _batch(2, seed=9)
+    batch0["input_ids"].fill_(2)
+    batch1["input_ids"].fill_(3)
+
+    m.before_task(task0, [batch0])
+    m.after_task(task0, [batch0])
+    assert all(doc["teacher_logits"].shape == (L, NL) for doc in m.store)
+    assert m.memory_bytes() > CoLaSlotRF.memory_bytes(m)
+
+    with torch.no_grad():
+        m.model.model.classifier.bias.add_(0.5)
+    m.before_task(task1, [batch1])
+    m._forced_slot_owner = 0
+    anchor_loss = m._positive_refit_loss(m._stack_replay(m.store[:2]), m.store[:2])
+    m._forced_slot_owner = None
+    assert anchor_loss > 0.1
+
+    slot_ids = {id(p) for p in m._slot_parameters()}
+    base_before = {
+        name: parameter.detach().clone()
+        for name, parameter in m.model.named_parameters()
+        if id(parameter) not in slot_ids
+    }
+    m.after_task(task1, [batch1])
+
+    assert torch.count_nonzero(m.head_slots.proj[:2]) > 0
+    assert all(
+        torch.equal(base_before[name], parameter)
+        for name, parameter in m.model.named_parameters()
+        if name in base_before
+    )
+    assert m.diagnostic_metrics["refit"]["1:0"]["positive_loss"] > 0
 
 
 def test_colaslot_rejects_known_broken_composition_modes():

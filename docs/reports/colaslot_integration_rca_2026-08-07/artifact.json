@@ -1,0 +1,965 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "CoLaR + LexSlot Integration RCA",
+    "description": "Root-cause analysis of the ungated and repaired CoLaR + LexSlot integrations, with a preregistered retention-only refit successor.",
+    "generatedAt": "2026-08-08T14:06:27Z",
+    "cards": [],
+    "charts": [
+      {
+        "id": "entity_delta_chart",
+        "title": "Final entity F1 change from CoLaR to CoLaSlot",
+        "subtitle": "Matched seed-42 DIL, k4/d50/r128; values are percentage-point changes",
+        "type": "bar",
+        "dataset": "entity_deltas",
+        "sourceId": "paired_full_results",
+        "valueFormat": "number",
+        "encodings": {
+          "x": {
+            "field": "entity",
+            "type": "nominal",
+            "label": "Domain / entity"
+          },
+          "y": {
+            "field": "delta_f1",
+            "type": "quantitative",
+            "label": "F1 change (points)"
+          },
+          "tooltip": [
+            {
+              "field": "colar_f1",
+              "type": "quantitative",
+              "label": "CoLaR F1"
+            },
+            {
+              "field": "colaslot_f1",
+              "type": "quantitative",
+              "label": "CoLaSlot F1"
+            }
+          ]
+        }
+      },
+      {
+        "id": "routing_accuracy_chart",
+        "title": "Lexical task-routing accuracy",
+        "subtitle": "All 497 DIL evaluation documents; raw token counts versus padding-masked counts",
+        "type": "bar",
+        "dataset": "routing_accuracy",
+        "sourceId": "routing_probe",
+        "valueFormat": "percent",
+        "encodings": {
+          "x": {
+            "field": "domain",
+            "type": "nominal",
+            "label": "Domain"
+          },
+          "y": {
+            "field": "accuracy",
+            "type": "quantitative",
+            "label": "Top-1 routing accuracy"
+          },
+          "color": {
+            "field": "router",
+            "type": "nominal",
+            "label": "Router"
+          },
+          "tooltip": [
+            {
+              "field": "n_eval",
+              "type": "quantitative",
+              "label": "Evaluation documents"
+            },
+            {
+              "field": "margin",
+              "type": "quantitative",
+              "label": "Own - best foreign cosine"
+            }
+          ]
+        }
+      },
+      {
+        "id": "scalar_calibration_chart",
+        "title": "CoLaSlot-R routing rates by stage and domain",
+        "subtitle": "Five-fold training-only calibration at margin 0.05; rates share a 0–100% scale",
+        "type": "bar",
+        "dataset": "calibration_rates",
+        "sourceId": "scalar_calibration",
+        "valueFormat": "percent",
+        "encodings": {
+          "x": {
+            "field": "stage_domain",
+            "type": "nominal",
+            "label": "Seen stage / domain"
+          },
+          "y": {
+            "field": "rate",
+            "type": "quantitative",
+            "label": "Rate"
+          },
+          "color": {
+            "field": "metric",
+            "type": "nominal",
+            "label": "Routing metric"
+          },
+          "tooltip": [
+            {
+              "field": "n",
+              "type": "quantitative",
+              "label": "Documents"
+            },
+            {
+              "field": "accepted_errors",
+              "type": "quantitative",
+              "label": "Accepted errors"
+            }
+          ]
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "boundary_table",
+        "title": "Learning and retention by domain",
+        "subtitle": "Matched full-capacity seed-42 runs; F1 and forgetting in points",
+        "dataset": "boundary_metrics",
+        "sourceId": "paired_full_results",
+        "defaultSort": {
+          "field": "colaslot_forgetting",
+          "direction": "desc"
+        },
+        "columns": [
+          {
+            "field": "domain",
+            "label": "Domain",
+            "type": "text"
+          },
+          {
+            "field": "colar_learn",
+            "label": "CoLaR at learning",
+            "format": "number"
+          },
+          {
+            "field": "colaslot_learn",
+            "label": "CoLaSlot at learning",
+            "format": "number"
+          },
+          {
+            "field": "colar_final",
+            "label": "CoLaR final",
+            "format": "number"
+          },
+          {
+            "field": "colaslot_final",
+            "label": "CoLaSlot final",
+            "format": "number"
+          },
+          {
+            "field": "colar_forgetting",
+            "label": "CoLaR forgetting",
+            "format": "number"
+          },
+          {
+            "field": "colaslot_forgetting",
+            "label": "CoLaSlot forgetting",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "ownership_table",
+        "title": "Effective slot training under the current ownership logic",
+        "subtitle": "48 head and 18 late slots with n_tasks=6; unowned slots receive gradient mask 1.0",
+        "dataset": "ownership_leak",
+        "sourceId": "slot_mask_code",
+        "defaultSort": {
+          "field": "task",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "task",
+            "label": "Training task",
+            "format": "number"
+          },
+          {
+            "field": "head_claimed_current",
+            "label": "Head slots claimed now",
+            "format": "number"
+          },
+          {
+            "field": "head_unowned_trainable",
+            "label": "Head unowned but trainable",
+            "format": "number"
+          },
+          {
+            "field": "head_total_trainable",
+            "label": "Head slots receiving gradients",
+            "format": "number"
+          },
+          {
+            "field": "late_claimed_current",
+            "label": "Late slots claimed now",
+            "format": "number"
+          },
+          {
+            "field": "late_unowned_trainable",
+            "label": "Late unowned but trainable",
+            "format": "number"
+          },
+          {
+            "field": "late_total_trainable",
+            "label": "Late slots receiving gradients",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "cheap_decomposition_table",
+        "title": "CoLaSlot-R gain decomposition by domain",
+        "subtitle": "Matched d5/r64/5-epoch seed-42 run; F1 differences in points",
+        "dataset": "cheap_decomposition",
+        "sourceId": "cheap_repaired_results",
+        "defaultSort": {
+          "field": "domain_order",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "domain_order",
+            "label": "Order",
+            "format": "number"
+          },
+          {
+            "field": "domain",
+            "label": "Domain",
+            "type": "text"
+          },
+          {
+            "field": "acquisition_delta",
+            "label": "At-learning Δ",
+            "format": "number"
+          },
+          {
+            "field": "final_delta",
+            "label": "Final Δ",
+            "format": "number"
+          },
+          {
+            "field": "retention_component",
+            "label": "Reduced-loss component",
+            "format": "number"
+          },
+          {
+            "field": "colar_final",
+            "label": "CoLaR final",
+            "format": "number"
+          },
+          {
+            "field": "colaslot_r_final",
+            "label": "CoLaSlot-R final",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "scalar_calibration_table",
+        "title": "Stage/domain routing at margin 0.05",
+        "subtitle": "Five-fold out-of-fold training documents; accepted accuracy excludes abstentions",
+        "dataset": "calibration_stage",
+        "sourceId": "scalar_calibration",
+        "defaultSort": {
+          "field": "stage_order",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "stage_order",
+            "label": "Order",
+            "format": "number"
+          },
+          {
+            "field": "stage_domain",
+            "label": "Stage / domain",
+            "type": "text"
+          },
+          {
+            "field": "n",
+            "label": "Documents",
+            "format": "number"
+          },
+          {
+            "field": "raw_accuracy",
+            "label": "Raw accuracy",
+            "format": "percent"
+          },
+          {
+            "field": "coverage",
+            "label": "Coverage",
+            "format": "percent"
+          },
+          {
+            "field": "accepted_accuracy",
+            "label": "Accepted accuracy",
+            "format": "percent"
+          },
+          {
+            "field": "accepted_errors",
+            "label": "Accepted errors",
+            "format": "number"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "paired_full_results",
+        "label": "Matched full-capacity CoLaR and CoLaSlot artifacts",
+        "path": "results/gates/colaslot_d50_r128_e10",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "description": "Materializes the reviewed matched-run boundary and entity rows recomputed from the linked metric files.",
+          "sql": "SELECT * FROM (VALUES ('entity','FUNSD HEADER',55.2083,60.2410,5.0326),('entity','FUNSD KEY',88.2537,88.7600,0.5064),('entity','FUNSD VALUE',87.7872,85.1945,-2.5927),('entity','SROIE KEY',86.2850,90.3319,4.0469),('entity','SROIE VALUE',73.3163,74.6025,1.2862),('entity','CORD VALUE',96.5992,95.6555,-0.9437)) AS t(grain,label,colar_value,colaslot_value,delta)"
+        }
+      },
+      {
+        "id": "routing_probe",
+        "label": "DIL lexical routing probe",
+        "path": "docs/reports/colaslot_integration_rca_2026-08-07/routing_probe.json",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "description": "Materializes reviewed raw and padding-masked top-1 routing accuracy from the linked probe output.",
+          "sql": "SELECT * FROM (VALUES ('FUNSD','Raw',0.50,50),('FUNSD','Masked',1.00,50),('SROIE','Raw',0.5619596542,347),('SROIE','Masked',1.00,347),('CORD','Raw',1.00,100),('CORD','Masked',0.88,100)) AS t(domain,router,accuracy,n_eval)"
+        }
+      },
+      {
+        "id": "slot_mask_code",
+        "label": "Historical pre-fix slot ownership behavior reconstructed in RCA notes",
+        "path": "docs/reports/colaslot_integration_rca_2026-08-07/source_notes.md",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "description": "Materializes slot counts derived from the linked ownership and mask implementation.",
+          "sql": "SELECT * FROM (VALUES (0,8,40,48,3,15,18),(1,8,32,40,3,12,15),(2,8,24,32,3,9,12)) AS t(task,head_claimed_current,head_unowned_trainable,head_total_trainable,late_claimed_current,late_unowned_trainable,late_total_trainable)"
+        }
+      },
+      {
+        "id": "replay_code",
+        "label": "Latent replay storage and dummy-ID forwarding",
+        "path": "doccl/methods/latent_replay.py"
+      },
+      {
+        "id": "colaslot_code",
+        "label": "Current CoLaSlot composition",
+        "path": "doccl/methods/colaslot.py"
+      },
+      {
+        "id": "source_notes",
+        "label": "RCA calculations, scope, and validation notes",
+        "path": "docs/reports/colaslot_integration_rca_2026-08-07/source_notes.md"
+      },
+      {
+        "id": "cheap_repaired_results",
+        "label": "Recomputed matched cheap CoLaR, CoLaSlot, and CoLaSlot-R evidence",
+        "path": "docs/reports/colaslot_integration_rca_2026-08-07/source_notes.md",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "description": "Materializes the reviewed acquisition, final, and retention-component deltas recomputed from the matched d5/r64 metric matrices.",
+          "sql": "SELECT * FROM (VALUES ('FUNSD',86.9223,87.1632,0.2408,44.3219,64.3089,19.9870,19.7461),('SROIE',80.8333,82.6117,1.7784,41.3394,64.2680,22.9286,21.1502),('CORD',96.7075,95.8652,-0.8423,96.7075,95.8652,-0.8423,0.0000)) AS t(domain,colar_learn,colaslot_r_learn,acquisition_delta,colar_final,colaslot_r_final,final_delta,retention_component)"
+        }
+      },
+      {
+        "id": "scalar_calibration",
+        "label": "Training-only CoLaSlot-R margin calibration and feasibility artifacts",
+        "path": "results/gates/colaslot_r_margin_feasibility_seed42.json",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "description": "Materializes reviewed five-fold out-of-fold stage/domain routing rates at margin 0.05 from the calibration artifact.",
+          "sql": "SELECT * FROM (VALUES ('Stage 2 · FUNSD',149,0.9798658,0.7785235,1.0000000,0),('Stage 2 · SROIE',626,1.0000000,0.9920128,1.0000000,0),('Stage 3 · FUNSD',149,0.9731544,0.7852349,0.9914530,1),('Stage 3 · SROIE',626,1.0000000,0.9920128,1.0000000,0),('Stage 3 · CORD',800,0.9012500,0.8725000,0.9770774,16)) AS t(stage_domain,n,raw_accuracy,coverage,accepted_accuracy,accepted_errors)"
+        }
+      },
+      {
+        "id": "refit_pattern",
+        "label": "Existing post-task slot-refit implementation pattern",
+        "path": "doccl/methods/lexslot_fm.py"
+      },
+      {
+        "id": "replay_owner_pattern",
+        "label": "Existing CoLaR replay-owner tracking pattern",
+        "path": "doccl/methods/colar_cb.py"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# CoLaR + LexSlot Integration RCA"
+      },
+      {
+        "id": "update-2026-08-14",
+        "type": "markdown",
+        "sourceId": "source_notes",
+        "body": "## Experimental update — August 14, 2026\n\n**Verdict: CoLaSlot-RF and CoLaSlot-RA are no-gos at the matched cheap gate.** RF is exactly inert at final evaluation because hard-label replay supplies no residual gradient. RA restores a strong acquisition-logit signal but changes the final row by [-0.29, -0.99, 0.00], reducing AA by 0.43; the SROIE loss is lower precision with unchanged recall.\n\nNo full-budget or multi-seed expansion is justified. The next admissible test is support-bounded: activate an entity/class correction only after held-out replay evidence shows positive entity F1 with non-negative precision; otherwise preserve the exact CoLaR fallback."
+      },
+      {
+        "id": "summary",
+        "type": "markdown",
+        "sourceId": "source_notes",
+        "body": "## Technical summary\n\n- **The repaired integration contains a real retention signal:** at d5/r64, CoLaSlot-R improves AA by 14.02 points and reduces AF by 20.45 points versus matched CoLaR.\n- **It is not safe enough to scale:** final CORD falls 0.84 points, violating the preregistered -0.5 guardrail. About 97.2% of the summed final-domain gain comes from reduced post-learning loss; the CORD regression enters at acquisition and also appears when routing is disabled.\n- **A global confidence margin cannot solve both requirements.** No tested scalar threshold meets at least 50% coverage and 99% accepted accuracy for every stage/domain.\n- **Post-task residuals do not resolve the tradeoff.** RF has no hard-label drift signal; RA restores gradient but overgeneralizes into false positives, reducing AA by 0.43 and SROIE by 0.99 versus its exact same-state CoLaR fallback.\n- **Next gate:** require held-out document support and non-negative precision before any entity/class residual may activate; unsupported corrections remain exactly zero."
+      },
+      {
+        "id": "redistribution_text",
+        "type": "markdown",
+        "sourceId": "paired_full_results",
+        "body": "## Full replay turns the apparent gain into redistribution\n\nAt d5/r64, slots compensated for a weak replay channel. At d50/r128, CoLaR already retained FUNSD and CORD, leaving SROIE as the only material hole. CoLaSlot reduced SROIE forgetting by 1.90 points, but FUNSD forgetting increased by 2.50 points and CORD learned 0.94 points lower. The entity view shows the same trade: SROIE KEY gained 4.05 while FUNSD VALUE lost 2.59 and CORD VALUE lost 0.94. **The integration needs conditional activation, not more globally active capacity.**"
+      },
+      {
+        "id": "entity_delta",
+        "type": "chart",
+        "chartId": "entity_delta_chart"
+      },
+      {
+        "id": "boundary_metrics",
+        "type": "table",
+        "tableId": "boundary_table"
+      },
+      {
+        "id": "repaired_text",
+        "type": "markdown",
+        "sourceId": "cheap_repaired_results",
+        "body": "## The repair exposed a retention mechanism, not a safe combined model\n\nAgainst the matched cheap CoLaR control, CoLaSlot-R gains 19.99 FUNSD and 22.93 SROIE points at the final boundary while losing 0.84 CORD. Its acquisition deltas are only +0.24, +1.78, and -0.84; subtracting these from the final deltas assigns 40.90 of 42.07 summed gain points to reduced post-learning loss. CORD has zero forgetting, so its entire loss happens while learning CORD. The same last-task penalty appears with routing disabled, which rules out router error as a complete explanation."
+      },
+      {
+        "id": "cheap_decomposition",
+        "type": "table",
+        "tableId": "cheap_decomposition_table"
+      },
+      {
+        "id": "ownership_text",
+        "type": "markdown",
+        "sourceId": "slot_mask_code",
+        "body": "## The historical ownership leak was real—and is now fixed\n\nThe original full-capacity CoLaSlot claimed 8 of 48 head slots and 3 of 18 late slots per task, but its pre-fix mask gave every unowned row gradient weight 1.0. Task 0 therefore trained the entire pool and every trained row fired globally because routing was disabled. CoLaSlot-R corrected claim-before-mask ownership and unowned-slot silence. The table is retained because it explains why the full ungated result cannot be interpreted as a strict task-private-slot test; it is not a remaining defect in CoLaSlot-R."
+      },
+      {
+        "id": "ownership",
+        "type": "table",
+        "tableId": "ownership_table"
+      },
+      {
+        "id": "routing_text",
+        "type": "markdown",
+        "sourceId": "routing_probe",
+        "body": "## Padding was fixed; calibration exposed the next router limit\n\nThe original bag-of-token-IDs router counted padding and special tokens, making task signatures nearly parallel. Attention masking and special-ID removal restored strong domain separation in the training-free probe and are implemented in CoLaSlot-R. The repaired router still needs an abstention rule, however, and its confidence scale is not comparable enough across stage/domain cells for one global margin to be both reliable and useful."
+      },
+      {
+        "id": "routing_accuracy",
+        "type": "chart",
+        "chartId": "routing_accuracy_chart"
+      },
+      {
+        "id": "calibration_text",
+        "type": "markdown",
+        "sourceId": "scalar_calibration",
+        "body": "## Scalar abstention is closed\n\nFive-fold out-of-fold calibration uses all 1,575 training documents and 2,350 stage-specific routing decisions. Margin 0.05 accepts 2,173 decisions with 17 errors; CORD alone contributes 16 errors and reaches only 97.71% accepted accuracy. Raising the threshold to the zero-error margin 0.326 leaves 0% FUNSD/SROIE coverage. Across the full 0.001 grid, no scalar threshold satisfies both at least 50% coverage and 99% accepted accuracy in every stage/domain cell."
+      },
+      {
+        "id": "scalar_calibration",
+        "type": "chart",
+        "chartId": "scalar_calibration_chart"
+      },
+      {
+        "id": "scalar_calibration_exact",
+        "type": "table",
+        "tableId": "scalar_calibration_table"
+      },
+      {
+        "id": "scope",
+        "type": "markdown",
+        "sourceId": "source_notes",
+        "body": "## Scope and metric definitions\n\n**Population.** DIL uses FUNSD, SROIE, and CORD in that order with LayoutLMv3 and seed 42. Evidence has three tiers: (1) a matched full-capacity k4/d50/r128, maximum-10-epoch CoLaR versus ungated CoLaSlot comparison; (2) a matched cheap k4/d5/r64, 5-epoch CoLaR, ungated CoLaSlot, and repaired CoLaSlot-R gate; and (3) five-fold routing calibration over 1,575 training documents. Cross-budget comparisons are triangulation, not matched effect estimates.\n\n**Average accuracy (AA).** Mean final entity micro-F1 across the three domains. **Forgetting.** At-learning F1 minus final F1 for each old domain; AF is its average. **Acquisition delta.** Method-minus-CoLaR F1 on a domain's diagonal matrix cell. **Reduced-loss component.** Final delta minus acquisition delta; this isolates the portion explained by lower post-learning loss. **Routing accuracy.** Fraction of documents whose highest task-signature score matches the source domain. **Coverage.** Fraction accepted after abstention; accepted accuracy excludes abstentions."
+      },
+      {
+        "id": "method",
+        "type": "markdown",
+        "sourceId": "replay_code",
+        "body": "## Replay evidence is now consistent, but evidence consistency is not outcome safety\n\nCoLaSlot-R stores each replay document's original token IDs beside its CoLaR factors and reuses the stored attention mask. This removes the dummy-padding-ID mismatch and costs 61,440 bytes in the cheap 15-document bank; observed peak VRAM rises by 1.66 MB. The fix makes current and replay routing consume the same lexical evidence. It cannot, by itself, stop the selected slot residual from changing current-domain logits or shared-weight optimization."
+      },
+      {
+        "id": "design",
+        "type": "markdown",
+        "body": "## Historical preregistration: CoLaSlot-RF\n\nThis design was implemented and failed the matched cheap gate. The steps below document the preregistration, not a current recommendation.\n\n1. **Preserve the base path.** Disable all slot reads during normal task training and current-task validation. With the same seed and data, this path should be logit-identical to CoLaR.\n2. **Refit after drift.** After CoLaR finishes a task and banks replay documents, freeze every CoLaR parameter. Fit owner-specific, zero-initialized head residuals on replay features passed through the current plastic layers.\n3. **Make foreign routes harmless.** For an owner residual, optimize its owner replay CE while penalizing its logit delta on current-task and foreign-owner documents toward zero. The slot—not a fragile global threshold—learns the null option.\n4. **Read for retention only.** At stage t, only owners less than t may contribute. If the current-task signature wins, the residual is exactly zero and prediction falls back to CoLaR. The stage is known globally; no document's true task ID is used at evaluation.\n5. **Reuse existing seams.** Use the current LogitSlots module, CoLaR reconstruction, CoLaR-CB's replay-owner tracking pattern, and LexSlot-FM's post-task refit pattern. Do not add late slots or a new router family in Gate 0."
+      },
+      {
+        "id": "limitations",
+        "type": "markdown",
+        "sourceId": "source_notes",
+        "body": "## What is verified and what remains uncertain\n\n**Verified:** the full ungated stack is redistribution; CoLaSlot-R fixes ownership, replay IDs, padding, and task-block routing; the repaired cheap run gains 14.02 AA but loses 0.84 CORD; 97.2% of its summed gain is reduced post-learning loss; and no global scalar margin meets the training-only coverage/accuracy bar.\n\n**Localized, not fully separated:** CORD damage enters at acquisition and persists with routing disabled, so routing error is not a sufficient root cause. No slots-on versus slots-off evaluation was saved from the repaired checkpoint, so direct residual damage and training-time shared-weight co-adaptation remain jointly identified.\n\n**Evidence limits:** all integration results are seed 42. CoLaSlot-R is cheap d5/r64; the full d50/r128 comparison is ungated CoLaSlot. The calibration uses training documents and predicts routing, not downstream F1. CoLaSlot-RF and CoLaSlot-RA later failed the matched cheap gate; see the August 14 update."
+      },
+      {
+        "id": "experiment",
+        "type": "markdown",
+        "sourceId": "source_notes",
+        "body": "## Completed gate and next falsification test\n\n1. CoLaSlot-RF and CoLaSlot-RA both preserved an identical slot-free trajectory, satisfying the base-isolation check.\n2. RF finished at 72.419807 AA, exactly equal to its slots-off fallback. RA finished at 71.993560 AA, 0.426247 below its fallback; final domain changes were [-0.286639, -0.992102, 0.000000].\n3. Both fail the preregistered GO rule: AA at least +0.5, old-domain mean at least +1.0, and no domain below -0.5. Do not run d50/r128 or more seeds.\n4. A successor may proceed only as a support-bounded cheap test: held-out replay documents must show positive entity F1 and non-negative precision before that entity/class correction is enabled. Every unsupported residual stays exactly zero.\n5. Do not sweep residual rank, router, or dense-anchor weight against test F1."
+      },
+      {
+        "id": "questions",
+        "type": "markdown",
+        "sourceId": "source_notes",
+        "body": "## Further questions\n\n- Can five replay documents provide enough held-out support to distinguish a useful entity correction from a false-positive residual?\n- Does a class-selective precision guard preserve the exact CoLaR fallback on unsupported tokens and domains?\n- If the support gate rejects every correction, should the CoLaR + LexSlot integration be closed entirely rather than increasing replay memory?"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-08T14:06:27Z",
+    "status": "ready",
+    "datasets": {
+      "entity_deltas": [
+        {
+          "entity": "FUNSD HEADER",
+          "domain": "FUNSD",
+          "class": "HEADER",
+          "colar_f1": 55.2083,
+          "colaslot_f1": 60.241,
+          "delta_f1": 5.0326
+        },
+        {
+          "entity": "FUNSD KEY",
+          "domain": "FUNSD",
+          "class": "KEY",
+          "colar_f1": 88.2537,
+          "colaslot_f1": 88.76,
+          "delta_f1": 0.5064
+        },
+        {
+          "entity": "FUNSD VALUE",
+          "domain": "FUNSD",
+          "class": "VALUE",
+          "colar_f1": 87.7872,
+          "colaslot_f1": 85.1945,
+          "delta_f1": -2.5927
+        },
+        {
+          "entity": "SROIE KEY",
+          "domain": "SROIE",
+          "class": "KEY",
+          "colar_f1": 86.285,
+          "colaslot_f1": 90.3319,
+          "delta_f1": 4.0469
+        },
+        {
+          "entity": "SROIE VALUE",
+          "domain": "SROIE",
+          "class": "VALUE",
+          "colar_f1": 73.3163,
+          "colaslot_f1": 74.6025,
+          "delta_f1": 1.2862
+        },
+        {
+          "entity": "CORD VALUE",
+          "domain": "CORD",
+          "class": "VALUE",
+          "colar_f1": 96.5992,
+          "colaslot_f1": 95.6555,
+          "delta_f1": -0.9437
+        }
+      ],
+      "routing_accuracy": [
+        {
+          "domain": "FUNSD",
+          "router": "Raw",
+          "accuracy": 0.5,
+          "n_eval": 50,
+          "margin": -0.0007
+        },
+        {
+          "domain": "FUNSD",
+          "router": "Masked",
+          "accuracy": 1,
+          "n_eval": 50,
+          "margin": 0.1126
+        },
+        {
+          "domain": "SROIE",
+          "router": "Raw",
+          "accuracy": 0.56196,
+          "n_eval": 347,
+          "margin": 0.003
+        },
+        {
+          "domain": "SROIE",
+          "router": "Masked",
+          "accuracy": 1,
+          "n_eval": 347,
+          "margin": 0.1428
+        },
+        {
+          "domain": "CORD",
+          "router": "Raw",
+          "accuracy": 1,
+          "n_eval": 100,
+          "margin": 0.0062
+        },
+        {
+          "domain": "CORD",
+          "router": "Masked",
+          "accuracy": 0.88,
+          "n_eval": 100,
+          "margin": 0.2994
+        }
+      ],
+      "boundary_metrics": [
+        {
+          "domain_order": 0,
+          "domain": "FUNSD",
+          "colar_learn": 86.9223,
+          "colaslot_learn": 88.5422,
+          "colar_final": 86.5116,
+          "colaslot_final": 85.6304,
+          "colar_forgetting": 0.4107,
+          "colaslot_forgetting": 2.9118
+        },
+        {
+          "domain_order": 1,
+          "domain": "SROIE",
+          "colar_learn": 82.7304,
+          "colaslot_learn": 82.5332,
+          "colar_final": 76.4611,
+          "colaslot_final": 78.1602,
+          "colar_forgetting": 6.2693,
+          "colaslot_forgetting": 4.373
+        },
+        {
+          "domain_order": 2,
+          "domain": "CORD",
+          "colar_learn": 96.5992,
+          "colaslot_learn": 95.6555,
+          "colar_final": 96.5992,
+          "colaslot_final": 95.6555,
+          "colar_forgetting": 0,
+          "colaslot_forgetting": 0
+        }
+      ],
+      "ownership_leak": [
+        {
+          "task": 0,
+          "head_claimed_current": 8,
+          "head_unowned_trainable": 40,
+          "head_total_trainable": 48,
+          "late_claimed_current": 3,
+          "late_unowned_trainable": 15,
+          "late_total_trainable": 18
+        },
+        {
+          "task": 1,
+          "head_claimed_current": 8,
+          "head_unowned_trainable": 32,
+          "head_total_trainable": 40,
+          "late_claimed_current": 3,
+          "late_unowned_trainable": 12,
+          "late_total_trainable": 15
+        },
+        {
+          "task": 2,
+          "head_claimed_current": 8,
+          "head_unowned_trainable": 24,
+          "head_total_trainable": 32,
+          "late_claimed_current": 3,
+          "late_unowned_trainable": 9,
+          "late_total_trainable": 12
+        }
+      ],
+      "cheap_decomposition": [
+        {
+          "domain_order": 0,
+          "domain": "FUNSD",
+          "colar_learn": 86.9223,
+          "colaslot_r_learn": 87.1632,
+          "acquisition_delta": 0.2408,
+          "colar_final": 44.3219,
+          "colaslot_r_final": 64.3089,
+          "final_delta": 19.987,
+          "retention_component": 19.7461
+        },
+        {
+          "domain_order": 1,
+          "domain": "SROIE",
+          "colar_learn": 80.8333,
+          "colaslot_r_learn": 82.6117,
+          "acquisition_delta": 1.7784,
+          "colar_final": 41.3394,
+          "colaslot_r_final": 64.268,
+          "final_delta": 22.9286,
+          "retention_component": 21.1502
+        },
+        {
+          "domain_order": 2,
+          "domain": "CORD",
+          "colar_learn": 96.7075,
+          "colaslot_r_learn": 95.8652,
+          "acquisition_delta": -0.8423,
+          "colar_final": 96.7075,
+          "colaslot_r_final": 95.8652,
+          "final_delta": -0.8423,
+          "retention_component": 0
+        }
+      ],
+      "calibration_stage": [
+        {
+          "stage_order": 0,
+          "stage_domain": "Stage 2 · FUNSD",
+          "n": 149,
+          "raw_accuracy": 0.9798658,
+          "coverage": 0.7785235,
+          "accepted_accuracy": 1,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 1,
+          "stage_domain": "Stage 2 · SROIE",
+          "n": 626,
+          "raw_accuracy": 1,
+          "coverage": 0.9920128,
+          "accepted_accuracy": 1,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 2,
+          "stage_domain": "Stage 3 · FUNSD",
+          "n": 149,
+          "raw_accuracy": 0.9731544,
+          "coverage": 0.7852349,
+          "accepted_accuracy": 0.991453,
+          "accepted_errors": 1
+        },
+        {
+          "stage_order": 3,
+          "stage_domain": "Stage 3 · SROIE",
+          "n": 626,
+          "raw_accuracy": 1,
+          "coverage": 0.9920128,
+          "accepted_accuracy": 1,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 4,
+          "stage_domain": "Stage 3 · CORD",
+          "n": 800,
+          "raw_accuracy": 0.90125,
+          "coverage": 0.8725,
+          "accepted_accuracy": 0.9770774,
+          "accepted_errors": 16
+        }
+      ],
+      "calibration_rates": [
+        {
+          "stage_order": 0,
+          "stage_domain": "Stage 2 · FUNSD",
+          "metric": "Raw accuracy",
+          "rate": 0.9798658,
+          "n": 149,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 0,
+          "stage_domain": "Stage 2 · FUNSD",
+          "metric": "Coverage @ 0.05",
+          "rate": 0.7785235,
+          "n": 149,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 0,
+          "stage_domain": "Stage 2 · FUNSD",
+          "metric": "Accepted accuracy @ 0.05",
+          "rate": 1,
+          "n": 149,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 1,
+          "stage_domain": "Stage 2 · SROIE",
+          "metric": "Raw accuracy",
+          "rate": 1,
+          "n": 626,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 1,
+          "stage_domain": "Stage 2 · SROIE",
+          "metric": "Coverage @ 0.05",
+          "rate": 0.9920128,
+          "n": 626,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 1,
+          "stage_domain": "Stage 2 · SROIE",
+          "metric": "Accepted accuracy @ 0.05",
+          "rate": 1,
+          "n": 626,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 2,
+          "stage_domain": "Stage 3 · FUNSD",
+          "metric": "Raw accuracy",
+          "rate": 0.9731544,
+          "n": 149,
+          "accepted_errors": 1
+        },
+        {
+          "stage_order": 2,
+          "stage_domain": "Stage 3 · FUNSD",
+          "metric": "Coverage @ 0.05",
+          "rate": 0.7852349,
+          "n": 149,
+          "accepted_errors": 1
+        },
+        {
+          "stage_order": 2,
+          "stage_domain": "Stage 3 · FUNSD",
+          "metric": "Accepted accuracy @ 0.05",
+          "rate": 0.991453,
+          "n": 149,
+          "accepted_errors": 1
+        },
+        {
+          "stage_order": 3,
+          "stage_domain": "Stage 3 · SROIE",
+          "metric": "Raw accuracy",
+          "rate": 1,
+          "n": 626,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 3,
+          "stage_domain": "Stage 3 · SROIE",
+          "metric": "Coverage @ 0.05",
+          "rate": 0.9920128,
+          "n": 626,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 3,
+          "stage_domain": "Stage 3 · SROIE",
+          "metric": "Accepted accuracy @ 0.05",
+          "rate": 1,
+          "n": 626,
+          "accepted_errors": 0
+        },
+        {
+          "stage_order": 4,
+          "stage_domain": "Stage 3 · CORD",
+          "metric": "Raw accuracy",
+          "rate": 0.90125,
+          "n": 800,
+          "accepted_errors": 16
+        },
+        {
+          "stage_order": 4,
+          "stage_domain": "Stage 3 · CORD",
+          "metric": "Coverage @ 0.05",
+          "rate": 0.8725,
+          "n": 800,
+          "accepted_errors": 16
+        },
+        {
+          "stage_order": 4,
+          "stage_domain": "Stage 3 · CORD",
+          "metric": "Accepted accuracy @ 0.05",
+          "rate": 0.9770774,
+          "n": 800,
+          "accepted_errors": 16
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "paired_full_results",
+      "label": "Matched full-capacity CoLaR and CoLaSlot artifacts",
+      "path": "results/gates/colaslot_d50_r128_e10",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "description": "Materializes the reviewed matched-run boundary and entity rows recomputed from the linked metric files.",
+        "sql": "SELECT * FROM (VALUES ('entity','FUNSD HEADER',55.2083,60.2410,5.0326),('entity','FUNSD KEY',88.2537,88.7600,0.5064),('entity','FUNSD VALUE',87.7872,85.1945,-2.5927),('entity','SROIE KEY',86.2850,90.3319,4.0469),('entity','SROIE VALUE',73.3163,74.6025,1.2862),('entity','CORD VALUE',96.5992,95.6555,-0.9437)) AS t(grain,label,colar_value,colaslot_value,delta)"
+      }
+    },
+    {
+      "id": "routing_probe",
+      "label": "DIL lexical routing probe",
+      "path": "docs/reports/colaslot_integration_rca_2026-08-07/routing_probe.json",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "description": "Materializes reviewed raw and padding-masked top-1 routing accuracy from the linked probe output.",
+        "sql": "SELECT * FROM (VALUES ('FUNSD','Raw',0.50,50),('FUNSD','Masked',1.00,50),('SROIE','Raw',0.5619596542,347),('SROIE','Masked',1.00,347),('CORD','Raw',1.00,100),('CORD','Masked',0.88,100)) AS t(domain,router,accuracy,n_eval)"
+      }
+    },
+    {
+      "id": "slot_mask_code",
+      "label": "Historical pre-fix slot ownership behavior reconstructed in RCA notes",
+      "path": "docs/reports/colaslot_integration_rca_2026-08-07/source_notes.md",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "description": "Materializes slot counts derived from the linked ownership and mask implementation.",
+        "sql": "SELECT * FROM (VALUES (0,8,40,48,3,15,18),(1,8,32,40,3,12,15),(2,8,24,32,3,9,12)) AS t(task,head_claimed_current,head_unowned_trainable,head_total_trainable,late_claimed_current,late_unowned_trainable,late_total_trainable)"
+      }
+    },
+    {
+      "id": "replay_code",
+      "label": "Latent replay storage and dummy-ID forwarding",
+      "path": "doccl/methods/latent_replay.py"
+    },
+    {
+      "id": "colaslot_code",
+      "label": "Current CoLaSlot composition",
+      "path": "doccl/methods/colaslot.py"
+    },
+    {
+      "id": "source_notes",
+      "label": "RCA calculations, scope, and validation notes",
+      "path": "docs/reports/colaslot_integration_rca_2026-08-07/source_notes.md"
+    },
+    {
+      "id": "cheap_repaired_results",
+      "label": "Recomputed matched cheap CoLaR, CoLaSlot, and CoLaSlot-R evidence",
+      "path": "docs/reports/colaslot_integration_rca_2026-08-07/source_notes.md",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "description": "Materializes the reviewed acquisition, final, and retention-component deltas recomputed from the matched d5/r64 metric matrices.",
+        "sql": "SELECT * FROM (VALUES ('FUNSD',86.9223,87.1632,0.2408,44.3219,64.3089,19.9870,19.7461),('SROIE',80.8333,82.6117,1.7784,41.3394,64.2680,22.9286,21.1502),('CORD',96.7075,95.8652,-0.8423,96.7075,95.8652,-0.8423,0.0000)) AS t(domain,colar_learn,colaslot_r_learn,acquisition_delta,colar_final,colaslot_r_final,final_delta,retention_component)"
+      }
+    },
+    {
+      "id": "scalar_calibration",
+      "label": "Training-only CoLaSlot-R margin calibration and feasibility artifacts",
+      "path": "results/gates/colaslot_r_margin_feasibility_seed42.json",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "description": "Materializes reviewed five-fold out-of-fold stage/domain routing rates at margin 0.05 from the calibration artifact.",
+        "sql": "SELECT * FROM (VALUES ('Stage 2 · FUNSD',149,0.9798658,0.7785235,1.0000000,0),('Stage 2 · SROIE',626,1.0000000,0.9920128,1.0000000,0),('Stage 3 · FUNSD',149,0.9731544,0.7852349,0.9914530,1),('Stage 3 · SROIE',626,1.0000000,0.9920128,1.0000000,0),('Stage 3 · CORD',800,0.9012500,0.8725000,0.9770774,16)) AS t(stage_domain,n,raw_accuracy,coverage,accepted_accuracy,accepted_errors)"
+      }
+    },
+    {
+      "id": "refit_pattern",
+      "label": "Existing post-task slot-refit implementation pattern",
+      "path": "doccl/methods/lexslot_fm.py"
+    },
+    {
+      "id": "replay_owner_pattern",
+      "label": "Existing CoLaR replay-owner tracking pattern",
+      "path": "doccl/methods/colar_cb.py"
+    }
+  ]
+}

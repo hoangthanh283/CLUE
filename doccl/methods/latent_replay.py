@@ -171,11 +171,15 @@ class LatentReplay(NaiveFineTune):
         labels = replay["labels"].to(self.device)
         attention_mask = replay["attention_mask"].to(self.device)
         b = bbox.shape[0]
-        # pad_id value is irrelevant to correctness (everything below layer k is
-        # discarded by the injection); vision-free wrappers have no processor.
-        processor = getattr(self.model, "processor", None)
-        pad_id = processor.tokenizer.pad_token_id if processor is not None else 0
-        dummy_ids = torch.full((b, bbox.shape[1]), pad_id, dtype=torch.long, device=self.device)
+        input_ids = replay.get("input_ids")
+        if input_ids is None:
+            # The value is irrelevant when no forward hook consumes token ids because
+            # everything below layer k is discarded by the injection.
+            processor = getattr(self.model, "processor", None)
+            pad_id = processor.tokenizer.pad_token_id if processor is not None else 0
+            input_ids = torch.full((b, bbox.shape[1]), pad_id, dtype=torch.long, device=self.device)
+        else:
+            input_ids = input_ids.to(self.device)
         dummy_pixels = (
             torch.zeros((b, *self._pixel_shape), device=self.device)
             if self._pixel_shape is not None
@@ -184,7 +188,7 @@ class LatentReplay(NaiveFineTune):
         self._inject = replay["hidden"]
         try:
             return self.model(
-                input_ids=dummy_ids,
+                input_ids=input_ids,
                 bbox=bbox,
                 pixel_values=dummy_pixels,
                 attention_mask=attention_mask,
@@ -256,14 +260,15 @@ class LatentReplay(NaiveFineTune):
                 for i in range(hidden.shape[0]):
                     if len(candidates) >= quota:
                         break
-                    candidates.append(
-                        {
-                            "hidden": hidden[i],
-                            "bbox": batch["bbox"][i].cpu(),
-                            "attention_mask": batch["attention_mask"][i].cpu(),
-                            "labels": batch["labels"][i].cpu(),
-                        }
-                    )
+                    candidate = {
+                        "hidden": hidden[i],
+                        "bbox": batch["bbox"][i].cpu(),
+                        "attention_mask": batch["attention_mask"][i].cpu(),
+                        "labels": batch["labels"][i].cpu(),
+                    }
+                    if self.config.get("store_input_ids", False):
+                        candidate["input_ids"] = batch["input_ids"][i].cpu()
+                    candidates.append(candidate)
                 if len(candidates) >= quota:
                     break
         if was_training:
@@ -320,4 +325,6 @@ class LatentReplay(NaiveFineTune):
         for d in self.store:
             total += d["hidden"].numel() * 2  # fp16 activations
             total += (d["bbox"].numel() + d["attention_mask"].numel() + d["labels"].numel()) * 8
+            if "input_ids" in d:
+                total += d["input_ids"].numel() * 8
         return total
