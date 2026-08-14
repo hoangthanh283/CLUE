@@ -75,12 +75,16 @@ gate closed.** Read-side-as-blending is dead; the RCA kill-tests (marginal corre
 attack the same readout locus directly and supersede this direction. Full verdict in
 STATE.md ACTIVE block.
 
-### RUNNING (2026-08-15): CoLaSlot-FD one-step functional-drift gate
+### RUNNING (2026-08-15): corrected RNG-matched CoLaSlot-FD gate
 Normal CoLaR/current forwards remain slot-free. For each sampled replay owner, FD snapshots
 centered logits before the base update and fits only that owner's head rows after the update,
 on entity tokens. Current, foreign-owner, and same-owner O support target zero residual.
-Run one d5/r64 seed-42 gate under the existing GO rule; do not sweep LR, null weight, route,
-or rank.
+The first launch was stopped during task 1: random slot initialization plus the shuffled lexical
+signature prepass advanced the global training RNG, so its 87.7029 task-0 F1 was not matched to
+CoLaR at 86.9223. The scoped fix preserves Torch RNG across both auxiliary operations and is covered
+by a shuffled-loader regression test (22 focused / 399 fast tests pass). Relaunch one clean
+d5/r64 seed-42 gate under the existing GO rule; require task-0 trajectory reproduction and do not
+sweep LR, null weight, route, or rank.
 
 ### CLOSED (2026-08-15): CoLaSlot-RO online hard-label gate
 RO preserves the exact same-state base trajectory but changes final domains by only

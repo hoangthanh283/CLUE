@@ -149,6 +149,17 @@
 
 ### CoLaSlot-FD preregistration
 
+Protocol correction before adjudication:
+
+- The first FD launch was stopped during task 1 and is audit-only. Random CoLaSlot initialization
+  and the LexSlot pass over a shuffled DataLoader both advanced the global Torch RNG, changing
+  subsequent batch/dropout order relative to CoLaR. The partial run task-0 F1 (87.7029) therefore
+  differed from the matched CoLaR control (86.9223).
+- CoLaSlot now restores CPU Torch RNG after both auxiliary operations. A regression test uses a
+  real DataLoader with shuffle enabled and pins initialization plus prepass neutrality. The corrected
+  run must reproduce the CoLaR task-0 trajectory before its slots-on/off result is eligible for the
+  gate; thresholds and permitted follow-ups remain unchanged.
+
 1. Capture each sampled owner's combined centered logits in eval/no-grad mode immediately before
    the normal CoLaR optimizer step. After the step, freeze CoLaR and train only that owner's
    existing head-slot rows to cancel the measured decision-logit drift on entity tokens.
