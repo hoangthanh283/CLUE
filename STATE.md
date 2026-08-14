@@ -21,7 +21,7 @@ Per-method BERT cells are tight (sd ≤5): dil er_cflat 78.3 / er 77.1 / der_pp 
 naive 39.4 / ewc 46.6; prompt-LoRA 34–39. bert lexslot (standalone soft) 37.96 ≈ naive —
 standalone-≈-naive finding reproduces off LayoutLMv3.
 
-## RUNNING (2026-08-15): RNG-matched CoLaSlot-FD functional-drift gate
+## RUNNING (2026-08-15): boundary-RNG-matched CoLaSlot-FD functional-drift gate
 
 The first FD launch was stopped during task 1 after a protocol audit found two RNG confounds.
 CoLaSlot initialized random slot keys after model construction and LexSlot made a signature pass
@@ -31,16 +31,18 @@ CoLaR control at 86.9223, so it cannot support an external CoLaR comparison. Its
 at results/gates/colaslot_fd_d5_e5.log for audit only.
 
 CoLaSlot now restores the CPU Torch RNG after auxiliary slot initialization and the signature
-pass. The second launch reproduced all five CoLaR task-0 epochs exactly, then diverged at the first
-replay epoch: SROIE val F1 77.3097 versus the archived pure-CoLaR value 78.3715. Code-path
-comparison localized the remaining confound to stored real token IDs being fed into LayoutLMv3
-replay, where token-derived position/bias state survives hidden injection. That launch was stopped;
-its audit log is results/gates/colaslot_fd_rngfix_d5_e5.log.
+pass. Launch 2 reproduced all five CoLaR task-0 epochs exactly, then its first replay-active
+validation was 77.3097 versus the archived pure-CoLaR value 78.3715. Launch 3 decoupled lexical
+routing IDs from model replay IDs but reproduced the same 77.3097, falsifying the token-ID
+hypothesis; both partial logs remain audit-only at results/gates/colaslot_fd_rngfix_d5_e5.log and
+results/gates/colaslot_fd_matched_d5_e5.log.
 
-Routing IDs are now a CoLaSlot-only side channel: the lexical gate sees stored real IDs while the
-model receives the original CoLaR dummy IDs. A regression test pins both sides of the same replay
-forward; all 23 CoLaR tests and the full 400-test non-GPU suite pass. The next run must reproduce
-both task-0 and replay-active task-1 CoLaR trajectories before its slot-on/off delta is admissible.
+The remaining confound was the extra base-only diagnostic evaluation in CoLaSlot-RF descendants.
+Creating even an unshuffled DataLoader iterator consumes global Torch RNG, so the second pass at a
+task boundary shifted the next-task shuffle/dropout stream. The diagnostic pass now restores CPU
+Torch RNG. Routing/model-ID and real-DataLoader boundary invariants are both pinned; all 24 CoLaR
+tests and the full 401-test non-GPU suite pass. The next run must reproduce both task-0 and
+replay-active task-1 CoLaR trajectories before its slot-on/off delta is admissible.
 
 RO closes hard-label residual fitting at both post-task and online timings. CoLaSlot-FD keeps
 the exact slot-free CoLaR path but records each sampled owner's centered logits immediately

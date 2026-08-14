@@ -75,17 +75,18 @@ gate closed.** Read-side-as-blending is dead; the RCA kill-tests (marginal corre
 attack the same readout locus directly and supersede this direction. Full verdict in
 STATE.md ACTIVE block.
 
-### RUNNING (2026-08-15): corrected RNG-matched CoLaSlot-FD gate
+### RUNNING (2026-08-15): boundary-RNG-matched CoLaSlot-FD gate
 Normal CoLaR/current forwards remain slot-free. For each sampled replay owner, FD snapshots
 centered logits before the base update and fits only that owner's head rows after the update,
 on entity tokens. Current, foreign-owner, and same-owner O support target zero residual.
 Launch 1 was stopped for auxiliary RNG contamination. Launch 2 reproduced CoLaR through task 0,
-then its first replay epoch differed because stored routing IDs were also fed into LayoutLMv3,
-changing token-derived position/bias state above the injection boundary. Routing now reads real IDs
-through a transient side channel while model replay keeps the original CoLaR dummy IDs. The joint
-invariant is covered by a regression test (23 focused / 400 fast tests pass). Relaunch one clean
-d5/r64 seed-42 gate under the existing GO rule; require task-0 and task-1 trajectory reproduction
-and do not sweep LR, null weight, route, or rank.
+then diverged at replay-active task 1. Launch 3 separated routing IDs from model replay IDs but
+reproduced the same 77.3097, falsifying that hypothesis. The actual remaining confound was the
+extra base-only diagnostic evaluation: each unshuffled DataLoader iterator consumed global Torch
+RNG and shifted the next-task shuffle/dropout stream. That diagnostic now restores CPU Torch RNG;
+routing/model-ID and boundary-evaluation invariants are covered by regressions (24 focused / 401
+fast tests pass). Relaunch one clean d5/r64 seed-42 gate under the existing GO rule; require task-0
+and task-1 trajectory reproduction and do not sweep any mechanism knob.
 
 ### CLOSED (2026-08-15): CoLaSlot-RO online hard-label gate
 RO preserves the exact same-state base trajectory but changes final domains by only

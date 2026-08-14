@@ -164,13 +164,15 @@ Protocol correction before adjudication:
   subsequent batch/dropout order relative to CoLaR. The partial run task-0 F1 (87.7029) therefore
   differed from the matched CoLaR control (86.9223).
 - CoLaSlot now restores CPU Torch RNG after both auxiliary operations. Launch 2 reproduced every
-  task-0 CoLaR epoch, then its first replay-active validation was 77.3097 versus the pure CoLaR
-  value 78.3715. Stored real IDs had also replaced dummy replay IDs, changing LayoutLMv3
-  token-derived position/bias state above the hidden-injection boundary; the run was stopped.
-- Routing IDs now travel through a CoLaSlot-only side channel. The lexical gate consumes real IDs
-  while the model receives dummy IDs, pinned by one replay-forward regression test. A run must
-  reproduce both task-0 and replay-active task-1 CoLaR trajectories before its slots-on/off result
-  is gate-eligible; thresholds and permitted follow-ups remain unchanged.
+  task-0 CoLaR epoch, then its first replay-active validation was 77.3097 versus pure CoLaR at
+  78.3715. Launch 3 sent routing IDs through a side channel while keeping dummy model replay IDs,
+  but reproduced the same 77.3097; this falsifies the token-ID explanation.
+- CoLaSlot-RF descendants also performed a second, base-only diagnostic evaluation after each task.
+  Creating each unshuffled DataLoader iterator consumes global Torch RNG, so that extra pass shifted
+  the next-task shuffle/dropout stream. The diagnostic now restores CPU Torch RNG. A real-loader
+  regression pins equivalence to one ordinary evaluation; the routing/model-ID invariant remains
+  pinned separately. A run must reproduce both task-0 and replay-active task-1 CoLaR trajectories
+  before its slots-on/off result is gate-eligible; thresholds and follow-ups remain unchanged.
 
 1. Capture each sampled owner's combined centered logits in eval/no-grad mode immediately before
    the normal CoLaR optimizer step. After the step, freeze CoLaR and train only that owner's
