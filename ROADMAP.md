@@ -89,6 +89,14 @@ runtime rises 55.9%. Eight pathways are active per owner, but random-zero biline
 makes their energy class-agnostic at the first update and scarcely target-aware thereafter. Close
 FDP, temperature/LR sweeps, d50/r128, and extra seeds.
 
+### PLANNED (2026-08-15): CoLaSlot-FDA support-gated analytic compensation
+Replace the two failed pieces, not the surrounding system: learn replay-only class-versus-O token
+support with leave-one-document-out precision >=90%, and solve the fixed nonlinear pathway readout
+directly by an 8-by-C relative-ridge update on paired logit drift plus balanced null blocks. Failed
+support keeps an owner exact-zero. Fix ridge=1e-3; no threshold/rank/LR sweeps. Require a >=50%
+synthetic cancellation check, then the same d5/r64 seed-42 GO rule as FDP. Full-budget and extra
+seeds remain locked behind a cheap-gate pass.
+
 ### CLOSED (2026-08-15): CoLaSlot-RO online hard-label gate
 RO preserves the exact same-state base trajectory but changes final domains by only
 [-0.054, +0.026, 0.000], giving -0.009 AA and -0.014 old-domain mean. Owner CE is
