@@ -89,13 +89,20 @@ runtime rises 55.9%. Eight pathways are active per owner, but random-zero biline
 makes their energy class-agnostic at the first update and scarcely target-aware thereafter. Close
 FDP, temperature/LR sweeps, d50/r128, and extra seeds.
 
-### PLANNED (2026-08-15): CoLaSlot-FDA support-gated analytic compensation
-Replace the two failed pieces, not the surrounding system: learn replay-only class-versus-O token
-support with leave-one-document-out precision >=90%, and solve the fixed nonlinear pathway readout
-directly by an 8-by-C relative-ridge update on paired logit drift plus balanced null blocks. Failed
-support keeps an owner exact-zero. Fix ridge=1e-3; no threshold/rank/LR sweeps. Require a >=50%
-synthetic cancellation check, then the same d5/r64 seed-42 GO rule as FDP. Full-budget and extra
-seeds remain locked behind a cheap-gate pass.
+### CLOSED (2026-08-15): CoLaSlot-FDA support-gated analytic compensation
+FDA passed its held-out support prerequisite but failed the matched d5/r64 seed-42 gate:
+58.8440 AA versus CoLaR 60.7896, with final deltas [-11.5315, +5.9272, -0.2324]. The
+analytic solve canceled 61--76% of measured drift but the additive residual harmed FUNSD
+retention through repeated online residual accumulation and readout overgeneralization. Close FDA and all ridge/LR sweeps.
+The literature-driven successor is a post-task route-conditioned prototype/readout alignment
+with an explicit O/NA null and held-out precision gate; d50 and extra seeds stay locked.
+
+### CLOSED (2026-08-15): CoLaSlot-Proto route-conditioned readout
+The RNG-corrected matched gate reproduced every CoLaR training checkpoint but finished at
+60.7526 AA versus 60.7896 control. Final deltas are [+0.4229, -0.5339, 0.0000], so efficacy fails
+and SROIE crosses the -0.5 safety floor. Support precision alone cannot detect owner-specific
+readout harm. Close scale/rank sweeps and promotion; admit one bounded successor only: LODO
+owner-utility gating that disables prototype owners unless held-out replay improves.
 
 ### CLOSED (2026-08-15): CoLaSlot-RO online hard-label gate
 RO preserves the exact same-state base trajectory but changes final domains by only

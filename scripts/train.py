@@ -37,6 +37,7 @@ from doccl.methods.colaslot import CoLaSlot
 from doccl.methods.colaslot_fd import CoLaSlotFD
 from doccl.methods.colaslot_fda import CoLaSlotFDA
 from doccl.methods.colaslot_fdp import CoLaSlotFDP
+from doccl.methods.colaslot_proto import CoLaSlotProto
 from doccl.methods.colaslot_ra import CoLaSlotRA
 from doccl.methods.colaslot_rf import CoLaSlotRF
 from doccl.methods.colaslot_ro import CoLaSlotRO
@@ -253,6 +254,7 @@ METHOD_REGISTRY = {
     "colaslot_fd": CoLaSlotFD,
     "colaslot_fda": CoLaSlotFDA,
     "colaslot_fdp": CoLaSlotFDP,
+    "colaslot_proto": CoLaSlotProto,
     "colaslot_ra": CoLaSlotRA,
     "colaslot_rf": CoLaSlotRF,
     "colaslot_ro": CoLaSlotRO,

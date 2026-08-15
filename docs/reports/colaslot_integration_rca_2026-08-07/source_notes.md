@@ -244,6 +244,51 @@
    and non-negative micro-precision delta on both old domains. A pass permits d50/r128 seed 42 and
    only then seeds 7/123. A protocol-specific best/SOTA claim requires the matched multi-seed audit.
 
+### CoLaSlot-FDA result and literature pivot
+
+The matched DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch run completed at AA 58.8440176 and final
+row [32.7903872, 47.2665699, 96.4750958], versus pure CoLaR AA 60.7895952 and
+[44.3218852, 41.3393964, 96.7075038]. Deltas are [-11.5314980, +5.9271730, -0.2324074]
+by domain. The support gate is valid (owners 0/1 final precision/F1 100/100; owner 2 0/0
+abstained), but additive analytic compensation is harmful: cancellation is 76.25% for task1/owner0
+and 61.48%/66.19% for task2 owners 0/1, while FUNSD retention falls 54.0943 -> 37.0857 after
+task1 and 44.3219 -> 32.7904 at the final boundary. This localizes the failure to repeated residual accumulation and readout overgeneralization, not
+shared-weight co-adaptation, routing, or numerical instability. Runtime is 8,309 s and
+peak VRAM 2,426 MB.
+
+The CL4IE graph review identifies the convergent next mechanism: stability-gap/NMC, SLCA, RanPAC,
+LayUP, ProtoNER, and IS3 all replace or align the drifting linear readout with prototypes or
+closed-form statistics; SER adds forward consistency against buffer overfit; concept-drift work
+separates virtual template shift from real label-boundary shift. FDA is therefore closed with no
+ridge/LR sweep. The next preregistration should test a post-task, route-conditioned prototype
+readout with explicit O/NA null behavior and held-out precision gating, with no slot reads during
+shared-weight training.
+
+### CoLaSlot-Proto result and RCA
+
+The single-FUNSD preflight passed at 87.2931 AA. The first DIL run was invalidated after CORD epoch
+1 because post-task prototype fitting ran replay forwards without model-mode/RNG isolation; it
+consumed dropout RNG and produced 93.2920 instead of the matched 94.9140 checkpoint. The invalid
+artifacts are preserved with the suffix _rng_contaminated. Prototype fitting now uses eval mode
+inside torch.random.fork_rng and restores model and slot-read state. A focused regression test
+proves RNG and mode conservation.
+
+The corrected DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch gate reproduced every archived CoLaR
+checkpoint exactly. It completed at AA 60.7525938 with final row [44.7447447, 40.8055330,
+96.7075038]. The exact base-only final row is [44.3218852, 41.3393964, 96.7075038] and AA
+60.7895952, yielding [-0.0370013 AA, -0.0555020 old-domain mean] and per-domain deltas
+[+0.4228596, -0.5338635, 0.0000000]. It fails AA +0.5 and old-domain +1.0 and narrowly violates
+the -0.5 domain floor on SROIE. Runtime is 6,734.17 s, peak VRAM 2,426.20 MB, and replay memory
+3,333,624 bytes. Owner prototype scales are 11.7803 and 10.9020; final support precision is 100%
+for both old owners, so support detection is not a sufficient utility/safety criterion.
+
+Verdict: CoLaSlot-Proto is a NO-GO; no global scale, route, rank, d50, or multi-seed sweep. The
+mixed sign localizes the remaining opportunity to owner heterogeneity. The one admissible bounded
+successor is leave-one-document-out owner utility gating: retain an owner's prototype readout only
+when prototypes fit on the other replay documents improve held-out replay over base logits. This
+operationalizes the stability-gap/prototype literature while preventing an owner such as SROIE
+from entering the read path solely because its entity-support detector is precise.
+
 ## Historical successor preregistration
 
 - Recommended concept: **CoLaSlot-RF**, a retention-only, post-task head-slot refit.
