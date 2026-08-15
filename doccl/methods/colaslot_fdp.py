@@ -14,18 +14,21 @@ class CoLaSlotFDP(CoLaSlotFD):
 
     name = "colaslot_fdp"
 
-    def _head_delta(self, feats: torch.Tensor) -> torch.Tensor:
+    def _pathway_features(self, feats: torch.Tensor) -> torch.Tensor:
         act = feats @ self.head_slots.values.T
         gate = self.head_slots._infer_gate
         if gate is None:
-            return act @ self.head_slots.proj
+            return act
 
         routed = gate.unsqueeze(1).to(device=act.device, dtype=act.dtype)
         active = routed.gt(0)
         energy = act.square().masked_fill(~active, torch.finfo(act.dtype).min)
         weights = energy.softmax(dim=-1)
         weights = weights * active.sum(dim=-1, keepdim=True).to(act.dtype) * routed
-        return (act * weights) @ self.head_slots.proj
+        return act * weights
+
+    def _head_delta(self, feats: torch.Tensor) -> torch.Tensor:
+        return self._pathway_features(feats) @ self.head_slots.proj
 
     def _add_head_slots(self, _module, _inp, output):
         if self._cur_feats is None or self._cur_feats.shape[1] != output.shape[1]:
