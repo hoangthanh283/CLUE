@@ -55,22 +55,49 @@ token weighting to the same tiny linear correction instead of resolving the enti
 conflict. FDP and energy-temperature/LR sweeps are closed. Evidence:
 `results/dil_colaslot_fdp_seed42_k4/` and `results/gates/colaslot_fdp_d5_e5.log`.
 
-## PLANNED (2026-08-15): CoLaSlot-FDA support-gated analytic drift compensation
+## NO-GO (2026-08-15): CoLaSlot-FDA support-gated analytic drift compensation
 
-The next bounded test changes the two mechanisms that FDP left unresolved. A per-owner token gate
-uses replay-only class-versus-O feature contrasts and leave-one-document-out validation; an owner
-is enabled only if held-out entity precision is at least 90% with positive entity F1, otherwise its
-residual is exact zero. Inside accepted tokens, the fixed FDP pathway map becomes a nonlinear basis
-whose projection increment is solved by an 8-by-C relative-ridge system against the measured
-pre/post-update logit drift. Entity and O/current/foreign null blocks receive balanced weight.
+The matched DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch gate completed with **58.8440 AA /
+43.8493 AF** and final row **[32.7904, 47.2666, 96.4751]**, versus the exact slot-free CoLaR
+control **60.7896 AA / [44.3219, 41.3394, 96.7075]**. FDA therefore changes AA by **-1.9456**;
+it fails the +0.5 AA, +1.0 old-domain, and no-domain-below -0.5 promotion clauses. Evidence:
+results/dil_colaslot_fda_seed42_k4/ and results/gates/colaslot_fda_d5_e5.log.
 
-This combines target-aware token routing from MoLE-CIE with the stable closed-form updates used by
-ACIL/Any-SSR, while retaining CoLaR, the document owner route, replay bytes, and the FD paired target.
-Fix relative ridge at 1e-3 and support precision at 90%; do not sweep them. Before any GPU run, a
-synthetic check must cancel at least 50% of a known drift and keep rejected tokens exactly zero.
-Then run only the matched d5/r64 seed-42 gate. GO remains AA >= +0.5, old-domain mean >= +1.0,
-every domain >= -0.5, and non-negative old-domain micro-precision. Only a pass unlocks d50/r128
-seed 42 and then seeds 7/123; no SOTA claim before matched multi-seed evidence.
+The support gate itself is not the failure: final held-out owner precision/F1 is 100/100 for
+owners 0 and 1 (owner 2 correctly abstains at 0/0). The analytic solve cancels 76.25% of owner-0
+drift after task 1, 61.48% and 66.19% for owners 0/1 after task 2, yet retention falls FUNSD
+54.0943 -> 37.0857 after task 1 and 44.3219 -> 32.7904 at the final boundary. SROIE improves
+41.3394 -> 47.2666. This is direct additive-readout overgeneralization from repeated online residual accumulation;
+RF keeps slot reads disabled and excludes slot parameters from the CoLaR optimizer, so shared-weight
+co-adaptation is not implicated. It is not a router or numerical failure. Runtime is 8,309 s (+57.1% vs pure CoLaR) with
+2,426 MB peak VRAM.
+
+The CL4IE literature review sharpens the next direction: stability-gap/NMC, SLCA, RanPAC, LayUP,
+ProtoNER, and IS3 all replace or align the drifting head with prototypes/closed-form statistics;
+SER adds forward consistency to prevent low-buffer overfit; concept-drift work separates virtual
+template shift from real label-boundary shift. The next admissible test is therefore a new,
+post-task, route-conditioned prototype readout with an explicit O/NA null and held-out
+precision gate. Do not run d50/r128, extra seeds, or FDA ridge/LR sweeps.
+
+
+## NO-GO (2026-08-15): CoLaSlot-Proto route-conditioned prototype readout
+
+The CL4IE review motivated a frozen route-conditioned prototype-vs-O margin on top of unchanged
+CoLaR training. The RNG-corrected matched gate completed at **60.7526 AA** with final row
+**[44.7447, 40.8055, 96.7075]**. Its exact slot-free CoLaR control is **60.7896 AA / [44.3219,
+41.3394, 96.7075]**: deltas are **-0.0370 AA**, **-0.0555 old-domain mean**, and
+**[+0.4229, -0.5339, 0.0000]** by domain. It fails both efficacy clauses and narrowly violates
+the -0.5 per-domain safety floor on SROIE. No d50, scale/rank sweep, or extra seeds.
+
+An initial run was invalid because prototype fitting performed dropout-active replay forwards and
+advanced RNG before CORD. The preserved contaminated run diverged at CORD epoch 1 (93.2920 vs
+94.9140). The fix evaluates prototypes inside a forked RNG context and restores model/slot-read
+state; the corrected run reproduced every CoLaR checkpoint exactly. Final base-only scores also
+match CoLaR exactly, proving the remaining failure is readout-level owner heterogeneity: owner 0
+helps FUNSD while owner 1 harms SROIE despite both final support gates reporting 100% precision.
+The next bounded test is owner-level leave-one-document-out prototype-utility gating, not a global
+scale sweep. Evidence: results/dil_colaslot_proto_seed42/, results/gates/colaslot_proto_d5_e5.log,
+and the preserved RNG-contaminated artifacts.
 
 ## NO-GO (2026-08-15): CoLaSlot-RO online hard-label drift tracking
 
