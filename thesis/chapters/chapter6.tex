@@ -905,6 +905,18 @@ has no runs yet; completing that matrix is the pending rented-GPU grid
 (Chapter~\ref{ch:conclusions}). What the present rows establish is that the benchmark's central
 empirical ordering is not an artefact of one backbone---or of multimodality itself.
 
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{figures/backbone_ordering.pdf}{%
+    \includegraphics[width=0.92\linewidth]{backbone_ordering.pdf}}{}
+  \caption[Replay-dominant ordering across backbones]{The replay-dominant ordering on
+  DIL across backbones (mean over three seeds, from the aggregated run table). The
+  three-tier structure---replay near the joint oracle, regularisation barely above the
+  naive floor---reproduces on the text-only BERT backbone at a uniformly lower level and
+  on LiLT where cells exist; C-Flat++ and Joint are not yet run on LiLT.}
+  \label{fig:backbone-ordering}
+\end{figure}
+
 \begin{table}[!htbp]
   \centering
   \caption[Method comparison across backbones]{Average accuracy (AA) across backbones, by
@@ -1146,6 +1158,20 @@ documents (zero private bytes) recovers dense-label tasks (FUNSD $76.1$) but not
 whose feature region the proxy pool does not cover (SROIE ${\sim}7$), topping out at AA
 $58.9$---a coverage-limited partial transfer, not a method.
 
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{figures/falsification_ladder.pdf}{%
+    \includegraphics[width=0.9\linewidth]{falsification_ladder.pdf}}{}
+  \caption[The latent-replay falsification ladder]{The latent-replay falsification
+  ladder at a fixed frozen boundary (layer $k{=}8$, DIL). Only whole-document replay
+  (blue) retains accuracy; every summarised representation---including \emph{real}
+  $k$-means centroids---collapses to the naive level, and the matched-budget
+  single-variable control (whole documents $63.8$ vs.\ the same features on decoupled
+  carriers $36.7$) isolates whole-document (feature, position, label) binding as the
+  necessary ingredient. Single-seed diagnostic runs (seed 42).}
+  \label{fig:falsification-ladder}
+\end{figure}
+
 \paragraph{CoLaR: the constructive control.}
 The negatives above could be effort-limited. CoLaR (compressed latent replay) shows they are
 not: per-\emph{document} rank-$r$ SVD factors respect whole-document binding (unlike the
@@ -1164,6 +1190,18 @@ consolidation is dose-dependently harmful ($85.9$ at $m=1$, $79.5$ at $m=3$)---c
 with the root cause: the readout must be \emph{repaired by re-exercise}, not averaged with a
 weaker reader or stiffened.
 
+\begin{figure}[!htbp]
+  \centering
+  \IfFileExists{figures/colar_pareto.pdf}{%
+    \includegraphics[width=0.78\linewidth]{colar_pareto.pdf}}{}
+  \caption[Replay memory versus retention]{Replay memory versus retention (DIL,
+  log-scale memory axis). CoLaR (blue) matches raw latent replay's accuracy at
+  $2.7\times$ less storage because its per-document SVD factors preserve whole-document
+  binding; the aggressive compressions at ${\sim}0.4$\,MB all break that binding and
+  collapse. Memory figures are serialized replay-store bytes as instrumented per run.}
+  \label{fig:colar-pareto}
+\end{figure}
+
 \paragraph{Task-capacity gates on CoLaR (single-seed, provisional).}
 Two pre-registered gates ask whether task-specific head capacity can break the conservation
 law. CoLaSlot-R (owner-routed additive head slots) raises the matched five-epoch, five-document
@@ -1179,6 +1217,17 @@ Hard-label refit losses near $10^{-5}$ explain the null effect. Replacing labels
 acquisition-logit anchors restores a training signal, but reduces AA by $0.43$ and SROIE by
 $0.99$ through lower precision. Both variants therefore fail the pre-registered gate; no
 full-budget or additional-seed run is warranted.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[CoLaSlot capacity-gate verdicts]{Pre-registered CoLaSlot capacity gates on
+  CoLaR (matched DIL $d{=}5$/$r{=}64$ seed-42 cells; single-seed diagnostic budget).
+  Wrong routes are destructive, correct routes are inert---head residuals on compressed
+  replay are closed in their current form.}
+  \label{tab:capacity-gates}
+  \IfFileExists{generated/table_capacity_gates.tex}{%
+    \input{generated/table_capacity_gates}}{}
+\end{table}
 
 \section{Discussion}
 \label{sec:results-discussion}
