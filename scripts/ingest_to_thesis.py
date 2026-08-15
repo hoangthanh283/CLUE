@@ -32,6 +32,10 @@ FIGURES = [
     ("pilot/figures/backbone_metrics.pdf", "figures/backbone_metrics.pdf"),
     ("pilot/figures/backbone_forgetting_matrices.pdf", "figures/backbone_forgetting_matrices.pdf"),
     ("pilot/figures/backbone_cka_grid.pdf", "figures/backbone_cka_grid.pdf"),
+    # §6.6 extended-falsification figures (scripts/build_falsification_figures.py).
+    ("figure_falsification_ladder.pdf", "figures/falsification_ladder.pdf"),
+    ("figure_colar_pareto.pdf", "figures/colar_pareto.pdf"),
+    ("figure_backbone_ordering.pdf", "figures/backbone_ordering.pdf"),
 ]
 TABLES = [
     # table_main.tex is NOT auto-copied: thesis/generated/table_main.tex carries a
@@ -44,6 +48,7 @@ TABLES = [
     ("table_ablation.tex", "generated/table_ablation.tex"),
     ("table_compute.tex", "generated/table_compute.tex"),
     ("table_single_task_baselines.tex", "generated/table_single_task_baselines.tex"),
+    ("table_capacity_gates.tex", "generated/table_capacity_gates.tex"),
 ]
 
 
