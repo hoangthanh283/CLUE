@@ -220,6 +220,30 @@
   Evidence: `results/dil_colaslot_fdp_seed42_k4/` and
   `results/gates/colaslot_fdp_d5_e5.log`.
 
+### CoLaSlot-FDA preregistration
+
+1. Keep CoLaR, FD paired pre/post-update logit target, hard document owner route, fixed random
+   FDP pathway basis, replay documents, and memory budget. Do not train pathway keys by SGD.
+2. Fit a replay-only class-versus-O token support gate for each owner. Validate it by leaving out
+   one replay document at a time. Enable that owner only when pooled held-out entity precision is
+   at least 90% and entity F1 is positive; otherwise its contribution is exactly zero.
+3. For enabled tokens, solve the owner projection increment analytically. Use entity drift as the
+   target and O/current/foreign tokens as zero targets, with each block normalized to equalize
+   sample count. Use a fixed relative ridge of 1e-3 on the 8-by-8 Gram matrix. Reject non-finite or
+   non-improving solves. Do not sweep ridge, support threshold, energy temperature, LR, rank, or
+   route margin.
+4. This is a mechanism synthesis, not a borrowed claim: MoLE-CIE motivates supervised token-level
+   expert selection; ACIL/Any-SSR motivate closed-form continual updates; DS-AL motivates a
+   complementary nonlinear feature stream when a linear analytic map underfits. Sources:
+   https://aclanthology.org/2025.findings-emnlp.718/,
+   https://openaccess.thecvf.com/content/ICCV2025/html/Tong_Any-SSR_How_Recursive_Least_Squares_Works_in_Continual_Learning_of_Large_ICCV_2025_paper.html,
+   https://arxiv.org/abs/2205.14922, and https://arxiv.org/abs/2403.17503.
+5. A CPU synthetic check must reduce a known entity-drift MSE by at least 50%, keep rejected tokens
+   exactly zero, and remain finite. Then run exactly one matched DIL/LayoutLMv3 seed-42
+   k4/d5/r64/5-epoch gate. GO requires AA >= +0.5, old-domain mean >= +1.0, every domain >= -0.5,
+   and non-negative micro-precision delta on both old domains. A pass permits d50/r128 seed 42 and
+   only then seeds 7/123. A protocol-specific best/SOTA claim requires the matched multi-seed audit.
+
 ## Historical successor preregistration
 
 - Recommended concept: **CoLaSlot-RF**, a retention-only, post-task head-slot refit.

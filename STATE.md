@@ -55,6 +55,23 @@ token weighting to the same tiny linear correction instead of resolving the enti
 conflict. FDP and energy-temperature/LR sweeps are closed. Evidence:
 `results/dil_colaslot_fdp_seed42_k4/` and `results/gates/colaslot_fdp_d5_e5.log`.
 
+## PLANNED (2026-08-15): CoLaSlot-FDA support-gated analytic drift compensation
+
+The next bounded test changes the two mechanisms that FDP left unresolved. A per-owner token gate
+uses replay-only class-versus-O feature contrasts and leave-one-document-out validation; an owner
+is enabled only if held-out entity precision is at least 90% with positive entity F1, otherwise its
+residual is exact zero. Inside accepted tokens, the fixed FDP pathway map becomes a nonlinear basis
+whose projection increment is solved by an 8-by-C relative-ridge system against the measured
+pre/post-update logit drift. Entity and O/current/foreign null blocks receive balanced weight.
+
+This combines target-aware token routing from MoLE-CIE with the stable closed-form updates used by
+ACIL/Any-SSR, while retaining CoLaR, the document owner route, replay bytes, and the FD paired target.
+Fix relative ridge at 1e-3 and support precision at 90%; do not sweep them. Before any GPU run, a
+synthetic check must cancel at least 50% of a known drift and keep rejected tokens exactly zero.
+Then run only the matched d5/r64 seed-42 gate. GO remains AA >= +0.5, old-domain mean >= +1.0,
+every domain >= -0.5, and non-negative old-domain micro-precision. Only a pass unlocks d50/r128
+seed 42 and then seeds 7/123; no SOTA claim before matched multi-seed evidence.
+
 ## NO-GO (2026-08-15): CoLaSlot-RO online hard-label drift tracking
 
 The matched gate completed with **72.4103 AA / 24.5255 AF / [67.5951, 52.6964, 96.9396]**.
