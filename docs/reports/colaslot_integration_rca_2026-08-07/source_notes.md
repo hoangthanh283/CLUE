@@ -201,6 +201,25 @@
    permits seeds 7/123. A protocol-specific best/SOTA claim requires the resulting matched
    multi-seed evidence and a comparator-table audit.
 
+### CoLaSlot-FDP result and mechanism RCA
+
+- The preregistered d5/r64 seed-42 gate completed at AA 60.79244398 and final row
+  [44.32188518, 41.34794294, 96.70750383], exactly equal to FD at every matrix entry and epoch
+  checkpoint. JSON and `matrix.npy` agree.
+- Against pure CoLaR, AA is +0.00284883, old-domain mean is +0.00427325, and final-domain deltas
+  are [0.00000000, +0.00854650, 0.00000000]. Old-domain micro-precision deltas are 0.00000000
+  FUNSD and +0.00870934 SROIE. The precision guard passes; both efficacy clauses fail by two
+  orders of magnitude.
+- Runtime is 8,242.70 seconds versus 5,285.98 for pure CoLaR (+55.94%); peak VRAM is 2,426.34 MB
+  versus 2,422.33 MB. The method is compute-limited, not memory-limited.
+- Each task owns eight active head pathways, so FDP is not algebraically identical to FD. The
+  equality is empirical: slot `values` begin random while `proj` begins at exact zero, so the
+  first update trains only projection rows. Later 5e-5 bilinear updates barely make the random
+  energy keys target-aware, and squared activation energy contains no class/direction signal.
+- Verdict: FDP is a NO-GO. Do not run d50/r128, seeds 7/123, or energy-temperature/LR sweeps.
+  Evidence: `results/dil_colaslot_fdp_seed42_k4/` and
+  `results/gates/colaslot_fdp_d5_e5.log`.
+
 ## Historical successor preregistration
 
 - Recommended concept: **CoLaSlot-RF**, a retention-only, post-task head-slot refit.

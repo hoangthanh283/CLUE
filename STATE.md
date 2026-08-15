@@ -21,7 +21,7 @@ Per-method BERT cells are tight (sd ≤5): dil er_cflat 78.3 / er 77.1 / der_pp 
 naive 39.4 / ewc 46.6; prompt-LoRA 34–39. bert lexslot (standalone soft) 37.96 ≈ naive —
 standalone-≈-naive finding reproduces off LayoutLMv3.
 
-## RUNNING (2026-08-15): CoLaSlot-FDP token-pathway gate
+## NO-GO (2026-08-15): CoLaSlot-FDP token-pathway gate
 
 The fully RNG-matched FD gate is a decisive NO-GO. It reproduced every archived CoLaR epoch
 checkpoint, so the same-state comparison is exact, but slots-on AA is **60.792444** versus
@@ -35,22 +35,25 @@ confident errors on FUNSD/SROIE with 92.0%/98.85% coverage. FD measures real cen
 (mean MSE 1.34e-3--2.33e-3), while null losses are only 0.99e-6--3.19e-6. A CPU fixture then
 localizes the optimization ceiling: the configured first slot step cancels 0.0017% of a known
 drift; 20--2,000x higher learning rates plateau near 4% cumulative cancellation. Removing the
-support-null term improves one stable point to 13% but diverges at larger rates, matching RA's
+support-null term improves one stable point to 13% but diverges at larger rates, matching RA
 false-positive failure. The shared cause is structural: the owner route is document-level and
 the existing head residual is only a low-rank linear token map, so entity correction conflicts
 with staying zero on O/current support. Another LR/null sweep is closed.
 
-The bounded successor is `method=colaslot_fdp`. It keeps CoLaR, FD targets, owner routing,
-parameters, memory, and optimizer unchanged. Within the selected owner block only, it treats each
-rank-one slot as a pathway and softmax-reweights those pathways per token by squared activation
-energy, preserving the original scale when energies are equal. This parameter-free PAS-style
-self-routing is the smallest change that adds the token selectivity supported by the RCA and
-current continual-IE literature.
+The bounded `method=colaslot_fdp` gate also fails. Its full matrix is exactly equal to FD: AA
+**60.792444**, final row **[44.321885, 41.347943, 96.707504]**, and deltas versus pure CoLaR
+**[0.000000, +0.008546, 0.000000]**. Old-domain micro-precision changes are 0.000000 FUNSD and
++0.008709 SROIE, so the safety clause passes but the +0.5 AA and +1.0 old-domain efficacy clauses
+fail by two orders of magnitude. JSON and `matrix.npy` agree. Runtime is 8,243 seconds (+55.9%
+versus pure CoLaR), with unchanged 2,426 MB peak VRAM. Do not run d50/r128 or more seeds.
 
-Run one DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch gate. GO requires AA >= +0.5, old-domain mean
->= +1.0, every domain >= -0.5, and non-negative micro-precision delta on each old domain.
-Failure closes FDP; success alone permits a matched d50/r128 seed-42 run, then seeds 7/123.
-No SOTA claim is allowed before that full matched multi-seed sequence passes.
+Mechanism RCA: every owner has eight pathways, so equality is empirical rather than forced by a
+single active slot. `values` start random while `proj` starts at exact zero; the first FD update can
+train only the projection, and subsequent 5e-5 bilinear updates scarcely make the energy keys
+target-aware. Squared activation energy is also class-agnostic. FDP therefore applies random-feature
+token weighting to the same tiny linear correction instead of resolving the entity/O support
+conflict. FDP and energy-temperature/LR sweeps are closed. Evidence:
+`results/dil_colaslot_fdp_seed42_k4/` and `results/gates/colaslot_fdp_d5_e5.log`.
 
 ## NO-GO (2026-08-15): CoLaSlot-RO online hard-label drift tracking
 
