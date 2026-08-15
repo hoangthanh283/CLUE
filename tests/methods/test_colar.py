@@ -19,6 +19,7 @@ from doccl.methods.colar_cb import CoLaRCB
 from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.colaslot import CoLaSlot
 from doccl.methods.colaslot_fd import CoLaSlotFD
+from doccl.methods.colaslot_fda import CoLaSlotFDA
 from doccl.methods.colaslot_fdp import CoLaSlotFDP
 from doccl.methods.colaslot_ra import CoLaSlotRA
 from doccl.methods.colaslot_rf import CoLaSlotRF
@@ -265,6 +266,23 @@ def _colaslot_fdp(**overrides):
         **overrides,
     )
     return CoLaSlotFDP(_Wrapper(), config)
+
+
+def _colaslot_fda(**overrides):
+    config = _colaslot_config(
+        infer_gate=True,
+        store_input_ids=True,
+        routing_mode="hard_top1",
+        route_margin=0.05,
+        slot_depth="head_only",
+        online_lr=1e-2,
+        online_weight_decay=0.0,
+        functional_null_weight=1.0,
+        analytic_ridge=1e-3,
+        support_min_precision=0.9,
+        **overrides,
+    )
+    return CoLaSlotFDA(_Wrapper(), config)
 
 
 def test_colaslot_uses_colar_freeze_map_and_unique_optimizer_params():
@@ -564,6 +582,62 @@ def test_colaslot_fdp_routes_each_token_by_owner_pathway_energy():
     m._set_owner_gate(1, m.device, None)
     abstained = m._head_delta(feats)
     assert torch.isfinite(abstained).all() and torch.count_nonzero(abstained) == 0
+
+
+def test_colaslot_fda_support_gate_rejects_o_tokens():
+    m = _colaslot_fda()
+    task = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
+    batch = _batch(2, seed=18)
+    m.before_task(task, [batch])
+    m._set_owner_gate(1, m.device, 0)
+    m._support_keys[0] = torch.nn.functional.normalize(
+        torch.tensor([[1.0] + [0.0] * (D - 1)]), dim=-1
+    )
+    m._support_enabled[0] = True
+    feats = torch.zeros(1, 2, D)
+    feats[0, 0, 0] = 1
+    feats[0, 1, 0] = -1
+    with torch.no_grad():
+        m.head_slots.proj[:2].fill_(1)
+    delta = m._head_delta(feats)
+    assert torch.count_nonzero(delta[0, 0]) > 0
+    assert torch.count_nonzero(delta[0, 1]) == 0
+
+
+def test_colaslot_fda_lodo_enables_separable_support():
+    m = _colaslot_fda()
+    task = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
+    m.before_task(task, [_batch(1, seed=19)])
+    feats = torch.zeros(2, D)
+    feats[0, 0] = 1
+    feats[1, 0] = -1
+    docs = [(feats.clone(), torch.tensor([1, 0])) for _ in range(3)]
+    entry = m._fit_support_gate(0, docs)
+    assert entry["precision"] == 100 and entry["f1"] == 100 and entry["enabled"]
+
+
+def test_colaslot_fda_refreshes_support_after_capture():
+    m = _colaslot_fda()
+    m.model.label_to_id = {"O": 0}
+    task = TaskInfo(task_id=0, task_name="t0", label_set=["O", "KEY", "VALUE"])
+    batch = _batch(2, seed=20)
+    batch["labels"][:, ::2] = 0
+    batch["labels"][:, 1::2] = 1
+    m.before_task(task, [batch])
+    m.after_task(task, [batch])
+    entry = m.diagnostic_metrics["support_gate"]["0"]
+    assert entry["documents"] == 2 and entry["keys"] == 1
+
+
+def test_colaslot_fda_ridge_cancels_known_drift():
+    entity_x = torch.eye(2)
+    target = torch.tensor([[1.0, -1.0], [-0.5, 0.5]])
+    solved = CoLaSlotFDA._ridge_increment(
+        entity_x, target, [torch.tensor([[1.0, 1.0]])], ridge=1e-3, null_weight=1.0
+    )
+    assert solved is not None
+    delta, before, after = solved
+    assert torch.isfinite(delta).all() and after / before < 0.5
 
 
 def test_colaslot_rejects_known_broken_composition_modes():
