@@ -58,7 +58,7 @@
         <mxCell id="lgA_t" value="boundary 0&#8594;1 (FUNSD&#8594;CORD)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1"><mxGeometry x="192" y="422" width="220" height="16" as="geometry" /></mxCell>
         <mxCell id="lgB_l" value="" style="endArrow=none;html=1;strokeColor=#3A9D4E;strokeWidth=2;dashed=1;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="430" y="430" as="sourcePoint" /><mxPoint x="466" y="430" as="targetPoint" /></mxGeometry></mxCell>
         <mxCell id="lgB_t" value="boundary 1&#8594;2 (CORD&#8594;SROIE)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1"><mxGeometry x="472" y="422" width="230" height="16" as="geometry" /></mxCell>
-        <mxCell id="finding" value="Finding: a monotonic depth gradient &#8212; input encoders do not drift (CKA = 1.0), while drift rises with depth and peaks at the last encoder layer and the classifier. Forgetting is a late-layer + head phenomenon." style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;fontStyle=2;fontColor=#333333;whiteSpace=wrap;" parent="1" vertex="1"><mxGeometry x="40" y="446" width="740" height="32" as="geometry" /></mxCell>
+        <mxCell id="finding" value="Finding: a monotonic depth gradient - input encoders do not drift (CKA = 1.0), while drift rises with depth and peaks at the last encoder layer and the classifier. Forgetting is a late-layer + head phenomenon." style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;fontStyle=2;fontColor=#333333;whiteSpace=wrap;" parent="1" vertex="1"><mxGeometry x="40" y="446" width="740" height="32" as="geometry" /></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

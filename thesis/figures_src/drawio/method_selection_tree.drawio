@@ -58,7 +58,7 @@
         <mxCell id="lbl_h0" value="H&lt;sub&gt;0&lt;/sub&gt;: no group separates after Bonferroni" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#6E6E6E;background=#FFFFFF;" parent="1" vertex="1">
           <mxGeometry x="835" y="202" width="250" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="bot_note" value="The remedy is selected from the diagnosis, not pre-committed — method choice emerges from pilot findings at Week 4." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=12;fontStyle=2;" parent="1" vertex="1">
+        <mxCell id="bot_note" value="The remedy is selected from the diagnosis, not pre-committed; method choice emerges from pilot findings at Week 4." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=12;fontStyle=2;" parent="1" vertex="1">
           <mxGeometry x="150" y="408" width="760" height="36" as="geometry" />
         </mxCell>
       </root>

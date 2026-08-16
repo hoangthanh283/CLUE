@@ -7,7 +7,7 @@
 \label{sec:intro-background}
 
 Modern organisations process a continuous stream of \emph{visually-rich
-documents}---forms, invoices, receipts, contracts, and reports---whose meaning
+documents} (forms, invoices, receipts, contracts, and reports) whose meaning
 depends not only on the words they contain but on \emph{where} those words sit on
 the page. Extracting structured information from such documents is the task of
 \gls{kie}, the cornerstone of document-understanding systems deployed in finance,
@@ -21,7 +21,7 @@ define the state of the art.
 Deployed document systems are not static. New document types appear, annotation
 schemas are extended, and the distribution of incoming documents drifts as an
 organisation enters new markets or adopts new templates. A model must therefore
-\emph{evolve}---learning new entity types and new domains over time---without
+\emph{evolve}, learning new entity types and new domains over time, without
 re-training from scratch on all historical data, which is often impossible because
 earlier data is unavailable, expensive to store, or restricted for privacy reasons
 (\gls{pii} under \gls{gdpr}). This is the setting of \gls{cl}: learning a sequence
@@ -30,7 +30,7 @@ of tasks while retaining performance on those seen earlier.
 The central obstacle to \gls{cl} is \gls{cf}~\citep{mccloskey1989catastrophic}:
 when a neural network is fine-tuned on a new task, gradient updates overwrite the
 parameters that encoded earlier tasks, and performance on those tasks collapses. A
-large literature has developed remedies---regularising important
+large literature has developed remedies: regularising important
 weights~\citep{kirkpatrick2017ewc}, distilling from past models~\citep{li2017lwf},
 replaying stored exemplars~\citep{rolnick2019er,buzzega2020der}, learning
 task-specific prompts~\citep{wang2022l2p,wang2022dualprompt,smith2023coda}, or
@@ -44,16 +44,16 @@ For a \emph{tri-modal} document encoder this uniform treatment is unsatisfying,
 because the network is manifestly heterogeneous: it contains a text stream, a
 visual/patch stream, layout (2D position) embeddings, shared self-attention and
 feed-forward blocks at increasing depth, and a task head. These parts are trained
-on different signals, carry different inductive biases, and---there is every reason
-to suspect---are unlikely to age at the same rate under a shifting task
+on different signals, carry different inductive biases, and, there is every reason
+to suspect, are unlikely to age at the same rate under a shifting task
 distribution. Yet the prevailing
 remedies are blind to this structure: elastic-weight
 penalties~\citep{kirkpatrick2017ewc} apply one importance-weighted quadratic term
 across all parameters, distillation~\citep{li2017lwf} matches whole-network
 outputs, and heuristic layer freezing draws an arbitrary depth-wise cut that
 ignores the modality a layer serves. Even the modern parameter-efficient and
-modular families---low-rank adapters~\citep{wang2023olora} and prompt
-pools~\citep{wang2022l2p,wang2022dualprompt,smith2023coda}---only sharpen the
+modular families (low-rank adapters~\citep{wang2023olora} and prompt
+pools~\citep{wang2022l2p,wang2022dualprompt,smith2023coda}) only sharpen the
 question rather than answer it: deciding \emph{which} weights to adapt or
 \emph{where} to inject a prompt implicitly presupposes that one already knows which
 part of the encoder is at risk. Evidence from unimodal vision transformers shows
@@ -61,12 +61,12 @@ that forgetting is far from uniform across depth and is concentrated in identifi
 layers~\citep{ramasesh2021anatomy}, and recent probes of multimodal models report
 modality-dependent degradation~\citep{zhai2023investigating}; but for a document
 encoder that jointly reasons over text, layout, and pixels, \emph{no prior work has
-measured where---at which depth, and in which input stream or the head---forgetting
+measured where: at which depth, and in which input stream or the head, forgetting
 concentrates}, nor whether that pattern differs from a unimodal encoder. That
 measurement is the missing prerequisite this thesis supplies.
 
-Answering that question---which component forgets most, and whether the pattern is
-stable across continual scenarios---is therefore a prerequisite for designing a
+Answering that question (which component forgets most, and whether the pattern is
+stable across continual scenarios) is therefore a prerequisite for designing a
 \gls{cl} method that spends its capacity where forgetting actually happens rather
 than spreading it thinly across the whole network. This thesis takes a
 \emph{measure-first, then-fix} stance: it first \emph{diagnoses} where forgetting
@@ -82,7 +82,7 @@ The thesis pursues the following concrete objectives:
   \item \textbf{Formulate continual document \gls{kie} as a unified problem.} Cast
         \gls{kie} across heterogeneous datasets (FUNSD, CORD, SROIE) as continual
         token-level sequence labelling, and define three continual
-        scenarios---\gls{cil}, \gls{dil}, and a mixed scenario---over a shared
+        scenarios (\gls{cil}, \gls{dil}, and a mixed scenario) over a shared
         output format (Chapter~\ref{ch:experimental-setup}).
   \item \textbf{Build a forgetting-localisation diagnostic.} Develop an
         instrumentation protocol that localises forgetting along the
@@ -100,8 +100,8 @@ The thesis pursues the following concrete objectives:
         (Chapter~\ref{ch:results}, \S\ref{sec:results-diagnosis}).
   \item \textbf{Derive and evaluate a mechanism-targeted remedy.} Propose a
         \gls{cl} method whose mechanism is concentrated on the dominant-forgetting
-        component identified by the diagnosis---LexSlot, an isolated slot
-        memory at the head/late locus paired with a compact 200-exemplar replay buffer---and evaluate it against ten
+        component identified by the diagnosis: LexSlot, an isolated slot
+        memory at the head/late locus paired with a compact 200-exemplar replay buffer, and evaluate it against ten
         baselines spanning the major method families
         (Chapters~\ref{ch:methodology} and~\ref{ch:results}).
   \item \textbf{Establish a reproducible benchmark.} Release the FCS-CL benchmark
@@ -129,12 +129,12 @@ The thesis pursues the following concrete objectives:
         forgetting metrics;
   \item \textbf{LexSlot, a mechanism-targeted continual-learning remedy} whose target
         is \emph{derived from} the diagnosis rather than chosen \emph{a priori},
-        concentrating its effort on the dominant-forgetting locus---the classifier head
-        and late encoder layers---with an isolated slot memory, gated by a
+        concentrating its effort on the dominant-forgetting locus, the classifier head
+        and late encoder layers, with an isolated slot memory, gated by a
         drift-immune lexical signature and paired with a compact 200-exemplar replay buffer;
   \item the \textbf{FCS-CL benchmark} together with reproducible diagnostic
-        tooling---unified scenarios, baselines, configurations, and
-        instrumentation---to support like-for-like comparison.
+        tooling (unified scenarios, baselines, configurations, and
+        instrumentation) to support like-for-like comparison.
 \end{enumerate}
 
 \noindent The remainder of this section expands each contribution.
@@ -142,7 +142,7 @@ The thesis pursues the following concrete objectives:
 \noindent\textbf{A forgetting-localisation diagnosis for tri-modal document
 encoders.} We introduce, to our knowledge, the first protocol that localises
 \gls{cf} in a multimodal document encoder along network \emph{depth} and across
-its \emph{separable} parts---the three input streams (text, layout, visual), the
+its \emph{separable} parts: the three input streams (text, layout, visual), the
 shared self-attention and feed-forward blocks at each depth, and the classifier
 head. We are deliberate about what is and is not separable: LayoutLMv3 is a
 \emph{single-stream} encoder, so after the input embeddings text and visual tokens
@@ -156,8 +156,8 @@ text encoder (BERT-base) run through the same instrument, so the analysis can sh
 whether the multimodal encoder forgets \emph{differently} from a unimodal one
 rather than merely re-confirming a known unimodal result. The diagnosis returns a
 clear, \emph{output-side} finding: under naive sequential fine-tuning LayoutLMv3
-forgets almost totally---an $88$-F1 task collapses to $\sim$2 F1 after a single
-further task---and the damage concentrates in the classifier head and late encoder
+forgets almost totally (an $88$-F1 task collapses to $\sim$2 F1 after a single
+further task), and the damage concentrates in the classifier head and late encoder
 layers, where per-token CKA drift rises monotonically with depth (from $1.00$ at the
 input encoders to $0.25$ at the late layers and $0.16$ at the head) and the
 old-task-Fisher-weighted displacement
@@ -170,8 +170,8 @@ by the BERT contrast and a powered, distribution-targeting test rather than by a
 underpowered magnitude comparison.
 
 \noindent\textbf{A mechanism-targeted continual-learning method (LexSlot).} Guided by
-the diagnosis---which localises forgetting in the classifier head and late encoder
-layers---we design \textbf{LexSlot}, a method that protects exactly that locus with an
+the diagnosis, which localises forgetting in the classifier head and late encoder
+layers, we design \textbf{LexSlot}, a method that protects exactly that locus with an
 \emph{isolated slot memory}: small additive, zero-initialised slot adapters at the head and
 late layers over a frozen backbone, where each task owns and writes \emph{only its own} slots,
 so earlier tasks are protected structurally with no consolidation penalty to tune. The headline
@@ -181,7 +181,7 @@ optional sharing axis, but the measurement selects \emph{isolation}. The contrib
 diagnosis-driven decision of \emph{where} the capacity attaches, isolated by a placement ablation
 (head-only, head/late, uniform) that tests whether targeting the diagnosed locus beats uniform
 treatment. Measured over three seeds on domain-incremental learning, LexSlot reaches AA
-$87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$---approaching full-replay retention
+$87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$, approaching full-replay retention
 (within $\sim$1 point of ER/DER++ and the oracle's $88.7$) with an order-of-magnitude smaller
 exemplar budget, and forgetting \emph{less} than the
 plain replay methods. We report this honestly: LexSlot is competitive with replay at a small
@@ -189,14 +189,14 @@ fraction of its exemplar budget rather than beating the strongest replay variant
 domain-incremental scenario and one backbone, with the multi-scenario and multi-backbone
 confirmation the pending grid. The honest contribution is thus that diagnosis-driven head/late
 targeting closes most of the forgetting gap on a domain shift with a compact 200-exemplar buffer, competitive
-with---rather than beating---full-scale data replay.
+with, rather than beating, full-scale data replay.
 
 \noindent\textbf{The FCS-CL benchmark and reproducible tooling.} We provide a
 unified \gls{cl} benchmark over three public document datasets with three
 scenarios, a baseline suite, and per-component instrumentation, all under a single
 configuration system and tracked experiment log, enabling like-for-like comparison
 that the fragmented prior literature has lacked. The benchmark already yields a clear
-ordering consistent with the diagnosis---replay\,$\gg$\,regularisation\,$\gg$\,distillation:
+ordering consistent with the diagnosis: replay\,$\gg$\,regularisation\,$\gg$\,distillation.
 because forgetting is output-side, replay (which re-exposes old-class targets at the
 head) is most effective, with ER and DER++ reaching the joint upper bound on
 domain-incremental learning (AA $\approx 88$ vs the oracle's $88.7$, backward transfer
