@@ -18,7 +18,7 @@ separate three layers of ``input/output'' that are easily conflated: at the
 \emph{user} level the input is a document scan and the output is extracted
 information; at the \emph{machine-learning} level the input is a stream of
 datasets $(\mathcal{D}_1,\mathcal{D}_2,\dots)$ and the output is the trained
-parameters; at the \emph{technical} level---the one we formalise---the input is a
+parameters; at the \emph{technical} level, the one we formalise, the input is a
 document tuple and the output is a label sequence. (All symbols introduced here
 are collected in the List of Notations.)
 
@@ -45,7 +45,7 @@ under a bounded memory $M$ (at most $M_{\max}$ exemplars) and a parameter budget
 $P$ (both relevant because the document setting favours memory-light,
 privacy-preserving methods). The object of
 study is how performance on earlier tasks degrades as later tasks are learned,
-and---uniquely here---how that degradation is distributed across the
+and, uniquely here, how that degradation is distributed across the
 \emph{components} of $\theta$.
 
 \subsection{Defining a Component}
@@ -58,23 +58,23 @@ honesty of the analysis: LayoutLMv3 is a \emph{single-stream} encoder. Only the
 onward, text and visual patch tokens are concatenated and share the \emph{same}
 query/key/value projections. There is therefore no identifiable
 ``text-attention'' versus ``visual-attention'' versus ``cross-modal fusion''
-\emph{parameter} group---those projections are one shared set. We do not pretend
+\emph{parameter} group: those projections are one shared set. We do not pretend
 otherwise. We group instead by what the architecture actually separates:
 
 \begin{itemize}
-  \item \textbf{Text word embeddings} --- the token embedding table
+  \item \textbf{Text word embeddings}: the token embedding table
         (\texttt{text\_word\_embed}).
-  \item \textbf{Layout embeddings} --- the 2D position embeddings encoding
+  \item \textbf{Layout embeddings}: the 2D position embeddings encoding
         bounding-box geometry (\texttt{layout\_2d\_pos\_embed}).
-  \item \textbf{Visual patch embedding} --- the image-patch projection
+  \item \textbf{Visual patch embedding}: the image-patch projection
         (\texttt{image\_patch\_embed}).
-  \item \textbf{Shared self-attention} --- the (single-stream) query/key/value
+  \item \textbf{Shared self-attention}: the (single-stream) query/key/value
         projections (\texttt{attn\_qkv}) and the attention output projection
         (\texttt{attn\_out}), reported separately rather than folded into the
         feed-forward block.
-  \item \textbf{Feed-forward and normalisation} --- the position-wise
+  \item \textbf{Feed-forward and normalisation}: the position-wise
         feed-forward blocks (\texttt{ffn}) and layer norms (\texttt{layernorm}).
-  \item \textbf{Task head} --- the token-classification layer
+  \item \textbf{Task head}: the token-classification layer
         (\texttt{classifier}), tracked separately as it is expanded for new
         labels.
 \end{itemize}
@@ -112,7 +112,7 @@ only (C1), image+layout (C2), text+layout (C3), and the full tri-modal input (C4
 Because only the inputs differ, any difference in forgetting is attributable to the
 modalities in play rather than to the network. Critically, the text-only condition
 (C1) keeps the real text tokens and zeroes \emph{only} the image and layout
-streams---it is a genuine text-only LayoutLMv3, not a null input.
+streams: it is a genuine text-only LayoutLMv3, not a null input.
 
 Second, because a same-architecture mask cannot tell us whether a multimodal
 encoder forgets \emph{differently} from a unimodal one, we add an \emph{external}
@@ -127,7 +127,7 @@ contrast answers ``is this multimodal-specific?''.
   \caption[The diagnostic conditions]{The diagnostic conditions. C1--C4 are the
   \emph{same} LayoutLMv3 architecture under different input-stream masks (only the
   active inputs differ); Cb is an external true-unimodal baseline. C1 keeps real
-  text (image and layout zeroed)---it is not a null-input condition.}
+  text (image and layout zeroed); it is not a null-input condition.}
   \label{tab:diagnostic-conditions}
   \begin{tabular}{cll}
     \toprule
@@ -213,8 +213,8 @@ average accuracy, backward transfer, and average forgetting
 (\S\ref{sec:eval-metrics}). Its structure is annotated in
 Figure~\ref{fig:forgetting-matrix}: the diagonal holds just-learned accuracy, the
 lower triangle holds retained accuracy on earlier tasks (the source of backward
-transfer and forgetting), and the upper triangle---unused here, as tasks arrive
-sequentially---would hold zero-shot forward transfer. This is the conventional,
+transfer and forgetting), and the upper triangle, unused here as tasks arrive
+sequentially, would hold zero-shot forward transfer. This is the conventional,
 component-agnostic view that the per-component metrics refine.
 
 \begin{figure}[!htbp]
@@ -366,7 +366,7 @@ the characterisation-only fallback rather than to a method.
   \end{tikzpicture}
   \caption[Decision tree mapping diagnostic outcomes to the remedy]{The decision
   rule as a tree over \emph{measurable} outcomes. A head/late-layer concentration
-  ($H_a$, the outcome the diagnosis returns) selects a head/late-targeted remedy---here
+  ($H_a$, the outcome the diagnosis returns) selects a head/late-targeted remedy, here
   \textbf{LexSlot}, an isolated slot memory at that locus; a uniform-across-depth pattern
   ($H_b$) would instead select a uniform mechanism; no significant concentration (at adequate
   power, $H_0$) selects the characterisation-only fallback. Unrealisable branches
@@ -378,8 +378,8 @@ the characterisation-only fallback rather than to a method.
 \section{Mechanism-Targeted Continual Learning}
 \label{sec:method-remedy}
 
-The diagnosis localises forgetting to a specific region of the network---the classifier
-head and late encoder layers (Chapter~\ref{ch:results})---without prescribing how to protect
+The diagnosis localises forgetting to a specific region of the network, the classifier
+head and late encoder layers (Chapter~\ref{ch:results}), without prescribing how to protect
 it. This thesis derives one remedy from that measurement: \textbf{LexSlot}
 (\S\ref{sec:method-lexslot}), a parameter-efficient, isolated \emph{slot memory} placed at the
 diagnosed head/late locus, paired in its headline configuration with a compact 200-exemplar
@@ -395,35 +395,35 @@ important parameters with a single Fisher-weighted term regardless of which
 component they belong to; LW-AFT freezes layers by a fixed heuristic. If
 forgetting concentrates in one component, both spend stability budget where it is
 not needed and may under-protect where it is. The hypothesis this thesis tests is that
-\emph{concentrating} the continual-learning mechanism---here, a learnable slot
-memory placed only where forgetting lives---on the dominant-forgetting component
+\emph{concentrating} the continual-learning mechanism (here, a learnable slot
+memory placed only where forgetting lives) on the dominant-forgetting component
 improves the stability--plasticity trade-off at negligible extra cost.
 
 \subsection{Design Space: Where a Mechanism Can Attach in a Single-Stream Encoder}
 \label{sec:method-design-space}
 
-The three continual-learning families of \S\ref{sec:bg-cl-families}---regularisation,
-replay, and distillation---each leave one design choice open for a document encoder:
+The three continual-learning families of \S\ref{sec:bg-cl-families}, regularisation,
+replay, and distillation, each leave one design choice open for a document encoder:
 \emph{where} in the network the mechanism concentrates its effort. This is precisely
 the choice that existing methods make blindly. EWC weights every parameter by its
 Fisher importance but applies the \emph{same} quadratic form everywhere; replay
 re-exposes whole inputs without regard to which layers most need grounding;
 distillation matches the full output without asking which representations have
 drifted. The contribution of this thesis is not a new family but a principled,
-\emph{measured} answer to the ``where'' question---and the honest constraint on that
+\emph{measured} answer to the ``where'' question, and the honest constraint on that
 answer is the single-stream caveat of \S\ref{sec:method-components}.
 
 That caveat rules out an entire class of otherwise-appealing designs. One might wish
 to place per-modality low-rank adapters on a ``text'', ``visual'', and ``fusion''
-bank, or to route per-modality prompt sub-pools by a layout-aware query---both natural
+bank, or to route per-modality prompt sub-pools by a layout-aware query, both natural
 ideas, and both presupposing separable text-, visual-, and fusion-attention parameter
 groups. LayoutLMv3 has none: from the first encoder layer the streams share one set of
 query/key/value projections (\S\ref{sec:method-components}). We therefore do not
 pursue modality-partitioned adapters or routers here; they are reserved for a
 genuinely two-stream backbone where the streams physically exist
 (Chapter~\ref{ch:conclusions}). What the architecture \emph{does} separate is
-\emph{depth}---input embeddings, early/mid/late encoder blocks, and the task
-head---and depth is the axis along which the diagnosis (\S\ref{sec:method-diagnostic})
+\emph{depth}: input embeddings, early/mid/late encoder blocks, and the task
+head, and depth is the axis along which the diagnosis (\S\ref{sec:method-diagnostic})
 can actually localise forgetting. The remedy is therefore built on the one axis the
 instrument can measure.
 
@@ -432,8 +432,8 @@ spending a Fisher penalty there (a depth-scaled version of regularisation), by r
 classes at the drifting head (a targeted version of replay), or by inserting dedicated learnable
 capacity there and freezing the rest (a structural, parameter-efficient option). This thesis
 takes the last route: \textbf{LexSlot} places small, isolated slot adapters at the head and late
-layers over a frozen backbone (\S\ref{sec:method-lexslot}). The components it uses---low-rank
-adapters and a frozen backbone---are established; what is novel is that \emph{where} they attach
+layers over a frozen backbone (\S\ref{sec:method-lexslot}). The components it uses, low-rank
+adapters and a frozen backbone, are established; what is novel is that \emph{where} they attach
 is fixed by measurement, not by a hand-tuned heuristic or a uniform default, and that each task's
 slots are write-once isolated so old knowledge is structurally protected.
 
@@ -460,7 +460,7 @@ A falsified hypothesis remains informative and is reported as such.
 
 The remedy follows directly from the measurable diagnostic outcome
 (Table~\ref{tab:subhypotheses}): a head/late-layer concentration selects a mechanism that
-concentrates its effort there---LexSlot with head/late slot placement
+concentrates its effort there: LexSlot with head/late slot placement
 (\S\ref{sec:method-lexslot}); a uniform-across-depth pattern would instead select a
 uniform mechanism; no concentration (at adequate power) selects the characterisation-only
 fallback (\S\ref{sec:method-fallback}). Beyond alignment with the diagnosis, the method must
@@ -477,16 +477,16 @@ the headline contributions and the remedy would have been withheld. The diagnosi
 concentrate forgetting at the head and late layers (Chapter~\ref{ch:results}), so this
 branch was \emph{not} taken: a head/late-targeted remedy is justified, and
 \S\ref{sec:method-lexslot} introduces the one this thesis proposes. We state the fallback
-explicitly because pre-registering it---rather than choosing the form after seeing which
-design won---is what licenses the claim that the remedy's \emph{target} was
+explicitly because pre-registering it, rather than choosing the form after seeing which
+design won, is what licenses the claim that the remedy's \emph{target} was
 \emph{derived from} the measurement; and because the diagnostic's value stands
 independently of the remedy's margin regardless.
 
 \section{Lexical-Slot Head-Memory Continual Learning (LexSlot)}
 \label{sec:method-lexslot}
 
-The diagnosis fixes \emph{where} a remedy should act---the classifier head and late encoder
-layers (\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection})---and LexSlot is the
+The diagnosis fixes \emph{where} a remedy should act, the classifier head and late encoder
+layers (\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection}), and LexSlot is the
 mechanism this thesis puts there. The guiding question is whether the diagnosed locus can be
 protected by a \emph{parameter-efficient structured memory that stores no past inputs at all},
 rather than by a consolidation budget that keeps a frozen teacher in memory and rehearses stored
@@ -494,7 +494,7 @@ inputs. LexSlot answers it with an \emph{isolated, write-once slot memory}: smal
 adapters placed at the head and late layers over a partially-frozen backbone (lower encoder
 frozen, head and late layers trainable), where each task writes its own slots and a drift-immune
 lexical signature gates both updates and activations so earlier tasks are protected
-structurally---no rehearsal buffer, no consolidation penalty to tune
+structurally: no rehearsal buffer, no consolidation penalty to tune
 (Figure~\ref{fig:lexslot-arch}).
 
 \subsection{Slot Memories at the Diagnosed Locus}
@@ -564,7 +564,7 @@ slot-bearing locus remains plastic.
   diagnosed forgetting locus over a \emph{partially-frozen} backbone. The lower $2/3$
   encoder (grey) is frozen so stable pretrained features flow into the slots without
   drifting; the late blocks and the classifier head (white) stay trainable and carry the
-  slots---the trainable set is exactly the slot-bearing set, and the dashed line marks the
+  slots, the trainable set is exactly the slot-bearing set, and the dashed line marks the
   freeze boundary. \textbf{Logit-slots} add a per-token bias $\Delta\ell$ at the head;
   \textbf{repr-slots} add a low-rank shift $\Delta h$ in the late blocks. Up-projections
   are zero-initialised, so an untrained slot is an exact no-op. The \emph{inference lexical
@@ -584,7 +584,7 @@ configuration each task updates its own slots fully and co-trains a lexically si
 task's slots in proportion to their signature similarity: a per-slot gradient mask scales every
 slot's update by that similarity, so a dissimilar new task can never meaningfully overwrite the
 parameters a previous task wrote. Because the lower encoder is frozen and low-similarity slots
-are masked, earlier tasks are \emph{structurally} protected---there is no consolidation penalty
+are masked, earlier tasks are \emph{structurally} protected: there is no consolidation penalty
 to tune and no replay buffer to store. Protection is reinforced at \emph{forward} time by the
 inference lexical gate (\S\ref{sec:method-lexslot-gate}), which routes each document to the
 slots of its signature-matching task. This is the sense in which LexSlot is
@@ -658,11 +658,11 @@ drift-immune signature, never disturbed (Figure~\ref{fig:lexslot-isolation}).
   two mechanisms driven by the same drift-immune lexical signature. (a)~At \emph{train}
   time a per-slot gradient mask scales each slot's update: a task trains its own slots
   fully and, under the canonical \emph{soft} setting, co-trains a prior task $\tau$'s
-  slots in proportion to $S_{t,\tau}$ (\emph{off} zeroes them---the isolated ablation).
+  slots in proportion to $S_{t,\tau}$ (\emph{off} zeroes them, the isolated ablation).
   (b)~At \emph{forward} time (train and inference) a per-document lexical gate
   $g_s=\cos(\mathrm{sig}(x),\mathrm{sig}_{t(s)})$ scales each slot's activation, so on a
   task-$\tau$ document the task-$\tau$ slots fire strongly and foreign slots are
-  suppressed---routing the right memory to the right document, which the gradient mask
+  suppressed, routing the right memory to the right document, which the gradient mask
   alone cannot do. The two are consistent: the signature that gates updates also gates
   activations.}
   \label{fig:lexslot-isolation}
@@ -672,7 +672,7 @@ drift-immune signature, never disturbed (Figure~\ref{fig:lexslot-isolation}).
 \label{sec:method-lexslot-gate}
 
 Isolation is one extreme of a more general gate. LexSlot computes, for each task, a sparse
-\emph{lexical signature}---a TF-IDF bag-of-tokens over the task's OCR input tokens---and the
+\emph{lexical signature} (a TF-IDF bag-of-tokens over the task's OCR input tokens) and the
 cosine similarity $S_{ij}$ between task signatures. This signature is purely input-derived and
 therefore \emph{drift-immune}: it does not depend on any learned, forgettable parameter. The
 signature drives \emph{two} consistent mechanisms (Figure~\ref{fig:lexslot-isolation}).
@@ -680,15 +680,15 @@ signature drives \emph{two} consistent mechanisms (Figure~\ref{fig:lexslot-isola
 prior task's slots when training a new one: \emph{soft} (the canonical setting) makes them
 trainable in proportion to $S_{ij}$, so lexically similar tasks co-train shared slots;
 \emph{hard} unlocks them above a similarity threshold; \emph{off} zeroes them (the isolated
-ablation). \textbf{At forward time}---in both training and inference---an \emph{inference
+ablation). \textbf{At forward time}, in both training and inference, an \emph{inference
 lexical gate} $g_s=\cos(\mathrm{sig}(x),\mathrm{sig}_{t(s)})$ scales each slot's activation by
 the cosine between the document's signature and the slot's owner-task signature, so on a
 task-$\tau$ document the task-$\tau$ slots fire strongly and foreign slots are suppressed.
 The gradient mask protects \emph{parameters}; the gate routes \emph{activations}; both use the
 same signature, so the train-time and forward-time decisions are consistent. The motivation for
-graded sharing is that on this benchmark the lexical overlap is itself label-bearing---the
+graded sharing is that on this benchmark the lexical overlap is itself label-bearing: the
 receipt tasks SROIE and CORD share the \texttt{total}/\texttt{tax}/\texttt{cash} vocabulary
-($S\!\approx\!0.31$) while the form task FUNSD is an outlier ($S\!\approx\!0.10$)---so high-$S$
+($S\!\approx\!0.31$) while the form task FUNSD is an outlier ($S\!\approx\!0.10$), so high-$S$
 tasks might \emph{help} each other by refining a shared lexical-to-label rule, and the
 inference gate ensures a document only ever activates the slots whose owner task is
 lexically close. Whether that putative transfer outweighs the interference of letting two
@@ -705,8 +705,8 @@ late-layer adapters are standard modules attached by forward hooks, the per-slot
 single element-wise multiply at the backward pass, the inference lexical gate is one cosine per
 slot installed by a forward pre-hook, and the lexical signature is one sparse pass over input
 tokens. In the canonical configuration the protection of old tasks comes entirely from the
-lexical gradient mask and inference gate---no Fisher penalty, no distillation teacher, and no
-rehearsal buffer---so the method's standing cost is just the small slot parameters
+lexical gradient mask and inference gate: no Fisher penalty, no distillation teacher, and no
+rehearsal buffer, so the method's standing cost is just the small slot parameters
 ($\sim$1--2\% over the frozen lower encoder, plus the trainable late blocks and head). Slot
 counts, ranks, and the per-task budget are listed in Appendix~\ref{app:hyperparameters}.
 
@@ -715,9 +715,9 @@ counts, ranks, and the per-task budget are listed in Appendix~\ref{app:hyperpara
 
 We have defined the genuinely separable components of a single-stream tri-modal
 document encoder, a controlled modality-ablation protocol with an external unimodal
-contrast, and complementary metrics---per-token CKA, per-group importance, an
+contrast, and complementary metrics (per-token CKA, per-group importance, an
 old-task-Fisher-weighted displacement (the forgetting localiser), and the
-forgetting matrix---that together localise forgetting by depth, stream, and head.
+forgetting matrix) that together localise forgetting by depth, stream, and head.
 From that measurement we derive a single head/late-targeted remedy, \textbf{LexSlot}: an
 isolated slot memory placed at the diagnosed locus, gated by a drift-immune
 lexical signature and paired with a compact 200-exemplar replay buffer in its headline

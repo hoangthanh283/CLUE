@@ -88,7 +88,7 @@
             <mxPoint x="860" y="318" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="hyp_note" value="Hypothesis: H&lt;sub&gt;1&lt;/sub&gt; — forgetting concentrates in specific components; H&lt;sub&gt;0&lt;/sub&gt; (null) — uniform across all. &amp;nbsp;Decision at Week 4 selects CL method." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" parent="1" vertex="1">
+        <mxCell id="hyp_note" value="Hypothesis: H&lt;sub&gt;1&lt;/sub&gt;: forgetting concentrates in specific components; H&lt;sub&gt;0&lt;/sub&gt; (null): uniform across all. &amp;nbsp;Decision at Week 4 selects CL method." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFBFB;strokeColor=#8895A6;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" parent="1" vertex="1">
           <mxGeometry x="60" y="448" width="940" height="30" as="geometry" />
         </mxCell>
         <mxCell id="leg_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#CCCCCC;" parent="1" vertex="1">

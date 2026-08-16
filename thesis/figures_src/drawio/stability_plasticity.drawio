@@ -120,7 +120,7 @@
         <mxCell id="lg_t2" value="Layout stream" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="272" y="592" width="110" height="16" as="geometry"/></mxCell>
         <mxCell id="lg_dot3" value="" style="ellipse;html=1;fillColor=#8055B5;strokeColor=#8055B5;" vertex="1" parent="1"><mxGeometry x="408" y="594" width="12" height="12" as="geometry"/></mxCell>
         <mxCell id="lg_t3" value="Fusion stream" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;" vertex="1" parent="1"><mxGeometry x="424" y="592" width="110" height="16" as="geometry"/></mxCell>
-        <mxCell id="lg_note" value="Schematic only — no numeric scale" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="556" y="592" width="232" height="16" as="geometry"/></mxCell>
+        <mxCell id="lg_note" value="Schematic only (no numeric scale)" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="556" y="592" width="232" height="16" as="geometry"/></mxCell>
 
       </root>
     </mxGraphModel>

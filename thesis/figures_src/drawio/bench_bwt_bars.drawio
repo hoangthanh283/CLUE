@@ -4,7 +4,7 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="title" value="Backward transfer (BWT) by method and scenario &#8212; closer to 0 = less forgetting" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
+        <mxCell id="title" value="Backward transfer (BWT) by method and scenario - closer to 0 = less forgetting" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=1;fontColor=#222222;" parent="1" vertex="1">
           <mxGeometry x="10" y="12" width="800" height="26" as="geometry" />
         </mxCell>
         <mxCell id="gl20" value="" style="endArrow=none;html=1;strokeColor=#ECECEC;" parent="1" edge="1"><mxGeometry relative="1" as="geometry"><mxPoint x="110" y="140" as="sourcePoint" /><mxPoint x="770" y="140" as="targetPoint" /></mxGeometry></mxCell>
@@ -32,7 +32,7 @@
         <mxCell id="b_m_na" value="" style="rounded=0;html=1;fillColor=#BFC6CF;strokeColor=#8895A6;" parent="1" vertex="1"><mxGeometry x="600" y="80" width="26" height="200" as="geometry" /></mxCell>
         <mxCell id="b_m_ew" value="" style="rounded=0;html=1;fillColor=#F0C088;strokeColor=#D9772B;" parent="1" vertex="1"><mxGeometry x="630" y="80" width="26" height="94" as="geometry" /></mxCell>
         <mxCell id="b_m_lw" value="" style="rounded=0;html=1;fillColor=#C2A9DC;strokeColor=#8055B5;" parent="1" vertex="1"><mxGeometry x="660" y="80" width="26" height="196" as="geometry" /></mxCell>
-        <mxCell id="b_m_er" value="&#8212;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=14;fontColor=#AAAAAA;" parent="1" vertex="1"><mxGeometry x="690" y="84" width="26" height="20" as="geometry" /></mxCell>
+        <mxCell id="b_m_er" value="-" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=14;fontColor=#AAAAAA;" parent="1" vertex="1"><mxGeometry x="690" y="84" width="26" height="20" as="geometry" /></mxCell>
         <mxCell id="vc_na" value="-90.4" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=9;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="136" y="352" width="34" height="14" as="geometry" /></mxCell>
         <mxCell id="vc_ew" value="-77.2" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=9;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="166" y="313" width="34" height="14" as="geometry" /></mxCell>
         <mxCell id="vc_lw" value="-90.4" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=9;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="196" y="352" width="34" height="14" as="geometry" /></mxCell>

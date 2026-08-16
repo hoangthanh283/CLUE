@@ -34,10 +34,10 @@
         <mxCell id="m11" value="88.0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#9FD3AC;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=16;fontStyle=1;fontColor=#1E5A2E;" parent="1" vertex="1">
           <mxGeometry x="200" y="142" width="110" height="62" as="geometry" />
         </mxCell>
-        <mxCell id="m12" value="&#8212;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4F4F4;strokeColor=#CCCCCC;fontFamily=Times New Roman;fontSize=14;fontColor=#AAAAAA;" parent="1" vertex="1">
+        <mxCell id="m12" value="-" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4F4F4;strokeColor=#CCCCCC;fontFamily=Times New Roman;fontSize=14;fontColor=#AAAAAA;" parent="1" vertex="1">
           <mxGeometry x="320" y="142" width="110" height="62" as="geometry" />
         </mxCell>
-        <mxCell id="m13" value="&#8212;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4F4F4;strokeColor=#CCCCCC;fontFamily=Times New Roman;fontSize=14;fontColor=#AAAAAA;" parent="1" vertex="1">
+        <mxCell id="m13" value="-" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4F4F4;strokeColor=#CCCCCC;fontFamily=Times New Roman;fontSize=14;fontColor=#AAAAAA;" parent="1" vertex="1">
           <mxGeometry x="440" y="142" width="110" height="62" as="geometry" />
         </mxCell>
         <mxCell id="m21" value="1.8" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E7A79C;strokeColor=#B3402F;fontFamily=Times New Roman;fontSize=16;fontStyle=1;fontColor=#7A2418;" parent="1" vertex="1">
@@ -46,7 +46,7 @@
         <mxCell id="m22" value="93.0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#9FD3AC;strokeColor=#3A9D4E;fontFamily=Times New Roman;fontSize=16;fontStyle=1;fontColor=#1E5A2E;" parent="1" vertex="1">
           <mxGeometry x="320" y="214" width="110" height="62" as="geometry" />
         </mxCell>
-        <mxCell id="m23" value="&#8212;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4F4F4;strokeColor=#CCCCCC;fontFamily=Times New Roman;fontSize=14;fontColor=#AAAAAA;" parent="1" vertex="1">
+        <mxCell id="m23" value="-" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4F4F4;strokeColor=#CCCCCC;fontFamily=Times New Roman;fontSize=14;fontColor=#AAAAAA;" parent="1" vertex="1">
           <mxGeometry x="440" y="214" width="110" height="62" as="geometry" />
         </mxCell>
         <mxCell id="m31" value="1.9" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E7A79C;strokeColor=#B3402F;fontFamily=Times New Roman;fontSize=16;fontStyle=1;fontColor=#7A2418;" parent="1" vertex="1">
@@ -67,7 +67,7 @@
             <mxPoint x="552" y="308" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="forget_note" value="sub-diagonal: retention of an&#10;earlier task after later training&#10;&#8212; collapses to ~2&#8211;4 F1" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#B3402F;whiteSpace=wrap;" parent="1" vertex="1">
+        <mxCell id="forget_note" value="sub-diagonal: retention of an&#10;earlier task after later training&#10; - collapses to ~2&#8211;4 F1" style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#B3402F;whiteSpace=wrap;" parent="1" vertex="1">
           <mxGeometry x="566" y="214" width="180" height="52" as="geometry" />
         </mxCell>
         <mxCell id="e_forget" value="" style="endArrow=open;endSize=6;html=1;strokeColor=#B3402F;" parent="1" edge="1">

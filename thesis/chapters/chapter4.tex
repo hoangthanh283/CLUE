@@ -21,8 +21,8 @@ every reported number regenerable from logs
 The primary backbone is LayoutLMv3-base
 (\texttt{microsoft/layoutlmv3-base}, $\approx$\,133M parameters, 12 layers, hidden
 size 768). It was chosen because it is document-specific, encoder-only, and small
-enough to run the full experimental grid---ten baselines and the selected method
-across three scenarios and three seeds---within the compute budget, while exposing
+enough to run the full experimental grid (ten baselines and the selected method
+across three scenarios and three seeds) within the compute budget, while exposing
 the four separable components central to the diagnosis. LiLT-base and BROS-base
 serve as secondary backbones for a generalisation study on a reduced method
 subset. Table~\ref{tab:backbone-comparison} compares the candidates. This choice
@@ -103,7 +103,7 @@ Table~\ref{tab:software-stack} summarises the stack.
     \toprule
     \textbf{Component} & \textbf{Package (min.\ version)} & \textbf{Role in this study} & \textbf{Alternative considered} \\
     \midrule
-    Language      & Python $\ge$3.10        & runtime & --- \\
+    Language      & Python $\ge$3.10        & runtime & N/A \\
     DL framework  & torch $\ge$2.3          & training; forward hooks (CKA); determinism flags & TensorFlow, JAX \\
     Models        & transformers $\ge$4.41  & LayoutLMv3 backbone + processor & re-implementation \\
     Data          & datasets $\ge$4.0       & HuggingFace Hub loading & bespoke loaders \\
@@ -119,20 +119,20 @@ Table~\ref{tab:software-stack} summarises the stack.
 \label{sec:impl-why-bespoke}
 
 The stack above leaves one decision open: whether to build the continual loop on
-an established CL framework---Avalanche~\citep{lomonaco2021avalanche},
-Mammoth~\citep{boschini2022mammoth}, or PyCIL~\citep{zhou2023pycil}---or to write a
+an established CL framework, Avalanche~\citep{lomonaco2021avalanche},
+Mammoth~\citep{boschini2022mammoth}, or PyCIL~\citep{zhou2023pycil}, or to write a
 bespoke harness. A bespoke harness was chosen, for three reasons rooted in the
 task rather than in preference.
 
 \paragraph{Task-shape mismatch.} All three frameworks are engineered for
 image classification: a sample is a single tensor with one integer label, and the
-metric is top-1 accuracy. Their training abstractions encode this directly---an
+metric is top-1 accuracy. Their training abstractions encode this directly: an
 Avalanche \texttt{SupervisedTemplate} reads its input as \texttt{mbatch[0]} and
 scores a sample-level criterion; a Mammoth model implements
 \texttt{observe(inputs, labels, \ldots)} over a single input tensor with
 integer-target task masking; PyCIL slices an image dataset by integer class sets
 and herds exemplars on pooled image features. The unit of work here is instead a
-tri-modal document---WordPiece ids, normalised boxes, and a page image---carrying
+tri-modal document (WordPiece ids, normalised boxes, and a page image) carrying
 a \emph{per-token} BIO label sequence and scored with entity-level
 \texttt{seqeval} F1, a metric absent from all three. Adopting any of them would
 require replacing their data, model, loss, and evaluation layers at once, which
@@ -147,8 +147,8 @@ tensor and one label per sample; class-incremental \emph{token} labelling is not
 supported mode.
 
 \paragraph{Method coverage.} The harness already implements the classical
-baselines and the 2024--2025 line---flatness-aware replay, LoRA-based and
-prompt-based methods---used in Chapter~\ref{ch:results}. The newest strategy
+baselines and the 2024--2025 line, flatness-aware replay, LoRA-based and
+prompt-based methods, used in Chapter~\ref{ch:results}. The newest strategy
 shipped by Avalanche or Mammoth predates several of these, so adopting a framework
 would subtract, not add, capability. These libraries remain the reference for the
 classical baselines, whose published algorithm definitions the implementations
@@ -162,7 +162,7 @@ regardless of dataset or continual scenario:
 
 \begin{enumerate}
   \item \textbf{Load.} Dataset-provided OCR tokens, word boxes, and the page
-  image are loaded---no OCR engine is ever run.
+  image are loaded; no OCR engine is ever run.
   \item \textbf{Tokenise.} The \texttt{LayoutLMv3Processor}
   (\texttt{apply\_ocr=False}) WordPiece-tokenises the words, truncating and
   padding to a maximum sequence length of 512.
@@ -188,8 +188,8 @@ regardless of dataset or continual scenario:
 Figure~\ref{fig:doc-pipeline} summarises the pipeline. The same preprocessing is
 shared across all datasets so that the only thing that changes between continual
 tasks is the data and label space, not the pipeline. For the diagnostic conditions
-(C1--C4) a modality mask is applied at the input layer---zeroing image pixels,
-replacing text with padding tokens, or zeroing layout positions---through the
+(C1--C4) a modality mask is applied at the input layer, zeroing image pixels,
+replacing text with padding tokens, or zeroing layout positions, through the
 backbone wrapper's \texttt{modality\_mask} forward argument rather than a separate
 ablated model, so the four conditions differ only in which input pathways are
 active.
@@ -307,8 +307,8 @@ each task to convergence rather than for a fixed number of epochs. A common
 validation entity-F1 after each epoch, keeps a CPU snapshot of the best-scoring
 weights, and stops once the score fails to improve for two consecutive epochs;
 \texttt{restore\_best} reloads that snapshot before the task boundary. Because the
-stopper lives in the base class, every method---regularisation, replay, distillation,
-and the proposed remedy alike---inherits the identical stopping rule for free, which
+stopper lives in the base class, every method, regularisation, replay, distillation,
+and the proposed remedy alike, inherits the identical stopping rule for free, which
 is what makes the comparison fair under the protocol of
 \S\ref{sec:exp-checkpointing}.
 
@@ -339,7 +339,7 @@ mechanisms make up the layer:
 
 \begin{itemize}
   \item \textbf{Representational drift (CKA).} Forward hooks capture per-layer
-  activations on a \emph{fixed} probe set---the same held-out documents are used at
+  activations on a \emph{fixed} probe set: the same held-out documents are used at
   every task boundary so that representations are compared on identical inputs.
   Linear CKA between the activations of two checkpoints scores how much each layer's
   representation has changed; because it is invariant to orthogonal transforms and
@@ -363,7 +363,7 @@ mechanisms make up the layer:
     \qquad W_{\mathrm{new}} \sim \mathcal{N}(0,\,0.02^{2}),
     \qquad b_{\mathrm{new}} = 0,
   \end{equation}
-  where the rows of $W^{(t-1)}$---the previously seen BIO labels---are copied
+  where the rows of $W^{(t-1)}$, the previously seen BIO labels, are copied
   unchanged so that old-label logits are exactly preserved, and
   $W^{(t)} \in \mathbb{R}^{|\mathcal{Y}_t| \times 768}$ for the label set
   $\mathcal{Y}_t$ after session $t$. Expansion is performed once by the
@@ -405,8 +405,8 @@ noise.
 
 \paragraph{Memory management.} Two documented low-VRAM knobs allow the debug
 tier to run the same code path: reducing the batch size from 8 to 2 and
-enabling gradient checkpointing. Production runs use full fp32 precision---an
-fp16 flag exists but is disabled by default---so no precision-related
+enabling gradient checkpointing. Production runs use full fp32 precision (an
+fp16 flag exists but is disabled by default), so no precision-related
 nondeterminism enters the measurements.
 
 \paragraph{Resource accounting.} Every run records wall-clock time per task,
@@ -464,8 +464,8 @@ Table~\ref{tab:software-stack} pinned in \texttt{pyproject.toml}.
 \texttt{benchmark=False}), and every run is fully specified by its Hydra
 configuration.
 
-\paragraph{One-command reproduction.} The diagnostic study---four conditions
-$\times$ three seeds over FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE---reproduces
+\paragraph{One-command reproduction.} The diagnostic study, four conditions
+$\times$ three seeds over FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE, reproduces
 with \texttt{bash scripts/run\_pilot.sh}; the main grid with
 \texttt{bash scripts/run\_grid.sh}, where the \texttt{PHASE} variable selects
 the core, advanced, selected-method, or ablation slices; and a single run via

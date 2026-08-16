@@ -42,7 +42,7 @@
         <mxCell id="t1" value="10&lt;sup&gt;-1&lt;/sup&gt;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#777777;" parent="1" vertex="1"><mxGeometry x="615" y="388" width="50" height="16" as="geometry" /></mxCell>
         <mxCell id="t0" value="10&lt;sup&gt;0&lt;/sup&gt;" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=10;fontColor=#777777;" parent="1" vertex="1"><mxGeometry x="725" y="388" width="50" height="16" as="geometry" /></mxCell>
         <mxCell id="xlab" value="mean Fisher information (log scale)" style="text;html=1;align=center;fontFamily=Times New Roman;fontSize=11;fontStyle=2;fontColor=#555555;" parent="1" vertex="1"><mxGeometry x="300" y="408" width="350" height="18" as="geometry" /></mxCell>
-        <mxCell id="finding" value="Finding: the classifier head dominates parameter importance by roughly an order of magnitude over every other component &#8212; the output side of the network is the most task-critical, and the most overwritten." style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;fontStyle=2;fontColor=#333333;whiteSpace=wrap;" parent="1" vertex="1"><mxGeometry x="40" y="430" width="740" height="34" as="geometry" /></mxCell>
+        <mxCell id="finding" value="Finding: the classifier head dominates parameter importance by roughly an order of magnitude over every other component - the output side of the network is the most task-critical, and the most overwritten." style="text;html=1;align=left;fontFamily=Times New Roman;fontSize=12;fontStyle=2;fontColor=#333333;whiteSpace=wrap;" parent="1" vertex="1"><mxGeometry x="40" y="430" width="740" height="34" as="geometry" /></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

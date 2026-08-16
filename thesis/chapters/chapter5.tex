@@ -13,7 +13,7 @@ benchmark used in Chapter~\ref{ch:results}.
 \label{sec:exp-datasets}
 
 We use five public \gls{vrdu} datasets (Table~\ref{tab:dataset-stats}). Three
-English datasets---FUNSD, CORD, SROIE---form the core benchmark and span forms and
+English datasets (FUNSD, CORD, SROIE) form the core benchmark and span forms and
 receipts across a wide range of label-space sizes; two further datasets extend the
 benchmark onto axes the core trio cannot probe. \textbf{XFUND} adds a
 \emph{language-shift} axis (the multilingual sibling of FUNSD, seven non-English
@@ -27,7 +27,7 @@ study.
 \texttt{nielsr/funsd-layoutlmv3}, FUNSD provides 149 training and 50 test
 documents and ships no validation split. Its three entity types (HEADER,
 QUESTION, ANSWER) plus background give 7 \gls{bio} tags. The documents are
-noisy, full-page scanned forms---small in number but the clearest test of the
+noisy, full-page scanned forms: small in number but the clearest test of the
 KEY/VALUE relation.
 
 \paragraph{CORD.} Loaded from \texttt{naver-clova-ix/cord-v2}, CORD provides
@@ -51,7 +51,7 @@ Portuguese, Chinese). It shares FUNSD's exact entity schema (HEADER, QUESTION,
 ANSWER $\to$ 7 \gls{bio} tags), which lets it reuse the unified domain-incremental
 mapping unchanged. XFUND supports the \emph{cross-lingual} domain-incremental
 scenario (\S\ref{sec:exp-dil}), in which the domain shift between tasks is the
-\emph{language} while the label space is held fixed---isolating representation drift
+\emph{language} while the label space is held fixed, isolating representation drift
 under language shift from any schema confound. The default language order
 de\,$\rightarrow$\,es\,$\rightarrow$\,fr\,$\rightarrow$\,it\,$\rightarrow$\,zh spans
 four Latin-script languages plus Chinese, so the sequence stresses both vocabulary
@@ -118,8 +118,8 @@ domain $P(X)$ (receipt images): only the label space changes from task to task.
 Because new classes are absent from earlier sessions, their tokens are folded into
 the background ``O'' tag until they are introduced, so the meaning of ``O'' shifts
 as the sequence advances. Fine-grained (not super-class) growth is deliberate:
-real \gls{kie} pipelines face exactly this---a receipt parser that begins with a
-handful of fields and accrues dozens over its deployment lifetime---whereas a
+real \gls{kie} pipelines face exactly this: a receipt parser that begins with a
+handful of fields and accrues dozens over its deployment lifetime, whereas a
 five-super-class split would be trivially easy. The monotone growth of
 Equation~\eqref{eq:cil-growth} is precisely what induces the \gls{cil}
 \emph{semantic shift of the ``O'' tag} (\S\ref{sec:bg-cl-scenarios}) noted above,
@@ -131,14 +131,14 @@ easy-to-hard ordering rather than at random, so that the curriculum reflects the
 order in which fields are realistically added to a deployed parser; the exact
 six classes introduced at each session are tabulated in
 Appendix~\ref{app:cil-classes}. A direct
-consequence is that class frequencies are markedly imbalanced across sessions---core
+consequence is that class frequencies are markedly imbalanced across sessions: core
 menu fields dominate early sessions while void and auxiliary categories are sparse
 and arrive late. We deliberately leave this imbalance \emph{unmodified} (no
 re-sampling or re-weighting) and treat it as a controlled factor of the benchmark,
 since artificially re-balancing the sessions would misrepresent the long-tailed
 schema growth that motivates the scenario. Concretely, applying the split to
-CORD's 800 training receipts---keeping every document that contains at least one
-in-session entity and relabelling out-of-session tokens to ``O''---yields
+CORD's 800 training receipts (keeping every document that contains at least one
+in-session entity and relabelling out-of-session tokens to ``O'') yields
 per-session training pools of $800$, $382$, $549$, $723$, and $780$ documents for
 sessions~0--4 respectively, reflecting how many receipts carry each session's fields.
 
@@ -276,7 +276,7 @@ the \emph{language}: de\,$\rightarrow$\,es\,$\rightarrow$\,fr\,$\rightarrow$\,it
 Because every XFUND language shares FUNSD's schema, the unified label space
 (Table~\ref{tab:dil-map}, row ``FUNSD'') is held \emph{fixed} across all five tasks
 and the classifier head never grows. Forgetting in this scenario is therefore pure
-representation drift under language shift, with no label-space confound---making it a
+representation drift under language shift, with no label-space confound, making it a
 direct test of whether the output-side forgetting finding of
 Chapter~\ref{ch:results} generalises beyond English. The order interposes four
 Latin-script languages and a final logographic one (Chinese), so the sequence
@@ -324,7 +324,7 @@ only the newly added rows are freshly initialised.
     \toprule
     \textbf{Item} & \textbf{Specification} \\
     \midrule
-    Backbone & \texttt{microsoft/layoutlmv3-base} --- encoder-only, 12 layers,
+    Backbone & \texttt{microsoft/layoutlmv3-base}: encoder-only, 12 layers,
                hidden size 768, $\approx$133M parameters \\
     Text input & WordPiece, maximum sequence length 512 \\
     Layout input & word boxes normalised to $[0,1000]^4$ \\
@@ -351,8 +351,8 @@ Training minimises the plain token-level cross-entropy
 \end{equation}
 where $\mathcal{I}_B$ indexes the first sub-token of each word; padding and
 trailing sub-tokens carry the ignore label $-100$, and no class weights are
-applied. The loss is deliberately unweighted---no re-weighting, focal terms, or
-re-sampling---so that the native long-tailed label distribution is preserved as
+applied. The loss is deliberately unweighted (no re-weighting, focal terms, or
+re-sampling), so that the native long-tailed label distribution is preserved as
 a controlled benchmark factor, matching the treatment of session imbalance in
 \S\ref{sec:exp-cil}. The $-100$ masking also makes the loss and the entity-level
 F1 metric agree on one prediction per word (step~5 of the pipeline,
@@ -369,7 +369,7 @@ but is disabled for all reported runs). Each task is trained \emph{to convergenc
 rather than for a fixed number of epochs: training stops when the task's validation
 entity-F1 fails to improve by at least $0.1$ points for two consecutive epochs
 (patience $2$), subject to a safety ceiling of $100$ epochs that in practice never
-binds---tasks converge in roughly four to eight epochs. The same constant learning
+binds: tasks converge in roughly four to eight epochs. The same constant learning
 rate and the same stopping \emph{rule} (identical patience and criterion) are applied
 to every method and every session, so the comparison remains apples-to-apples while
 each task is allowed to reach its own convergence point; this replaces an earlier
@@ -383,8 +383,8 @@ listed in Appendix~\ref{app:hyperparameters}.
 \subsection{Checkpointing and Model Selection}
 \label{sec:exp-checkpointing}
 
-The model carried into session $t{+}1$---and evaluated on all tasks seen so
-far---is the \emph{best-validation-F1} checkpoint of session $t$: at each epoch the
+The model carried into session $t{+}1$, and evaluated on all tasks seen so
+far, is the \emph{best-validation-F1} checkpoint of session $t$: at each epoch the
 task's validation entity-F1 is measured, and the weights at the highest-scoring epoch
 are restored before the session boundary. This pairs with the convergence-based
 stopping of \S\ref{sec:exp-optim} so that what is carried forward is a properly-fitted
@@ -394,7 +394,7 @@ applied identically to every method, so it does not advantage any one of them.
 \paragraph{Validation signal and its honest limitation.} Of the three datasets only
 CORD provides a native validation split; FUNSD and SROIE do not
 (Table~\ref{tab:dataset-stats}). For those two the early-stopping signal is therefore
-read from the task's evaluation set---the same set on which the reported metrics are
+read from the task's evaluation set, the same set on which the reported metrics are
 later computed. This introduces a mild optimistic selection bias: the best-epoch
 checkpoint is chosen using information from the set it is then scored on. We bound
 rather than eliminate this bias, and we are explicit about it. The bias is small
@@ -428,10 +428,10 @@ finding rests on a real unimodal encoder rather than a masked multimodal one. Me
 are reproduced and validated against their published behaviour before being extended
 (for example, \gls{er} is made to work before DER++). The proposed LexSlot method is
 added once the diagnosis fixes its target (\S\ref{sec:method-lexslot}). Default
-settings---\gls{ewc} $\lambda{=}1000$ with the Fisher estimated over 200 samples, DER++
+settings (\gls{ewc} $\lambda{=}1000$ with the Fisher estimated over 200 samples, DER++
 $\alpha{=}\beta{=}0.5$, O-LoRA rank 8 on the query/key/value projections with
 orthogonality weight $0.5$, C-Flat++ neighbourhood $\rho{=}0.05$ on top of ER, CL-LoRA
-rank 8 with shared-adapter distillation---are tabulated in
+rank 8 with shared-adapter distillation) are tabulated in
 Appendix~\ref{app:hyperparameters}.
 
 \begin{table}[!htbp]
@@ -476,9 +476,9 @@ performance matrix \gls{not:R}. The primary task metric is entity-level F1 with
 (FUNSD has only 50 documents), we report mean\,$\pm$\,standard deviation rather than
 point estimates.
 
-The checkpointing and validation-usage policy---best-validation-F1 checkpoints
+The checkpointing and validation-usage policy (best-validation-F1 checkpoints
 under convergence-based early stopping, with the validation-signal limitation for
-FUNSD and SROIE disclosed---is specified in \S\ref{sec:exp-checkpointing} and is not
+FUNSD and SROIE disclosed) is specified in \S\ref{sec:exp-checkpointing} and is not
 repeated here. All reported metrics are computed on the held-out \emph{test} splits;
 the per-method hyperparameter sweeps that fix one shared configuration per method are
 the only other use of held-out data. The per-method hyperparameter sweeps of Table~\ref{tab:baselines} and
@@ -510,7 +510,7 @@ drift metrics of \S\ref{sec:method-diag-metrics} (per-layer \gls{cka} and per-gr
 Because FUNSD provides only 149 training documents, sample efficiency matters and
 variance is wide. We therefore (i) report accuracy at 1\%, 5\%, and 10\% of each
 task's training set in addition to the full-data result; (ii) hold the replay
-buffer fixed at 200 documents across scenarios---the framework default---which
+buffer fixed at 200 documents across scenarios, the framework default, which
 yields deliberately heterogeneous relative coverage: roughly 25\% of CORD's 800
 training documents and 32\% of SROIE's 626, but more than FUNSD's entire
 149-document training set, so for FUNSD replay approaches joint training on
@@ -531,7 +531,7 @@ test (paired $t$-test or Wilcoxon signed-rank over the per-seed, per-order resul
 The same small-sample power caveat that governs the pilot applies here: a Wilcoxon
 signed-rank test over three seeds cannot reach $p<0.05$ on its own, so for the main
 grid we pool seeds with the alternate task orders to raise $n$, lean on the paired
-$t$-test, and---where the pooled $n$ is still small---report the effect size and
+$t$-test, and (where the pooled $n$ is still small) report the effect size and
 confidence interval rather than treating a non-rejection as evidence of equivalence.
 
 The \emph{pilot diagnosis} carries a stricter requirement, because a rank test on

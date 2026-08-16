@@ -37,9 +37,9 @@ Chapter~\ref{ch:conclusions}). The other combination \emph{not} run is
 the 2025 baselines / prompt/LoRA methods on the large-scale
 \texttt{cil\_wildreceipt} scenario (\S\ref{sec:results-extended}), which for
 compute-budget reasons reports only the classical methods and the oracle. The qualitative
-conclusions---near-total collapse under naive fine-tuning, a depth/head-concentrated
+conclusions: near-total collapse under naive fine-tuning, a depth/head-concentrated
 forgetting locus confirmed by the targeting ablation, and replay as the strongest
-baseline family---are stable across seeds.
+baseline family, are stable across seeds.
 
 \section{Where Forgetting Lives: The Per-Component Diagnosis}
 \label{sec:results-diagnosis}
@@ -65,8 +65,8 @@ retains almost nothing of earlier tasks. Table~\ref{tab:forgetting-matrix} gives
 performance matrices for all four backbones, and Figure~\ref{fig:forgetting-matrix-viz}
 visualises them: on every architecture the diagonal is strong (e.g.\ LayoutLMv3
 $89.1 / 94.1 / 81.4$ entity-F1) while the sub-diagonal collapses to roughly $1$--$3$ F1.
-After learning CORD, FUNSD performance falls from $89.1$ to $3.3$ on LayoutLMv3---an
-$86$-point drop in a single task step---and LiLT and BROS show the identical pattern
+After learning CORD, FUNSD performance falls from $89.1$ to $3.3$ on LayoutLMv3, an
+$86$-point drop in a single task step, and LiLT and BROS show the identical pattern
 ($83.9\rightarrow2.1$ and $88.9\rightarrow6.6$). Even the unimodal BERT baseline, the
 mildest of the four, still loses most of each earlier task. Forgetting in this setting
 is therefore not gradual but essentially total within one boundary \emph{regardless of
@@ -87,7 +87,7 @@ old-task-Fisher-weighted displacement $D_g$ (\S\ref{sec:method-diag-metrics}), w
 is large precisely where parameters that mattered for the \emph{previous} task have
 moved. Figure~\ref{fig:per-component-bars} reports $D_g$ by depth bucket; the
 forgetting it localises concentrates at the classifier head and late encoder layers,
-while the input encoders barely move---an output-facing locus that the importance
+while the input encoders barely move: an output-facing locus that the importance
 table is consistent with but, on its own, cannot establish.
 
 \begin{figure}[!htbp]
@@ -95,7 +95,7 @@ table is consistent with but, on its own, cannot establish.
   \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{pilot_displacement_bars.pdf}
   \caption[Per-component forgetting localiser]{Per-component forgetting localiser:
   old-task-Fisher-weighted displacement $D_g$ by depth bucket (\textbf{log scale}, first
-  boundary FUNSD\,$\rightarrow$\,CORD), grouped by backbone condition---large where
+  boundary FUNSD\,$\rightarrow$\,CORD), grouped by backbone condition, large where
   parameters important to the \emph{previous} task were overwritten. Across every
   condition (the four LayoutLMv3 modality masks, the BERT text-only baseline, and the LiLT
   and BROS secondary backbones), the classifier head's weighted displacement is
@@ -117,7 +117,7 @@ table is consistent with but, on its own, cannot establish.
   FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE; mean over three seeds, fixed
   $0$--$100$ colour scale. The pattern is identical on every architecture: the
   \emph{diagonal} (just-learned task) stays high, while every \emph{sub-diagonal} cell
-  ---an earlier task re-evaluated after later training---collapses to $\sim$1--3 F1
+  (an earlier task re-evaluated after later training) collapses to $\sim$1--3 F1
   (e.g.\ LayoutLMv3 FUNSD $89.1\rightarrow3.3$ after a single further task). The only
   visible difference is the unimodal BERT baseline, whose retention is slightly less
   catastrophic (CORD held at $18.4$ vs $\le 3$ for the others). White cells are tasks
@@ -130,7 +130,7 @@ table is consistent with but, on its own, cannot establish.
   \caption[Forgetting matrices across backbones]{Performance matrix $R[i,j]$ (entity-F1
   on task $j$ after training task $i$) under naive sequential fine-tuning, for all four
   backbones (mean\,$\pm$\,std over three seeds). On every architecture the diagonal (just-learned
-  task) is strong while the sub-diagonal collapses to $\sim$1--3 F1---near-total
+  task) is strong while the sub-diagonal collapses to $\sim$1--3 F1: near-total
   forgetting within one task step. The unimodal BERT baseline is the mildest (CORD held
   at $18.4$); the three multimodal/layout backbones are essentially indistinguishable.}
   \label{tab:forgetting-matrix}
@@ -166,7 +166,7 @@ table is consistent with but, on its own, cannot establish.
   \caption[Per-component Fisher importance]{Empirical Fisher \emph{importance} (not a
   forgetting measure) per parameter group for the full multimodal model (C4),
   averaged over seeds and task boundaries. The classifier head carries more than an
-  order of magnitude more Fisher mass than any other group---as it does for \emph{any} token classifier
+  order of magnitude more Fisher mass than any other group, as it does for \emph{any} token classifier
   by the geometry of the cross-entropy head; forgetting itself is localised by the
   displacement of Figure~\ref{fig:per-component-bars}, not by these levels. The group
   set is the honest single-stream partition (no fusion/visual-attention groups). The
@@ -226,7 +226,7 @@ gap mirroring LayoutLMv3's). The head/late forgetting locus is therefore \emph{n
 multimodal-specific: it is the general output-side forgetting pattern, here reproduced
 on a multimodal backbone. What \emph{is} specific to LayoutLMv3 is that its visual
 patch \emph{input} encoder stays frozen ($\mathrm{CKA}=0.97$), a stabilising structure
-the text-only BERT simply does not have---BERT has no vision input stream to
+the text-only BERT simply does not have: BERT has no vision input stream to
 hold fixed. The per-component permutation test of \S\ref{sec:method-diag-hypotheses}
 quantifies the head dominance directly.
 
@@ -241,7 +241,7 @@ Both reproduce the pattern (Table~\ref{tab:bert-contrast}, rightmost columns, an
 Figure~\ref{fig:backbone-signature}): the
 monotonic depth gradient holds (embeddings $\approx 1.0$, falling to $0.17$/$0.18$ at
 the last layer and $0.13$/$0.14$ at the head for LiLT/BROS), and the Fisher-weighted
-displacement is head-dominant on both---LiLT head $5.2\times10^{-4}$ versus its largest
+displacement is head-dominant on both: LiLT head $5.2\times10^{-4}$ versus its largest
 non-head bucket $1.8\times10^{-5}$ ($28\times$), BROS head $1.1\times10^{-4}$ versus
 $1.6\times10^{-7}$ ($\sim$$700\times$). A permutation test on the full
 displacement-by-depth \emph{profile} cannot distinguish either secondary backbone from
@@ -254,7 +254,7 @@ on \emph{which} parameters move: its 1D/2D position embeddings are both its most
 Fisher-important parameters and its second-most-displaced group (layout $6.4\times10^{-4}$,
 just below the classifier), reflecting that BROS encodes geometry in trainable position
 tables rather than a frozen input stream. The head remains the dominant locus on BROS,
-but a head-only remedy is, for that backbone, necessary rather than fully sufficient---a
+but a head-only remedy is, for that backbone, necessary rather than fully sufficient, a
 point we return to when scoping the method (\S\ref{sec:results-stability}).
 
 \begin{figure}[!htbp]
@@ -264,7 +264,7 @@ point we return to when scoping the method (\S\ref{sec:results-stability}).
   \caption[Cross-backbone forgetting signature]{The forgetting signature is the same
   across four architectures. \textbf{Left:} per-layer representational drift (linear
   CKA, FUNSD$\rightarrow$CORD) collapses onto one monotonic curve for LayoutLMv3, BERT,
-  LiLT and BROS---input encoders frozen near $1.0$, drift rising with depth, minimal at
+  LiLT and BROS: input encoders frozen near $1.0$, drift rising with depth, minimal at
   the classifier head. \textbf{Right:} old-task-Fisher-weighted parameter displacement,
   head versus largest non-head bucket (log scale); the classifier head dominates on
   every backbone (annotated head:non-head ratio). A permutation test cannot separate the
@@ -281,7 +281,7 @@ point we return to when scoping the method (\S\ref{sec:results-stability}).
   representational drift (linear CKA between consecutive checkpoints) by depth and task
   boundary, one panel per backbone (mean over three seeds). The input encoders do not
   drift ($\mathrm{CKA}\approx 1.0$, yellow) while drift rises monotonically with depth and
-  peaks at the last encoder layer and the classifier head (dark)---the same gradient on
+  peaks at the last encoder layer and the classifier head (dark), the same gradient on
   LayoutLMv3, BERT, LiLT and BROS alike. This is the per-backbone, per-boundary detail
   behind the collapsed line view of Figure~\ref{fig:backbone-signature}
   (cf.\ Tables~\ref{tab:cka-layer}, \ref{tab:bert-contrast}).}
@@ -315,7 +315,7 @@ point we return to when scoping the method (\S\ref{sec:results-stability}).
   \centering
   \caption[Cross-architecture depth-gradient contrast]{Depth-gradient contrast at the
   first boundary (FUNSD$\rightarrow$CORD): per-token CKA ($1.0=$ no drift) at
-  depth-matched points across four backbones---the full multimodal model (C4,
+  depth-matched points across four backbones: the full multimodal model (C4,
   LayoutLMv3), the true unimodal text encoder (Cb, BERT-base), and the two secondary
   backbones LiLT (decoupled text$+$layout) and BROS (text$+$spatial). All four show the
   \emph{same} monotonic late$+$head drift gradient (input encoders frozen at
@@ -349,7 +349,7 @@ The earlier exploratory pass reported a cross-condition Mann--Whitney test that
 $\alpha=0.0167$). That non-rejection was an \emph{artefact of sample size}, not
 evidence: with $n_1{=}6$ and $n_2{=}3$ the minimum achievable two-sided $p$-value is
 $2/\binom{9}{3}=0.0238 > 0.0167$, so the test \emph{could not} clear its own bar even
-under perfect separation---and C4 vs C1 was essentially perfectly separated
+under perfect separation; and C4 vs C1 was essentially perfectly separated
 ($p\approx 0.026$, the floor). A method-abandonment decision cannot rest on a test
 that was statistically impossible to pass. The head/late locus is instead established
 by three converging instruments that do clear their bars: the \emph{per-component}
@@ -366,16 +366,16 @@ is located in statistically the same place. Combined with the per-component Fish
 rejection and the shared CKA gradient, the head/late locus is established on four
 backbones. Per the decision rule
 (\S\ref{sec:method-selection}) this head/late concentration selects a head/late-targeted
-remedy---LexSlot, the isolated slot memory of \S\ref{sec:method-lexslot}.
+remedy: LexSlot, the isolated slot memory of \S\ref{sec:method-lexslot}.
 
 \paragraph{Forgetting by condition.}
 Table~\ref{tab:condition-metrics} reports the continual-learning metrics by
 modality-ablation condition. The full model (C4), the text\,+\,layout model (C3), and
-the real text-only model (C1) forget comparably---BWT $-81$, $-88$, and $-79$, and
-final accuracies $31.6$, $27.7$, and $27.3$ that cluster tightly. This is the central
+the real text-only model (C1) forget comparably (BWT $-81$, $-88$, and $-79$, and
+final accuracies $31.6$, $27.7$, and $27.3$ that cluster tightly). This is the central
 diagnostic observation: removing the visual and layout streams (C1) barely changes the
 forgetting profile relative to the full model, so the catastrophic forgetting is
-\emph{not} an artefact of any one input stream---it is carried by the text-and-head path
+\emph{not} an artefact of any one input stream; it is carried by the text-and-head path
 common to all three.
 
 \begin{table}[!htbp]
@@ -385,10 +385,10 @@ common to all three.
   FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE. C1 is the corrected real text-only
   LayoutLMv3 (image and layout zeroed); Cb is the external BERT-base unimodal text
   baseline. Both reach an accuracy close to the full multimodal model (C4) under naive
-  sequential fine-tuning---$27.3$ and $33.1$ versus $31.6$---confirming that the heavy
+  sequential fine-tuning ($27.3$ and $33.1$ versus $31.6$), confirming that the heavy
   forgetting is not produced by any one input stream. $^{\ddagger}$C2 (text removed,
   layout$+$vision retained) is reported from its single non-degenerate seed: the other two
-  collapsed to an all-background predictor, which is itself the finding---without text,
+  collapsed to an all-background predictor, which is itself the finding: without text,
   optimisation is unstable, so text is the stream that supports usable learning at all.}
   \label{tab:condition-metrics}
   \begin{tabular}{llccc}
@@ -407,7 +407,7 @@ common to all three.
 \paragraph{Forgetting by backbone.} The secondary backbones sit in the same regime as
 the primary one under naive fine-tuning (Figure~\ref{fig:backbone-metrics}): LiLT and
 BROS reach final accuracies of $27.1$ and $28.7$ against LayoutLMv3's $28.3$, with
-backward transfer of $-86.7$ and $-88.9$ against $-89.8$---all three multimodal/layout
+backward transfer of $-86.7$ and $-88.9$ against $-89.8$: all three multimodal/layout
 backbones forget heavily and comparably, while the text-only BERT baseline forgets
 somewhat less ($\mathrm{BWT}=-66.7$). We do \emph{not} read the small accuracy and
 $|\mathrm{BWT}|$ differences between backbones as significant: at three seeds the
@@ -429,16 +429,16 @@ on every multimodal backbone, consistent with its shared head/late \emph{locatio
 \end{figure}
 
 \paragraph{On the role of the text stream.} The exploratory pass concluded that
-``the text stream is load-bearing'' partly from the C1 row---but that C1 was a
+``the text stream is load-bearing'' partly from the C1 row, but that C1 was a
 \emph{null-input} condition (no usable input at all), so its $0$ score was a
 tautology, not evidence about text. We retract that inference as stated. The honest
 evidence for the role of text is twofold. (i) C2 (text removed, image$+$layout retained)
-is both far less accurate and highly unstable across seeds---only one of three seeds even
-converged (to $21.6$ AA); the other two collapsed to an all-background predictor---whereas
+is both far less accurate and highly unstable across seeds: only one of three seeds even
+converged (to $21.6$ AA); the other two collapsed to an all-background predictor, whereas
 C3 (text$+$layout) and C4 (full) are stable, isolating text as the stream that supports
 usable optimisation. (ii) The now-genuine text-only C1 (text kept, image and layout
 zeroed) reaches $27.3$ AA with the \emph{same} near-total forgetting profile as the full
-model---direct evidence that the text-and-head path carries both the learning signal and
+model, direct evidence that the text-and-head path carries both the learning signal and
 the forgetting. The external BERT contrast (Cb) now corroborates this directly: the
 text-only BERT baseline reaches a comparable accuracy (AA $33.1$ vs the full model's
 $31.6$) and forgets heavily (BWT $-65.3$) through the same head-concentrated locus, so the
@@ -462,7 +462,7 @@ Figure~\ref{fig:where-forgetting} draws the diagnostic threads together. Forgett
 concentrates in the classifier head and late encoder layers (per-token CKA drift and
 Fisher-weighted displacement agree) while the input encoders stay stable. We frame
 this precisely: it is a \emph{depth/head-concentrated} phenomenon, and we do not
-claim a ``fusion-specific'' effect---fusion is not a measurable component on a
+claim a ``fusion-specific'' effect: fusion is not a measurable component on a
 single-stream encoder. What makes the finding more than a re-confirmation of the
 known unimodal depth gradient is the contrast against the true unimodal baseline Cb
 (Table~\ref{tab:bert-contrast}): BERT reproduces the same head/late locus, so the
@@ -471,8 +471,8 @@ multimodal-specific element is the frozen vision input stream that BERT
 lacks. The two secondary backbones LiLT and BROS, architecturally distinct from both,
 reproduce the identical localisation (their displacement profiles are statistically
 indistinguishable from LayoutLMv3's), so the locus is architecture-general. Because the
-forgetting locus is \emph{output-facing}, the diagnosis motivates---and the
-decision rule selects---a head/late-targeted remedy, the isolated slot memory LexSlot of
+forgetting locus is \emph{output-facing}, the diagnosis motivates, and the
+decision rule selects, a head/late-targeted remedy, the isolated slot memory LexSlot of
 \S\ref{sec:method-lexslot}, and predicts
 that head-protecting remedies such as experience replay are strong baselines, tested
 in \S\ref{sec:results-remedy}.
@@ -496,13 +496,13 @@ in \S\ref{sec:results-remedy}.
     % finding + hypothesis notes
     \node[note, fill=blue!5, below=4mm of emb.south west, anchor=north west] (find)
       {\textbf{Finding.} Forgetting concentrates in the classifier head and late encoder layers;
-       the input encoders are stable. It is \textbf{not} a fusion-specific effect---the full
+       the input encoders are stable. It is \textbf{not} a fusion-specific effect: the full
        multimodal model is statistically indistinguishable from its modality ablations. Text is
        the load-bearing stream.};
     \node[note, fill=gray!8, right=4mm of find]
       {\textbf{Consequence.} Because the locus is output-facing, remedies that protect or
-       re-expose the head---experience replay, and the head/late-targeted \textbf{LexSlot}
-       (\S\ref{sec:method-lexslot})---are the natural intervention; \S\ref{sec:results-remedy}
+       re-expose the head (experience replay, and the head/late-targeted \textbf{LexSlot}
+       (\S\ref{sec:method-lexslot})) are the natural intervention; \S\ref{sec:results-remedy}
        confirms both work on DIL.};
   \end{tikzpicture}
   \caption[Where forgetting lives: synthesis]{Synthesis of the per-component diagnosis on
@@ -516,9 +516,9 @@ in \S\ref{sec:results-remedy}.
 \label{sec:results-remedy}
 
 This section reports the main continual-learning grid, all measured to convergence over
-three seeds. It covers the six core methods---the lower bound (naive), the upper bound
+three seeds. It covers the six core methods (the lower bound (naive), the upper bound
 (joint), the two regularisation/distillation methods (EWC, LwF), and the two replay
-methods (ER, DER++)---together with the proposed LexSlot remedy (the head/late-targeted
+methods (ER, DER++)) together with the proposed LexSlot remedy (the head/late-targeted
 isolated slot memory derived from the diagnosis, \S\ref{sec:method-lexslot}) and the additional
 prompt-/LoRA-based baselines (L2P, DualPrompt, CODA-Prompt, O-LoRA, CL-LoRA) and the
 text-only BERT comparator, each on the scenarios where it was run.
@@ -538,14 +538,14 @@ replay variant C-Flat++ ($88.4$, the best non-oracle result) all statistically m
 joint upper bound ($88.7$), closing essentially the entire forgetting gap; on the Mixed
 scenario ER and DER++ reach $60.3$ and $60.8$, below the oracle ($67.5$) but far above the
 rest. C-Flat++ adds a sharpness-aware neighbourhood on top of ER and edges it out on DIL
-($88.4$ vs $87.9$), but the gain over plain replay is within noise---replay's dominance is
+($88.4$ vs $87.9$), but the gain over plain replay is within noise: replay's dominance is
 the robust pattern, not the particular replay variant. Third, regularisation (EWC) is the most surprising result:
 trained to convergence its Fisher penalty over-constrains the growing head and it
-\emph{collapses} on fine-grained class-incremental learning---CIL-CORD AA falls to $0.5$,
-far below naive ($19.0$)---and it is unstable on Mixed ($22.0\pm7.6$); yet on the
+\emph{collapses} on fine-grained class-incremental learning (CIL-CORD AA falls to $0.5$,
+far below naive ($19.0$)), and it is unstable on Mixed ($22.0\pm7.6$); yet on the
 fixed-label DIL scenario the same penalty yields near-zero forgetting (BWT $-2.8$). EWC thus
 buys retention at the cost of plasticity, and on a growing output space that trade-off is
-catastrophic. Fourth, distillation (LwF) tracks the naive lower bound throughout---in this
+catastrophic. Fourth, distillation (LwF) tracks the naive lower bound throughout: in this
 dense token-classification setting LwF gives essentially no benefit, because the old-class
 logits it distils collapse anyway as the classifier head grows. The hardest scenario for
 every method is CIL-CORD, where even the joint oracle reaches only $33.3$ AA: packing all
@@ -558,9 +558,9 @@ scenario) \emph{approaches replay-level accuracy} (LexSlot $87.3$ vs ER $87.9$, 
 within $\sim$1 point, and the oracle's $88.7$) while \emph{forgetting less than the plain
 replay methods} (LexSlot BWT $-2.3$ vs ER $-2.8$, DER++ $-3.4$; \S\ref{sec:results-lexslot}),
 and it does so with an order-of-magnitude smaller exemplar budget than the plain replay
-baselines---slot isolation carries most of the protection structurally, with the small buffer
+baselines: slot isolation carries most of the protection structurally, with the small buffer
 supplying the rest. The honest reading is that LexSlot's
-diagnosis-driven head/late targeting is competitive with---rather than exceeding---data replay
+diagnosis-driven head/late targeting is competitive with, rather than exceeding, data replay
 on the domain shift, with the chief advantage being qualitative: replay-level retention at a
 parameter-efficient cost with a fraction of the exemplar budget. LexSlot is so far measured on the domain-incremental
 scenario and LayoutLMv3 (the multi-scenario and multi-backbone confirmation is the pending grid,
@@ -569,7 +569,7 @@ carried by the baselines.
 Sixth, the parameter-efficient prompt baselines, which \emph{freeze} the backbone and
 train only a prompt pool plus the head, \emph{nearly fail} on this dense per-token task:
 L2P, DualPrompt, and CODA-Prompt collapse to single-digit AA on class-incremental CORD
-($0$--$2$) and reach only $\sim$30 on DIL and $\sim$12 on Mixed---far below even the naive
+($0$--$2$) and reach only $\sim$30 on DIL and $\sim$12 on Mixed, far below even the naive
 full-fine-tuning lower bound. The frozen backbone, sufficient for the \texttt{[CLS]}-level
 image-classification tasks these methods were designed for, cannot supply the per-token
 representations that document IE needs; the LoRA-adapted O-LoRA and CL-LoRA, which do
@@ -607,15 +607,15 @@ adaptation recovers the naive lower bound only where the output space is fixed.
     EWC                   & $0.5 \pm 0.5$ & $41.2 \pm 0.9$ & $22.0 \pm 7.6$ \\
     LwF                   & $18.8 \pm 0.1$ & $43.7 \pm 0.9$ & $35.2 \pm 1.0$ \\
     ER                    & $16.0 \pm 1.1$ & $87.9 \pm 1.4$ & $60.3 \pm 5.3$ \\
-    ER + C-Flat++ (2025)  & $15.9 \pm 1.5$ & $\mathbf{88.4 \pm 0.1}$ & --- \\
+    ER + C-Flat++ (2025)  & $15.9 \pm 1.5$ & $\mathbf{88.4 \pm 0.1}$ & -- \\
     DER++                 & $18.2 \pm 0.2$ & $88.0 \pm 0.9$ & $\mathbf{60.8 \pm 2.7}$ \\
-    \textbf{LexSlot (ours)} & --- & $87.3 \pm 1.0$ & --- \\
+    \textbf{LexSlot (ours)} & -- & $87.3 \pm 1.0$ & -- \\
     \midrule
     L2P                   & $1.1 \pm 0.9$ & $30.4 \pm 0.3$ & $11.5 \pm 0.1$ \\
     DualPrompt            & $1.8 \pm 1.4$ & $29.9 \pm 0.5$ & $11.7 \pm 0.1$ \\
     CODA-Prompt           & $0.0 \pm 0.0$ & $32.5 \pm 1.2$ & $8.1 \pm 1.5$ \\
     O-LoRA                & $4.7 \pm 8.2$ & $40.8 \pm 0.3$ & $13.4 \pm 0.7$ \\
-    CL-LoRA (2025)        & $8.9 \pm 7.7$ & $41.1 \pm 0.3$ & --- \\
+    CL-LoRA (2025)        & $8.9 \pm 7.7$ & $41.1 \pm 0.3$ & -- \\
     \midrule
     Joint (upper bound)   & $33.3 \pm 0.3$ & $88.7 \pm 1.1$ & $67.5 \pm 0.7$ \\
     \bottomrule
@@ -640,9 +640,9 @@ adaptation recovers the naive lower bound only where the output space is fixed.
   \caption[LexSlot versus replay versus oracle on DIL]{Focused comparison of the proposed
   \textbf{LexSlot} (isolated slot memory with a compact 200-exemplar replay buffer) against the strongest baselines and the joint
   oracle on the domain-incremental scenario (mean over three seeds, error bars $\pm$std).
-  \emph{Top:} average entity-F1---LexSlot ($87.3$) approaches replay (ER $87.9$, DER++ $88.0$,
+  \emph{Top:} average entity-F1: LexSlot ($87.3$) approaches replay (ER $87.9$, DER++ $88.0$,
   C-Flat++ $88.4$) and the oracle ($88.7$), within $\sim$1 point, and far exceeds naive
-  ($41.3$). \emph{Bottom:} backward transfer---LexSlot ($-2.3$) forgets less than the plain
+  ($41.3$). \emph{Bottom:} backward transfer; LexSlot ($-2.3$) forgets less than the plain
   replay methods (ER $-2.8$, DER++ $-3.4$), bettered only by C-Flat++ ($-1.8$). LexSlot reaches
   this with an order-of-magnitude smaller exemplar budget than the plain replay methods.}
   \label{fig:lexslot-bars}
@@ -666,18 +666,18 @@ adaptation recovers the naive lower bound only where the output space is fixed.
 Backward transfer (Table~\ref{tab:bwt-comparison}, Figure~\ref{fig:bwt-bars}) reveals a
 \emph{decoupling} of forgetting from accuracy that the AA table alone hides. Naive and LwF
 forget almost totally everywhere (BWT $\approx-90$ on CIL-CORD, $\approx-70$ elsewhere).
-The replay methods all but eliminate forgetting on DIL---ER $-2.8$, DER++ $-3.4$, and
-C-Flat++ $-1.8$ (the closest to zero), all near-zero---meaning later tasks no longer
+The replay methods all but eliminate forgetting on DIL (ER $-2.8$, DER++ $-3.4$, and
+C-Flat++ $-1.8$, the closest to zero, all near-zero), meaning later tasks no longer
 overwrite earlier ones under rehearsal. The
 striking result is \emph{EWC}: trained to convergence it is the single \emph{best}
 forgetting-reducer on two of three scenarios (CIL-CORD $-54.8$ and Mixed $-8.4$, both
 ahead of replay) and near-zero on DIL ($-2.8$). But this stability is bought with
 plasticity: the same penalty that protects old classes prevents EWC from \emph{learning}
 the current one, which is why its accuracy collapses on the growing CIL-CORD head
-($0.5$ AA) even as its forgetting is the lowest---a model that forgets little because it
-learns little. The measured LexSlot drives DIL forgetting to $-2.3$---\emph{below} the plain replay
+($0.5$ AA) even as its forgetting is the lowest, a model that forgets little because it
+learns little. The measured LexSlot drives DIL forgetting to $-2.3$, \emph{below} the plain replay
 methods ($-2.8$ to $-3.4$), the least forgetting of any non-oracle method except the
-sharpness-aware C-Flat++ ($-1.8$)---and does so with a fraction of the plain replay methods'
+sharpness-aware C-Flat++ ($-1.8$), and does so with a fraction of the plain replay methods'
 exemplar budget; its other-scenario forgetting
 is the pending grid (\S\ref{sec:results-lexslot}). LexSlot's forgetting profile on the domain
 shift thus slightly improves on replay's while needing an order of magnitude fewer stored exemplars.
@@ -687,8 +687,8 @@ shift thus slightly improves on replay's while needing an order of magnitude few
 $\mathrm{FWT}=\frac{1}{T-1}\sum_{i>0}\big(R[i{-}1,i]-b_i\big)$. The convergence-trained
 grid records the required zero-shot $R[i{-}1,i]$ entries and the single-task baselines
 $b_i$ (measured: FUNSD $87.4$, CORD $94.2$, SROIE $83.1$). Because each
-new session introduces label structure the model has never produced---entirely new BIO
-tags in class-incremental CORD, a shifted domain in DIL---forward transfer is
+new session introduces label structure the model has never produced (entirely new BIO
+tags in class-incremental CORD, a shifted domain in DIL), forward transfer is
 \emph{strongly negative} and depends on the scenario, not the method. Where it is measured
 (the naive runs, seeded with the single-task baselines), it is
 $\approx-92$ on CIL-CORD (the head cannot predict unseen classes), $\approx-75$ to $-84$ on
@@ -706,11 +706,11 @@ baselines.
   cells marked ``--'' denote method/scenario combinations not run. Note that EWC \emph{and}
   the prompt methods (L2P, DualPrompt,
   CODA-Prompt) show small BWT, but this is the same trap (Table~\ref{tab:main-comparison}):
-  they forget little because they barely learn---their accuracy is at or near zero. Only
+  they forget little because they barely learn: their accuracy is at or near zero. Only
   the replay family (ER, DER++, C-Flat++) and \textbf{LexSlot} drive DIL forgetting to
   near zero \emph{while remaining accurate}; LexSlot's DIL BWT ($-2.3 \pm 1.2$, three seeds) is
   better than the plain replay methods (ER $-2.8$, DER++ $-3.4$), with only
-  the sharpness-aware C-Flat++ ($-1.8$) lower---and it achieves this with a compact
+  the sharpness-aware C-Flat++ ($-1.8$) lower, and it achieves this with a compact
   200-exemplar buffer, an order of magnitude smaller than the plain replay methods'.}
   \label{tab:bwt-comparison}
   \begin{tabular}{lccc}
@@ -721,15 +721,15 @@ baselines.
     EWC                 & $\mathbf{-54.8 \pm 8.6}$ & $-2.8 \pm 0.9$ & $\mathbf{-8.4 \pm 2.4}$ \\
     LwF                 & $-93.7 \pm 0.6$ & $-69.1 \pm 1.4$ & $-66.4 \pm 1.2$ \\
     ER                  & $-68.3 \pm 3.2$ & $-2.8 \pm 1.7$ & $-23.5 \pm 5.6$ \\
-    ER + C-Flat++ (2025) & $-73.2 \pm 4.1$ & $\mathbf{-1.8 \pm 0.3}$ & --- \\
+    ER + C-Flat++ (2025) & $-73.2 \pm 4.1$ & $\mathbf{-1.8 \pm 0.3}$ & -- \\
     DER++               & $-86.2 \pm 3.2$ & $-3.4 \pm 1.4$ & $-34.8 \pm 2.0$ \\
-    \textbf{LexSlot (ours)} & --- & $-2.3 \pm 1.2$ & --- \\
+    \textbf{LexSlot (ours)} & -- & $-2.3 \pm 1.2$ & -- \\
     \midrule
     L2P                 & $-15.7$ & $-11.5$ & $-2.8$ \\
     DualPrompt          & $-15.2$ & $-11.1$ & $-2.6$ \\
     CODA-Prompt         & $-17.9$ & $-10.5$ & $-5.9$ \\
     O-LoRA              & $-36.0$ & $-56.8$ & $-18.9$ \\
-    CL-LoRA (2025)      & $-36.2$ & $-58.8$ & --- \\
+    CL-LoRA (2025)      & $-36.2$ & $-58.8$ & -- \\
     \midrule
     Joint (upper bound) & $0.0$ & $0.0$ & $0.0$ \\
     \bottomrule
@@ -741,7 +741,7 @@ baselines.
   \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{bench_bwt_bars.pdf}
   \caption[Backward transfer by method and scenario]{Backward transfer (BWT) of each method,
   grouped by scenario; bars hang below zero, so shorter is less forgetting. Converged EWC
-  has the least forgetting on CIL-CORD and Mixed (but at a severe accuracy cost---see
+  has the least forgetting on CIL-CORD and Mixed (but at a severe accuracy cost, see
   Table~\ref{tab:main-comparison}), and replay (ER, DER++) and the proposed LexSlot drive BWT to
   $\approx 0$ on DIL. Joint has BWT $=0$ by construction.}
   \label{fig:bwt-bars}
@@ -763,7 +763,7 @@ baselines.
   \caption[Forgetting trajectory under naive fine-tuning]{Per-task entity-F1 as the naive
   sequential pilot progresses (C4, seed 42). Each task is learned to a strong F1 when it is
   the current task (bold markers: 88.0 / 93.0 / 80.5) and then collapses to $\sim$2--4 F1
-  once the next task is trained --- the rows of Table~\ref{tab:forgetting-matrix} read left
+  once the next task is trained: the rows of Table~\ref{tab:forgetting-matrix} read left
   to right. Pilot result (seed 42).}
   \label{fig:forgetting-curves}
 \end{figure}
@@ -774,15 +774,15 @@ baselines.
 Before evaluating LexSlot itself, we ask whether the diagnosed head/late locus is
 \emph{causal}: does concentrating \emph{any} continual-learning mechanism there beat
 spreading it uniformly across depth? We answer this with a clean depth-scaled consolidation
-probe---a Fisher-weighted penalty whose per-bucket strength is either concentrated on the
-head and late layers or spread equally across every depth---on DIL, three seeds each
+probe (a Fisher-weighted penalty whose per-bucket strength is either concentrated on the
+head and late layers or spread equally across every depth) on DIL, three seeds each
 (Table~\ref{tab:ablation}). The result is decisive. The \emph{uniform} variant, which applies
-an equal penalty to every depth bucket---including the stable input and early encoders the
-targeted schedule leaves free, and hence if anything a \emph{larger} total budget---
+an equal penalty to every depth bucket (including the stable input and early encoders the
+targeted schedule leaves free, and hence if anything a \emph{larger} total budget)
 \emph{collapses in accuracy} to $42.6$ AA, roughly half the targeted variant and barely above the
 naive lower bound, whereas concentrating the same budget on the head/late locus recovers
-$84.7$. We are precise about the mechanism: the uniform variant does not forget \emph{more}---its
-backward transfer ($-1.8$) is in fact the mildest in the table---it simply cannot \emph{fit} the
+$84.7$. We are precise about the mechanism: the uniform variant does not forget \emph{more}; its
+backward transfer ($-1.8$) is in fact the mildest in the table; it simply cannot \emph{fit} the
 tasks when an equal penalty stiffens every depth, including the input encoders that should stay
 plastic. So what the probe establishes is a budget-placement claim: a fixed consolidation budget
 is only \emph{usable} when concentrated on the head/late locus, and is wasted (to the point of
@@ -791,8 +791,8 @@ restrictions each recover essentially the full accuracy, indicating the head ter
 the effect and the late-layer term is largely redundant with it. The probe is therefore
 consistent with the diagnosis and is the strongest available causal evidence short of a direct
 freezing intervention, which we flag as the cleaner control (a freeze of the high-displacement
-bucket) for future work; it does not, on its own, isolate forgetting from capacity. It motivates LexSlot's design directly---place capacity at the head/late
-locus, leave the rest frozen---and LexSlot's own placement ablation (\S\ref{sec:results-lexslot})
+bucket) for future work; it does not, on its own, isolate forgetting from capacity. It motivates LexSlot's design directly: place capacity at the head/late
+locus, leave the rest frozen; and LexSlot's own placement ablation (\S\ref{sec:results-lexslot})
 re-confirms the same targeting effect with the slot mechanism (hypotheses
 H\textsubscript{target}/H\textsubscript{head} of \S\ref{sec:method-component-hypotheses}).
 
@@ -805,8 +805,8 @@ pairs that isolation with a compact 200-exemplar replay buffer (the DocCL-hybrid
 isolated configuration reaches \textbf{AA $87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$}
 (seeds 42/7/123: $88.4$/$87.2$/$86.3$).
 Two readings stand out. First, its accuracy \emph{approaches the replay methods} (ER $87.9$, DER++
-$88.0$, C-Flat++ $88.4$) and the joint oracle ($88.7$) on DIL---within about a point, the seeds
-overlapping---and clearly exceeds the head/late consolidation probe ($84.7$,
+$88.0$, C-Flat++ $88.4$) and the joint oracle ($88.7$) on DIL, within about a point, the seeds
+overlapping, and clearly exceeds the head/late consolidation probe ($84.7$,
 \S\ref{sec:results-key-ablation}), with an order-of-magnitude smaller replay buffer than the
 plain replay methods: most of the protection
 comes structurally from freezing each task's slots, with the small buffer closing the remaining gap.
@@ -822,17 +822,17 @@ slots (\emph{soft}) reaches $86.3 \pm 0.6$ / $-3.8 \pm 2.0$, \emph{below} the is
 configuration ($87.3 \pm 1.0$ / $-2.3 \pm 1.2$) on both axes over three seeds. The putative
 vocabulary-overlap transfer does not materialise: on this benchmark, allowing two tasks to write the
 same slots costs more in interference than it recovers in shared-rule refinement. This is why
-\emph{off} (isolation) is presented as the method and \emph{soft} as the control---the measurement
+\emph{off} (isolation) is presented as the method and \emph{soft} as the control: the measurement
 selects isolation.
 
 \emph{Depth (targeting vs.\ uniform).} Placing slots only at the diagnosed head/late locus
 ($86.9$ / $-1.5$) beats spreading them across every layer (\emph{uniform}, $84.8$ / $-2.1$) by
-$2.1$ AA with less forgetting, reproducing---now with the slot mechanism---the same targeting
+$2.1$ AA with less forgetting, reproducing, now with the slot mechanism, the same targeting
 effect the depth-scaled consolidation probe shows (\S\ref{sec:results-key-ablation}). LexSlot's
 gain comes from \emph{where} the mechanism attaches: capacity placed where forgetting lives
 outperforms the same capacity spread uniformly. The effect is smaller than for the consolidation
-probe (which collapses to $42.6$ under uniform treatment), as expected---additive zero-initialised
-slots away from the locus are near-inert rather than actively harmful---but its direction confirms
+probe (which collapses to $42.6$ under uniform treatment), as expected: additive zero-initialised
+slots away from the locus are near-inert rather than actively harmful, but its direction confirms
 the diagnosis-driven placement.
 
 \begin{table}[!htbp]
@@ -840,7 +840,7 @@ the diagnosis-driven placement.
   \caption[LexSlot ablation: sharing and depth]{LexSlot ablations on the domain-incremental
   scenario (LayoutLMv3). \emph{Sharing}: isolating each task's slots (\emph{off}) beats graded
   lexical sharing (\emph{soft}) on both AA and backward transfer over three seeds, so the
-  putative vocabulary-overlap transfer does not outweigh slot interference---isolation is the
+  putative vocabulary-overlap transfer does not outweigh slot interference: isolation is the
   selected method. \emph{Depth}: slots concentrated on the diagnosed head/late locus versus
   spread uniformly across depth (targeting the locus beats spreading by $2.1$ AA), reproducing the
   depth-targeting probe's effect with the slot mechanism. The sharing rows are mean\,$\pm$\,std over three seeds (42/123/7);
@@ -868,14 +868,14 @@ The headline isolated and shared configurations are now measured over three seed
 depth-ablation rows (head-only, uniform) are a single seed pending the grid. As with the
 depth-targeting probe, a
 head-only restriction ($87.1$, single seed) already recovers essentially the full head/late
-result, suggesting the late-layer slots are largely redundant with the head slots---a simpler
+result, suggesting the late-layer slots are largely redundant with the head slots; a simpler
 head-only variant is a natural future simplification. The remaining scope is the multi-backbone
 (LiLT/BROS/BERT) confirmation, still the pending grid, and class-incremental learning is a known
 hard case for the lexical gate (same-dataset sessions collapse the signature contrast). What the
 present evidence establishes is that the head/late diagnosis admits a \emph{second},
 mechanistically distinct remedy that on a domain shift is competitive with replay at a small
 fraction of its exemplar budget,
-with lower forgetting than the plain replay methods---supporting the thesis's central claim that
+with lower forgetting than the plain replay methods, supporting the thesis's central claim that
 localising forgetting is a practical instrument for \emph{designing} continual methods, not just
 one method.
 
@@ -885,25 +885,25 @@ one method.
 \S\ref{sec:results-diagnosis} established that the \emph{forgetting locus} is
 architecture-general (the head-dominant displacement and the monotonic CKA depth gradient
 reproduce on BERT, LiLT, and BROS). A complementary question is whether the \emph{method
-ordering}---replay $\gg$ regularisation $\gg$ naive---also transfers off LayoutLMv3.
+ordering} (replay $\gg$ regularisation $\gg$ naive) also transfers off LayoutLMv3.
 Table~\ref{tab:backbone-byscenario} reports the secondary-backbone runs available:
 the \emph{complete} text-only BERT slice (the full method grid at three seeds on CIL-CORD, DIL,
 and Mixed, plus the naive lower bound on all five scenarios), and the four classical methods on
 the decoupled-stream LiLT backbone (DIL and Mixed, three seeds).
 The ordering is preserved on both secondaries. On LiLT, replay (ER $85.7$, DER++ $84.4$ on DIL)
 dominates by a wide margin, regularisation (EWC $48.4$) sits in between, and naive ($40.1$) is
-the floor---the same pattern measured on LayoutLMv3 (Table~\ref{tab:main-comparison}), with the
+the floor, the same pattern measured on LayoutLMv3 (Table~\ref{tab:main-comparison}), with the
 absolute replay level a few points lower on the smaller-capacity backbone. On text-only BERT the
 full grid reproduces the same three-tier structure at a uniformly lower level: replay
 (ER + C-Flat++ $78.3$, DER++ $77.4$, ER $77.1$ on DIL) reaches the joint upper bound measured on
 the same backbone ($77.2$), regularisation barely moves the naive floor (EWC $46.6$ vs.\ naive
-$39.4$), and the prompt/LoRA families remain at or below naive ($34$--$39$)---so the
+$39.4$), and the prompt/LoRA families remain at or below naive ($34$--$39$), so the
 replay-dominant ordering, the regularisation gap, \emph{and} the prompt-family failure all
 survive the removal of the layout and vision modalities entirely. Remaining coverage is
 explicit: LiLT is run on the two scenarios the secondary grid has reached, and the BROS backbone
 has no runs yet; completing that matrix is the pending rented-GPU grid
 (Chapter~\ref{ch:conclusions}). What the present rows establish is that the benchmark's central
-empirical ordering is not an artefact of one backbone---or of multimodality itself.
+empirical ordering is not an artefact of one backbone, or of multimodality itself.
 
 \begin{figure}[!htbp]
   \centering
@@ -911,8 +911,8 @@ empirical ordering is not an artefact of one backbone---or of multimodality itse
     \includegraphics[width=0.92\linewidth]{backbone_ordering.pdf}}{}
   \caption[Replay-dominant ordering across backbones]{The replay-dominant ordering on
   DIL across backbones (mean over three seeds, from the aggregated run table). The
-  three-tier structure---replay near the joint oracle, regularisation barely above the
-  naive floor---reproduces on the text-only BERT backbone at a uniformly lower level and
+  three-tier structure (replay near the joint oracle, regularisation barely above the
+  naive floor) reproduces on the text-only BERT backbone at a uniformly lower level and
   on LiLT where cells exist; C-Flat++ and Joint are not yet run on LiLT.}
   \label{fig:backbone-ordering}
 \end{figure}
@@ -943,7 +943,7 @@ empirical ordering is not an artefact of one backbone---or of multimodality itse
 \label{sec:results-ablation}
 
 The depth-targeting probe restricts a depth-scaled consolidation penalty to a subset of
-depths to test whether the diagnosed head/late target is what matters---a causal check on the
+depths to test whether the diagnosed head/late target is what matters, a causal check on the
 diagnosis, independent of the proposed remedy. The variants (head-only / late-only / uniform /
 full) were run on DIL over three seeds
 (Table~\ref{tab:ablation}). The result is decisive: the \emph{uniform} variant collapses
@@ -957,8 +957,8 @@ developed in \S\ref{sec:results-key-ablation}, and LexSlot's own placement ablat
 limits bound the claim. First,
 that head-only and late-only each \emph{match} the full schedule means the extra late-layer
 term is largely \emph{redundant} with the head term on this
-scenario---a simpler head-only target would be near-equivalent here, which is exactly the
-configuration LexSlot adopts. Second, this probe is on DIL---the scenario where head/late
+scenario: a simpler head-only target would be near-equivalent here, which is exactly the
+configuration LexSlot adopts. Second, this probe is on DIL, the scenario where head/late
 targeting is effective; the same contrast on the CIL-CORD growing-head scenario is
 uninformative (no variant clears $\sim$18 AA, since no method works there), so the targeting
 claim is established for the domain shift and left open for the harder scenarios.
@@ -967,12 +967,12 @@ claim is established for the domain shift and left open for the harder scenarios
   \centering
   \caption[Depth-targeting probe]{Depth-targeting probe on the DIL scenario
   (three seeds): a depth-scaled consolidation penalty restricted to different depths, used to
-  test whether the diagnosed locus is causal. Concentrating on the locus---\emph{head
-  only} ($86.1$) or \emph{late only} ($86.2$)---recovers essentially the full result and
+  test whether the diagnosed locus is causal. Concentrating on the locus (\emph{head
+  only} ($86.1$) or \emph{late only} ($86.2$)) recovers essentially the full result and
   slightly edges the full head$+$late schedule ($84.7$), while the \emph{uniform}
   across-depth variant collapses to $42.6$. This confirms the targeting hypotheses
   H\textsubscript{target} and H\textsubscript{head} (\S\ref{sec:results-key-ablation}): the
-  gain comes from \emph{where} capacity is spent, not merely how much---the principle LexSlot
+  gain comes from \emph{where} capacity is spent, not merely how much: the principle LexSlot
   is built on.}
   \label{tab:ablation}
   % Auto-loaded from generated/table_ablation.tex (scenario: dil); the inline table below
@@ -1006,7 +1006,7 @@ trains only a small slot memory (head logit-slots $+$ low-rank late-layer adapte
 parameter overhead over the frozen backbone; hyperparameters in
 Appendix~\ref{app:hyperparameters}), and its headline configuration pairs that frozen-backbone
 slot memory with a compact 200-exemplar replay buffer, an order of magnitude smaller than the
-plain replay methods' buffers---so its standing
+plain replay methods' buffers, so its standing
 advantage is qualitative: replay-level retention on the domain shift (\S\ref{sec:results-lexslot})
 with a frozen backbone and a small fraction of the rehearsal data. Its CIL-CORD wall-clock/memory numbers are not in
 this table (LexSlot is measured on DIL so far). ``Run'' denotes one full continual scenario.
@@ -1059,18 +1059,18 @@ $20.2$ / $-84.0$), all far below the joint oracle ($33.9$). The best non-oracle 
 is just $\sim$$20.8$ (LwF and naive). The lesson is that class-incremental learning
 \emph{at scale} is the hardest regime: when the head must keep growing to admit dozens of
 new classes, the head-growth bottleneck dominates, and a replay buffer over past inputs
-cannot compensate for an output space that keeps expanding. This mirrors---at larger
-scale---the CIL-CORD difficulty in the main grid.
+cannot compensate for an output space that keeps expanding. This mirrors, at larger
+scale, the CIL-CORD difficulty in the main grid.
 
 \paragraph{Pure language shift: XFUND cross-lingual DIL.} The \texttt{dil\_xlingual}
 scenario presents five languages in sequence (de\,$\rightarrow$\,es\,$\rightarrow$\,fr\,$\rightarrow$\,it\,$\rightarrow$\,zh)
 under a \emph{fixed} unified label space: only the input language changes, never the set
 of output classes. The headline finding is that forgetting is \emph{near zero for every
 method}, including naive (BWT $-6.6$); regularisation and replay show forgetting at or
-below zero (EWC $-9.6$, ER $+1.6$, DER++ $+0.5$---i.e.\ slightly \emph{positive} backward
+below zero (EWC $-9.6$, ER $+1.6$, DER++ $+0.5$, i.e.\ slightly \emph{positive} backward
 transfer). On accuracy, naive already reaches $72.9$ AA, DER++ $80.3$, and the replay
 methods even edge \emph{past} the joint oracle ($78.5$), exactly as the head-locus account
-predicts---with the output space fixed there is almost no head-forgetting for any head/late
+predicts: with the output space fixed there is almost no head-forgetting for any head/late
 remedy to repair, so head-protection neither helps nor hurts here, which is itself corroborating
 evidence. This is direct support for the
 output-side / head-locus thesis. When the label space is held fixed and only the input
@@ -1079,8 +1079,8 @@ head-concentrated forgetting mechanism is barely triggered and forgetting is min
 Contrast this with format/schema shift (regular DIL: naive BWT $-73.1$) and with
 class-growth (CIL-CORD and WildReceipt: BWT $\approx-85$ to $-94$), where the head
 \emph{must} change and forgetting is catastrophic. Read together, the three regimes form
-a clean gradient---near-zero forgetting under pure input-language shift, severe forgetting
-under output-space change---which is strong corroboration that forgetting in continual
+a clean gradient: near-zero forgetting under pure input-language shift, severe forgetting
+under output-space change, which is strong corroboration that forgetting in continual
 document IE is driven by change at the \emph{output side} (the classifier head), not by
 input-representation drift \emph{per se}.
 
@@ -1093,8 +1093,8 @@ input-representation drift \emph{per se}.
   compute-budget reasons), where forgetting is severe and even replay stays near the naive
   lower bound, far below the oracle. \emph{Right:} XFUND cross-lingual DIL (pure language
   shift, fixed label space), where forgetting is near
-  zero for every method---naive already reaches $72.9$ AA and replay edges past the
-  oracle---because the fixed output space never forces
+  zero for every method: naive already reaches $72.9$ AA and replay edges past the
+  oracle, because the fixed output space never forces
   the head to relearn its distribution. The contrast corroborates the output-side /
   head-locus forgetting thesis.}
   \label{fig:newscenarios-aa}
@@ -1126,9 +1126,9 @@ snap on a class-asymmetric substrate}, not representation erasure.
 
 \paragraph{Pre-registered kill-tests: every cheap correction is a null.}
 If the snap were merely a mis-calibrated prior, eval-time or marginal-level corrections
-should reverse it. Five kill-tests---registered with explicit support/kill bars before any
+should reverse it. Five kill-tests, registered with explicit support/kill bars before any
 run executed, though we note the registration and adjudication were self-administered rather
-than third-party---close this hole. Eval-time readout repair (marginal matching, prior-ratio
+than third-party, close this hole. Eval-time readout repair (marginal matching, prior-ratio
 correction, and per-document EM re-estimation) recovers at best $-0.1$ AA: the saturation
 probe shows the head has already annihilated the recoverable mass (old-class probability
 mass ${\sim}10^{-6}$, two to three orders below the $10^{-3}$ branch threshold), so the
@@ -1137,7 +1137,7 @@ objectives fare no better: a KL anchor to the prior-task label mixture and a
 balanced-softmax logit adjustment both leave the extinguished classes at $0.0$ F1. A
 frozen-trunk variant reproduces old-class extinction with the trunk fixed, though its poor
 acquisition makes it invalid as a clean effect-size confirmation. The consolidated verdict:
-the snap is a \emph{symptom}, not an invertible transformation---only task-consistent
+the snap is a \emph{symptom}, not an invertible transformation: only task-consistent
 re-exercise (replay) prevents it. This closes the ``did you try cheap recalibration''
 objection with registered nulls rather than absence of evidence.
 
@@ -1147,7 +1147,7 @@ ladder over latent replay at a fixed frozen boundary (layer $k=8$) isolates it. 
 \emph{real} banked activations of whole documents retains AA $87.3$ (converged). Every
 summarised variant collapses to naive level: a rank-16 spectral summary of the same store
 reaches $41.9$, per-class Gaussians (full dimension, no truncation) $39.4$, and even
-\emph{real} k-means centroids of the same activations $36.7$---so the failure is not
+\emph{real} k-means centroids of the same activations $36.7$, so the failure is not
 synthesis fidelity. The single-variable control makes the mechanism explicit: four whole
 replayed documents retain AA $63.8$ (at a matched five-epoch budget), while the same
 features pasted onto decoupled layout carriers retain $36.7$. The
@@ -1156,7 +1156,7 @@ summaries that break it fail regardless of how faithful they are pointwise. A bo
 positive probes the storage side of the same law: replaying pseudo-labelled \emph{public}
 documents (zero private bytes) recovers dense-label tasks (FUNSD $76.1$) but not tasks
 whose feature region the proxy pool does not cover (SROIE ${\sim}7$), topping out at AA
-$58.9$---a coverage-limited partial transfer, not a method.
+$58.9$, a coverage-limited partial transfer, not a method.
 
 \begin{figure}[!htbp]
   \centering
@@ -1164,8 +1164,8 @@ $58.9$---a coverage-limited partial transfer, not a method.
     \includegraphics[width=0.9\linewidth]{falsification_ladder.pdf}}{}
   \caption[The latent-replay falsification ladder]{The latent-replay falsification
   ladder at a fixed frozen boundary (layer $k{=}8$, DIL). Only whole-document replay
-  (blue) retains accuracy; every summarised representation---including \emph{real}
-  $k$-means centroids---collapses to the naive level, and the matched-budget
+  (blue) retains accuracy; every summarised representation, including \emph{real}
+  $k$-means centroids, collapses to the naive level, and the matched-budget
   single-variable control (whole documents $63.8$ vs.\ the same features on decoupled
   carriers $36.7$) isolates whole-document (feature, position, label) binding as the
   necessary ingredient. Single-seed diagnostic runs (seed 42).}
@@ -1177,7 +1177,7 @@ The negatives above could be effort-limited. CoLaR (compressed latent replay) sh
 not: per-\emph{document} rank-$r$ SVD factors respect whole-document binding (unlike the
 pooled feature space, individual documents \emph{are} low-rank), giving AA $87.6$ at
 $60$\,MB ($2.7\times$ smaller than raw replay at equal document count; final-task row
-$[89.2, 76.3, 97.2]$ on FUNSD/SROIE/CORD)---within $1.4$ points of the joint oracle.
+$[89.2, 76.3, 97.2]$ on FUNSD/SROIE/CORD), within $1.4$ points of the joint oracle.
 Compression that respects the consistency law works; every marginal summary collapses.
 CoLaR is a \emph{control}, not a claimed contribution. Attempts to improve it obey a
 conservation law: class-balanced replay losses ($87.1$), coverage-based exemplar selection
@@ -1186,7 +1186,7 @@ FUNSD surplus for SROIE roughly $1{:}1$ without moving AA; a three-seed check co
 lever beats the base ($87.8$ base $=$ balanced $87.8$ $>$ $k$-center $87.0$). Read-side
 extensions are clean negatives: blending a $k$NN readout over the stored latents is inert at
 $\lambda=0.3$ and destructive at $\lambda=1.0$ (AA $46.2$), and Benna--Fusi metaplastic
-consolidation is dose-dependently harmful ($85.9$ at $m=1$, $79.5$ at $m=3$)---consistent
+consolidation is dose-dependently harmful ($85.9$ at $m=1$, $79.5$ at $m=3$), consistent
 with the root cause: the readout must be \emph{repaired by re-exercise}, not averaged with a
 weaker reader or stiffened.
 
@@ -1222,7 +1222,7 @@ full-budget or additional-seed run is warranted.
   \centering
   \caption[CoLaSlot capacity-gate verdicts]{Pre-registered CoLaSlot capacity gates on
   CoLaR (matched DIL $d{=}5$/$r{=}64$ seed-42 cells; single-seed diagnostic budget).
-  Wrong routes are destructive, correct routes are inert---head residuals on compressed
+  Wrong routes are destructive, correct routes are inert; head residuals on compressed
   replay are closed in their current form.}
   \label{tab:capacity-gates}
   \IfFileExists{generated/table_capacity_gates.tex}{%
@@ -1235,8 +1235,8 @@ full-budget or additional-seed run is warranted.
 \paragraph{What the diagnosis means.}
 The diagnosis (\S\ref{sec:results-diagnosis}) gives a clear, if sobering, picture:
 under naive sequential fine-tuning LayoutLMv3 forgets catastrophically, and the
-forgetting concentrates---by both per-token CKA drift and old-task-Fisher-weighted
-displacement---in the \emph{classifier head and the late encoder layers}, not in the
+forgetting concentrates, by both per-token CKA drift and old-task-Fisher-weighted
+displacement, in the \emph{classifier head and the late encoder layers}, not in the
 input encoders. We are careful not to over-claim: because LayoutLMv3 is single-stream
 we do \emph{not} assert a ``fusion-specific'' (or its absence as a) finding, since
 fusion is not a measurable parameter component here; the cross-condition magnitude
@@ -1244,12 +1244,12 @@ test, moreover, was underpowered by construction, so the head/late locus rests i
 on the per-component Fisher displacement test (classifier head dominant, $p<0.01$), the
 CKA depth gradient, and the displacement bars across all four backbone conditions
 (LayoutLMv3, BERT, LiLT and BROS), whose displacement-by-depth profiles are
-statistically indistinguishable---establishing that the pattern is neither
+statistically indistinguishable, establishing that the pattern is neither
 multimodal-specific nor an artefact of a single architecture. The actionable
 consequence is robust to all of this: the
 forgetting locus is output-facing, so remedies that protect or re-expose the upper
-layers and the classifier---of which experience replay is the simplest instance, and
-the head/late-targeted LexSlot the diagnosis-grounded one---are the natural
+layers and the classifier, of which experience replay is the simplest instance, and
+the head/late-targeted LexSlot the diagnosis-grounded one, are the natural
 intervention, which also explains \emph{why} replay is so effective below
 (Figure~\ref{fig:replay-mechanism}).
 
@@ -1270,15 +1270,15 @@ intervention, which also explains \emph{why} replay is so effective below
        overwritten as new tasks arrive.};
     \node[stage, fill=green!10, right=8mm of mech] (out)
       {\textbf{Outcome (\S\ref{sec:results-remedy}).} The head stays aligned. On DIL: ER/DER++
-       AA $\approx 88$, BWT $\approx 0$---matching the joint oracle ($88.7$); forgetting
+       AA $\approx 88$, BWT $\approx 0$, matching the joint oracle ($88.7$); forgetting
        essentially eliminated.};
     \draw[flow] (diag) -- (mech);
     \draw[flow] (mech) -- (out);
     \node[note, fill=gray!8, below=4mm of mech.south, anchor=north]
       {\textbf{The diagnosis-grounded alternative.} Because the locus is output-facing, a
-       mechanism that targets the head/late layers \emph{directly}---the proposed
+       mechanism that targets the head/late layers \emph{directly}: the proposed
        \textbf{LexSlot}, an isolated slot memory paired with a compact 200-exemplar replay
-       buffer---matches replay-level accuracy on DIL
+       buffer, matches replay-level accuracy on DIL
        ($87.3$ vs the oracle's $88.7$) and forgets \emph{less} than the plain replay methods
        ($-2.3$ vs $-2.8$/$-3.4$), \emph{with an order-of-magnitude smaller exemplar budget}. By contrast EWC
        constrains all weights broadly (partial help, mainly under domain shift) and LwF
@@ -1287,7 +1287,7 @@ intervention, which also explains \emph{why} replay is so effective below
   \caption[Why replay works]{From diagnosis to result: because forgetting is output-facing,
   replay's re-exposure of old-class targets keeps the classifier head aligned, which
   explains its empirical win (both ER and DER++ reach DIL BWT $\approx 0$). The
-  diagnosis-grounded method --- LexSlot, an isolated slot memory at the head/late layers ---
+  diagnosis-grounded method, LexSlot, an isolated slot memory at the head/late layers,
   approaches the oracle and replay on the DIL forgetting gap ($87.3$ vs the oracle's $88.7$),
   forgets less than the plain replay methods, and does so \emph{with a compact 200-exemplar buffer}
   (frozen backbone, an order-of-magnitude smaller exemplar budget than plain replay).}
@@ -1307,14 +1307,14 @@ label frequencies and read the replay result as real cross-domain retention only
 sparse KEY class is itself retained. The convergence training surfaces a second, sharper
 lesson: \emph{backward transfer and accuracy must be read together}. EWC trained to
 convergence achieves the \emph{lowest forgetting} on CIL-CORD and Mixed, yet its accuracy
-\emph{collapses} (CIL-CORD $0.5$, Mixed $22.0\pm7.6$)---the Fisher penalty over-protects
+\emph{collapses} (CIL-CORD $0.5$, Mixed $22.0\pm7.6$): the Fisher penalty over-protects
 the old classes and starves the new ones, so a low BWT here signals failure-to-learn, not
 success. LwF tracks the naive lower bound throughout. That the two replay variants land so
 close together suggests the benefit comes from \emph{rehearsing past examples} per se
 rather than from the logit-distillation term DER++ adds on top. The dense
 token-classification setting with a growing head is the likely reason distillation
 (LwF) fails: the old-class logits it distils decay regardless once their classes stop
-being reinforced. The scenario lens matters too---domain-incremental learning, with
+being reinforced. The scenario lens matters too: domain-incremental learning, with
 distinct documents under a fixed label space, is the most tractable, whereas
 fine-grained class-incremental learning over a single dataset (60 classes in one
 growing head) is the hardest for every method, oracle included.
@@ -1326,12 +1326,12 @@ internally valid (the small per-seed standard deviations indicate stable ranking
 single bounded coverage gap is that the 2025 baselines and the prompt/LoRA methods
 were not run on the large-scale WildReceipt scenario
 (\S\ref{sec:results-extended}), where only the classical methods and the oracle are
-reported; everything else---including C-Flat++ (\texttt{er\_cflat}), the depth-targeting
-probe, and the cross-lingual scenario---is measured over three
+reported; everything else, including C-Flat++ (\texttt{er\_cflat}), the depth-targeting
+probe, and the cross-lingual scenario, is measured over three
 seeds. The proposed LexSlot is measured on DIL/LayoutLMv3 (3 seeds); its other-scenario and
-multi-backbone confirmation is the pending grid. The qualitative conclusions---replay strongest,
+multi-backbone confirmation is the pending grid. The qualitative conclusions: replay strongest,
 LexSlot approaching replay on the DIL gap with a small fraction of the exemplar budget, and the depth-targeting probe
-confirming the head/late locus---do not depend on the unrun cells.
+confirming the head/late locus, do not depend on the unrun cells.
 (ii) Each scenario uses
 a single fixed task order in the main grid; the pilot showed order materially affects
 forgetting ($\sim$6 BWT points), so the full run repeats the comparison under alternate
@@ -1354,9 +1354,9 @@ separate them). What remains scoped to LayoutLMv3 is the \emph{full CL benchmark
 sweep is a compute-bound follow-up on larger hardware, and the magnitude comparison of
 $|\mathrm{BWT}|$ across backbones is underpowered at three seeds, so we claim a shared
 \emph{location} of forgetting, not a shared \emph{amount}. None of these undercut the
-robust findings---forgetting is a depth/head phenomenon \emph{across architectures},
+robust findings: forgetting is a depth/head phenomenon \emph{across architectures},
 replay (ER/DER++) is the strongest remedy and matches the joint
 oracle on domain-incremental learning while LexSlot approaches that gap with an order-of-magnitude
 smaller replay buffer, and forgetting
-is near zero under pure language shift but catastrophic under output-space growth---but
-they delimit how far the exact numbers should be pushed.
+is near zero under pure language shift but catastrophic under output-space growth. They
+do, however, delimit how far the exact numbers should be pushed.

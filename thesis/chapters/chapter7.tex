@@ -8,8 +8,8 @@
 
 This study is deliberately scoped, and several limitations should be read
 alongside its findings. First, the controlled diagnosis centres on a primary
-backbone, LayoutLMv3-base, but its central claim---that forgetting concentrates at
-the head and late layers---has been confirmed on three further architectures: the
+backbone, LayoutLMv3-base, but its central claim, that forgetting concentrates at
+the head and late layers, has been confirmed on three further architectures: the
 unimodal BERT baseline and the LiLT and BROS secondary backbones all reproduce the
 same head-dominant displacement and depth gradient, and a permutation test cannot
 separate their forgetting profiles from LayoutLMv3's ($p=0.38$, $0.51$). What stays
@@ -44,24 +44,24 @@ across document genres and could interact with the per-component forgetting pict
 quantifying that interaction is left to future work. Sixth, each task is trained to
 convergence by early stopping on a validation signal, but FUNSD and SROIE provide no
 native validation split, so for those datasets the task's evaluation set serves as both
-the stopping signal and the reporting set---a mild optimistic selection bias, bounded by
+the stopping signal and the reporting set, a mild optimistic selection bias, bounded by
 the short patience and the same rule applied to every method, and disclosed in
 \S\ref{sec:exp-checkpointing}; a held-out split carved from training data would remove it
 and is a camera-ready refinement. Seventh, the heavier baselines (the 2025 methods and the prompt/LoRA family) were not run on the
 large-scale WildReceipt scenario, where only the classical methods and the oracle are
-reported; every other baseline cell---including the depth-targeting probe and the
-cross-lingual scenario---is measured over three seeds, and the qualitative conclusions do
+reported; every other baseline cell (including the depth-targeting probe and the
+cross-lingual scenario) is measured over three seeds, and the qualitative conclusions do
 not depend on that one missing cell. Eighth, and most consequentially for the proposed method,
 LexSlot is at present evaluated on the domain-incremental scenario (three seeds) on LayoutLMv3
 only; its multi-backbone and other-scenario confirmation in that configuration is the pending
 grid (the completed BERT slice runs the buffer-free soft-sharing configuration, which lands at
-the naive level there---consistent with the finding that isolation plus the compact buffer,
+the naive level there, consistent with the finding that isolation plus the compact buffer,
 not the slot mechanism alone, carries the protection
-(\S\ref{sec:results-lexslot})---so it does not yet confirm the headline configuration off
+(\S\ref{sec:results-lexslot}), so it does not yet confirm the headline configuration off
 LayoutLMv3),
 and its lexical gate is expected to be ineffective on class-incremental learning, where
 same-dataset sessions collapse the signature contrast the gate relies on, so its claims are
-deliberately confined to the domain-shift setting---which is why we frame it as promising rather
+deliberately confined to the domain-shift setting, which is why we frame it as promising rather
 than established. Finally, results rest on three
 seeds; more seeds would tighten the confidence intervals around the smaller
 effects.
@@ -79,8 +79,8 @@ old-task-Fisher-weighted displacement metrics together with standard forgetting
 measures.
 
 The diagnosis returns a clear and somewhat counter-intuitive finding: under naive
-sequential fine-tuning LayoutLMv3 forgets almost totally---an earlier task that
-scores $88$ entity-F1 collapses to $\sim$2 F1 after a single subsequent task---and
+sequential fine-tuning LayoutLMv3 forgets almost totally (an earlier task that
+scores $88$ entity-F1 collapses to $\sim$2 F1 after a single subsequent task), and
 this forgetting is \emph{output-side}. It concentrates in the classifier head and
 the late encoder layers: per-token CKA drift rises monotonically with depth (from
 $1.00$ at the input encoders to $0.25$ at the late layers and $0.16$ at the head) and the
@@ -94,8 +94,8 @@ one is answered by the BERT contrast and an adequately powered, distribution-tar
 test rather than by the underpowered scalar magnitude comparison of an earlier pass.
 
 The benchmark of continual-learning strategies confirms what this diagnosis predicts.
-Across the three scenarios the ordering is unambiguous---replay $\gg$ regularisation
-$\gg$ distillation---and it follows directly from \emph{where} forgetting lives:
+Across the three scenarios the ordering is unambiguous: replay $\gg$ regularisation
+$\gg$ distillation, and it follows directly from \emph{where} forgetting lives:
 because the damage is at the head, \emph{replay}, which re-exposes old-class targets at
 the output, is the most effective remedy. On domain-incremental learning both replay
 methods (ER, DER++) reach the joint upper bound (AA $\approx 88$ vs the oracle's $88.7$,
@@ -114,13 +114,13 @@ to tune; its headline configuration pairs this isolation with a compact 200-exem
 buffer. Measured over three seeds on domain-incremental learning, LexSlot
 \emph{approaches replay-level accuracy} (AA $87.3 \pm 1.0$ vs the oracle's $88.7$, within
 $\sim$1 point of ER/DER++) while forgetting \emph{less} than the plain replay methods (backward
-transfer $-2.3$ versus $-2.8$/$-3.4$)---with an order-of-magnitude smaller exemplar budget than
+transfer $-2.3$ versus $-2.8$/$-3.4$), with an order-of-magnitude smaller exemplar budget than
 the plain replay methods. The honest finding is
-that diagnosis-driven head/late targeting is competitive with---but does not exceed---data replay
+that diagnosis-driven head/late targeting is competitive with, but does not exceed, data replay
 on the domain shift, with the chief advantage being qualitative: replay-level retention
 at a small fraction of the exemplar budget. A depth-targeting probe supports the locus as a budget-placement claim (a fixed
 consolidation budget recovers $\sim$85 AA when concentrated on the head/late locus but
-under-fits and collapses to $42.6$ AA when spread uniformly across depth---though the uniform
+under-fits and collapses to $42.6$ AA when spread uniformly across depth, though the uniform
 variant forgets no more, it simply cannot fit the tasks), and LexSlot's own placement ablation
 reproduces the accuracy ordering with the slot mechanism; a direct freezing intervention is left
 as the cleaner causal control.
@@ -129,20 +129,20 @@ domain-incremental scenario and LayoutLMv3, with the multi-scenario and multi-ba
 confirmation the pending grid (\S\ref{sec:concl-future}). The diagnostic
 contribution stands on its own regardless: it provides a reusable
 tool and a shared benchmark for studying forgetting in multimodal document
-encoders---together with the finding that replay remains the strongest single
-remedy---which the prior, fragmented literature lacked.
+encoders (together with the finding that replay remains the strongest single
+remedy), which the prior, fragmented literature lacked.
 
 \section{Future Work}
 \label{sec:concl-future}
 
 The convergence-trained grid is now complete, and the measured result is that
 the head/late-targeted LexSlot approaches replay with a compact 200-exemplar buffer on the domain shift, forgetting
-less than the plain replay methods---competitive with but not beating the strongest replay
-variant---while the depth-targeting probe and LexSlot's placement ablation support
+less than the plain replay methods, competitive with but not beating the strongest replay
+variant, while the depth-targeting probe and LexSlot's placement ablation support
 H\textsubscript{target} and H\textsubscript{head}. The
 benchmark now spans five scenarios, including large-scale class-incremental learning
 (WildReceipt) and cross-lingual domain-incremental learning (XFUND); the cross-lingual
-result---near-zero forgetting under pure language shift (naive BWT only $-6.6$)---further
+result, near-zero forgetting under pure language shift (naive BWT only $-6.6$), further
 corroborates the output-side thesis. Beyond that, several extensions
 follow naturally and are reserved for post-thesis work; each is a future direction
 rather than part of the present AAAI-phase scope.
@@ -150,15 +150,15 @@ rather than part of the present AAAI-phase scope.
 \emph{Scaling and broadening the diagnosis.} The controlled diagnosis is
 established for an encoder-only, base-scale backbone. A natural next step is to
 re-run the same per-component protocol on larger and architecturally different
-backbones---LayoutLMv3-large, the multilingual LayoutXLM, and decoder-based or
-instruction-tuned document MLLMs such as InternVL3---to test whether the
+backbones: LayoutLMv3-large, the multilingual LayoutXLM, and decoder-based or
+instruction-tuned document MLLMs such as InternVL3, to test whether the
 dominant-forgetting locus is a property of the LayoutLMv3-base design or a more
 general feature of tri-modal document encoders. A particularly important extension
 is to a \emph{two-stream} backbone (for example LiLT, whose text and layout streams
 are physically separate parameter blocks): there the per-stream \emph{attention}
 decomposition that a single-stream encoder cannot support becomes identifiable, so
-the modality-partitioned mechanisms set aside in \S\ref{sec:method-design-space}---component-banked
-LoRA and modality-routed prompts---could be evaluated on signals that genuinely
+the modality-partitioned mechanisms set aside in \S\ref{sec:method-design-space}, component-banked
+LoRA and modality-routed prompts, could be evaluated on signals that genuinely
 exist. Decoder-based encoders are especially interesting because their generative
 objective and tokenisation differ markedly from the sequence-labelling setup used
 here.
@@ -175,7 +175,7 @@ cross-lingual domain-incremental scenario over XFUND
 (de\,$\rightarrow$\,es\,$\rightarrow$\,fr\,$\rightarrow$\,it\,$\rightarrow$\,zh,
 \S\ref{sec:exp-extended}) and a larger-scale class-incremental scenario over
 WildReceipt, so language shift and corpus scale are now first-class axes rather than
-gaps. The open question these enable---left for deeper analysis---is whether the
+gaps. The open question these enable, left for deeper analysis, is whether the
 per-component diagnosis itself shifts under language change: when script and
 vocabulary change while layout statistics stay comparatively stable, does forgetting
 move toward the text pathway, or does it remain output-side as in the English
