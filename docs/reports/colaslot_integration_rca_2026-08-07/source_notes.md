@@ -289,6 +289,127 @@ when prototypes fit on the other replay documents improve held-out replay over b
 operationalizes the stability-gap/prototype literature while preventing an owner such as SROIE
 from entering the read path solely because its entity-support detector is precise.
 
+### CoLaSlot-Proto-U result and RCA
+
+The LODO owner-utility successor reproduced all CoLaR checkpoints and finished exactly equal to
+the base: AA 60.7895952, AF 41.0471861, final [44.3218852, 41.3393964, 96.7075038]. Both owners
+tied base/prototype token F1 at 100/100 on leave-one-document-out replay and were disabled. The
+gate is therefore safe but inert. Its proxy is fundamentally saturated: stored training documents
+remain perfectly classified while held-out old-domain F1 collapses. No threshold, rank, d50, or
+seed sweep is justified. The next bounded test returns to CoLaSlot-R's large +14.02 AA signal and
+changes only slot lifecycle: at stage evaluation, suppress the newest owner so slots act as aged
+retention memories and current-domain acquisition falls back exactly to CoLaR.
+
+### CoLaSlot-Age preflight
+
+The age-only lifecycle was killed on matched single FUNSD: both ordinary slots-on and newest-owner
+slots-off score 86.1225478, versus pure CoLaR 87.2930867. The current slot contributes exactly
+zero at inference; shared-weight co-adaptation during joint slot/base training causes the loss.
+No DIL run is justified. The next mechanism must optimize an exact slots-off CoLaR loss and a
+slot-only detached sidecar loss, select checkpoints on base-only validation, and expose sidecars
+only after their owner task ages.
+
+### CoLaSlot-Sidecar result and RCA
+
+The separated head-sidecar gate reproduced every CoLaR validation checkpoint exactly, proving RNG,
+gradient, clipping, and checkpoint isolation. It finished at AA 60.7587641, AF 41.0934327, final
+[44.3218852, 41.2469034, 96.7075038]. Exact deltas are -0.0308310 AA, -0.0462465 old-domain
+mean, and [0.0000000, -0.0924931, 0.0000000]. Runtime is 5,762.27 s, peak VRAM 2,423.97 MB,
+and replay memory 3,265,920 bytes. The sidecar is a NO-GO; do not promote or sweep it.
+
+Mechanism: hard-label head sidecars train during acquisition but become redundant as the exact
+CoLaR head fits the same task. The original coupled CoLaSlot-R signal must therefore include
+upper-layer co-adaptation that a detached linear head cannot represent. The only admitted
+successor changes capacity, not supervision or routing: enable the existing late representation
+slots under the same separated objective and aged-read policy.
+
+### CoLaSlot-Shadow preregistration
+
+1. The detached head sidecar is redundant, while the coupled CoLaSlot-R trajectory supplies the
+   only large integration signal: versus cheap CoLaR it changes final FUNSD/SROIE by
+   +19.987/+22.929 F1 and micro precision by +25.695/+28.859 points. Its -0.842 CORD acquisition
+   loss is isolated by keeping the exact CoLaR path as the newest/abstained fallback.
+2. Keep the exact CoLaR base objective, replay sample, optimizer, RNG stream, early-stop
+   validation, owner head slots, lexical router, and aged-read policy. Add one shared rank-16
+   representation residual at each plastic layer `k..11`; train this shadow and the owner head
+   slots on the same current+replay batch while base parameters are frozen. This adds 196,608
+   parameters at k4 (about 0.16% of LayoutLMv3-base), not another model or replay sample.
+3. This is the smallest project-specific test of the shared/specific low-rank pattern supported by
+   BranchLoRA (ACL 2025), D-MoLE (ICML 2025), MoLE-CIE (Findings EMNLP 2025), and MoBLoRA
+   (ACL 2026). Those works use different MCIT/LLM-IE protocols and do not establish document-DIL
+   efficacy or novelty. MoBLoRA's orthogonal bases and task-specific mixing remain a successor,
+   not part of this gate.
+4. First require matched single-FUNSD AA 87.293087, proving constructor/forward RNG and base
+   optimization remain exact. Then run one DIL/LayoutLMv3 seed-42 k4/d5/r64/5-epoch gate. GO
+   requires AA >= +0.5, old-domain mean >= +1.0, every domain >= -0.5, and non-negative
+   micro-precision deltas on both old domains. No LR, rank, router, margin, or depth sweep.
+5. Passing the cheap gate permits only matched d50/r128 seed 42; passing that permits seeds 7/123.
+   A protocol-specific best/SOTA claim still requires the matched multi-seed comparator audit.
+
+### CoLaSlot-Sidecar-Late result and RCA
+
+The matched gate reproduced all CoLaR validation checkpoints but finished at AA 59.0501791, AF
+43.7143455, and [43.4562911, 36.8706719, 96.8235744]. Against exact CoLaR, deltas are
+-1.7394160 AA, -2.6671593 old-domain mean, and [-0.8655941, -4.4687245, +0.1160706].
+After task 1, FUNSD was already 51.8841482 versus 54.0942928 (-2.2101446). Runtime was
+6,081.79 seconds, peak VRAM 2,458.46 MB, and replay memory 3,265,920 bytes. The generic
+per-class artifact is base-only because it bypassed method routing, so it is not used for
+precision claims. The exporter is fixed for future routed runs.
+
+Verdict: more detached capacity does not recover the original coupled CoLaSlot-R mechanism.
+Head-only sidecars are redundant and head+late sidecars overgeneralize. Close this family.
+
+### CoLaSlot-Shadow preflight
+
+The exact-base preflight matches the prior single-FUNSD control at every epoch:
+[74.4608, 77.4285, 84.8719, 86.4012, 87.2931], with final AA 87.2930867. Runtime is
+305.19 seconds, peak VRAM 2,427.24 MB, and the shadow adds exactly 196,608 parameters at k4.
+This passes the preregistered invariance requirement and authorizes one matched cheap DIL gate.
+
+### CoLaSlot-Shadow-Replay preregistration
+
+The shared-shadow gate exposed an objective/read-policy mismatch before its final boundary:
+after task 1, FUNSD is 50.13 versus CoLaR 54.09. Current examples dominate the observed shadow
+loss while the age policy suppresses that branch on the current domain and exposes it only to old
+domains. The only admitted correction turns the shadow off for current examples and trains it on
+the already-sampled replay batch; owner heads, exact CoLaR training, routing, rank, depth, and LR
+stay fixed.
+
+First require exact single-FUNSD 87.293087. In DIL, continue past task 1 only if SROIE remains the
+exact CoLaR fallback 80.833333 and FUNSD reaches at least 54.594293 (+0.5). A pass retains the
+existing final gates: AA +0.5, old-domain mean +1.0, every domain >= -0.5, and non-negative old
+micro-precision deltas. Failure closes shared replay shadows; no rank/LR/depth/router sweep.
+
+### CoLaSlot-Shadow result and RCA
+
+The matched gate reproduced every CoLaR validation checkpoint but finished at AA 57.5962983,
+AF 45.8371314, and [41.1618669, 34.9195241, 96.7075038]. Against exact CoLaR, deltas are
+-3.1932969 AA, -4.7899453 old-domain mean, and [-3.1600183, -6.4198723, 0.0000000]. FUNSD
+was already -3.9686647 after SROIE. Both old-domain precision guardrails fail: micro precision
+changes -3.5954029 FUNSD and -6.1184315 SROIE; SROIE recall changes only -0.1380262, locating
+its loss mainly in false positives.
+
+The base path is exactly isolated, CORD is exact, and JSON equals matrix.npy. Runtime is
+9,406.21 seconds (+77.95% versus CoLaR), peak VRAM 2,427.27 MB, and replay memory 3,265,920
+bytes. Mean task-1 current CE is 0.065781 versus replay 0.001981 (33.2x), proving that newest
+gradients dominate a shared branch later read only by aged owners. This is a NO-GO: no d50,
+seeds, or hyperparameter sweep. Only the preregistered replay-only correction remains admissible.
+
+### 2026-08-16 adapter-literature boundary
+
+- Latent-LoRA (arXiv:2607.23837, July 2026 preprint) freezes one compact SVD-subspace adapter per
+  task and routes with Gaussian mixtures over frozen token embeddings. It explicitly reports that
+  indiscriminately summing task adapters causes interference. This is the closest new item missing
+  from the CL4IE graph, but its text-generation benchmarks, replay-free protocol, and adapter
+  parameterization are not comparable to document-DIL token classification.
+- CL-LoRA (CVPR 2025) separates shared early-block adapters from task-specific late-block adapters
+  and adds distillation plus orthogonality. TUNA (ICCV 2025) combines separately trained
+  task-specific and fused universal adapters with entropy-based selection. MoLE-CIE (Findings of
+  EMNLP 2025) routes token-level LoRA experts with task keys and distills the router.
+- These works support explicit sharing boundaries and protected routing, not the current shadow's
+  newest-gradient/aged-read mismatch. Owner-specific shadows or a different router become
+  admissible only after replay-only training first shows a retention signal under the fixed gate.
+
 ## Historical successor preregistration
 
 - Recommended concept: **CoLaSlot-RF**, a retention-only, post-task head-slot refit.

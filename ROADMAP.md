@@ -104,6 +104,61 @@ and SROIE crosses the -0.5 safety floor. Support precision alone cannot detect o
 readout harm. Close scale/rank sweeps and promotion; admit one bounded successor only: LODO
 owner-utility gating that disables prototype owners unless held-out replay improves.
 
+### CLOSED (2026-08-15): CoLaSlot-Proto-U owner-utility gate
+
+LODO utility rejected both old owners because base and prototype replay F1 tied at 100/100. The
+result is exact CoLaR: 60.7896 AA and [44.3219, 41.3394, 96.7075]. The proxy is saturated on
+memorized replay documents and cannot predict held-out utility. Close prototype gates and sweeps.
+One bounded successor is admitted: age-aware CoLaSlot-R reads that suppress the newest owner at
+stage evaluation, preserving exact current-task acquisition while retaining older slot reads.
+
+### CLOSED (2026-08-15): CoLaSlot-Age read lifecycle
+
+Single-FUNSD slots-on and newest-slots-off both equal 86.1225, below CoLaR 87.2931. The current
+slot is inference-inert and the regression is training co-adaptation, so read gating cannot fix it.
+Close before DIL. A successor must separate base and sidecar gradients.
+
+### CLOSED (2026-08-15): CoLaSlot-Sidecar separated head slots
+
+The exact matched gate gives 60.7588 AA and [44.3219, 41.2469, 96.7075], or -0.0308 AA versus
+CoLaR. Base checkpoints are exact, proving separation works; head-only sidecars are redundant and
+slightly harm SROIE. Close d50/seeds. One capacity discriminator remains: reuse the same method
+with existing `head_late` representation slots to model the missing co-adapted upper-layer branch.
+
+### CLOSED (2026-08-16): CoLaSlot-Sidecar late capacity
+
+The head+late discriminator gives 59.0502 AA and [43.4563, 36.8707, 96.8236], or -1.7394 AA and
+-2.6672 old-domain mean versus exact CoLaR. Detached head capacity is redundant; detached
+representation capacity overgeneralizes. Close depth/rank/LR sweeps and the detached-sidecar family.
+
+### CLOSED (2026-08-16): CoLaSlot-Shadow replay-trained branch
+
+A 196,608-parameter shared rank-16 residual now co-adapts on the same current+replay sample while
+the exact CoLaR base remains the newest/abstained fallback. Single-FUNSD matches all control
+checkpoints and final 87.293087 exactly. The preregistered k4/d5/r64 seed-42 DIL gate is running;
+no d50/r128 or extra seeds unless it passes every fixed efficacy, domain, and precision guard.
+
+The task-1 boundary is already adverse: FUNSD 50.13 versus exact CoLaR 54.09. Code tracing shows
+current-task gradients dominate a shared branch that the age policy suppresses on current data and
+reads only for old domains. One preregistered correction is ready: `colaslot_shadow_replay` trains
+that branch only on replay. It must match single FUNSD exactly, then reach FUNSD 54.594293 with
+exact SROIE 80.833333 after task 1 to justify running CORD. No hyperparameter sweep.
+
+Final result: 57.5963 AA and [41.1619, 34.9195, 96.7075], or -3.1933 AA and -4.7899
+old-domain mean versus CoLaR. Old-domain precision falls 3.60/6.12 points; SROIE recall is nearly
+unchanged, so the shadow produces unsupported false positives. Runtime is +77.95%. Close d50,
+seeds, rank/depth/LR/router sweeps.
+
+### GO (2026-08-16): CoLaSlot-Shadow-Replay bounded correction
+
+The one admitted correction removes newest-task representation gradients while retaining the exact
+base, owner heads, replay sample, rank, depth, LR, and router. Preflight matched single-FUNSD
+exactly; task-1 gate passed (FUNSD 56.1296 >= 54.594293, exact SROIE 80.833333). Final
+**62.7027 AA / [46.4097, 44.8750, 96.8236]** — deltas vs exact CoLaR **+1.9131 AA**,
+**+2.8117 old-domain mean**, all domains >= -0.5, old micro-precision **+2.35/+3.80**. All four
+final guards pass. Next admissible step per prereg: d50/r128 and extra seeds (no
+rank/depth/LR/router sweep). Evidence: `results/dil_colaslot_shadow_replay_seed42_k4/`.
+
 ### CLOSED (2026-08-15): CoLaSlot-RO online hard-label gate
 RO preserves the exact same-state base trajectory but changes final domains by only
 [-0.054, +0.026, 0.000], giving -0.009 AA and -0.014 old-domain mean. Owner CE is
