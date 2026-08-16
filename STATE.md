@@ -1,5 +1,24 @@
 # STATE
 
+## GO (2026-08-16): CoLaSlot-Shadow-Replay bounded correction
+
+The replay-only shadow gate **passes every preregistered guard** — the first positive in the
+CoLaSlot successor chain. Task-1 continuation gate held: FUNSD **56.129624** (>= 54.594293) with
+exact SROIE **80.833333**. Final result **62.702740 AA / 38.235500 AF /
+[46.409675, 44.874972, 96.823574]** versus exact CoLaR 60.789595 / [44.321885, 41.339396,
+96.707504]: deltas **+1.913145 AA** (>= +0.5), **+2.811683 old-domain mean** (>= +1.0), per-domain
+**[+2.087790, +3.535575, +0.116071]** (all >= -0.5), and old micro-precision deltas
+**+2.3490 FUNSD / +3.8038 SROIE** (both non-negative; SROIE recall -0.2761, so the gain is
+precision-led — the shared-shadow false-positive failure mode is reversed). Runtime 9,395.12 s
+(+77.74%), peak VRAM 2,427.27 MB, replay memory 3,265,920 bytes. matrix.npy equals metrics.json.
+Evidence: `results/dil_colaslot_shadow_replay_seed42_k4/`,
+`results/gates/colaslot_shadow_replay_d5_e5.log`.
+
+RCA of the pass: training the shared rank-16 branch only on replay aligns its gradient exposure
+with its read policy (aged owners only), removing the newest-gradient domination (33.2x CE ratio)
+that sank the shared-shadow gate. Per prereg, the pass unlocks the scale-up ladder previously
+barred: d50/r128 and extra seeds are now admissible; rank/depth/LR/router sweeps remain closed.
+
 ## DONE (2026-08-15): thesis results update; CoLaSlot-RF record corrected
 
 **Correction:** CoLaSlot-RF's raw AA 72.42 was previously compared with an older CoLaR run at
@@ -98,6 +117,81 @@ helps FUNSD while owner 1 harms SROIE despite both final support gates reporting
 The next bounded test is owner-level leave-one-document-out prototype-utility gating, not a global
 scale sweep. Evidence: results/dil_colaslot_proto_seed42/, results/gates/colaslot_proto_d5_e5.log,
 and the preserved RNG-contaminated artifacts.
+
+## NO-GO (2026-08-15): CoLaSlot-Proto-U owner-utility gate
+
+The matched k4/d5/r64/5-epoch gate finished at the exact slot-free CoLaR result:
+**60.789595 AA / 41.047186 AF / [44.321885, 41.339396, 96.707504]**. Training reproduced every
+CoLaR checkpoint, including CORD **94.9140, 95.4755, 94.2226, 96.7075, 96.0308**. Owner-level
+leave-one-document-out replay utility tied base and prototype token F1 at **100.00/100.00** for
+both old owners, so both prototype reads were disabled. Runtime was 6,747.80 s, peak VRAM
+2,426.20 MB, and replay memory 3,296,760 bytes.
+
+This is a safe but inert NO-GO: replay documents are perfectly memorized even while held-out
+old-domain F1 falls to 44.32/41.34, so training-memory utility cannot estimate test-time readout
+utility. Do not sweep thresholds, rank, d50, or seeds. Close prototype/readout gating on this
+memory. Return to the only large positive integration signal, CoLaSlot-R, and test the minimal
+age-aware lifecycle: train slots normally but read only owners older than the current task, so
+current-domain acquisition is exact CoLaR while old-domain slots supply retention.
+
+## NO-GO (2026-08-15): CoLaSlot-Age read lifecycle
+
+A matched single-FUNSD preflight falsified the age-only premise before DIL. Newest-owner slots off
+and ordinary CoLaSlot-R slots on both score exactly **86.122548**, versus pure CoLaR
+**87.293087**. Thus the current slot is already inference-inert; the 1.170539 acquisition loss is
+training-time shared-weight co-adaptation. No DIL or sweep. Any successor must separate the exact
+CoLaR base gradient from slot learning, keep base-only validation, and read slots only after aging.
+
+## NO-GO (2026-08-15): CoLaSlot-Sidecar separated head slots
+
+The matched k4/d5/r64/5-epoch gate preserved every CoLaR validation checkpoint exactly but
+finished at **60.758764 AA / 41.093433 AF / [44.321885, 41.246903, 96.707504]**. Against exact
+CoLaR, deltas are **-0.030831 AA**, **-0.046247 old-domain mean**, and
+**[0.000000, -0.092493, 0.000000]**. The first aged read was already inert/slightly harmful:
+post-SROIE FUNSD 54.0323 versus CoLaR 54.0943. Runtime was 5,762.27 s, peak VRAM 2,423.97 MB,
+and replay memory 3,265,920 bytes. No d50/r128 or extra seeds.
+
+RCA: gradient/RNG separation solved acquisition safety, but head-only sidecars became redundant as
+the exact CoLaR head learned the same hard labels; their nonzero acquisition loss produced no
+held-out retention gain. The original CoLaSlot-R's +14.02 AA therefore depends on a co-adapted
+upper-layer branch, not a detachable head correction. Admit one bounded capacity discriminator:
+the same separated objective with existing `head_late` representation slots. Current-task reads
+remain off and the CoLaR base stays exact; no new router, target, memory, or optimizer is added.
+
+## NO-GO (2026-08-16): CoLaSlot-Sidecar late-capacity discriminator
+
+The matched k4/d5/r64/5-epoch gate preserved every CoLaR validation checkpoint but fell to
+**59.050179 AA / 43.714345 AF / [43.456291, 36.870672, 96.823574]**. Against exact CoLaR,
+deltas are **-1.739416 AA**, **-2.667159 old-domain mean**, and
+**[-0.865594, -4.468725, +0.116071]**. FUNSD was already -2.210145 after SROIE. Runtime was
+6,081.79 s, peak VRAM 2,458.46 MB, and replay memory 3,265,920 bytes.
+
+RCA: adding detached representation capacity amplifies owner-read overgeneralization rather than
+recovering the coupled signal; head-only is inert and head+late is harmful. Close detached-sidecar
+capacity, LR, rank, and depth sweeps. The remaining causal hypothesis is a replay-trained low-rank
+shadow branch that can co-adapt while the exact CoLaR base remains the newest/abstained fallback.
+
+## NO-GO (2026-08-16): CoLaSlot-Shadow exact-base branch gate
+
+Implemented a shared rank-16 residual at every plastic layer, trained with owner head slots on the
+same current+replay sample while base parameters are frozen. It adds 196,608 parameters at k4
+(about 0.16%), preserves Python/Torch RNG and base gradients, and reuses the existing router.
+Single-FUNSD preflight matched every control checkpoint and final **87.293087 AA** exactly; the
+preregistered seed-42 k4/d5/r64/5-epoch DIL gate is running. Six focused tests, Ruff/Black, Hydra
+composition, and diff checks pass. The per-class exporter now enters each method's routed
+diagnostic context so future precision evidence reflects the method rather than its base fallback.
+
+Task 1 already gives FUNSD 50.13 versus CoLaR 54.09. The mechanism mismatch is explicit: current
+examples dominate training of a shadow that is suppressed for the current owner and later read by
+old owners. A minimal replay-only exposure fix is implemented and focused-tested. After the current
+gate finishes, it gets an exact single-FUNSD preflight and may continue beyond task 1 only at
+FUNSD >=54.594293 with exact SROIE 80.833333; failure closes shared shadows without sweeps.
+
+The final gate is **57.5963 AA / 45.8371 AF / [41.1619, 34.9195, 96.7075]**, versus CoLaR
+**60.7896 / [44.3219, 41.3394, 96.7075]**. It fails every efficacy and old-domain precision
+guard. SROIE precision falls 6.12 points while recall falls only 0.14, identifying false-positive
+overgeneralization. Runtime rises 77.95%. The replay-only single-FUNSD preflight is now running;
+no d50, seeds, or shadow hyperparameter sweep.
 
 ## NO-GO (2026-08-15): CoLaSlot-RO online hard-label drift tracking
 

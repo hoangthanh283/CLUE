@@ -12,6 +12,7 @@ import json
 import logging
 import random
 import time
+from contextlib import nullcontext
 from pathlib import Path
 
 import hydra
@@ -38,9 +39,12 @@ from doccl.methods.colaslot_fd import CoLaSlotFD
 from doccl.methods.colaslot_fda import CoLaSlotFDA
 from doccl.methods.colaslot_fdp import CoLaSlotFDP
 from doccl.methods.colaslot_proto import CoLaSlotProto
+from doccl.methods.colaslot_proto_u import CoLaSlotProtoUtility
 from doccl.methods.colaslot_ra import CoLaSlotRA
 from doccl.methods.colaslot_rf import CoLaSlotRF
 from doccl.methods.colaslot_ro import CoLaSlotRO
+from doccl.methods.colaslot_shadow import CoLaSlotShadow, CoLaSlotShadowReplay
+from doccl.methods.colaslot_sidecar import CoLaSlotSidecar
 from doccl.methods.coreset_memory import CoresetMemory
 from doccl.methods.cpfd import CPFD
 from doccl.methods.cuber import CUBER
@@ -251,10 +255,15 @@ METHOD_REGISTRY = {
     # the compressed-replay retention frontier before adding lexical routing.
     "colaslot": CoLaSlot,
     "colaslot_r": CoLaSlot,
+    "colaslot_sidecar": CoLaSlotSidecar,
+    "colaslot_sidecar_late": CoLaSlotSidecar,
+    "colaslot_shadow": CoLaSlotShadow,
+    "colaslot_shadow_replay": CoLaSlotShadowReplay,
     "colaslot_fd": CoLaSlotFD,
     "colaslot_fda": CoLaSlotFDA,
     "colaslot_fdp": CoLaSlotFDP,
     "colaslot_proto": CoLaSlotProto,
+    "colaslot_proto_u": CoLaSlotProtoUtility,
     "colaslot_ra": CoLaSlotRA,
     "colaslot_rf": CoLaSlotRF,
     "colaslot_ro": CoLaSlotRO,
@@ -513,6 +522,10 @@ def main(cfg: DictConfig) -> None:
         "colar",
         "colaslot",
         "colaslot_r",
+        "colaslot_sidecar",
+        "colaslot_sidecar_late",
+        "colaslot_shadow",
+        "colaslot_shadow_replay",
         "colaslot_fd",
         "colaslot_fda",
         "colaslot_fdp",
@@ -975,6 +988,10 @@ def main(cfg: DictConfig) -> None:
         "colar",
         "colaslot",
         "colaslot_r",
+        "colaslot_sidecar",
+        "colaslot_sidecar_late",
+        "colaslot_shadow",
+        "colaslot_shadow_replay",
         "colaslot_fd",
         "colaslot_fda",
         "colaslot_fdp",
@@ -994,7 +1011,9 @@ def main(cfg: DictConfig) -> None:
     }  # noqa: N806
     if cfg.method.name in _std_forward:
         try:
-            save_per_class_f1(out_dir, model, eval_loaders_seen, device)
+            context = getattr(method, "diagnostic_forward_context", nullcontext)
+            with context():
+                save_per_class_f1(out_dir, model, eval_loaders_seen, device)
         except Exception as e:  # never fail a run over a diagnostic
             log.warning("per-class F1 skipped: %s", e)
 
