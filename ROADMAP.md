@@ -161,9 +161,14 @@ final guards pass. Evidence: `results/dil_colaslot_shadow_replay_seed42_k4/`.
 The d50/r128 scale-up is a **NO-GO**: 86.5697 AA vs a matched CoLaR e5 control at 86.3829 —
 +0.1868 AA and +0.2802 old-domain mean, below the +0.5/+1.0 guards, at +76.78% runtime.
 The gain is a low-coverage phenomenon: at d50 CoLaR's replay saturates retention and the shadow
-is inert-positive. d5 GO stands as a mechanism finding. Remaining admissible: extra seeds at
-d5/r64 only. Evidence: `results/dil_colaslot_shadow_replay_seed42_k4_d50_r128/`,
+is inert-positive. Evidence: `results/dil_colaslot_shadow_replay_seed42_k4_d50_r128/`,
 `results/dil_colar_seed42_k4_d50_r128/`.
+
+Multi-seed d5 adjudication (2026-08-17): seeds 42/123 pass all guards (+1.91/+1.85 AA), seed 7
+inverts (−0.66); pooled +1.03 ± 1.20 AA, CI includes 0. **Chain closed**: the shadow branch is
+not promoted; the mechanism claim survives only as "low-coverage, seed-sensitive". Successor
+program: CA-CoLaR (`docs/PLAN_CACOLAR_2026-08-17.md`) — coverage-adaptive allocation, which
+does not depend on the shadow branch.
 
 ### CLOSED (2026-08-15): CoLaSlot-RO online hard-label gate
 RO preserves the exact same-state base trajectory but changes final domains by only

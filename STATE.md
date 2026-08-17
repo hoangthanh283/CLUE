@@ -1,5 +1,24 @@
 # STATE
 
+## MIXED (2026-08-17): CoLaSlot-Shadow-Replay d5/r64 multi-seed adjudication
+
+Seeds 7 and 123 ran with matched CoLaR controls (sequential queue, all rc=0). Per-seed deltas vs
+matched control: **seed 42 +1.9131 AA / +2.8117 old-mean** (all guards pass), **seed 7 −0.6565 /
+−0.9847** (guards FAIL — full inversion, precision deltas also negative), **seed 123 +1.8456 /
++2.7684** (all guards pass, gain concentrated in SROIE +4.985 with precision +5.007). Pooled:
+**+1.034 ± 1.196 AA**, **+1.532 ± 1.784 old-mean** (n=3; CI includes 0). Verdict: the d5
+replay-shadow effect is **real on average but not seed-robust** — 2/3 GO under the per-seed
+guards. Combined with the d50 NO-GO, the shadow branch stays closed as a method; the surviving
+claim is the mechanism statement (gradient/read-policy alignment can help only in the
+low-coverage regime, and not reliably). Evidence:
+`results/dil_colaslot_shadow_replay_seed{7,123}_k4/`, `results/dil_colar_seed{7,123}_k4/`,
+`results/gates/shadow_replay_seed_queue.log`.
+
+Note for CA-CoLaR (docs/PLAN_CACOLAR_2026-08-17.md): the plan's independence from the shadow
+branch is confirmed as the right call; the seed-7 inversion coincides with its control's high
+FUNSD retention (67.9 vs 44.3 at seed 42) — per-seed retention-need heterogeneity is itself
+response-surface input for plan task T1.
+
 ## GO (2026-08-16): CoLaSlot-Shadow-Replay bounded correction
 
 The replay-only shadow gate **passes every preregistered guard** — the first positive in the
