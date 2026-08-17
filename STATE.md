@@ -19,6 +19,26 @@ with its read policy (aged owners only), removing the newest-gradient domination
 that sank the shared-shadow gate. Per prereg, the pass unlocks the scale-up ladder previously
 barred: d50/r128 and extra seeds are now admissible; rank/depth/LR/router sweeps remain closed.
 
+## NO-GO (2026-08-17): CoLaSlot-Shadow-Replay d50/r128 scale-up
+
+The admitted d50/r128 seed-42 run finished at **86.569699 AA / [85.244292, 77.495108,
+96.969697]**. Against a freshly run matched CoLaR d50/r128 e5 control (**86.382931 AA /
+[85.265997, 76.913100, 96.969697]**), deltas are **+0.186768 AA** (< +0.5, FAIL),
+**+0.280151 old-domain mean** (< +1.0, FAIL), per-domain **[-0.021705, +0.582008, 0.000000]**
+(pass), and old micro-precision **+0.0995 FUNSD / +0.9312 SROIE** (pass). Runtime +76.78%
+(10,272.3 s vs 5,810.8 s), peak VRAM 2,414.7 MB, replay memory 61,017,600 bytes. matrix.npy
+equals metrics.json for both runs. Evidence:
+`results/dil_colaslot_shadow_replay_seed42_k4_d50_r128/`,
+`results/dil_colar_seed42_k4_d50_r128/` (new e5 control),
+`results/gates/colaslot_shadow_replay_d50_r128.log`, `results/gates/colar_d50_r128_e5_control.log`.
+
+RCA: the replay-shadow gain is a low-coverage phenomenon. At d5 the shadow recovers signal the
+sparse replay bank cannot (+1.91 AA, +2.81 old mean); at d50 CoLaR's own replay already saturates
+old-domain retention and the shadow adds only +0.19 AA at +77% runtime. The d5 GO stands as a
+mechanism finding (gradient/read-policy alignment), not a scalable method: at the canonical
+CoLaR operating point the correction is inert-positive and cost-dominated. Remaining admissible
+step: extra seeds at d5/r64 to confirm the low-coverage effect; no sweeps, no further scale-up.
+
 ## DONE (2026-08-15): thesis results update; CoLaSlot-RF record corrected
 
 **Correction:** CoLaSlot-RF's raw AA 72.42 was previously compared with an older CoLaR run at
