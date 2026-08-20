@@ -170,6 +170,21 @@ not promoted; the mechanism claim survives only as "low-coverage, seed-sensitive
 program: CA-CoLaR (`docs/PLAN_CACOLAR_2026-08-17.md`) — coverage-adaptive allocation, which
 does not depend on the shadow branch.
 
+### ACTIVE (2026-08-21): CA-CoLaR — coverage-adaptive replay allocation
+
+T1 response surface (free, from existing runs): the dials are separable and task-heterogeneous
+— coverage d5→d50 @r64 gives FUNSD +37.97 / SROIE +21.08 / CORD +0.41; fidelity r64→r128 @d50
+gives SROIE +14.49 / FUNSD +2.98; kcenter selection is null (R3 retired). Implemented
+`colar_adaptive` (per-task docs/rank schedules; empty schedules ≡ colar).
+
+T4 equal-byte gate (seed 42, 6.29 vs 6.41 MB): **+7.1052 AA, +11.1604 old-domain mean, −0.26%
+runtime, old micro-precision +10.90/+15.62** — but **CORD −1.0054 fails the ≥−0.5 per-domain
+guard** (CORD banks zero docs by design; the trade is +22.3 old-domain points for −1.0 on the
+task that never forgets). All three preregistered predictions HIT. **Next: one re-gate at
+docs=[20,5,2]** (token CORD bank, same budget) to test whether the guard failure is removable;
+pass → T5 (seeds 7/123, dil orders, cil_cord). The guard is mis-specified for zero-sum
+allocation gates but is NOT relaxed retroactively.
+
 ### CLOSED (2026-08-15): CoLaSlot-RO online hard-label gate
 RO preserves the exact same-state base trajectory but changes final domains by only
 [-0.054, +0.026, 0.000], giving -0.009 AA and -0.014 old-domain mean. Owner CE is
