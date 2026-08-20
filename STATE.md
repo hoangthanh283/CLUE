@@ -1,5 +1,35 @@
 # STATE
 
+## PARTIAL PASS (2026-08-21): CA-CoLaR T4 equal-byte allocation gate
+
+First CA-CoLaR gate (`docs/CACOLAR_T1_T2_2026-08-20.md`, preregistered before launch). Treatment
+`colar_adaptive` docs=[20,5,0] rank=[64,128,64] vs equal-byte uniform `colar` d10/r64, seed 42,
+dil k4/e5. Measured banks 6.29 MB vs 6.41 MB (treatment 1.9% SMALLER — parity holds; the doc·rank
+unit model is byte-exact since per-doc bytes (seq+d)·r·2 are linear in r).
+
+**Result: 79.0358 AA / [81.1966, 59.6685, 96.2423]** vs control **71.9307 / [70.2294, 48.3149,
+97.2477]**. Deltas **+7.1052 AA** (guard +0.5 PASS), **+11.1604 old-domain mean** (guard +1.0
+PASS), runtime **−0.26%** (guard +10% PASS), old micro-precision **+10.90 FUNSD / +15.62 SROIE**
+(secondary, both positive). **The per-domain guard FAILS: CORD −1.0054** (guard ≥ −0.5).
+All three falsifiable predictions HIT (FUNSD ≥ control+3, SROIE ≥ control, CORD ≥ 96).
+matrix.npy == metrics.json on both arms; both exited rc=0. Evidence:
+`results/dil_colar_adaptive_seed42/`, `results/dil_colar_seed42_k4_d10/`,
+`results/gates/cacolar_t4_{adaptive,uniform_d10}.log`.
+
+Verdict per prereg letter: **not a clean GO** — one guard fails. Substantively the effect is the
+largest allocation gain measured in this project (+7.1 AA at equal bytes, ~2× the old-domain
+retention of the shadow chain's best) and the CORD loss is the *designed* cost: CORD banks zero
+docs, so it keeps only what the frozen trunk plus current-task training provide. The trade is
++22.3 points of old-domain retention for −1.0 on the task that never forgets.
+
+RCA / next step: the guard was written for *augmentation* gates (add capacity, harm nothing),
+and is mis-specified for *allocation* gates where spending is necessarily zero-sum. Do NOT relax
+it retroactively for this run. Instead the admitted correction is one re-gate at
+docs=[20,5,2]/rank=[64,128,64] (2 CORD docs, still inside budget by shifting 2 FUNSD docs), which
+tests whether a token CORD bank recovers the −1.0 while keeping the old-domain gain. If it does,
+CA-CoLaR v1 passes cleanly and proceeds to T5 (seeds 7/123, dil orders, cil_cord); if the
+old-domain gain collapses, the allocation claim is coverage-only and the guard question is moot.
+
 ## MIXED (2026-08-17): CoLaSlot-Shadow-Replay d5/r64 multi-seed adjudication
 
 Seeds 7 and 123 ran with matched CoLaR controls (sequential queue, all rc=0). Per-seed deltas vs
