@@ -1,0 +1,13 @@
+name: colar_adaptive
+# CA-CoLaR: CoLaR with preregistered per-task (docs, rank) bank schedules under a fixed
+# doc*rank budget (see docs/CACOLAR_T1_T2_2026-08-20.md). Empty schedules == plain colar.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5        # fallback for tasks beyond the schedules
+replay_batch_size: 4
+rank_r: 64              # fallback rank
+docs_schedule: []       # per-task docs, e.g. [20, 5, 0]
+rank_schedule: []       # per-task rank, e.g. [64, 128, 64]

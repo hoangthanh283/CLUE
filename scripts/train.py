@@ -29,6 +29,7 @@ from doccl.methods.aglr_replay import AGLRReplay
 from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.colar import CoLaR
+from doccl.methods.colar_adaptive import CoLaRAdaptive
 from doccl.methods.colar_bal import CoLaRBal
 from doccl.methods.colar_cb import CoLaRCB
 from doccl.methods.colar_knn import CoLaRKNN
@@ -251,6 +252,9 @@ METHOD_REGISTRY = {
     # CoLaR: latent_replay with per-DOCUMENT rank-r SVD storage — d50 coverage at ~d5 bytes
     # (whole-doc binding preserved; per-doc matrices ARE low-rank though the pooled space isn't).
     "colar": CoLaR,
+    # CA-CoLaR: CoLaR with preregistered per-task (docs, rank) bank schedules under a
+    # fixed doc*rank budget (docs/CACOLAR_T1_T2_2026-08-20.md).
+    "colar_adaptive": CoLaRAdaptive,
     # CoLaR + isolated additive slots: tests whether task-specific capacity can break
     # the compressed-replay retention frontier before adding lexical routing.
     "colaslot": CoLaSlot,
@@ -986,6 +990,7 @@ def main(cfg: DictConfig) -> None:
         "coreset_memory",
         "proxy_latent_replay",
         "colar",
+        "colar_adaptive",
         "colaslot",
         "colaslot_r",
         "colaslot_sidecar",
