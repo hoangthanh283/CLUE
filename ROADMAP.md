@@ -229,7 +229,13 @@ tune against final test F1. Evidence:
    min/dil-run — too slow).
 2. **Evidence hygiene (blocks the paper table).** Clean grid re-run of the stale 1-epoch
    `dil_latent_replay_seed42` (64.9 → ~87 converged); regenerate the deleted 4-carrier
-   `dil_coreset_memory_seed42`; CoLaR seeds 7/123 + cil_cord; int8-on-factors probe (~30 MB @ r128).
+   `dil_coreset_memory_seed42`; ~~CoLaR seeds 7/123~~ **(DONE 2026-08-17** — `results/dil_colar_seed{7,123}_k4/`,
+   run as the shadow-replay matched controls**)** + cil_cord; int8-on-factors probe (~30 MB @ r128).
+   - *Provenance note (2026-08-22):* the cited latent-replay **87.3** is the **converged d5 k=8**
+     run (STATE "Exp #5"; contrast the 5-epoch diagnostics at 63.8). The `dil_latent_replay_seed*_k4`
+     dirs on disk are a *different* operating point (5ep, k=4, AA ≈ 76–81) and have no
+     `metrics.json` — so the headline is documented and internally consistent, but no artifact on
+     disk reproduces it. The re-run above is what closes that.
 3. **Write-up.** DONE for the thesis (2026-08-15, ch6 §6.6 + backbone/ch7 refresh — see STATE);
    the PAPER-side fold of Finding 3b + consistency-law figure remains. CoLaR positioned as the
    constructive control, PLaR as the bounded-negative.

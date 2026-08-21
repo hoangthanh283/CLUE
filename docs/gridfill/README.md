@@ -48,3 +48,11 @@ while ER revisits each domain through its buffer. Since "joint upper bound" is l
 language in the thesis, this needs either a protocol change (longer patience / pooled-val
 split) or an explicit disclosure that joint is a fixed-protocol reference, not a true bound.
 Worth checking whether the same inversion exists on LayoutLMv3 and BERT once the grid lands.
+
+## Marginal-memory failures (retry list, not a hard ceiling)
+
+`mixed_der_pp_seed7_lilt` OOMed at bs=1 on a 96 MiB allocation in task 0 epoch 1 — but
+seeds 42/123 of the same cell completed earlier, so this is marginal pressure (LiLT's 250k
+XLM-R embedding table + `mixed`'s longer concatenated sequences), not a structural limit.
+Retry with gradient accumulation (`training.gradient_accumulation_steps=2` at bs=1) rather
+than another batch-size cut. Tracked in `retry_jobs.txt`.
