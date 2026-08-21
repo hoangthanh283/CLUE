@@ -31,6 +31,31 @@ No third schedule (prereg: escalate-don't-iterate).
 
 # STATE
 
+## IN FLIGHT (2026-08-22): BROS/LiLT generality-grid fill
+
+**Running unattended:** `docs/gridfill/grid_fill.sh` (PID 2203423 this session), 67 local jobs,
+resume-safe (skips any run with `metrics.json`), logs to `results/gates/gridfill.log` and
+per-run `results/logs_gridfill_<run>.log`. ETA ~1–2 days from LiLT's measured 0.41 h median
+(`cil_cord` runs slower, ~1 h). **To resume after any interruption: just re-run the script** —
+it skips completed work. Full context, job lists, and traps: `docs/gridfill/README.md`.
+
+Coverage when this started → now: LayoutLMv3 6/6 and BERT 6/6 on all three scenarios (unchanged);
+LiLT dil 4/6 → **5/6 (local max)**, LiLT mixed 4/6 (+1 retry pending), LiLT cil_cord 0/6 → filling;
+BROS 0/6 everywhere → queued next. Validation so far is clean: LiLT cil_cord naive AA **18.89** vs
+LayoutLMv3 18.79 / BERT 19.39, with the textbook CIL collapse row `[0,0,0,0,94.47]` — head
+expansion works on LiLT and the naive floor reproduces across backbones.
+
+**Three carry-overs for the next session (none block the queue):**
+1. **18 `lwf` jobs need >6 GB VRAM** (`docs/gridfill/lwf_deferred_jobs.txt`). Hard ceiling: `lwf`
+   deepcopies the model into a frozen teacher, so two full LiLT/BROS backbones + optimizer state
+   coexist from task 1. Failed identically at bs=2 and bs=1. Rent, or disclose the gap.
+2. **Joint-oracle inversion, LiLT dil only** (joint 83.79 vs ER 85.65, DER++ 84.35, all 3 seeds).
+   LayoutLMv3, BERT, and LiLT mixed are all clean → footnote-scale disclosure or a patience/val
+   protocol change, not a crisis. Recheck after the grid lands.
+3. **`EPOCHS_CAP=100` is mandatory** for any hand-run job — every method config says `epochs: 10`
+   while the whole existing table was built at 100. Silent contamination otherwise (verified:
+   `dil_joint_seed7_lilt` 84.27@10ep vs 85.12@100ep).
+
 ## PARTIAL PASS (2026-08-21): CA-CoLaR T4 equal-byte allocation gate
 
 First CA-CoLaR gate (`docs/CACOLAR_T1_T2_2026-08-20.md`, preregistered before launch). Treatment
