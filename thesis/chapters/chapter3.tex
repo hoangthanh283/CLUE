@@ -488,9 +488,10 @@ independently of the remedy's margin regardless.
 The diagnosis fixes \emph{where} a remedy should act, the classifier head and late encoder
 layers (\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection}), and LexSlot is the
 mechanism this thesis puts there. The guiding question is whether the diagnosed locus can be
-protected by a \emph{parameter-efficient structured memory that stores no past inputs at all},
+protected by a \emph{parameter-efficient structured memory backed by only a small exemplar
+buffer} ($200$ inputs, an order of magnitude below the replay baselines' budget),
 rather than by a consolidation budget that keeps a frozen teacher in memory and rehearses stored
-inputs. LexSlot answers it with an \emph{isolated, write-once slot memory}: small additive slot
+inputs at scale. LexSlot answers it with an \emph{isolated, write-once slot memory}: small additive slot
 adapters placed at the head and late layers over a partially-frozen backbone (lower encoder
 frozen, head and late layers trainable), where each task writes its own slots and a drift-immune
 lexical signature gates both updates and activations so earlier tasks are protected
