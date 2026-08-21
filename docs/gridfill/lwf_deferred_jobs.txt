@@ -16,3 +16,6 @@ bros mixed lwf 123
 bros cil_cord lwf 42
 bros cil_cord lwf 7
 bros cil_cord lwf 123
+lilt cil_cord ewc 42
+lilt cil_cord ewc 7
+lilt cil_cord ewc 123

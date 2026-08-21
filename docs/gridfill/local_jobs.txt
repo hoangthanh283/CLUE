@@ -11,9 +11,6 @@ lilt cil_cord naive 123
 lilt cil_cord joint 42
 lilt cil_cord joint 7
 lilt cil_cord joint 123
-lilt cil_cord ewc 42
-lilt cil_cord ewc 7
-lilt cil_cord ewc 123
 lilt cil_cord er 42
 lilt cil_cord er 7
 lilt cil_cord er 123
