@@ -66,3 +66,22 @@ seeds 42/123 of the same cell completed earlier, so this is marginal pressure (L
 XLM-R embedding table + `mixed`'s longer concatenated sequences), not a structural limit.
 Retry with gradient accumulation (`training.gradient_accumulation_steps=2` at bs=1) rather
 than another batch-size cut. Tracked in `retry_jobs.txt`.
+
+## Batch-size heterogeneity in the existing table (found 2026-08-22)
+
+`mixed_der_pp_seed7_lilt` cannot be filled locally: its two completed siblings
+(`seed42`, `seed123`) were produced at **bs=16** on rented hardware, and the cell OOMs at
+bs=1–2 on the 6 GB box. Deferred with the other >6 GB jobs (**22 total**).
+
+Surveying the whole core-6 grid for recorded batch size:
+
+| backbone | recorded batch sizes | reading |
+|---|---|---|
+| LayoutLMv3 | `None` (54 runs) | metadata absent — `training_hparams` logging was added in `c974159`; NOT evidence of variation |
+| BERT | 2, plus `None` | same: the `None`s predate hparam logging |
+| **LiLT** | **16 and 2, both explicitly recorded, in `dil` and `mixed`** | **genuine within-cell variation** |
+
+Only the LiLT row is a real issue. Batch size affects optimization, so a bs=2 run does not
+sit cleanly beside a bs=16 run of the same cell. Before the paper table is final, either
+(a) re-run the LiLT bs=2 runs at bs=16 on adequate hardware, or (b) report the batch size
+per cell and argue the within-cell method ordering is unaffected. Do not silently mix them.
