@@ -31,13 +31,23 @@ JOBS=docs/gridfill/local_jobs.txt bash docs/gridfill/grid_fill.sh
    `method.epochs=${EPOCHS_CAP}` with a default of 100. Omitting it silently produces runs
    that are not comparable to the table. Verified real: `dil_joint_seed7_lilt` scored 84.27
    at the 10-epoch cap vs 85.12 at 100 (it early-stops at epoch 14).
-2. **`lwf` cannot run on LiLT/BROS at 6 GB, at any batch size.** It deepcopies the model into
-   a frozen teacher at each task boundary, so from task 1 onward two full backbones plus
-   optimizer state coexist (~1.1 GB of parameters each for LiLT's 250k XLM-R vocab). Both
-   bs=2 and bs=1 died on the identical 734 MiB allocation, at the same point (task 1, after
-   task 0 completed). This is a capacity ceiling, not a tuning knob — run these 18 on rented
-   hardware, or disclose the gap. `der_pp` does NOT deepcopy (it replays stored logits) and
-   runs fine.
+2. **The 6 GB VRAM boundary has one rule.** A method that must hold a *second full-size,
+   parameter-shaped tensor* alongside the live model fails on **LiLT at any batch size**;
+   methods holding only activations or stored logits recover at bs=1. The recurring symptom is
+   an identical **734 MiB** failed allocation — LiLT's 250k-row XLM-R embedding gradient buffer.
+
+   | method | second tensor | verdict on LiLT |
+   |---|---|---|
+   | `lwf` | deepcopied frozen teacher (per task boundary) | **defer** — dies at bs=2 *and* bs=1, task 1, all scenarios |
+   | `ewc` | Fisher diagonal over all params | **defer on `cil_cord` only** — 5 sessions + growing head; `dil`/`mixed` already completed fine |
+   | `der_pp` | stored logits (not params) | local, bs=1; one seed needed a retry (marginal) |
+   | `naive`/`joint`/`er` | none | local, bs=2 |
+
+   BROS is expected to survive `ewc` because it uses BERT's ~30k WordPiece vocab (≈1/8 of
+   LiLT's embedding table) — unverified at time of writing; the queue will settle it.
+   **21 jobs deferred** to >6 GB hardware: 18 `lwf` + 3 LiLT `cil_cord` `ewc`
+   (`lwf_deferred_jobs.txt`). Either rent, or disclose the gap in the reproducibility appendix —
+   the rule above is a clean statement of the hardware boundary.
 
 ## Open finding for the methodology section
 
