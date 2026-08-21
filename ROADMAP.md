@@ -180,10 +180,17 @@ gives SROIE +14.49 / FUNSD +2.98; kcenter selection is null (R3 retired). Implem
 T4 equal-byte gate (seed 42, 6.29 vs 6.41 MB): **+7.1052 AA, +11.1604 old-domain mean, −0.26%
 runtime, old micro-precision +10.90/+15.62** — but **CORD −1.0054 fails the ≥−0.5 per-domain
 guard** (CORD banks zero docs by design; the trade is +22.3 old-domain points for −1.0 on the
-task that never forgets). All three preregistered predictions HIT. **Next: one re-gate at
-docs=[20,5,2]** (token CORD bank, same budget) to test whether the guard failure is removable;
-pass → T5 (seeds 7/123, dil orders, cil_cord). The guard is mis-specified for zero-sum
-allocation gates but is NOT relaxed retroactively.
+task that never forgets). All three preregistered predictions HIT.
+
+A1 re-gate (2026-08-21, docs=[18,5,2], budget-neutral): **all four guards PASS** —
+**+4.0444 AA**, **+6.2923 old-domain mean**, min domain −0.4514, runtime −0.43%. Lands on the
+prereg's **Pareto-trade branch** (CORD prediction HIT by 0.05; old-domain ≥+8.0 MISSED at +6.29).
+Measured exchange rate: 2 CORD docs cost 4.87 old-domain points, buy back 0.55 CORD points (~9:1)
+— the guard-satisfying point is materially weaker than the guard-violating one, so the headline
+is the **frontier**, not a single schedule.
+
+**Next: T5** — seeds 7/123 + dil orders + cil_cord for the A1 schedule (the shadow chain's
+seed-fragility is the live risk). No third schedule per prereg (escalate-don't-iterate).
 
 ### CLOSED (2026-08-15): CoLaSlot-RO online hard-label gate
 RO preserves the exact same-state base trajectory but changes final domains by only
