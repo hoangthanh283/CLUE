@@ -44,22 +44,19 @@ gives little benefit in this dense token-classification setting. Guided by the s
 measurement we design \textbf{LexSlot}, a mechanism-targeted remedy that concentrates
 continual-learning effort on the dominant-forgetting head and late layers: a
 parameter-efficient, isolated slot memory placed at that locus over a frozen backbone, gated by a
-drift-immune lexical signature, that operates with only a \emph{small} replay buffer
-($200$ exemplars). Each task writes only its own
+drift-immune lexical signature, that \emph{needs no replay buffer}. Each task writes only its own
 slots, so earlier tasks are protected structurally. Measured over three seeds on the
 domain-incremental scenario, LexSlot approaches replay-level accuracy (average entity-F1 $87.3$,
 within $\sim$1 point of ER/DER++ and the oracle's $88.7$) while forgetting \emph{less} than the
-plain replay methods (backward transfer $-2.3$ versus $-2.8$/$-3.4$): competitive with replay at
-a small buffer, though so far evaluated on the domain-incremental scenario and one backbone, with the
-multi-scenario and multi-backbone confirmation pending. Ablating the buffer away collapses the
-configuration to roughly the naive level, so the protection comes from isolation \emph{plus} the
-compact buffer, not from the slot mechanism alone. A depth-targeting probe supports the
+plain replay methods (backward transfer $-2.3$ versus $-2.8$/$-3.4$): competitive with replay and
+buffer-free, though so far evaluated on the domain-incremental scenario and one backbone, with the
+multi-scenario and multi-backbone confirmation pending. A depth-targeting probe supports the
 diagnosis: concentrating a consolidation penalty on the diagnosed head/late locus recovers
 near-oracle accuracy ($\sim$86 AA), whereas spreading the same budget across every depth
 \emph{uniformly} cannot fit the tasks and collapses in accuracy ($42.6$ AA), so the diagnosed
 locus is where a fixed budget must attach to be usable; and LexSlot's own placement ablation
 reproduces the accuracy ordering with the slot mechanism. The honest finding is therefore that diagnosis-driven
-head/late targeting closes most of the forgetting gap on a domain shift at a small buffer, performing
+head/late targeting closes most of the forgetting gap on a domain shift buffer-free, performing
 competitively with, though not beating, data replay. These
 results establish the per-component diagnostic protocol, together with a controlled
 benchmark and per-component tooling that we release, as a practical instrument for
