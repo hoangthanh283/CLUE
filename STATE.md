@@ -1,3 +1,34 @@
+## GO — Pareto branch (2026-08-21): CA-CoLaR A1 re-gate passes all four guards
+
+Amendment A1 (`docs/CACOLAR_T1_T2_2026-08-20.md`, preregistered before launch): treatment
+docs=[18,5,2] rank=[64,128,64], budget-neutral vs T4 (1,920 units), adjudicated against the
+already-completed equal-byte uniform d10/r64 control.
+
+**Result: 75.9751 AA / [76.5283, 54.6006, 96.7963]** vs control 71.9307 / [70.2294, 48.3149,
+97.2477]. **+4.0444 AA** (guard +0.5 PASS), **+6.2923 old-domain mean** (guard +1.0 PASS),
+**min domain −0.4514** (guard −0.5 **PASS** — the CORD failure is removed), runtime −0.43%
+(PASS). Banks 6.29 vs 6.41 MB. matrix.npy == metrics.json; rc=0. Evidence:
+`results/gates/cacolar_a1/`, `results/gates/cacolar_a1.log`.
+
+Predictions: CORD ≥ control−0.5 **HIT** (96.7963 vs 96.7477, by 0.05 — narrow); old-domain mean
+≥ +8.0 **MISS** (+6.29). Per the prereg's own decision rule this is therefore the **Pareto-trade
+branch, not the clean-GO branch**: the headline is a frontier, not a point.
+
+The frontier, measured (both budget-neutral, vs the same control):
+| schedule | AA | old-dom mean | CORD | guards |
+|---|---|---|---|---|
+| [20,5,0] (T4) | +7.1052 | +11.1604 | −1.0054 | 3/4 (CORD fails) |
+| [18,5,2] (A1) | +4.0444 | +6.2923 | −0.4514 | **4/4** |
+Two CORD documents cost 4.87 old-domain points and buy back 0.55 CORD points — a ~9:1 exchange
+rate. The allocation effect is real and large in both arms; what the guard selects is where on
+the frontier to sit, and the guard-satisfying point is materially weaker than the guard-violating
+one. This is evidence that the per-domain guard, written for augmentation gates, prices zero-sum
+allocation badly — but the rule was fixed in advance and A1 is the admitted result.
+
+Status: CA-CoLaR v1 is a **GO on the Pareto branch** → proceed to T5 (seeds 7/123, dil orders,
+cil_cord). Seed-fragility warning from the shadow chain applies: T5 decides whether this holds.
+No third schedule (prereg: escalate-don't-iterate).
+
 # STATE
 
 ## PARTIAL PASS (2026-08-21): CA-CoLaR T4 equal-byte allocation gate
