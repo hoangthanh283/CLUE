@@ -22,12 +22,6 @@ bros dil joint 123
 bros dil ewc 42
 bros dil ewc 7
 bros dil ewc 123
-bros dil er 42
-bros dil er 7
-bros dil er 123
-bros dil der_pp 42
-bros dil der_pp 7
-bros dil der_pp 123
 bros mixed naive 42
 bros mixed naive 7
 bros mixed naive 123
@@ -37,12 +31,6 @@ bros mixed joint 123
 bros mixed ewc 42
 bros mixed ewc 7
 bros mixed ewc 123
-bros mixed er 42
-bros mixed er 7
-bros mixed er 123
-bros mixed der_pp 42
-bros mixed der_pp 7
-bros mixed der_pp 123
 bros cil_cord naive 42
 bros cil_cord naive 7
 bros cil_cord naive 123
@@ -52,9 +40,3 @@ bros cil_cord joint 123
 bros cil_cord ewc 42
 bros cil_cord ewc 7
 bros cil_cord ewc 123
-bros cil_cord er 42
-bros cil_cord er 7
-bros cil_cord er 123
-bros cil_cord der_pp 42
-bros cil_cord der_pp 7
-bros cil_cord der_pp 123
