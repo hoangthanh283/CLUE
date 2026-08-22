@@ -4,7 +4,6 @@ lilt dil joint 123
 lilt mixed joint 42
 lilt mixed joint 7
 lilt mixed joint 123
-lilt mixed der_pp 7
 lilt cil_cord naive 42
 lilt cil_cord naive 7
 lilt cil_cord naive 123
@@ -14,9 +13,6 @@ lilt cil_cord joint 123
 lilt cil_cord er 42
 lilt cil_cord er 7
 lilt cil_cord er 123
-lilt cil_cord der_pp 42
-lilt cil_cord der_pp 7
-lilt cil_cord der_pp 123
 bros dil naive 42
 bros dil naive 7
 bros dil naive 123

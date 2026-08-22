@@ -31,6 +31,24 @@ No third schedule (prereg: escalate-don't-iterate).
 
 # STATE
 
+## FINDING (2026-08-22): the naive forgetting signature is four-backbone general
+
+First BROS run ever completed. `dil` naive, seed 42, across all four backbones:
+
+| backbone | architecture | AA | FUNSD | SROIE | CORD |
+|---|---|---|---|---|---|
+| LayoutLMv3 | tri-modal (text+layout+vision) | 40.06 | 18.3 | 4.3 | 97.6 |
+| BERT | text only | 39.41 | 16.1 | 5.0 | 97.1 |
+| LiLT | decoupled text+layout | 40.68 | 20.8 | 3.1 | 98.1 |
+| **BROS** | order-robust text+layout | **40.84** | 21.1 | 4.1 | 97.3 |
+
+All four within **1.4 AA**, with near-superimposable final rows: total collapse on the two older
+domains, near-perfect retention on the newest. This is the widest architectural span the project
+has tested and it directly answers the reviewer objection the ROADMAP flags as bounding the
+paper ("a negative result on ONE setup is not a finding"). Same pattern already confirmed on
+`cil_cord` naive (LiLT 18.89 vs LayoutLMv3 18.79 vs BERT 19.39) and joint (LiLT 32.44 vs 33.32 /
+32.41). BROS is also cheap: 26.8 min/run, 4,617 MB peak (≈1 GB more headroom than LiLT).
+
 ## IN FLIGHT (2026-08-22): BROS/LiLT generality-grid fill
 
 **Running unattended:** `docs/gridfill/grid_fill.sh` (PID 2203423 this session), 67 local jobs,
