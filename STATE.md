@@ -31,6 +31,31 @@ No third schedule (prereg: escalate-don't-iterate).
 
 # STATE
 
+## FINDING (2026-08-23): generality holds for the PHENOMENON, not for every REMEDY
+
+Two four-backbone results that must be stated together, because they point different ways.
+
+**(a) The forgetting phenomenon is architecture-invariant.** On `mixed`, the joint→naive
+forgetting gap is +33.65 (LayoutLMv3), +31.63 (BERT), +31.11 (LiLT), +31.42 (BROS) — a 2.5-point
+spread across a tri-modal encoder, a text-only encoder, and two text+layout encoders, despite
+~10 points of difference in absolute capability (BERT sits lowest throughout; the three
+layout-aware backbones cluster at 30.7–33.9 naive). *How much is lost to sequential training is
+conserved under architectural variation* — a sharper claim than raw AA convergence, and close to
+the conservation framing the thesis already uses for locus migration.
+
+**(b) A remedy's effectiveness is NOT.** EWC on `mixed`, benefit vs naive:
+LayoutLMv3 **−11.81** (actively harmful), LiLT −2.60, BROS **+3.52**, BERT **+5.27** — a 17-point
+spread with a sign flip. EWC harming a strong backbone is consistent with regularization fighting
+plasticity, and ch4/ch7 already report EWC as weak off domain-shift; but the *cross-backbone sign
+flip* is new and the current write-up does not capture it.
+
+Reading: this strengthens rather than weakens the diagnostic framing — a remedy chosen without
+regard to where forgetting lives behaves unpredictably across architectures, which is the
+thesis's argument for diagnosis-first design. **Caveat:** whether *replay* (the remedy the
+diagnosis predicts) is similarly unstable cannot be answered locally — all LiLT/BROS replay cells
+are in the deferred set (`replay_batch_size: 8` OOMs 6 GB). That is the single most valuable
+thing rented GPUs would buy.
+
 ## FINDING (2026-08-22): the naive forgetting signature is four-backbone general
 
 First BROS run ever completed. `dil` naive, seed 42, across all four backbones:
