@@ -59,6 +59,33 @@ language in the thesis, this needs either a protocol change (longer patience / p
 split) or an explicit disclosure that joint is a fixed-protocol reference, not a true bound.
 Worth checking whether the same inversion exists on LayoutLMv3 and BERT once the grid lands.
 
+## `replay_batch_size` is a SECOND batch knob (found 2026-08-22)
+
+`er` and `der_pp` set **`replay_batch_size: 8`** in their method configs, independent of
+`training.batch_size`. Every step therefore forwards 8 replay documents *in addition to* the
+current batch — roughly doubling activation memory. This is why all six BROS `dil` replay jobs
+OOMed (512 MiB allocation) at `training.batch_size=1`, on the backbone with the *most* headroom.
+
+**Do not lower `replay_batch_size` to force these through.** All 200+ existing runs use 8;
+changing it makes the cell incomparable to the rest of the table — the same trap as
+`EPOCHS_CAP`. Defer instead.
+
+### What the 6 GB box can and cannot do (final)
+
+| method | auxiliary state | LiLT | BROS |
+|---|---|---|---|
+| `naive`, `joint` | none | ✅ | ✅ |
+| `ewc` | Fisher diagonal | ✅ `dil`/`mixed`, ❌ `cil_cord` (growing head) | ✅ (small vocab = headroom) |
+| `er`, `der_pp` | replay batch (8 docs) | ❌ except where already run at bs=16 on rented HW | ❌ all |
+| `lwf` | deepcopied teacher | ❌ all | ❌ all |
+
+**43 of 85 jobs deferred.** The rule: on 6 GB, any method carrying auxiliary state fails on the
+layout-aware secondaries. Locally reachable = `naive` + `joint` + `ewc`.
+
+**Consequence for the paper:** local hardware supports a *three-method* generality claim across
+four backbones. The replay methods — the paper's strongest result, since replay is precisely the
+remedy the head-localization diagnosis predicts — require rented GPUs on LiLT/BROS.
+
 ## Batch-size heterogeneity in the existing table (found 2026-08-22)
 
 > Supersedes an earlier note here that called `mixed_der_pp_seed7_lilt` "marginal pressure,
