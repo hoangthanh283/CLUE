@@ -31,6 +31,35 @@ No third schedule (prereg: escalate-don't-iterate).
 
 # STATE
 
+## ⚠ NON-REPRODUCTION (2026-08-23): latent-replay 87.3 does not replicate at the canonical config
+
+Ran the re-run the ROADMAP's evidence-hygiene item called for: `latent_replay`, **k=8, d=5,
+early-stopped** (the config the record identifies for "Exp #5"; STATE:928 — *"that was a
+prior-session early-stop run"*). Seed 42:
+
+| | cited | re-run | delta |
+|---|---|---|---|
+| AA | 87.3 | **65.7981** | **−21.50** |
+| BWT | −2.3 | **−30.8380** | −28.54 |
+| final row | ≈ER-200 | [67.94, 34.53, 94.92] | SROIE collapses |
+
+**The run is healthy, not truncated.** It converged normally (task 2 ran 12 epochs to a val-F1
+plateau of 94.92 with patience-2 early stop; tasks 0/1 likewise), peak VRAM 2,408 MB, 81.5 min,
+rc=0, `EPOCHS_CAP=100`. So this is a real converged latent-replay run at the canonical operating
+point, and it does not behave like the citation: FUNSD holds (67.94) but SROIE collapses (34.53),
+versus the cited near-zero forgetting.
+
+**Status: one seed. Seeds 7/123 are running** — do not act on this until all three land; a single
+seed is exactly what burned the shadow-replay chain. But if it holds, **87.3 is not reproducible
+at the config the record names**, and it is cited in `CLAUDE.md` ("conv AA 87.3"), STATE, and the
+falsification-chain narrative as evidence the buffer-free negatives are not effort-limited.
+
+Possible explanations to check before revising anything: (1) a different k/d than the record
+states; (2) a scenario/data difference (task order, dataset revision) between then and now;
+(3) the original was mis-transcribed. Note the honest fallback: the *qualitative* chain claim
+(real latent replay works where marginal compressions collapse) survives at 65.80 — it still
+beats every falsified marginal method (~37–42) by a wide margin. Only the magnitude is at issue.
+
 ## FINDING (2026-08-23): generality holds for the PHENOMENON, not for every REMEDY
 
 Two four-backbone results that must be stated together, because they point different ways.
