@@ -49,16 +49,32 @@ rc=0, `EPOCHS_CAP=100`. So this is a real converged latent-replay run at the can
 point, and it does not behave like the citation: FUNSD holds (67.94) but SROIE collapses (34.53),
 versus the cited near-zero forgetting.
 
-**Status: one seed. Seeds 7/123 are running** — do not act on this until all three land; a single
-seed is exactly what burned the shadow-replay chain. But if it holds, **87.3 is not reproducible
-at the config the record names**, and it is cited in `CLAUDE.md` ("conv AA 87.3"), STATE, and the
-falsification-chain narrative as evidence the buffer-free negatives are not effort-limited.
+**Seed 7 confirms** (63.9095 / −34.2199, same signature: FUNSD 72.93 holds, SROIE 25.48
+collapses). Two independent seeds ⇒ not seed variance. Seed 123 pending.
 
-Possible explanations to check before revising anything: (1) a different k/d than the record
-states; (2) a scenario/data difference (task order, dataset revision) between then and now;
-(3) the original was mis-transcribed. Note the honest fallback: the *qualitative* chain claim
-(real latent replay works where marginal compressions collapse) survives at 65.80 — it still
-beats every falsified marginal method (~37–42) by a wide margin. Only the magnitude is at issue.
+### Likely cause: the cited run was **d=50**, not d=5
+
+The coverage ladder, measured, all at converged/5ep in the same family:
+
+| config | AA |
+|---|---|
+| colar **d5**/r64 (3 seeds) | 60.79 |
+| latent_replay **d5** k8 converged (today, 2 seeds) | **63.91 – 65.80** |
+| colar **d50**/r64 (seed 42) | 80.61 |
+| colar **d50**/r128 (3 seeds) | **86.75** |
+
+**d=5 lands in the 60s for BOTH compressed and uncompressed replay; 87.3 sits exactly where
+d=50 lands.** The only run in the entire family on disk above 84 is `dil_colar_seed42_k4_d50_r128`
+(86.38). This is independently corroborated by today's CA-CoLaR T1 response surface, which
+measured the coverage effect directly (d5→d50 at r64: FUNSD **+37.97**, SROIE +21.08).
+
+⇒ STATE:834's "private **d5**-conv 87.3" is almost certainly a **d50** run mislabelled as d5.
+The number is real; the *config attribution* is wrong. Fix the label, not the value — and re-cite
+it against a run that exists on disk.
+
+**The qualitative chain claim is unaffected**: real latent replay at 63.9–65.8 still beats every
+falsified marginal method (~37–42) by >20 points, so "real latent replay works where marginal
+compressions collapse" stands. Only the headline magnitude and its config label need correcting.
 
 ## FINDING (2026-08-23): generality holds for the PHENOMENON, not for every REMEDY
 
