@@ -74,7 +74,29 @@ paper ("a negative result on ONE setup is not a finding"). Same pattern already 
 `cil_cord` naive (LiLT 18.89 vs LayoutLMv3 18.79 vs BERT 19.39) and joint (LiLT 32.44 vs 33.32 /
 32.41). BROS is also cheap: 26.8 min/run, 4,617 MB peak (≈1 GB more headroom than LiLT).
 
-## IN FLIGHT (2026-08-22): BROS/LiLT generality-grid fill
+## DONE (2026-08-23): generality-grid fill complete — 44/72 → 57/72 method-cells
+
+| backbone | dil | cil_cord | mixed | change |
+|---|---|---|---|---|
+| LayoutLMv3 | 6/6 | 6/6 | 6/6 | — |
+| BERT | 6/6 | 6/6 | 6/6 | — |
+| LiLT | 5/6 | 3/6 | 4/6 | was 4 / **0** / 4 |
+| BROS | 3/6 | 3/6 | 3/6 | was **0 / 0 / 0** |
+
+**BROS built from nothing**: 27 new runs (naive/joint/ewc × 3 scenarios × 3 seeds). LiLT gained
+its entire `cil_cord` column plus the `dil` `joint` triple. All at `EPOCHS_CAP=100`, matching the
+existing table's protocol.
+
+**Every one of the 15 remaining cells is the same hardware ceiling**, not a defect or a dead end:
+`lwf` everywhere (teacher deepcopy), `er`/`der_pp` on BROS + parts of LiLT (`replay_batch_size: 8`
+forwards 8 extra docs/step regardless of `training.batch_size`), `ewc` on LiLT `cil_cord` (Fisher
++ growing head). Full analysis and the job lists: `docs/gridfill/`. **These need a >6 GB GPU.**
+
+The most valuable missing piece: **every LiLT/BROS replay cell**. Replay is the remedy the
+head-localization diagnosis predicts should win, so "ER/DER++ reach the joint bound" is the
+paper's payoff claim — currently demonstrated on 2 of 4 backbones.
+
+## SUPERSEDED (2026-08-22): BROS/LiLT generality-grid fill — in flight
 
 **Running unattended:** `docs/gridfill/grid_fill.sh` (PID 2203423 this session), 67 local jobs,
 resume-safe (skips any run with `metrics.json`), logs to `results/gates/gridfill.log` and
