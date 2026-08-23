@@ -49,8 +49,9 @@ rc=0, `EPOCHS_CAP=100`. So this is a real converged latent-replay run at the can
 point, and it does not behave like the citation: FUNSD holds (67.94) but SROIE collapses (34.53),
 versus the cited near-zero forgetting.
 
-**Seed 7 confirms** (63.9095 / −34.2199, same signature: FUNSD 72.93 holds, SROIE 25.48
-collapses). Two independent seeds ⇒ not seed variance. Seed 123 pending.
+**FINAL, 3 seeds:** 65.7981 / 63.9095 / 69.6993 → **mean 66.47 ± 2.95 AA**, BWT −26.4 to −34.2.
+Same signature every time (FUNSD holds 67.9–78.4, SROIE collapses 25.5–35.6). Not seed variance;
+**−20.83 vs the cited 87.3**, and **+26.5 vs the falsified marginals** (~40).
 
 ### Likely cause: the cited run was **d=50**, not d=5
 
