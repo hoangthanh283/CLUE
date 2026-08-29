@@ -53,7 +53,7 @@ A multimodal document encoder ingests three streams (\gls{ocr} tokens, their
 bounding boxes (2D position embeddings), and image patches) and fuses them
 through transformer self-attention. LayoutLMv3 is the most widely adopted
 encoder-only backbone in the \gls{vrdu}
-literature~\citep{huang2022layoutlmv3, cui2021documentai}: it dispenses with a convolutional vision
+literature~\citep{huang2022layoutlmv3}: it dispenses with a convolutional vision
 front-end, instead consuming raw $16\times16$ image patches in the manner of a
 \gls{vit}, and is pre-trained with three objectives: \gls{mlm} over text,
 \gls{mim} over image patches, and \gls{wpa}, an explicit cross-modal supervision
@@ -283,8 +283,8 @@ and visual streams are pre-trained on a narrower corpus; and D-MoLE's per-layer
 budget routing supports measuring first and allocating second.
 
 \paragraph{Architecture-based.} These allocate separate parameters per task by
-masking (PackNet~\citep{mallya2018packnet}) or growth (Progressive
-Networks~\citep{rusu2016progressive}), trading parameter count for isolation.
+masking (PackNet~\citep{mallya2018packnet}) or growth (Dynamically Expandable
+Networks~\citep{yoon2018den}), trading parameter count for isolation.
 \emph{Implication for document \gls{ie}.} Per-task parameter growth is
 unattractive for deployed \gls{kie} parsers that accrue dozens of schema
 versions, and hard parameter isolation sits awkwardly with the shared,
@@ -429,11 +429,11 @@ representation on the stored relation prototypes so that replayed relations
 resist drift. CRL~\citep{zhao2022crl} adds contrastive replay with distillation,
 a consistency objective that keeps old relation embeddings stable while the
 encoder adapts. A second, rehearsal-free line uses prompts:
-WAVE++~\citep{wavepp} tackles \gls{cre} with task-specific prompt pools in a
-\gls{moe} style under a \gls{til} setting on TACRED and FewRel, achieving
-rehearsal-free state-of-the-art. FCRE-OIE~\citep{fcreoie} extends to open-world
-relations through \gls{oie} and is the first to bring \gls{kgc} into a continual
-setting, in a few-shot regime. All of these methods operate on sentence-level
+WAVE-CRE~\citep{le2025wavecre} tackles \gls{cre} with task-specific prompt pools
+in a \gls{moe} style under a \gls{til} setting on TACRED and FewRel, achieving
+rehearsal-free state-of-the-art. The few-shot regime is addressed by shaping
+discriminative representations within clusters of similar
+relations~\citep{le2025fscre}. All of these methods operate on sentence-level
 benchmarks (TACRED, FewRel) with gold entity pairs; none confronts
 cross-sentence evidence (the DocRED setting) or layout signals, the second
 structural failure mode identified in the introduction to this section
@@ -471,8 +471,8 @@ forgets: the question this thesis answers.
     Continual NER  & GenCNER            & Small backbone; no document/layout context \\
     Continual NER  & ProtoNER           & Few-shot only; no full-grid CL evaluation \\
     Continual RE   & EMAR / RP-CRE / CRL & Replay + prototypes; sentence-level; closed-world \\
-    Continual RE   & WAVE++             & Task-IL; closed-world; sentence-level \\
-    Continual RE   & FCRE-OIE           & Few-shot; no document-level relations \\
+    Continual RE   & WAVE-CRE           & Task-IL; closed-world; sentence-level \\
+    Continual RE   & Similar-cluster FS-CRE & Few-shot; no document-level relations \\
     Document CL    & GDI-Bench + LW-AFT & Heuristic freezing; no IE tasks; no diagnosis \\
     Document CL    & CL Table Detection & Detection only; simple replay; no IE \\
     Multimodal CL  & CL-CrossVQA / CLiMB / CLOVE & VQA/VL only; no document IE \\
@@ -622,7 +622,7 @@ layout, visual, and fusion components of a single tri-modal document encoder.
 Continual \gls{ner} methods (distillation and pseudo-labelling
 approaches~\citep{zhang2023cpfd, zheng2022cfner, liu2023ice, zheng2023spankl} and
 generative reformulations~\citep{gencner}) operate on sentence-level, text-only
-corpora, as do the continual \gls{re} lines~\citep{wavepp, fcreoie}.
+corpora, as do the continual \gls{re} lines~\citep{le2025wavecre, le2025fscre}.
 ProtoNER~\citep{kumar2024protoner} reaches LayoutLM-family encoders but only in
 a few-shot regime, without a full continual evaluation. None of these confronts
 the structural failure modes that arise when the unit of extraction grows from a
