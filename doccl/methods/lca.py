@@ -61,6 +61,9 @@ class LCA(NaiveFineTune):
         self.merge_method = config.get("merge_method", "ties")
         self.merge_coef = float(config.get("merge_coef", 1.0))
         self.merge_topk = int(config.get("merge_topk", 100))
+        # merge=false + backbone_lr_scale<1 turns LCA into SLCA (slow learner + alignment).
+        self.merge = bool(config.get("merge", True))
+        self.backbone_lr_scale = float(config.get("backbone_lr_scale", 1.0))
         # Classifier-alignment (CA) defaults.
         self.ca_lr = float(config.get("ca_lr", 5e-3))
         self.ca_epochs = int(config.get("ca_epochs", 10))
@@ -100,9 +103,17 @@ class LCA(NaiveFineTune):
     ) -> TrainMetrics:
         """Fine-tune backbone + head on task t with LCA's SGD + cosine recipe."""
         self.model.train()
-        params = [p for p in self.model.model.parameters() if p.requires_grad]
+        named = [(n, p) for n, p in self.model.model.named_parameters() if p.requires_grad]
+        params = [p for _, p in named]
+        head = [p for n, p in named if "classifier" in n]
+        backbone = [p for n, p in named if "classifier" not in n]
         optimizer = torch.optim.SGD(
-            params, lr=self.base_lr, momentum=0.9, weight_decay=self.weight_decay
+            [
+                {"params": head, "lr": self.base_lr},
+                {"params": backbone, "lr": self.base_lr * self.backbone_lr_scale},
+            ],
+            momentum=0.9,
+            weight_decay=self.weight_decay,
         )
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=self.epochs, eta_min=1e-6
@@ -115,13 +126,7 @@ class LCA(NaiveFineTune):
             for batch in pbar:
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
                 optimizer.zero_grad()
-                out = self.model(
-                    input_ids=batch["input_ids"],
-                    bbox=batch["bbox"],
-                    pixel_values=batch.get("pixel_values"),
-                    attention_mask=batch.get("attention_mask"),
-                    labels=batch["labels"],
-                )
+                out = self.model(**batch)
                 loss = out.loss
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(params, self.max_grad_norm)
@@ -144,8 +149,9 @@ class LCA(NaiveFineTune):
         # (1) class feature Gaussians for the classes seen this task.
         self._compute_class_stats(train_loader)
         # (2) stash this task's backbone, then TIES-merge all task backbones onto base.
-        self._task_backbones.append(self._backbone_state())
-        self._merge_backbones()
+        if self.merge:
+            self._task_backbones.append(self._backbone_state())
+            self._merge_backbones()
         # (3) align the classifier on sampled features (LCA skips task 0).
         if task.task_id > 0 and self._class_means:
             self._align()
@@ -165,8 +171,11 @@ class LCA(NaiveFineTune):
             if bi >= self.ca_feature_n_batches:
                 break
             batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
-            feats = self.model.token_features(batch)  # (B, L, D)
-            labels = batch["labels"][:, : feats.shape[1]]
+            feats = self.model.token_features(batch)  # (B, L, D); (B, 1, D) for images
+            labels = batch["labels"]
+            if labels.dim() == 1:
+                labels = labels[:, None]
+            labels = labels[:, : feats.shape[1]]
             mask = labels != -100
             f = feats[mask].cpu()  # (n_tok, D)
             y = labels[mask].cpu()  # (n_tok,)

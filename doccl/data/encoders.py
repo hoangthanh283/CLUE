@@ -156,7 +156,18 @@ def _cfg_get(cfg: Any, key: str, default: Any = None) -> Any:
     return getattr(cfg, key, default)
 
 
+class ImageEncoder:
+    """Placeholder for image-classification backbones: the vision datasets apply their
+    own torchvision transforms, so nothing tokenises here."""
+
+    has_image = True
+
+    def encode(self, *args, **kwargs):  # noqa: ARG002
+        raise NotImplementedError("ImageEncoder has no KIE encode(); use doccl.data.vision")
+
+
 _ENCODER_BY_FAMILY = {
+    "vit": lambda cfg: ImageEncoder(),  # noqa: ARG005
     "layoutlmv3": lambda cfg: LayoutLMv3Encoder(_cfg_get(cfg, "name", _DEFAULT_LAYOUTLMV3)),
     "lilt": lambda cfg: LiLTEncoder(_cfg_get(cfg, "tokenizer_name") or _cfg_get(cfg, "name")),
     "bros": lambda cfg: BROSEncoder(_cfg_get(cfg, "tokenizer_name") or _cfg_get(cfg, "name")),

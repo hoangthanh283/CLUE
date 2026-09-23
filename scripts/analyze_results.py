@@ -81,8 +81,18 @@ METHOD_DISPLAY = {
     "lexslot": "\\textbf{LexSlot (ours)}",
     "doccl": "DocCL (legacy)",
 }
-SCENARIO_ORDER = ["cil_cord", "cil_wildreceipt", "dil", "dil_xlingual", "mixed"]
+SCENARIO_ORDER = [
+    "cil_cord",
+    "cil_wildreceipt",
+    "dil",
+    "dil_xlingual",
+    "mixed",
+    "cil_cifar100",
+    "cil_imagenet_r",
+]
 SCENARIO_DISPLAY = {
+    "cil_cifar100": "Split CIFAR-100",
+    "cil_imagenet_r": "Split ImageNet-R",
     "cil_cord": "CIL-CORD",
     "cil_wildreceipt": "CIL-WildReceipt",
     "dil": "DIL",
@@ -261,12 +271,14 @@ SECONDARY_FAMILIES = [
     "lilt",
     "bros",
     "bert",
+    "vit",  # image-classification scope test (docs/IMAGE_SCOPE_PREREG.md)
 ]  # backbone-generalization study (BERT-naive doubles as the main-table comparator)
 BACKBONE_DISPLAY = {
     "layoutlmv3": "LayoutLMv3",
     "lilt": "LiLT",
     "bros": "BROS",
     "bert": "BERT",
+    "vit": "ViT-B/16",
 }
 
 

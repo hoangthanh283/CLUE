@@ -71,7 +71,7 @@ def classify_param(name: str) -> str:
     # leaving them unclassified for the Fisher/depth analysis.
     if "attention.output.dense" in name or "attention.layout_output.dense" in name:
         return "attn_out"
-    if "LayerNorm" in name or name.endswith(".norm.weight") or name.endswith(".norm.bias"):
+    if "layernorm" in name.lower() or name.endswith(".norm.weight") or name.endswith(".norm.bias"):
         return "layernorm"
     if "intermediate.dense" in name or ("output.dense" in name and "attention" not in name):
         return "ffn"  # feed-forward block (intermediate + FFN output)

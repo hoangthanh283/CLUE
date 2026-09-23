@@ -1,0 +1,6 @@
+# ViT-B/16 (ImageNet-21k pre-trained) — image-classification backbone for the scope test
+# (docs/IMAGE_SCOPE_PREREG.md). CLS-token linear head; no layout, no text.
+name: google/vit-base-patch16-224-in21k
+family: vit
+hidden_size: 768
+num_layers: 12

@@ -1,3 +1,36 @@
+## RESUME HERE (2026-09-23): ICLR 2027 draft v1 + image-CL scope test implemented
+
+**Paper.** `paper/main.tex` (ICLR 2027 style, anonymised) builds; main text ends p.9 (limit 9).
+Abstract registered on OpenReview 2026-09-18; **full paper due 2026-09-25 AoE**. Table 1 = 68/72
+grid cells from regenerated aggregates (`analyze_results.py --source local`, 2026-09-23).
+Remaining: appendix B extra tables, ledger HGT/CUBER number, trim, anonymisation check.
+Plan/story: `docs/ICLR2027_PAPER_PLAN.md`.
+
+**Grid.** 68/72. BROS DER++ 9/9 done with fp16 + replay batch 1 (HF BROS has no gradient
+checkpointing): dil 86.8/87.1/87.6-ish (seeds 42/7/123), mixed 63.0±0.4, cil_cord 17.7±1.1.
+Still OOM on 6 GB even with fp16: LiLT LwF (dil/mixed/cil_cord ×3 seeds) + LiLT cil_cord EWC ×3
+= 12 runs → rented GPU or grey cells (paper currently discloses them as missing).
+**Hygiene fix:** 109 locally-run result dirs lacked the `.done` marker `analyze_results.py`
+requires → they were silently skipped by the aggregates; marked 2026-09-23.
+
+**CA-CoLaR is a null at 3 seeds.** Treatment A1 [18,5,2]/[64,128,64] vs equal-byte uniform
+d10/r64 control, dil k4 5ep — treatment / control AA: seed42 75.98 / 71.93 (+4.04; the
+non-gate rerun `results/dil_colar_adaptive_seed42` gives 79.04, +7.11), seed7 71.18 / 79.21
+(−8.03), seed123 75.29 / 69.63 (+5.66) → **+0.6 to +1.6 ± 8** depending on which seed-42 run is
+used; either way a null. Controls: `results/dil_colar_seed{7,123}_k4_d10`.
+Reported as a frontier-not-gain negative in the paper appendix.
+
+**Image-CL scope test (next cycle, pre-registered).** `docs/IMAGE_SCOPE_PREREG.md` (H1–H3 +
+decision rules + sanity gate) written BEFORE any run. Implemented: `ViTWrapper`
+(`doccl/models/vit_wrapper.py`), `doccl/data/vision.py` (Split CIFAR-100 / ImageNet-R),
+scenarios `cil_cifar100` / `cil_imagenet_r`, configs `model/vit_b16`, `training/vision`,
+`method/slca` (= `lca` align with `merge: false`, `backbone_lr_scale: 0.01`), accuracy metric
+dispatch on `model.task_type`, Fisher 1-D label guard, ViT param grouping. 302 offline tests +
+ViT integration test green. Runner `scripts/run_vision_grid.sh`. Smoke run (naive, 1 ep, bs 8,
+2026-09-24) PASSED end-to-end: task0 98.6 → after task1 [33.6, 95.6]; ~3 min/task, 1.8 GB VRAM
+on the 2060 — CIFAR-100 cells are feasible locally (~2.5 h/run at bs 32). ImageNet-R must be
+downloaded manually to `data/vision/imagenet-r/`. Needs a rented GPU (~25 GPU-h for 54 runs).
+
 ## GO — Pareto branch (2026-08-21): CA-CoLaR A1 re-gate passes all four guards
 
 Amendment A1 (`docs/CACOLAR_T1_T2_2026-08-20.md`, preregistered before launch): treatment

@@ -21,7 +21,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from doccl.eval.metrics import compute_token_f1
+from doccl.eval.metrics import compute_eval_metrics
 from doccl.types import EvalMetrics, TaskInfo, TaskState, TrainMetrics
 
 log = logging.getLogger(__name__)
@@ -215,7 +215,9 @@ class ContinualMethod(ABC):
             mask = labels != -100
             all_preds.extend(preds[mask].cpu().tolist())
             all_labels.extend(labels[mask].cpu().tolist())
-        f1 = compute_token_f1(all_preds, all_labels, id_to_label)["f1"]
+        f1 = compute_eval_metrics(
+            all_preds, all_labels, id_to_label, getattr(self.model, "task_type", "token")
+        )["f1"]
         if was_training:
             self.model.train()
         return f1

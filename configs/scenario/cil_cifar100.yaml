@@ -1,0 +1,4 @@
+name: cil_cifar100
+kwargs:
+  num_sessions: 10
+  class_order_seed: 1993   # PyCIL/LAMDA-PILOT convention (SLCA, RanPAC)
