@@ -78,7 +78,7 @@ def empirical_fisher_diagonal(
     for batch in pbar:
         batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}
         labels = batch["labels"]
-        batch_size = batch["input_ids"].shape[0]
+        batch_size = labels.shape[0]
 
         # One backward pass PER DOCUMENT so each per-sample gradient is squared
         # individually (the correct empirical Fisher; see the docstring). Slicing a

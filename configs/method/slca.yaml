@@ -1,0 +1,17 @@
+# SLCA (Zhang et al., ICCV 2023): slow-learner backbone + post-task classifier alignment on
+# class-Gaussian features. Reuses the LCA align step with the backbone merge disabled.
+name: lca
+lr: 1.0e-2                 # head LR
+backbone_lr_scale: 0.01    # backbone LR = 1e-4 (the "slow learner")
+weight_decay: 5.0e-4
+epochs: 20
+max_grad_norm: 1.0
+merge: false
+ca_lr: 5.0e-3
+ca_epochs: 10
+ca_batch_size: 64
+ca_samples_per_cls: 256
+ca_robust_weight: 0.0      # plain CE alignment, as in SLCA
+ca_entropy_weight: 0.0
+ca_feature_n_batches: 1000000  # use the whole task loader for (mu, cov)
+ca_skip_O: false           # no background class in image CIL

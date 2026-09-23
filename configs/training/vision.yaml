@@ -1,0 +1,7 @@
+# Image-classification protocol: same early-stopping rule as the document grid, larger batch.
+batch_size: 128
+num_workers: 4
+gradient_accumulation_steps: 1
+amp: false
+fp16: false
+gradient_checkpointing: false

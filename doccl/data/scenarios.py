@@ -25,6 +25,7 @@ from doccl.data.dil_remapping import DIL_LabelRemapper, DIL_UNIFIED_LABELS
 from doccl.data.funsd import FUNSDDataset
 from doccl.data.receipt_remapping import RECEIPT_UNIFIED_LABELS, Receipt_LabelRemapper
 from doccl.data.sroie import SROIEDataset
+from doccl.data.vision import VisionCILDataset, cifar100_bases, imagenet_r_bases
 from doccl.data.wildreceipt import WildReceiptDataset
 from doccl.data.xfund import XFUNDDataset
 from doccl.types import ScenarioType, TaskInfo
@@ -76,8 +77,6 @@ class CLScenario:
     # the Joint path falls back to ``train_datasets`` (correct for scenarios whose tasks are
     # disjoint documents, e.g. DIL).
     joint_train_datasets: list[Dataset] | None = None
-
-
 
 
 def build_cil_funsd() -> CLScenario:
@@ -294,8 +293,6 @@ def build_cil_wildreceipt(num_sessions: int = 4) -> CLScenario:
     )
 
 
-
-
 def build_dil(order: list[int] | None = None) -> CLScenario:
     """Domain-incremental: FUNSD → SROIE → CORD-superclass with unified schema.
 
@@ -420,8 +417,6 @@ def build_dil_xlingual(langs: list[str] | None = None) -> CLScenario:
             )
         )
     return CLScenario("dil_xlingual", ScenarioType.DIL, tasks, train_dss, eval_dss)
-
-
 
 
 def build_mixed() -> CLScenario:
@@ -557,8 +552,6 @@ def build_mixed() -> CLScenario:
     )
 
 
-
-
 def build_single(dataset_name: str) -> CLScenario:
     """Single-task baseline (no CL, sanity check)."""
     if dataset_name == "funsd":
@@ -631,8 +624,47 @@ def build_pilot(order: list[int] | None = None) -> CLScenario:
     return CLScenario("pilot", ScenarioType.PILOT, tasks, train_dss, eval_dss)
 
 
+def _build_vision_cil(name: str, bases, num_sessions: int, class_order_seed: int) -> CLScenario:
+    """Split-<dataset> class-incremental: ``num_sessions`` equal chunks of a seeded class
+    permutation. Head index = position in the permutation, so no remapper and no ``O``."""
+    import numpy as np
+
+    base_train, base_eval, split, num_classes = bases
+    train_idx, eval_idx = split if split is not None else (None, None)
+    perm = np.random.RandomState(class_order_seed).permutation(num_classes).tolist()
+    head_index = {int(c): i for i, c in enumerate(perm)}
+    per = num_classes // num_sessions
+    sessions = [perm[i * per : (i + 1) * per] for i in range(num_sessions)]
+
+    train_dss = [VisionCILDataset(base_train, s, head_index, True, train_idx) for s in sessions]
+    eval_dss = [VisionCILDataset(base_eval, s, head_index, False, eval_idx) for s in sessions]
+    joint = [VisionCILDataset(base_train, perm, head_index, True, train_idx)]
+    tasks = [
+        TaskInfo(
+            task_id=i,
+            task_name=f"{name}_t{i}",
+            label_set=[f"c{c}" for c in s],
+            is_first=(i == 0),
+            is_last=(i == num_sessions - 1),
+        )
+        for i, s in enumerate(sessions)
+    ]
+    return CLScenario(
+        name, ScenarioType.CIL, tasks, train_dss, eval_dss, joint_train_datasets=joint
+    )
+
+
+def build_cil_cifar100(num_sessions: int = 10, class_order_seed: int = 1993) -> CLScenario:
+    return _build_vision_cil("cil_cifar100", cifar100_bases(), num_sessions, class_order_seed)
+
+
+def build_cil_imagenet_r(num_sessions: int = 10, class_order_seed: int = 1993) -> CLScenario:
+    return _build_vision_cil("cil_imagenet_r", imagenet_r_bases(), num_sessions, class_order_seed)
+
 
 SCENARIO_REGISTRY = {
+    "cil_cifar100": build_cil_cifar100,
+    "cil_imagenet_r": build_cil_imagenet_r,
     "single_funsd": lambda: build_single("funsd"),
     "single_cord": lambda: build_single("cord"),
     "single_sroie": lambda: build_single("sroie"),

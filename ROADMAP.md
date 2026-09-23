@@ -17,6 +17,16 @@ ordering B+ 22–30% > diagnostic-as-is 12–18% > method-paper 8–12% at ICML/
 existing code on Vast.ai. CoLaR is the *constructive control*, PLaR the *bounded-negative*, not
 method contributions.
 
+### RESUME HERE (2026-09-23)
+1. **Sep 25 AoE: submit ICLR 2027** — `paper/main.tex`: fill App. B, ledger HGT/CUBER number,
+   trim, strip TODO/vnum macros, anonymisation check, upload PDF to OpenReview.
+2. Rent GPU: (a) 12 LiLT LwF/EWC runs (`scripts/run_oom_cells.sh` pattern, fp16 insufficient
+   locally); (b) image scope test `scripts/run_vision_grid.sh` — sanity gate first (joint + slca
+   + er on cil_cifar100 seed 42 vs SLCA 91.5 / joint ~93), then full 54 runs; adjudicate against
+   `docs/IMAGE_SCOPE_PREREG.md` → `docs/IMAGE_SCOPE_VERDICT.md`.
+3. Fold the image verdict into the paper (next cycle): section "what changes when the head is
+   not per-token"; optional H4 bridge (RVL-CDIP doc classification on LayoutLMv3).
+
 ### RESUME HERE (2026-07-18): thesis structural reframe + grid launch
 (1) Execute `docs/THESIS_METHOD_CHAPTER_REFRAME_2026-07.md` (session task #5) — resolve
 [EXAMINER] annotations, rewrite ch3 §3.4 / ch6 §6.1.5 / title / ch1 / ch7. Buffer-free

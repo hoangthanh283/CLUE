@@ -22,7 +22,6 @@ from doccl.models.bros_wrapper import BROSWrapper
 from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
 from doccl.models.lilt_wrapper import LiLTWrapper
 
-
 # Representative parameter names from LiLT / BROS that must NOT fall into ``misc``.
 _LAYOUT_NAMES = [
     "lilt.layout_embeddings.x_position_embeddings.weight",
@@ -31,6 +30,32 @@ _LAYOUT_NAMES = [
     "bros.embeddings.bbox_projection.weight",
     "bros.embeddings.bbox_sinusoid_emb.x_pos_emb.inv_freq",
 ]
+
+_VIT_NAMES = {
+    "vit.embeddings.patch_embeddings.projection.weight": "image_patch_embed",
+    "vit.embeddings.cls_token": "cls_pooler",
+    "vit.embeddings.position_embeddings": "pos_1d_embed",
+    "vit.encoder.layer.0.attention.attention.query.weight": "attn_qkv",
+    "vit.encoder.layer.0.attention.output.dense.weight": "attn_out",
+    "vit.encoder.layer.0.layernorm_before.weight": "layernorm",
+    "vit.encoder.layer.11.output.dense.weight": "ffn",
+    "vit.layernorm.weight": "layernorm",
+    "classifier.weight": "classifier",
+}
+
+
+@pytest.mark.parametrize(("name", "group"), list(_VIT_NAMES.items()))
+def test_vit_params_classified(name, group):
+    assert param_grouping.classify_param(name) == group
+
+
+def test_image_metrics_are_top1_accuracy():
+    from doccl.eval.metrics import compute_eval_metrics
+
+    m = compute_eval_metrics([0, 1, 2, 2], [0, 1, 1, 2], {}, task_type="image")
+    assert m["f1"] == pytest.approx(75.0)
+    assert compute_eval_metrics([], [], {}, task_type="image")["f1"] == 0.0
+
 
 _NON_MISC_NAMES = _LAYOUT_NAMES + [
     "lilt.embeddings.word_embeddings.weight",  # text_word_embed
@@ -50,8 +75,6 @@ def test_layout_params_classified_as_layout(name):
 def test_no_real_param_lands_in_misc(name):
     """The ``misc`` group must stay empty for stock LiLT/BROS parameter names."""
     assert param_grouping.classify_param(name) != "misc"
-
-
 
 
 class _StubEncoding:
@@ -136,8 +159,6 @@ def test_build_encoder_unknown_family_raises():
         build_encoder({"family": "not-a-backbone"})
 
 
-
-
 def _synthetic_batch(wrapper, batch_size=2, seq_len=16):
     n = wrapper.model.config.num_labels
     # VALID boxes: x0<=x1, y0<=y1 (real KIE datasets always emit ordered corners).
@@ -189,6 +210,23 @@ def test_wrapper_forward_expand_and_groups(wrapper_cls):
     groups = model.param_groups
     assert groups and "misc" not in groups
     assert model.param_groups_by_depth
+
+
+@pytest.mark.integration
+def test_vit_wrapper_forward_expand_and_groups():
+    from doccl.models.vit_wrapper import ViTWrapper
+
+    model = ViTWrapper(num_labels=10)
+    model.id_to_label = {i: f"c{i}" for i in range(10)}
+    model.label_to_id = {v: k for k, v in model.id_to_label.items()}
+    batch = {"pixel_values": torch.zeros(2, 3, 224, 224), "labels": torch.tensor([1, 3])}
+    out = model(**batch)
+    assert out.loss is not None and out.logits.shape == (2, 10)
+    model.expand_classifier([f"c{i}" for i in range(10, 20)])
+    assert model(**batch).logits.shape == (2, 20)
+    assert "misc" not in model.param_groups
+    assert model.encode_query(batch).shape == (2, model.hidden_size)
+    assert model.token_features(batch).shape == (2, 1, model.hidden_size)
 
 
 @pytest.mark.integration

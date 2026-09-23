@@ -13,7 +13,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from doccl.eval.metrics import compute_token_f1
+from doccl.eval.metrics import compute_eval_metrics
 from doccl.methods.base import ContinualMethod
 from doccl.types import EvalMetrics, TaskInfo, TrainMetrics
 
@@ -88,7 +88,9 @@ class NaiveFineTune(ContinualMethod):
                     all_preds.extend(preds[mask].cpu().tolist())
                     all_labels.extend(labels[mask].cpu().tolist())
 
-                metrics = compute_token_f1(all_preds, all_labels, id_to_label)
+                metrics = compute_eval_metrics(
+                    all_preds, all_labels, id_to_label, getattr(self.model, "task_type", "token")
+                )
                 results[tid] = EvalMetrics(
                     task_id=tid,
                     f1=metrics["f1"],

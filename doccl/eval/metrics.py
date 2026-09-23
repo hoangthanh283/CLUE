@@ -39,6 +39,22 @@ def compute_token_f1(
     }
 
 
+def compute_eval_metrics(
+    preds: list[int],
+    labels: list[int],
+    label_map: dict[int, str],
+    task_type: str = "token",
+) -> dict[str, float]:
+    """Span-F1 for token tasks; top-1 accuracy (in the ``f1`` slot) for image tasks so the
+    CL tracker and the early stopper are untouched."""
+    if task_type != "image":
+        return compute_token_f1(preds, labels, label_map)
+    if not preds:
+        return {"f1": 0.0, "precision": 0.0, "recall": 0.0}
+    acc = 100.0 * float(np.mean(np.asarray(preds) == np.asarray(labels)))
+    return {"f1": acc, "precision": acc, "recall": acc}
+
+
 def compute_per_class_f1(
     preds: list[int],
     labels: list[int],

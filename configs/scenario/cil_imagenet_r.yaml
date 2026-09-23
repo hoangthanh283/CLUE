@@ -1,0 +1,4 @@
+name: cil_imagenet_r
+kwargs:
+  num_sessions: 10
+  class_order_seed: 1993

@@ -82,6 +82,7 @@ from doccl.models.bert_family_wrapper import BERTWrapper
 from doccl.models.bros_wrapper import BROSWrapper
 from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
 from doccl.models.lilt_wrapper import LiLTWrapper
+from doccl.models.vit_wrapper import ViTWrapper
 from doccl.utils.tb_logger import TBLogger
 
 log = logging.getLogger(__name__)
@@ -96,6 +97,8 @@ MODEL_REGISTRY = {
     "bros": BROSWrapper,
     # External text-only comparator (unimodal): the genuine BERT baseline.
     "bert": BERTWrapper,
+    # Image-classification backbone for the scope test (docs/IMAGE_SCOPE_PREREG.md).
+    "vit": ViTWrapper,
 }
 
 
@@ -1014,7 +1017,7 @@ def main(cfg: DictConfig) -> None:
         "nullspace_analytic",
         "fisher_mask",
     }  # noqa: N806
-    if cfg.method.name in _std_forward:
+    if cfg.method.name in _std_forward and getattr(model, "task_type", "token") == "token":
         try:
             context = getattr(method, "diagnostic_forward_context", nullcontext)
             with context():
