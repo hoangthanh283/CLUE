@@ -1,0 +1,8 @@
+name: er
+run_alias: er_b2000   # 20 exemplars/class on CIFAR-100 (image-CL convention); documents used 200 docs
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+buffer_size: 2000
+replay_batch_size: 8

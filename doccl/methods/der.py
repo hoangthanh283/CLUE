@@ -92,7 +92,9 @@ class DERpp(NaiveFineTune):
                     else:
                         # Build a (B, 1, n_shared) class mask: True for columns < width.
                         cols = torch.arange(n_shared, device=student.device)
-                        col_mask = (cols.unsqueeze(0) < widths.unsqueeze(1)).unsqueeze(1)
+                        col_mask = cols.unsqueeze(0) < widths.unsqueeze(1)  # (B, n_shared)
+                        if student.dim() == 3:  # token logits (B, L, C): broadcast over L
+                            col_mask = col_mask.unsqueeze(1)
                         col_mask = col_mask.to(student.dtype)
                         sq = (student - teacher) ** 2 * col_mask
                         denom = col_mask.expand_as(sq).sum().clamp(min=1)

@@ -35,7 +35,7 @@ from torch.distributions import MultivariateNormal
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from doccl.eval.metrics import compute_token_f1
+from doccl.eval.metrics import compute_eval_metrics
 from doccl.methods.naive import NaiveFineTune
 from doccl.methods.ties_merge import merge_state_dicts
 from doccl.types import EvalMetrics, TaskInfo, TrainMetrics
@@ -210,7 +210,7 @@ class LCA(NaiveFineTune):
     def _align(self) -> None:
         """Re-train the classifier head on synthetic features ~ N(μ_c, Σ_c) (LCA align)."""
         classes = [c for c in sorted(self._class_means) if not (self.ca_skip_O and c == 0)]
-        if not classes:
+        if not classes or self.ca_epochs <= 0:  # ca_epochs=0 → slow-learner only (SLCA "Seq FT")
             return
         data, labels = [], []
         for c in classes:
@@ -301,19 +301,18 @@ class LCA(NaiveFineTune):
                 preds_all, labels_all = [], []
                 for batch in loader:
                     batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
-                    out = self.model(
-                        input_ids=batch["input_ids"],
-                        bbox=batch["bbox"],
-                        pixel_values=batch.get("pixel_values"),
-                        attention_mask=batch.get("attention_mask"),
-                    )
+                    out = self.model(**{k: v for k, v in batch.items() if k != "labels"})
                     logits = out.logits
                     preds = logits.argmax(dim=-1)
-                    labels = batch["labels"][:, : logits.shape[1]]
+                    labels = batch["labels"]
+                    if labels.dim() == 2:
+                        labels = labels[:, : logits.shape[1]]
                     mask = labels != -100
                     preds_all.extend(preds[mask].cpu().tolist())
                     labels_all.extend(labels[mask].cpu().tolist())
-                m = compute_token_f1(preds_all, labels_all, id_to_label)
+                m = compute_eval_metrics(
+                    preds_all, labels_all, id_to_label, getattr(self.model, "task_type", "token")
+                )
                 results[tid] = EvalMetrics(
                     task_id=tid,
                     f1=m["f1"],

@@ -365,7 +365,7 @@ def save_run_metrics(
     if torch.cuda.is_available():
         peak_mem_mb = torch.cuda.max_memory_allocated() / (1024**2)
     metrics = {
-        "method": cfg.method.name,
+        "method": cfg.method.get("run_alias") or cfg.method.name,
         "scenario": cfg.scenario.name,
         "seed": int(cfg.seed),
         # Backbone family so the result pipeline can distinguish e.g. a text-only
@@ -473,7 +473,10 @@ def main(cfg: DictConfig) -> None:
     # Include the ablation knob in the run name so ablation runs (same method,
     # different target) get distinct result dirs and are identifiable. DocCL uses
     # target_depth; the legacy candidates use target_component.
-    run_name = f"{cfg.scenario.name}_{cfg.method.name}_seed{cfg.seed}"
+    # run_alias lets a config variant (e.g. slca = lca w/o merge; er_b2000) own its run dir
+    # and metrics "method" key while keeping the registry name for class dispatch.
+    method_key = cfg.method.get("run_alias") or cfg.method.name
+    run_name = f"{cfg.scenario.name}_{method_key}_seed{cfg.seed}"
     # Non-default backbones (BERT text-only, LiLT, BROS) suffix the run so their
     # result dirs/metrics don't collide with the LayoutLMv3 run of the same method.
     model_family = cfg.model.get("family", "layoutlmv3")

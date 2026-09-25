@@ -1,0 +1,10 @@
+name: der_pp
+run_alias: der_pp_b2000
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+buffer_size: 2000
+replay_batch_size: 8
+alpha: 0.5
+beta: 0.5
