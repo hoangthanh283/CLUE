@@ -167,8 +167,16 @@ class LatentReplay(NaiveFineTune):
 
     def _replay_forward(self, replay: dict[str, torch.Tensor]):
         """Full wrapper forward with the stored hidden injected at layer k."""
-        bbox = replay["bbox"].to(self.device)
         labels = replay["labels"].to(self.device)
+        if "bbox" not in replay:  # image backbone: only pixel_values + labels exist
+            b = labels.shape[0]
+            dummy_pixels = torch.zeros((b, *self._pixel_shape), device=self.device)
+            self._inject = replay["hidden"]
+            try:
+                return self.model(pixel_values=dummy_pixels, labels=labels)
+            finally:
+                self._inject = None
+        bbox = replay["bbox"].to(self.device)
         attention_mask = replay["attention_mask"].to(self.device)
         b = bbox.shape[0]
         input_ids = replay.get("input_ids")
@@ -260,12 +268,10 @@ class LatentReplay(NaiveFineTune):
                 for i in range(hidden.shape[0]):
                     if len(candidates) >= quota:
                         break
-                    candidate = {
-                        "hidden": hidden[i],
-                        "bbox": batch["bbox"][i].cpu(),
-                        "attention_mask": batch["attention_mask"][i].cpu(),
-                        "labels": batch["labels"][i].cpu(),
-                    }
+                    candidate = {"hidden": hidden[i], "labels": batch["labels"][i].cpu()}
+                    for k in ("bbox", "attention_mask"):  # absent for image backbones
+                        if k in batch:
+                            candidate[k] = batch[k][i].cpu()
                     if self.config.get("store_input_ids", False):
                         candidate["input_ids"] = batch["input_ids"][i].cpu()
                     candidates.append(candidate)
@@ -301,7 +307,11 @@ class LatentReplay(NaiveFineTune):
         doc farthest from the selected set. Maximizes feature-region coverage."""
         means = torch.stack(
             [
-                d["hidden"][: d["attention_mask"].shape[0]][d["attention_mask"].bool()]
+                (
+                    d["hidden"][: d["attention_mask"].shape[0]][d["attention_mask"].bool()]
+                    if "attention_mask" in d
+                    else d["hidden"]
+                )
                 .float()
                 .mean(0)
                 for d in candidates
@@ -324,7 +334,7 @@ class LatentReplay(NaiveFineTune):
         total = 0
         for d in self.store:
             total += d["hidden"].numel() * 2  # fp16 activations
-            total += (d["bbox"].numel() + d["attention_mask"].numel() + d["labels"].numel()) * 8
+            total += sum(d[k].numel() for k in ("bbox", "attention_mask", "labels") if k in d) * 8
             if "input_ids" in d:
                 total += d["input_ids"].numel() * 8
         return total

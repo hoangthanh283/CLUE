@@ -136,19 +136,20 @@ class AGLRReplay(LatentReplay):
             if self._hidden_width is None:
                 self._hidden_width = hidden.shape[1]  # e.g. 709 for LayoutLMv3 (text + patches)
             labels = batch["labels"].cpu()
-            am = batch["attention_mask"].bool().cpu()
+            if labels.dim() == 1:  # image backbone: one CLS "token" per sample
+                labels = labels[:, None]
+            am = batch.get("attention_mask")
+            am = am.bool().cpu() if am is not None else torch.ones_like(labels, dtype=torch.bool)
             valid = (labels != -100) & am
             text_len = am.shape[1]
             text_hidden = hidden[:, :text_len, :]  # drop image-patch positions for the fit
             for i in range(hidden.shape[0]):
                 if len(carriers) < self.carriers_per_task:
-                    carriers.append(
-                        {
-                            "bbox": batch["bbox"][i].cpu(),
-                            "attention_mask": batch["attention_mask"][i].cpu(),
-                            "labels": labels[i],
-                        }
-                    )
+                    carrier = {"labels": labels[i]}
+                    for k in ("bbox", "attention_mask"):
+                        if k in batch:
+                            carrier[k] = batch[k][i].cpu()
+                    carriers.append(carrier)
                 m = valid[i]
                 f = text_hidden[i][m]
                 lab = labels[i][m]
@@ -198,15 +199,18 @@ class AGLRReplay(LatentReplay):
             # Vectorised: gather per-token class stats, one broadcast sample.
             hidden = mean_stack[rows] + std_stack[rows] * torch.randn(w, self.d)  # (w, d)
             hiddens.append(hidden.to(torch.float16))
-            bboxes.append(carrier["bbox"])
-            masks.append(carrier["attention_mask"])
+            if "bbox" in carrier:
+                bboxes.append(carrier["bbox"])
+                masks.append(carrier["attention_mask"])
             labels_out.append(lab)
-        return {
-            "hidden": torch.stack(hiddens),
-            "bbox": torch.stack(bboxes),
-            "attention_mask": torch.stack(masks),
-            "labels": torch.stack(labels_out),
-        }
+        labels_t = torch.stack(labels_out)
+        out = {"hidden": torch.stack(hiddens), "labels": labels_t}
+        if bboxes:
+            out["bbox"] = torch.stack(bboxes)
+            out["attention_mask"] = torch.stack(masks)
+        else:  # image backbone: labels were stored as (1,) per carrier
+            out["labels"] = labels_t.squeeze(-1)
+        return out
 
     # ── lifecycle ─────────────────────────────────────────────────────────────
 
@@ -221,7 +225,7 @@ class AGLRReplay(LatentReplay):
             for g in entry["gaussians"].values():
                 total += (g["mean"].numel() + g["var"].numel()) * 4
             total += sum(
-                (c["bbox"].numel() + c["attention_mask"].numel() + c["labels"].numel()) * 8
+                sum(c[k].numel() for k in ("bbox", "attention_mask", "labels") if k in c) * 8
                 for c in entry["carriers"]
             )
         return total
