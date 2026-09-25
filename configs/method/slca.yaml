@@ -1,6 +1,7 @@
 # SLCA (Zhang et al., ICCV 2023): slow-learner backbone + post-task classifier alignment on
 # class-Gaussian features. Reuses the LCA align step with the backbone merge disabled.
 name: lca
+run_alias: slca      # run-dir + metrics "method" key (train.py); name stays lca for the registry
 lr: 1.0e-2                 # head LR
 backbone_lr_scale: 0.01    # backbone LR = 1e-4 (the "slow learner")
 weight_decay: 5.0e-4

@@ -50,3 +50,32 @@ of the published values (SLCA 91.5, joint ~93). If the gate fails, fix the port 
 Optional bridge H4 (only if H2 supported): document *classification* (RVL-CDIP, 16 classes,
 4 sessions x 4) on LayoutLMv3 with `aglr_replay`; support = works (within 3 pp of ER),
 implying the boundary is task structure, not modality.
+
+## Amendment 1 (2026-09-25, before any arm-A/B/C cell beyond the seed-42 gate had run)
+
+1. **Recipe.** All image cells use the *document* recipe as launched (AdamW 5e-5 all
+   params, weight decay 0.01, early stop patience 2 / δ 0.1 / cap 100, bs 16 + gradient
+   checkpointing on the local 6 GB GPU, Resize(224)+flip). The published ViT-B/16
+   numbers (SLCA Table 1: CIFAR-100 joint 93.22 / SLCA 91.53 / Seq-FT 88.86; ImageNet-R
+   79.60 / 77.00 / 71.80) were obtained under SGD 1e-4 (backbone) / 1e-2 (head), 20–50
+   epochs, bs 128. Our seed-42 joint under the document recipe is **89.08** (−4.1 pp).
+   Therefore the **gate is internal**: H2/H3 compare methods to *our own* joint and ER
+   under one recipe; published values are reported as context only. Gate condition:
+   CIFAR-100 seed 42 joint > 85 and naive < 25 (met: 89.08 / 11.75 at 1 epoch).
+2. **Buffer size is an arm, not a constant.** 200 exemplars = 0.4 % of CIFAR-100
+   (vs 25–100 % of a document task); seed-42 ER@200 = 44.15 AA. Add ER and DER++ at
+   **2000 exemplars** (20/class, the image-CIL convention) as `er_b2000` / `der_pp_b2000`.
+   H2's "ER" refers to the 2000-exemplar arm; the 200-exemplar arm is the
+   document-matched comparator and is reported alongside.
+3. **H2b (new).** The slow-backbone regime alone (`slca_noca`: SGD backbone 1e-4 / head
+   1e-2, 20 ep, no alignment) recovers ≥ 80 % of the naive→joint gap on CIFAR-100; the
+   alignment step adds the remainder. Support = (slca_noca − naive) ≥ 0.8·(joint − naive)
+   on 3/3 seeds. Note SLCA/slca_noca therefore run under the SLCA optimiser, not the
+   document recipe — this is the arm's variable, stated here.
+4. **Bug disclosure.** The seed-42 SLCA gate run crashed (`lca.evaluate` assumed token
+   batches) and DER++'s logit-width mask broadcast wrongly for 2-D logits; both fixed
+   (tests `tests/methods/test_image_batches.py`) before any SLCA/DER++ image cell ran.
+   The seed-42 joint (89.08) and ER@200 (44.15) results predate the fix and are unaffected.
+5. Queue order: CIFAR-100 {naive, ewc, lwf, er, er_b2000, der_pp, der_pp_b2000, slca,
+   slca_noca, joint} × {42, 7, 123}, then ImageNet-R same. H1 pilot conditions and the
+   H3 pair follow once their code paths are wired (separate amendment).
