@@ -45,6 +45,7 @@ BACKBONES = {
     "cb_bert": "BERT",
     "cl_lilt": "LiLT",
     "cr_bros": "BROS",
+    "cv_vit_fast": "ViT (images)",
 }
 # Distinct, colour-blind-friendly palette, stable across all three figures.
 COLORS = {
@@ -52,6 +53,7 @@ COLORS = {
     "cb_bert": "#999999",  # grey (unimodal baseline)
     "cl_lilt": "#D55E00",  # vermillion
     "cr_bros": "#009E73",  # green
+    "cv_vit_fast": "#CC79A7",  # purple (image scope test)
 }
 # Normalised depth axis shared across backbones (different layer-name schemes map here).
 DEPTH_ORDER = ["embeddings", "early (L0)", "mid (L6)", "late (L11)", "head"]

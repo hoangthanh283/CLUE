@@ -113,7 +113,9 @@ def _select_vectors(
             # Activation shorter than text (e.g. patch_embed): keep all positions.
             return feat.reshape(B * L, D)
     else:
-        return feat.reshape(B * L, D)
+        # No attention mask = image backbone (ViT): the head reads the CLS token only,
+        # so probe that position rather than all patch tokens.
+        return feat[:, 0, :]
     return f[valid]  # (M_valid, D)
 
 
@@ -190,7 +192,8 @@ def collect_activations(
                 n_collected = (
                     sum(c.shape[0] for c in ref)
                     if token_level
-                    else n_collected + batch["input_ids"].shape[0]
+                    else n_collected
+                    + next(v for v in batch.values() if torch.is_tensor(v)).shape[0]
                 )
                 if n_collected >= max_samples:
                     break

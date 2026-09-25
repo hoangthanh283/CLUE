@@ -43,7 +43,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from doccl.data.bert_adapter import BertKIEAdapter
 from doccl.data.encoders import LayoutLMv3Encoder, build_encoder, set_default_encoder
-from doccl.data.scenarios import build_pilot
+from doccl.data.scenarios import build_cil_cifar100, build_pilot
 from doccl.eval.cka import collect_activations, linear_cka
 from doccl.eval.fisher import (
     empirical_fisher_diagonal,
@@ -51,11 +51,12 @@ from doccl.eval.fisher import (
     fisher_weighted_displacement,
     snapshot_params,
 )
-from doccl.eval.metrics import CLMetricsTracker, compute_token_f1
+from doccl.eval.metrics import CLMetricsTracker, compute_eval_metrics
 from doccl.models.bert_wrapper import BertTokenClassificationWrapper
 from doccl.models.bros_wrapper import BROSWrapper
 from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
 from doccl.models.lilt_wrapper import LiLTWrapper
+from doccl.models.vit_wrapper import ViTWrapper
 from doccl.types import ModalityMask
 
 log = logging.getLogger(__name__)
@@ -86,9 +87,18 @@ _SECONDARY_BACKBONES = {
     "cl_lilt": (LiLTWrapper, "lilt", "SCUT-DLVCLab/lilt-roberta-en-base", "roberta-base"),
     "cr_bros": (BROSWrapper, "bros", "jinho8345/bros-base-uncased", "jinho8345/bros-base-uncased"),
 }
+# Image-classification scope test (docs/IMAGE_SCOPE_PREREG.md, H1): ViT-B/16 on Split
+# CIFAR-100, naive, under the document recipe ("fast": AdamW 5e-5 all params) or the
+# SLCA slow-learner recipe ("slow": SGD, backbone 1e-4 / head 1e-2).
+_VISION_CONDITIONS = {"cv_vit_fast": "fast", "cv_vit_slow": "slow"}
 # Conditions that are NOT the masked LayoutLMv3 family (built maskless, own encoder).
-_MASKLESS_CONDITIONS = {"cb_bert", *_SECONDARY_BACKBONES.keys()}
-ALL_CONDITIONS = ["cb_bert", *_LAYOUTLM_CONDITIONS.keys(), *_SECONDARY_BACKBONES.keys()]
+_MASKLESS_CONDITIONS = {"cb_bert", *_SECONDARY_BACKBONES.keys(), *_VISION_CONDITIONS.keys()}
+ALL_CONDITIONS = [
+    "cb_bert",
+    *_LAYOUTLM_CONDITIONS.keys(),
+    *_SECONDARY_BACKBONES.keys(),
+    *_VISION_CONDITIONS.keys(),
+]
 
 
 def set_seed(seed: int) -> None:
@@ -148,10 +158,13 @@ def run_pilot_condition(
         set_default_encoder(
             build_encoder({"family": family, "name": model_name, "tokenizer_name": tok_name})
         )
-    else:
+    elif condition not in _VISION_CONDITIONS:
         set_default_encoder(LayoutLMv3Encoder())
 
-    scenario = build_pilot(order=task_order)
+    if condition in _VISION_CONDITIONS:
+        scenario = build_cil_cifar100()  # vision datasets carry their own transforms
+    else:
+        scenario = build_pilot(order=task_order)
     model, modality_mask = _build_condition_model(condition, scenario)
     model = model.to(device)
     if gradient_checkpointing:
@@ -211,7 +224,15 @@ def run_pilot_condition(
                 model, eval_loader, fisher_mask, cka_n_samples, device
             )
 
-        _train_naive(model, train_loader, modality_mask, epochs_per_task, device, is_maskless)
+        _train_naive(
+            model,
+            train_loader,
+            modality_mask,
+            epochs_per_task,
+            device,
+            is_maskless,
+            recipe=_VISION_CONDITIONS.get(condition, "fast"),
+        )
 
         if prev_activations is not None:
             log.info("Capturing post-training activations...")
@@ -267,7 +288,8 @@ def run_pilot_condition(
         tracker.update(task_idx, eval_results)
         accuracy_records.append({"task_idx": task_idx, "results": eval_results})
 
-    order = task_order or [0, 1, 2]
+    default_order = list(range(len(scenario.tasks)))
+    order = task_order or default_order
     summary = {
         "condition": condition,
         "seed": seed,
@@ -279,7 +301,7 @@ def run_pilot_condition(
         "cl_metrics": tracker.summary(),
         "matrix": tracker.matrix.tolist(),
     }
-    order_suffix = "" if order == [0, 1, 2] else "_ord" + "".join(str(i) for i in order)
+    order_suffix = "" if order == default_order else "_ord" + "".join(str(i) for i in order)
     out_path = output_dir / f"{condition}_seed{seed}{order_suffix}.json"
     with open(out_path, "w") as f:
         json.dump(summary, f, indent=2)
@@ -301,6 +323,9 @@ def _build_condition_model(condition: str, scenario):
     n_labels = len(scenario.tasks[0].label_set)
     if condition == "cb_bert":
         model: torch.nn.Module = BertTokenClassificationWrapper(num_labels=n_labels)
+        mask = None
+    elif condition in _VISION_CONDITIONS:
+        model = ViTWrapper(num_labels=n_labels)
         mask = None
     elif condition in _SECONDARY_BACKBONES:
         wrapper_cls, _, model_name, _ = _SECONDARY_BACKBONES[condition]
@@ -345,14 +370,30 @@ def _train_naive(
     epochs: int,
     device: torch.device,
     is_maskless: bool,
+    recipe: str = "fast",
 ) -> None:
-    """Naive sequential training for one task."""
+    """Naive sequential training for one task.
+
+    ``recipe`` = "fast" (document grid: AdamW 5e-5 on all params) or "slow" (SLCA
+    slow learner: SGD, backbone 1e-4 / head 1e-2) — the H1 image conditions.
+    """
     from tqdm import tqdm
 
     model.train()
-    optimizer = torch.optim.AdamW(
-        [p for p in model.parameters() if p.requires_grad], lr=5e-5, weight_decay=0.01
-    )
+    if recipe == "slow":
+        named = [(n, p) for n, p in model.named_parameters() if p.requires_grad]
+        optimizer = torch.optim.SGD(
+            [
+                {"params": [p for n, p in named if "classifier" in n], "lr": 1e-2},
+                {"params": [p for n, p in named if "classifier" not in n], "lr": 1e-4},
+            ],
+            momentum=0.9,
+            weight_decay=5e-4,
+        )
+    else:
+        optimizer = torch.optim.AdamW(
+            [p for p in model.parameters() if p.requires_grad], lr=5e-5, weight_decay=0.01
+        )
     extra = {} if is_maskless else {"modality_mask": modality_mask}
     for epoch in range(epochs):
         pbar = tqdm(loader, desc=f"ep{epoch+1}/{epochs}", leave=False)
@@ -408,7 +449,9 @@ def _evaluate_all(
                 m = lbl != -100
                 preds.extend(p[m].cpu().tolist())
                 golds.extend(lbl[m].cpu().tolist())
-            out[tid] = compute_token_f1(preds, golds, model.id_to_label)
+            out[tid] = compute_eval_metrics(
+                preds, golds, model.id_to_label, getattr(model, "task_type", "token")
+            )
     return out
 
 

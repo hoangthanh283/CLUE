@@ -515,6 +515,8 @@ _CONDITION_LABELS = {
     "cb_bert": "BERT (text-only)",
     "cl_lilt": "LiLT",
     "cr_bros": "BROS",
+    "cv_vit_fast": "ViT-B/16 CIFAR-100 (AdamW)",
+    "cv_vit_slow": "ViT-B/16 CIFAR-100 (slow trunk)",
 }
 # Task-boundary keys → readable transition labels for figure titles.
 _BOUNDARY_LABELS = {
