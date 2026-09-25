@@ -1,4 +1,21 @@
-## RESUME HERE (2026-09-23): ICLR 2027 draft v1 + image-CL scope test implemented
+## RESUME HERE (2026-09-25): image-CL grid running; ICLR full paper due TODAY (Sep 25 AoE)
+
+**Image grid (local 2060, bs 16 + ckpt, document recipe).** Launched 07:18 Sep 25 via
+`scripts/run_vision_grid.sh`: CIFAR-100 {naive, ewc, lwf, er, er_b2000, der_pp,
+der_pp_b2000, slca, slca_noca, joint} × {42,7,123}, then ImageNet-R same. Resume-safe; log
+`results/logs_vision/queue.log`. Seed-42 gate results: joint 89.08 (published 93.22 →
+gate made *internal*, see prereg Amendment 1), ER@200 44.15 / BWT −59.8 (200 exemplars =
+0.4 % of CIFAR → added 2000-exemplar arm), naive 1-ep smoke 11.75. Lesson: a `setsid bash -c
+'while pgrep -f "bash scripts/X"...'` waiter matches ITSELF and deadlocks — cost ~20 h idle
+GPU on Sep 24. Use direct sequential launches or match on a unique token.
+**Prereg amended** (`docs/IMAGE_SCOPE_PREREG.md` Amendment 1): internal gate, buffer-size
+arm, H2b (slow-trunk vs alignment), bug disclosure. **Wired but not yet queued:** H1 pilot
+conditions `cv_vit_fast`/`cv_vit_slow` (`doccl-pilot --conditions cv_vit_fast --seeds 42 7 123
+--epochs 3 --batch_size 16`), H3 pair (`latent_replay` real bank vs `aglr_replay`, ViT).
+Queue them after the main grid (one GPU job at a time). Then `scripts/image_scope_verdict.py`
+(to write) → `docs/IMAGE_SCOPE_VERDICT.md`.
+
+## (2026-09-23): ICLR 2027 draft v1 + image-CL scope test implemented
 
 **Paper.** `paper/main.tex` (ICLR 2027 style, anonymised) builds; main text ends p.9 (limit 9).
 Abstract registered on OpenReview 2026-09-18; **full paper due 2026-09-25 AoE**. Table 1 = 68/72
