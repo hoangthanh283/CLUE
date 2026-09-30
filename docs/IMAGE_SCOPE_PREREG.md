@@ -79,3 +79,26 @@ implying the boundary is task structure, not modality.
 5. Queue order: CIFAR-100 {naive, ewc, lwf, er, er_b2000, der_pp, der_pp_b2000, slca,
    slca_noca, joint} × {42, 7, 123}, then ImageNet-R same. H1 pilot conditions and the
    H3 pair follow once their code paths are wired (separate amendment).
+
+## Amendment 2 (2026-09-30, after the CIFAR-100 arms A–C landed; before any H1/H3 run)
+
+CIFAR-100 (3 seeds): naive 11.7, EWC 13.9, LwF 15.7, ER@200 42.3, ER@2000 76.2, DER++@200
+43.6, DER++@2000 76.5, **SLCA 87.5**, **slca_noca 38.0**, joint 89.5. Verdicts by
+`scripts/image_scope_verdict.py`: gate PASS; **H2 SUPPORTED** (SLCA −2.0 vs joint, +11.3 vs
+ER@2000); **H2b NOT SUPPORTED** (slow trunk alone recovers 34 % of the naive→joint gap, per
+seed 0.38/0.35/0.28). The slow-trunk final rows are [0, 7, 10, 14, 32, 19, 50, 66, 87, 97]:
+old-task accuracy is extinguished at the *head* while the trunk is nearly frozen — the
+readout-marginal snap of the document RCA, reproduced on images. The alignment step (Gaussian
+re-grounding of the head) carries essentially the whole SLCA gain.
+
+Discrepancy to calibrate, not to explain away: SLCA's published Seq-FT under the same
+optimiser is 88.86; our `slca_noca` is 38.0. Differences: fixed 20-epoch cosine schedule vs
+our early stopping (patience 2), bs 128 vs 16 (8× more head steps per epoch at lr 1e-2), and
+augmentation. **Added calibration arm** `slca_noca_pub` (fixed 20 epochs, cosine, no early
+stop; bs 16 remains a stated caveat) × 3 seeds on CIFAR-100. It does not change H2b's verdict
+under the registered rule; it bounds how much of the 38-vs-89 gap is schedule.
+
+H1 (pilot `cv_vit_fast` / `cv_vit_slow`, 5 epochs/task, 3 seeds) and H3 (`latent_replay`
+real CLS bank, 500 images/task at layer 8, vs `aglr_replay` class-Gaussian summary with
+500 label carriers/task; 3 seeds, CIFAR-100) are queued behind the ImageNet-R cells,
+unchanged from the original registration.
