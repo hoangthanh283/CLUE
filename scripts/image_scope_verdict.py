@@ -103,8 +103,15 @@ def main() -> None:
     lines += ["## Gate (internal, Amendment 1)", ""]
     for sc in SCENARIOS:
         j, n = aa(runs, sc, "joint").get(42), aa(runs, sc, "naive").get(42)
-        status = "n/a" if j is None or n is None else ("PASS" if j > 85 and n < 25 else "FAIL")
-        lines.append(f"- {sc}: joint@42 = {j}, naive@42 = {n} → {status}")
+        # Amendment 3: joint within 10 pp of the published joint, naive < 25 (CIFAR: >83.2;
+        # ImageNet-R: >69.6). Amendment 1's literal ">85" was written for CIFAR-100 only.
+        j_min = PUBLISHED[sc]["joint"] - 10
+        status = "n/a" if j is None or n is None else ("PASS" if j > j_min and n < 25 else "FAIL")
+        lines.append(
+            f"- {sc}: joint@42 = {j:.2f}, naive@42 = {n:.2f} (joint > {j_min:.1f}) → {status}"
+            if status != "n/a"
+            else f"- {sc}: n/a"
+        )
     lines.append("")
 
     lines += ["## Hypotheses", ""]
