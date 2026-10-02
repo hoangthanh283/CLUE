@@ -102,3 +102,23 @@ H1 (pilot `cv_vit_fast` / `cv_vit_slow`, 5 epochs/task, 3 seeds) and H3 (`latent
 real CLS bank, 500 images/task at layer 8, vs `aglr_replay` class-Gaussian summary with
 500 label carriers/task; 3 seeds, CIFAR-100) are queued behind the ImageNet-R cells,
 unchanged from the original registration.
+
+## Amendment 3 (2026-10-02, after all ImageNet-R arms landed; H1/H3 still queued)
+
+1. **Gate clarification.** Amendment 1's literal "joint > 85" was written for CIFAR-100.
+   The intended rule, now applied to both benchmarks in `scripts/image_scope_verdict.py`:
+   seed-42 joint within 10 pp of the published joint (CIFAR-100 > 83.2; ImageNet-R > 69.6)
+   and naive < 25. Both benchmarks PASS (CIFAR 89.1 / 10.6; ImageNet-R 77.4 / 9.6).
+2. **ImageNet-R (3 seeds, AA):** naive 9.3, EWC 9.3, LwF 12.7, ER@200 21.6, ER@2000 54.8,
+   DER++@200 20.2, DER++@2000 52.8, SLCA 65.0, slow-trunk 25.8, joint 77.6.
+   **H2 NOT SUPPORTED on ImageNet-R** (SLCA − joint = −12.6; SLCA − ER@2000 = +10.2).
+   Combined with CIFAR-100 (H2 supported, −2.0) the registered reading is "mixed: report as
+   measured": buffer-free head re-grounding closes the gap on the in-distribution benchmark
+   and leaves a 12.6-pp gap under domain shift, while remaining the best buffer-free
+   method and above 2 000-exemplar replay on both.
+3. **Calibration arm (first seed):** `slca_noca_pub` (fixed 20 ep, cosine, no early stop)
+   = 26.6 on seed 42 — *lower* than the early-stopped slow-trunk run (38.4). Longer
+   head-only training at lr 1e-2 deepens the snap. The published Seq-FT (88.9) is therefore
+   not a schedule effect of ours; the remaining candidate is batch size (bs 128 → 8× fewer
+   head updates per epoch) and we do not have the memory to test it locally. Reported as an
+   unresolved discrepancy; it does not bear on H2/H2b under the registered rules.

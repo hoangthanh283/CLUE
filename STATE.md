@@ -1,4 +1,18 @@
-## RESUME HERE (2026-09-25): image-CL grid running; ICLR full paper due TODAY (Sep 25 AoE)
+## RESUME HERE (2026-10-02): image-CL main grid DONE (60/60); H1/H3/calibration queue running
+
+**Verdicts** (`docs/IMAGE_SCOPE_VERDICT.md`, rules in `docs/IMAGE_SCOPE_PREREG.md` + Amendments
+1–3): gate PASS both benchmarks. **H2 SUPPORTED on CIFAR-100** (SLCA 87.5 vs joint 89.5, +11 over
+ER@2000) and **NOT SUPPORTED on ImageNet-R** (SLCA 65.0 vs joint 77.6, still +10 over ER@2000) →
+"mixed, report as measured". **H2b NOT SUPPORTED**: slow trunk alone 38.0 / 25.8 — old-task rows
+extinguished at the head (readout snap reproduced on images); the Gaussian head re-grounding
+carries the gain. EWC/LwF at the naive floor on both. Unresolved: published Seq-FT 88.9 vs our
+slow-trunk 38 (not schedule — fixed-20-ep arm gives 26.6; likely bs 128 vs 16).
+**Running:** `scripts/queue_after_grid.sh` → slca_noca_pub ×3, H3 pair (latent_replay d500 vs
+aglr_replay) ×3, H1 pilot cv_vit_fast/slow ×3 (`results/pilot/cv_vit_*.json`). Then: extend
+`image_scope_verdict.py` for H1/H3, `doccl-pilot-analyze` + `build_backbone_figures.py` with the
+ViT condition, write the paper section "what changes when the head is not per-token".
+
+## (2026-09-25): image-CL grid launched; ICLR full paper due Sep 25 AoE
 
 **Image grid (local 2060, bs 16 + ckpt, document recipe).** Launched 07:18 Sep 25 via
 `scripts/run_vision_grid.sh`: CIFAR-100 {naive, ewc, lwf, er, er_b2000, der_pp,
