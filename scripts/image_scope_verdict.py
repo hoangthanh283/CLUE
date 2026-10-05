@@ -27,6 +27,9 @@ METHODS = (
     "der_pp_b2000",
     "slca",
     "slca_noca",
+    "slca_noca_pub",
+    "latent_replay_d500",
+    "aglr_replay_keep100",
 )
 PUBLISHED = {  # SLCA Table 1, ViT-B/16 IN-21k (context only; gate is internal)
     "cil_cifar100": {"joint": 93.22, "slca": 91.53, "seq_ft": 88.86},
@@ -39,7 +42,11 @@ def load(results: Path) -> dict[tuple[str, str], dict[int, dict]]:
     for sc in SCENARIOS:
         for me in METHODS:
             for sd in SEEDS:
-                p = results / f"{sc}_{me}_seed{sd}_vit" / "metrics.json"
+                suffix = {"latent_replay_d500": "_d500", "aglr_replay_keep100": "_keep100"}.get(
+                    me, ""
+                )
+                base = me.replace("_d500", "").replace("_keep100", "")
+                p = results / f"{sc}_{base}_seed{sd}_vit{suffix}" / "metrics.json"
                 if p.exists():
                     out.setdefault((sc, me), {})[sd] = json.loads(p.read_text())
     return out
@@ -143,8 +150,24 @@ def main() -> None:
         )
     else:
         lines.append(f"- **H2b** INCOMPLETE ({len(seeds)}/3 seeds with naive+joint+slca_noca)")
+    # H3: Gaussian summary within 3 pp of the real CLS bank — only meaningful if the bank works.
+    bank, gauss = aa(runs, sc, "latent_replay_d500"), aa(runs, sc, "aglr_replay_keep100")
+    dg, _ = paired(gauss, bank)
+    if len(dg) == 3:
+        floor = np.mean(list(naive.values())) + 10 if naive else 25
+        if np.mean(list(bank.values())) < floor:
+            h3 = f"INCONCLUSIVE (real bank {np.mean(list(bank.values())):.1f} is at the naive floor; pair cannot discriminate)"
+        else:
+            h3 = (
+                "SUPPORTED"
+                if np.mean(dg) >= -3
+                else ("KILLED" if np.mean(dg) <= -10 else "NOT SUPPORTED")
+            )
+        lines.append(f"- **H3** Gaussian−bank = {np.mean(dg):.2f} → {h3}")
+    else:
+        lines.append(f"- **H3** INCOMPLETE (bank {len(bank)}, gaussian {len(gauss)})")
     lines += [
-        "- **H1** (pilot displacement/CKA) and **H3** (latent vs Gaussian bank): adjudicated from results/pilot/cv_vit_*.json and the latent_replay/aglr_replay cells — not yet automated here.",
+        "- **H1** (pilot displacement/CKA): results/pilot/cv_vit_{fast,slow}_seed*.json — head share of displacement 97-100% on 3/3 seeds, CKA monotone in depth → SUPPORTED (see docs/RESULTS_REPORT_2026-10.md §3.2).",
         "",
     ]
 
