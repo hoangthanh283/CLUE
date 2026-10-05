@@ -1,3 +1,19 @@
+## ⚠ BUG (2026-10-06): latent replay × gradient checkpointing — all checkpointed latent-replay-family runs invalid
+
+HF checkpointing recomputes `layer.__call__` in backward; the layer-k injection pre-hook re-fires
+after `_inject` was cleared, so layer k was recomputed on the DUMMY input → wrong layer-k weight
+gradients on every replay step (silent; shapes match). Repro + guard:
+`tests/methods/test_latent_replay_checkpointing.py`. Fix: `LatentReplay.no_checkpointing()` around
+every gradient-carrying injected forward (base `_replay_forward`, PLaR soft path).
+**Affected = every run with training.gradient_checkpointing=true** in the latent_replay / CoLaR /
+CoLaSlot / CA-CoLaR / PLaR family — incl. the 3-seed document rerun **66.47** (the "87.3 does not
+reproduce" finding: original ran on the rented GPU without checkpointing), all `results/gates/*`
+CoLaR/CA-CoLaR/CoLaSlot gates (logs show checkpointing on), and the ViT H3 latent arms.
+NOT affected: non-checkpointed rented-GPU runs (87.3 raw, CoLaR r128 87.6 if run there) and every
+non-latent method. Re-runs queued (`scripts/run_ckptfix_queue.sh`): dil latent k8/d5 ×3 seeds with
+the identical config except the fix → decides the 87.3 question; then ViT Step-1 arms.
+Also fixed: AMP picked emulated bf16 on Turing; now fp16+GradScaler (ViT 2.27→7.50 it/s).
+
 ## RESUME HERE (2026-10-05): ALL image-CL experiments complete; consolidated report written
 
 `docs/RESULTS_REPORT_2026-10.md` = every result in comparable tables (doc grid AA/BWT, extra

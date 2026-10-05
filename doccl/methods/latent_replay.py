@@ -35,6 +35,7 @@ drive the correct rel_pos/rel_2d_pos biases and masking for the replayed documen
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import random
 
@@ -128,6 +129,7 @@ class LatentReplay(NaiveFineTune):
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
         stopper = self.make_early_stopper(val_loader)
+        self._amp_setup()  # opt-in mixed precision; inert unless cfg.training.amp
 
         total_loss = 0.0
         n_steps = 0
@@ -137,18 +139,17 @@ class LatentReplay(NaiveFineTune):
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
 
                 optimizer.zero_grad()
-                cur_out = self.model(**batch)
-                ce_loss = cur_out.loss
-                replay_loss = torch.zeros((), device=self.device)
+                with self._amp_autocast():
+                    cur_out = self.model(**batch)
+                    ce_loss = cur_out.loss
+                    replay_loss = torch.zeros((), device=self.device)
 
-                replay = self._sample_replay()
-                if replay is not None:
-                    replay_loss = self._replay_forward(replay).loss
+                    replay = self._sample_replay()
+                    if replay is not None:
+                        replay_loss = self._replay_forward(replay).loss
 
-                loss = ce_loss + self._replay_loss_scale(task.task_id) * replay_loss
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.trainable_parameters(), max_grad_norm)
-                optimizer.step()
+                    loss = ce_loss + self._replay_loss_scale(task.task_id) * replay_loss
+                self._amp_backward_step(loss, optimizer, self.trainable_parameters(), max_grad_norm)
                 self._post_optimizer_step()
 
                 total_loss += float(loss.item())
@@ -174,8 +175,35 @@ class LatentReplay(NaiveFineTune):
         """Equalize per-task loss mass; default 1.0 preserves all prior runs."""
         return float(max(task_id, 1)) if self.config.get("replay_task_balance", False) else 1.0
 
+    def _encoder_module(self):
+        inner = getattr(self.model, "_inner", None)
+        if inner is None:
+            inner = self.model.model.layoutlmv3
+        return inner.encoder
+
     def _replay_forward(self, replay: dict[str, torch.Tensor]):
-        """Full wrapper forward with the stored hidden injected at layer k."""
+        """Full wrapper forward with the stored hidden injected at layer k.
+
+        Gradient checkpointing is switched off for this forward: HF recomputes
+        ``layer.__call__`` during backward, which re-fires the injection pre-hook after
+        ``_inject`` has been cleared, so layer k would be recomputed on the dummy input
+        and receive wrong gradients (tests/methods/test_latent_replay_checkpointing.py).
+        """
+        with self.no_checkpointing():
+            return self._replay_forward_inner(replay)
+
+    @contextlib.contextmanager
+    def no_checkpointing(self):
+        """Disable HF gradient checkpointing for any forward that injects at layer k."""
+        encoder = self._encoder_module()
+        ckpt = getattr(encoder, "gradient_checkpointing", False)
+        encoder.gradient_checkpointing = False
+        try:
+            yield
+        finally:
+            encoder.gradient_checkpointing = ckpt
+
+    def _replay_forward_inner(self, replay: dict[str, torch.Tensor]):
         labels = replay["labels"].to(self.device)
         if "bbox" not in replay:  # image backbone: only pixel_values + labels exist
             b = labels.shape[0]

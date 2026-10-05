@@ -209,12 +209,13 @@ class ProxyLatentReplay(LatentReplay):
         )
         self._inject = replay["hidden"]
         try:
-            out = self.model(
-                input_ids=dummy_ids,
-                bbox=bbox,
-                pixel_values=dummy_pixels,
-                attention_mask=attention_mask,
-            )
+            with self.no_checkpointing():  # recompute would drop the injection
+                out = self.model(
+                    input_ids=dummy_ids,
+                    bbox=bbox,
+                    pixel_values=dummy_pixels,
+                    attention_mask=attention_mask,
+                )
         finally:
             self._inject = None
         cur = out.logits  # (b, text, C_now)
