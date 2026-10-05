@@ -1,0 +1,12 @@
+# CoLaR on ViT image CIL (prereg Amendment 4). k / docs / rank are set per cell on the CLI;
+# replay density follows the Step-1 diagnostic (batch 16, task-balanced).
+name: colar
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 100
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 500
+rank_r: 64
+replay_batch_size: 16
+replay_task_balance: true

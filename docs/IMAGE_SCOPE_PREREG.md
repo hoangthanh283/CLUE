@@ -122,3 +122,26 @@ unchanged from the original registration.
    not a schedule effect of ours; the remaining candidate is batch size (bs 128 → 8× fewer
    head updates per epoch) and we do not have the memory to test it locally. Reported as an
    unresolved discrepancy; it does not bear on H2/H2b under the registered rules.
+
+## Amendment 4 (2026-10-05, before any CoLaR image cell; Step-1 diagnostic running)
+
+**Why.** H3 was inconclusive because frozen-trunk latent replay at k=8 (replay batch 4,
+d=500) collapses on ViT after task 6. CoLaR — the document paper's constructive control —
+was never run on images. We now (1) find a working latent-replay operating point on ViT and
+(2) test CoLaR on it. Internal comparison only (document recipe; published SoTA as context).
+
+**Step 1 (diagnostic, not a hypothesis).** CIFAR-100 seed 42, raw bank d=500, replay batch
+16, task-balanced replay loss; arms k = 8 (A), 11 (B), 12 = head-only (D), 4 (C). Select the
+arm with the highest AA that is ≥ ER@2000 (76.2); if none, report "latent replay does not
+reach raw-exemplar replay on ViT" and run Step 2 on the best arm regardless.
+
+**Step 2 hypotheses (CIFAR-100 and ImageNet-R, 3 seeds, at the selected k):**
+- H5 *per-sample SVD is lossless on images*: CoLaR r=64 and r=128 within 2 pp of the raw
+  bank (d=500). Kill: r=128 below the bank by > 5 pp.
+- H6 *compression buys coverage*: CoLaR r=16 with d=2000 (≈ the raw bank's bytes at d=500,
+  31 KB vs 302 KB per image) exceeds the raw bank d=500 by ≥ 3 pp. Expected on both;
+  equal-*pixel*-byte superiority over ER is expected only on ImageNet-R (CIFAR raw images are
+  3 KB, cheaper than any latent store) and is reported, not hypothesised.
+- H3 re-adjudicated: AGLR class-Gaussian summary at the selected k vs the raw bank.
+Decision rules unchanged (3 seeds; sign agreement; |mean| > pooled s.d.). Memory axis uses the
+per-run `memory_bytes()` log, never hand computation.

@@ -63,11 +63,20 @@ class LatentReplay(NaiveFineTune):
         self._capture: list[torch.Tensor] | None = None
         self._pixel_shape: tuple[int, ...] | None = None
         n_layers = len(self._encoder_layers())
-        if not 0 < self.split_layer_k < n_layers:
-            raise ValueError(f"split_layer_k must be in (0, {n_layers}), got {self.split_layer_k}")
-        self._encoder_layers()[self.split_layer_k].register_forward_pre_hook(
-            self._pre_hook, with_kwargs=True
-        )
+        if not 0 < self.split_layer_k <= n_layers:
+            raise ValueError(f"split_layer_k must be in (0, {n_layers}], got {self.split_layer_k}")
+        if self.split_layer_k == n_layers:
+            # k == n_layers: bank the encoder output (input to the final layernorm) and keep
+            # only the head plastic — the head-only arm of the image diagnostic.
+            final_ln = getattr(self.model._inner, "layernorm", None)
+            if final_ln is None:
+                raise ValueError(
+                    "split_layer_k == n_layers needs a backbone with a final layernorm"
+                )
+            hook_point = final_ln
+        else:
+            hook_point = self._encoder_layers()[self.split_layer_k]
+        hook_point.register_forward_pre_hook(self._pre_hook, with_kwargs=True)
 
     # ------------------------------------------------------------------ hooks
     def _encoder_layers(self):
