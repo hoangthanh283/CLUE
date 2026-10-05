@@ -256,7 +256,9 @@ class ContinualMethod(ABC):
             self._amp_dtype = None
             self._amp_scaler = None
             return
-        if torch.cuda.is_bf16_supported():
+        # Native bf16 only (Ampere+). Turing reports bf16 "supported" via slow emulation;
+        # fp16 + GradScaler is ~3x faster there (RTX 2060: 2.3 → 7.5 it/s on ViT-B).
+        if torch.cuda.is_bf16_supported(including_emulation=False):
             self._amp_dtype = torch.bfloat16
             self._amp_scaler = None
         else:
