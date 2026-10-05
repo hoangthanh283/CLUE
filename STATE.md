@@ -1,4 +1,18 @@
-## RESUME HERE (2026-10-02): image-CL main grid DONE (60/60); H1/H3/calibration queue running
+## RESUME HERE (2026-10-05): ALL image-CL experiments complete; consolidated report written
+
+`docs/RESULTS_REPORT_2026-10.md` = every result in comparable tables (doc grid AA/BWT, extra
+baselines, diagnostics, replay ladder, falsification ledger, image grid + verdicts) — the basis
+for the write-up. Image verdicts (`docs/IMAGE_SCOPE_VERDICT.md`): gate PASS; **H1 SUPPORTED**
+(ViT displacement 97–100 % at head on 3/3 seeds, CKA monotone; slow trunk 100 %); H2 mixed
+(CIFAR yes, ImageNet-R no); H2b NOT SUPPORTED; **H3 INCONCLUSIVE** (both latent arms at floor:
+real bank d500 12.0 — frozen-trunk latent replay loses plasticity from task 5 on ViT; Gaussian
+10.7). Gotcha: `aglr_replay` with `attn_keep=1.0` gets a `_keep100` run-dir suffix — the
+after-grid queue logged it FAIL but the runs completed. Optional follow-ups (not needed for the
+claims): bs-128 SLCA/Seq-FT replication on ≥16 GB; H3 redesign with a working ViT replay;
+H4 RVL-CDIP bridge. Next: paper §7 "what changes when the head is not per-token" + figures
+(`doccl-pilot-analyze`, `build_backbone_figures.py` know the ViT condition).
+
+## (2026-10-02): image-CL main grid DONE (60/60); H1/H3/calibration queue running
 
 **Verdicts** (`docs/IMAGE_SCOPE_VERDICT.md`, rules in `docs/IMAGE_SCOPE_PREREG.md` + Amendments
 1–3): gate PASS both benchmarks. **H2 SUPPORTED on CIFAR-100** (SLCA 87.5 vs joint 89.5, +11 over

@@ -2,10 +2,10 @@
 
 ## Cells (AA, mean ± sd over available seeds)
 
-| scenario | naive | joint | ewc | lwf | er | er_b2000 | der_pp | der_pp_b2000 | slca | slca_noca |
-|---|---|---|---|---|---|---|---|---|---|---|
-| cil_cifar100 | 11.7±1.1 (n=3) | 89.5±0.4 (n=3) | 13.9±1.5 (n=3) | 15.7±0.6 (n=3) | 42.3±2.7 (n=3) | 76.2±1.2 (n=3) | 43.6±4.0 (n=3) | 76.5±1.5 (n=3) | 87.5±0.2 (n=3) | 38.0±3.9 (n=3) |
-| cil_imagenet_r | 9.3±0.3 (n=3) | 77.6±0.5 (n=3) | 9.3±0.2 (n=3) | 12.7±1.4 (n=3) | 21.6±1.3 (n=3) | 54.8±0.7 (n=3) | 20.2±2.5 (n=3) | 52.8±1.1 (n=3) | 65.0±0.3 (n=3) | 25.8±0.7 (n=3) |
+| scenario | naive | joint | ewc | lwf | er | er_b2000 | der_pp | der_pp_b2000 | slca | slca_noca | slca_noca_pub | latent_replay_d500 | aglr_replay_keep100 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| cil_cifar100 | 11.7±1.1 (n=3) | 89.5±0.4 (n=3) | 13.9±1.5 (n=3) | 15.7±0.6 (n=3) | 42.3±2.7 (n=3) | 76.2±1.2 (n=3) | 43.6±4.0 (n=3) | 76.5±1.5 (n=3) | 87.5±0.2 (n=3) | 38.0±3.9 (n=3) | 26.7±0.3 (n=3) | 12.0±7.2 (n=3) | 10.7±0.8 (n=3) |
+| cil_imagenet_r | 9.3±0.3 (n=3) | 77.6±0.5 (n=3) | 9.3±0.2 (n=3) | 12.7±1.4 (n=3) | 21.6±1.3 (n=3) | 54.8±0.7 (n=3) | 20.2±2.5 (n=3) | 52.8±1.1 (n=3) | 65.0±0.3 (n=3) | 25.8±0.7 (n=3) | — | — | — |
 
 Published context (SLCA Tab. 1): cil_cifar100: joint 93.22, SLCA 91.53, Seq-FT 88.86; cil_imagenet_r: joint 79.6, SLCA 77.0, Seq-FT 71.8
 
@@ -19,5 +19,6 @@ Published context (SLCA Tab. 1): cil_cifar100: joint 93.22, SLCA 91.53, Seq-FT 8
 - **H2 [cil_cifar100]** SLCA−joint = -2.01, SLCA−ER2000 = 11.32 → SUPPORTED
 - **H2 [cil_imagenet_r]** SLCA−joint = -12.60, SLCA−ER2000 = 10.20 → NOT SUPPORTED
 - **H2b** slow-trunk recovers 34% of the naive→joint gap (per seed ['0.38', '0.35', '0.28']) → NOT SUPPORTED
-- **H1** (pilot displacement/CKA) and **H3** (latent vs Gaussian bank): adjudicated from results/pilot/cv_vit_*.json and the latent_replay/aglr_replay cells — not yet automated here.
+- **H3** Gaussian−bank = -1.30 → INCONCLUSIVE (real bank 12.0 is at the naive floor; pair cannot discriminate)
+- **H1** (pilot displacement/CKA): results/pilot/cv_vit_{fast,slow}_seed*.json — head share of displacement 97-100% on 3/3 seeds, CKA monotone in depth → SUPPORTED (see docs/RESULTS_REPORT_2026-10.md §3.2).
 
