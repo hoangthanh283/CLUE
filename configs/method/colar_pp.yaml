@@ -1,0 +1,20 @@
+# CoLaR++ (docs/IMAGE_SCOPE_PREREG.md Amendment 5). All switches default OFF here; arms
+# turn them on via CLI. rank_r: 0 = raw latent bank.
+name: colar_pp
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 100
+max_grad_norm: 1.0
+split_layer_k: 4
+docs_per_task: 500
+rank_r: 0
+replay_batch_size: 16
+replay_task_balance: true
+head_align_epochs: 0
+head_align_lr: 5.0e-3
+head_align_batch: 64
+trunk_lr_scale: 1.0
+weight_align: false
+replay_balance: none
+quant: none
+token_pool: 1

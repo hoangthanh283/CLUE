@@ -121,11 +121,7 @@ class LatentReplay(NaiveFineTune):
         self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None
     ) -> TrainMetrics:
         self.model.train()
-        optimizer = torch.optim.AdamW(
-            self.trainable_parameters(),
-            lr=self.config.get("lr", 5e-5),
-            weight_decay=self.config.get("weight_decay", 0.01),
-        )
+        optimizer = self._make_optimizer()
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
         stopper = self.make_early_stopper(val_loader)
@@ -259,6 +255,14 @@ class LatentReplay(NaiveFineTune):
             self._apply_freeze_map()
         if self.docs_per_task > 0:
             self._capture_task(train_loader)
+
+    def _make_optimizer(self) -> torch.optim.Optimizer:
+        """AdamW over all trainable params; subclasses may split LR by parameter group."""
+        return torch.optim.AdamW(
+            self.trainable_parameters(),
+            lr=self.config.get("lr", 5e-5),
+            weight_decay=self.config.get("weight_decay", 0.01),
+        )
 
     def _apply_freeze_map(self) -> None:
         """Early-freeze mirror of lexmem's map: layers < k + embeddings frozen,

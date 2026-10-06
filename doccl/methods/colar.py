@@ -73,12 +73,11 @@ class CoLaR(LatentReplay):
             "hidden": torch.stack(
                 [(doc["us"].float() @ doc["v"].float()).to(torch.float16) for doc in docs]
             ),
-            "bbox": torch.stack([doc["bbox"] for doc in docs]),
-            "attention_mask": torch.stack([doc["attention_mask"] for doc in docs]),
             "labels": torch.stack([doc["labels"] for doc in docs]),
         }
-        if "input_ids" in docs[0]:
-            replay["input_ids"] = torch.stack([doc["input_ids"] for doc in docs])
+        for k in ("bbox", "attention_mask", "input_ids"):  # document keys; absent for images
+            if k in docs[0]:
+                replay[k] = torch.stack([doc[k] for doc in docs])
         return replay
 
     def _sample_replay(self) -> dict[str, torch.Tensor] | None:
@@ -91,7 +90,9 @@ class CoLaR(LatentReplay):
         total = 0
         for d in self.store:
             total += (d["us"].numel() + d["v"].numel()) * 2  # fp16 factors
-            total += (d["bbox"].numel() + d["attention_mask"].numel() + d["labels"].numel()) * 8
-            if "input_ids" in d:
-                total += d["input_ids"].numel() * 8
+            total += sum(
+                d[k].numel() * 8
+                for k in ("bbox", "attention_mask", "labels", "input_ids")
+                if k in d
+            )
         return total
