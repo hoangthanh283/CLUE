@@ -145,3 +145,28 @@ reach raw-exemplar replay on ViT" and run Step 2 on the best arm regardless.
 - H3 re-adjudicated: AGLR class-Gaussian summary at the selected k vs the raw bank.
 Decision rules unchanged (3 seeds; sign agreement; |mean| > pooled s.d.). Memory axis uses the
 per-run `memory_bytes()` log, never hand computation.
+
+## Amendment 5 (2026-10-06, before any CoLaR++ run): CoLaR++ on image CIL
+
+**Status of Step 2 (Amendment 4).** Raw latent bank at k=4 (d500, replay batch 16, task-balanced,
+fp16) on CIFAR-100: seed 42 80.5; seeds 7/123 completed or running. The plain-CoLaR cells were
+stopped before running (they would have crashed: `colar.py` assumed document keys — fixed).
+H5/H6 are now tested inside CoLaR++ Phase A2/B instead.
+
+**CoLaR++** (`doccl/methods/colar_pp.py`), switches motivated by our own findings:
+CA = post-task head alignment on *real* stored latents (features recomputed through the current
+trunk; class-balanced SGD 5e-3, 10 ep); SL = plastic trunk at 0.1× head LR (0.1 rather than the
+plan's 0.01 because under AdamW 0.01 ≈ frozen; stated before any run); WA = weight aligning;
+BAL = class-balanced replay; Q8 = int8 factors; POOL = CLS + 2×2-pooled patches.
+Settings fixed as Step 1 (ViT-B/16 IN-21k, k=4, d500, bs 16, fp16, AdamW 5e-5, early stop).
+
+**Phase A (seed 42, CIFAR-100):** +CA, +SL, +CA+SL, +CA+SL+WA, +CA+SL+WA+BAL vs base 80.5.
+Go criterion: best ≥ 87.5 (SLCA, same recipe). Else one round on CA epochs {10,30} × LR
+{5e-3,1e-2}, then report.
+**Phase A2 (seed 42):** winner at r128 / r64 / r16 / r16+Q8 / r16+Q8+POOL / r16+Q8+POOL@2000.
+Lossless point = smallest store within 1 pp of the raw winner; coverage point = best AA/MB.
+**Phase B (3 seeds × CIFAR-100, ImageNet-R; + 20-task CIFAR-100 stress):** winner, lossless,
+coverage, ablations −CA / −SL / −(WA,BAL). **Claim rule:** mean ≥ SLCA on both benchmarks
+with sign agreement on 3/3 seeds, at the stated memory. Metrics: final AA, Inc-Acc, BWT,
+`replay_memory_bytes`. Published SoTA (SLCA 91.5/77.0, RanPAC 92.2/78.1) is context only
+unless the published-recipe Phase C is run on a ≥16 GB GPU.
