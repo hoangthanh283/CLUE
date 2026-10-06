@@ -1,18 +1,22 @@
-## ⚠ BUG (2026-10-06): latent replay × gradient checkpointing — all checkpointed latent-replay-family runs invalid
+## Latent replay × gradient checkpointing bug (found 2026-10-06; scope NARROWED same day)
 
-HF checkpointing recomputes `layer.__call__` in backward; the layer-k injection pre-hook re-fires
-after `_inject` was cleared, so layer k was recomputed on the DUMMY input → wrong layer-k weight
-gradients on every replay step (silent; shapes match). Repro + guard:
-`tests/methods/test_latent_replay_checkpointing.py`. Fix: `LatentReplay.no_checkpointing()` around
-every gradient-carrying injected forward (base `_replay_forward`, PLaR soft path).
-**Affected = every run with training.gradient_checkpointing=true** in the latent_replay / CoLaR /
-CoLaSlot / CA-CoLaR / PLaR family — incl. the 3-seed document rerun **66.47** (the "87.3 does not
-reproduce" finding: original ran on the rented GPU without checkpointing), all `results/gates/*`
-CoLaR/CA-CoLaR/CoLaSlot gates (logs show checkpointing on), and the ViT H3 latent arms.
-NOT affected: non-checkpointed rented-GPU runs (87.3 raw, CoLaR r128 87.6 if run there) and every
-non-latent method. Re-runs queued (`scripts/run_ckptfix_queue.sh`): dil latent k8/d5 ×3 seeds with
-the identical config except the fix → decides the 87.3 question; then ViT Step-1 arms.
-Also fixed: AMP picked emulated bf16 on Turing; now fp16+GradScaler (ViT 2.27→7.50 it/s).
+HF checkpointing recomputes `layer.__call__` in backward and re-fires the layer-k injection
+pre-hook after `_inject` was cleared → layer k recomputed on the dummy input (silent). Fixed in
+38648af (`LatentReplay.no_checkpointing()`), test `tests/methods/test_latent_replay_checkpointing.py`.
+**Scope: only backbones using HF-native checkpointing (ViT; LiLT/BROS/BERT if ever used with
+latent replay).** LayoutLMv3 checkpoints via our own per-layer `forward` wrap
+(`layoutlm_wrapper.py:440`), whose recompute does not re-fire the hook → **all document
+latent/CoLaR/CA-CoLaR/CoLaSlot/PLaR results are unaffected.** Verified: post-fix rerun of the
+document latent replay k8/d5 (identical config) reproduces 65.80 / 63.91 / 69.70 byte-identically
+→ the 66.47 non-reproduction of 87.3 stands. Affected and superseded: the pre-fix ViT H3 arms.
+AMP: Turing now uses fp16+GradScaler (was emulated bf16); ER@2000 seed 42 fp16 77.11 vs fp32
+75.59 (inside the 3-seed spread 76.2±1.2) → fp16 cells are comparable.
+
+**ViT Step 1 (post-fix, fp16, seed 42, CIFAR-100, d500, replay batch 16, task-balanced):**
+k=8 77.5, k=11 71.3, k=12 head-only 67.9, **k=4 78.8 → selected** (prereg rule: highest ≥ 76.2).
+Latent replay now works on ViT (diagonal ≥ 95 on every task). Step 2 launched
+2026-10-06 20:08: `K=4 scripts/run_colar_vision.sh` (bank500, CoLaR r128/r64/r16 @ d500,
+CoLaR r16 @ d2000, AGLR; CIFAR-100 then ImageNet-R; 3 seeds; ~2 days).
 
 ## RESUME HERE (2026-10-05): ALL image-CL experiments complete; consolidated report written
 
