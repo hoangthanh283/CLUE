@@ -63,6 +63,10 @@ class CoLaRPP(CoLaR):
         self.replay_balance = str(config.get("replay_balance", "none"))
         self.quant = str(config.get("quant", "none"))
         self.token_pool = int(config.get("token_pool", 1))
+        # Anti-memorisation (Amendment 6): Phase A showed the replay loss → 0 within a few
+        # epochs (the stored latents are memorised), so replay stops carrying signal.
+        self.latent_distill = float(config.get("latent_distill", 0.0))  # LD: logit-MSE weight
+        self.token_drop = float(config.get("token_drop", 0.0))  # TD: patch-token drop rate
         self._seen_before = 0
 
     # ---------------------------------------------------------------- storage
@@ -84,6 +88,8 @@ class CoLaRPP(CoLaR):
                     d[key], d[f"{key}_scale"] = _q8(t)
                 else:
                     d[key] = t.to(torch.float16)
+        if self.latent_distill > 0:
+            self._bank_logits(self.store[n_before:])
         log.info(
             "colar_pp: encoded %d samples (rank=%d pool=%d quant=%s) store=%.1f MB",
             len(self.store) - n_before,
@@ -103,20 +109,66 @@ class CoLaRPP(CoLaR):
             return self._deq(d, "hidden")
         return self._deq(d, "us") @ self._deq(d, "v")
 
-    def _stack_replay(self, docs: list[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
+    def _stack_replay(
+        self, docs: list[dict[str, torch.Tensor]], augment: bool = False
+    ) -> dict[str, torch.Tensor]:
+        hidden = torch.stack([self._decode(d) for d in docs])
+        if augment and self.token_drop > 0 and "bbox" not in docs[0] and hidden.shape[1] > 2:
+            # keep CLS + a random subset of patch tokens (same count per batch, own draw per
+            # sample); ViT layers above the embeddings accept any sequence length.
+            n_patch = hidden.shape[1] - 1
+            keep = max(1, round(n_patch * (1 - self.token_drop)))
+            idx = torch.rand(hidden.shape[0], n_patch).argsort(dim=1)[:, :keep].sort(dim=1).values
+            patches = torch.gather(
+                hidden[:, 1:], 1, idx.unsqueeze(-1).expand(-1, -1, hidden.shape[2])
+            )
+            hidden = torch.cat([hidden[:, :1], patches], dim=1)
         replay = {
-            "hidden": torch.stack([self._decode(d) for d in docs]).to(torch.float16),
+            "hidden": hidden.to(torch.float16),
             "labels": torch.stack([d["labels"] for d in docs]),
         }
         for k in ("bbox", "attention_mask", "input_ids"):
             if k in docs[0]:
                 replay[k] = torch.stack([d[k] for d in docs])
+        if "logits" in docs[0]:
+            width = max(d["logits"].shape[0] for d in docs)
+            replay["logits"] = torch.stack(
+                [F.pad(d["logits"].float(), (0, width - d["logits"].shape[0])) for d in docs]
+            )
+            replay["logit_width"] = torch.tensor([d["logits"].shape[0] for d in docs])
         return replay
 
     def _sample_replay(self) -> dict[str, torch.Tensor] | None:
         if not self.store:
             return None
-        return self._stack_replay([self.store[i] for i in self._sample_indices()])
+        return self._stack_replay([self.store[i] for i in self._sample_indices()], augment=True)
+
+    def _replay_forward(self, replay: dict[str, torch.Tensor]):
+        out = super()._replay_forward(replay)
+        if self.latent_distill > 0 and "logits" in replay and out.loss is not None:
+            tgt = replay["logits"].to(out.logits.device)
+            width = replay["logit_width"].to(out.logits.device)
+            c = min(out.logits.shape[-1], tgt.shape[-1])
+            mask = (torch.arange(c, device=tgt.device)[None] < width[:, None]).float()
+            mse = (((out.logits[:, :c].float() - tgt[:, :c]) ** 2) * mask).sum() / mask.sum()
+            out.loss = out.loss + self.latent_distill * mse
+        return out
+
+    @torch.no_grad()
+    def _bank_logits(self, docs: list[dict]) -> None:
+        """Store each new sample's logits under the model that just learned its task."""
+        was_training = self.model.training
+        self.model.eval()
+        try:
+            for i in range(0, len(docs), self.ca_batch):
+                chunk = docs[i : i + self.ca_batch]
+                replay = {k: v for k, v in self._stack_replay(chunk).items() if k != "logits"}
+                logits = super()._replay_forward(replay).logits.float().cpu()
+                for d, row in zip(chunk, logits, strict=True):
+                    d["logits"] = row.to(torch.float16)
+        finally:
+            if was_training:
+                self.model.train()
 
     def _sample_indices(self) -> list[int]:
         n = min(self.replay_batch_size, len(self.store))

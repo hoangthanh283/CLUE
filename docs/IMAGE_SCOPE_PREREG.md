@@ -170,3 +170,22 @@ coverage, ablations −CA / −SL / −(WA,BAL). **Claim rule:** mean ≥ SLCA o
 with sign agreement on 3/3 seeds, at the stated memory. Metrics: final AA, Inc-Acc, BWT,
 `replay_memory_bytes`. Published SoTA (SLCA 91.5/77.0, RanPAC 92.2/78.1) is context only
 unless the published-recipe Phase C is run on a ≥16 GB GPU.
+
+## Amendment 6 (2026-10-07, after Phase A; before any run below)
+
+**Phase A result (seed 42, CIFAR-100; go criterion 87.5 NOT met):** base 80.5 (3-seed 80.0±0.7),
++CA 80.6, +SL 77.2, +CA+SL 75.9, +CA+SL+WA 75.8, +all 74.6. Diagnosis from the logs: the replay
+loss reaches ≈0.000 within a few epochs of every task — the stored latents are memorised, replay
+stops carrying gradient, and old-class test accuracy drifts to ~70 while stored-sample accuracy
+stays perfect. CA cannot help because the head already fits the stored features. Exploratory
+(not registered, reported as such): the 1-epoch smoke run with all switches + r16/int8/pool
+(66 MB) reached 81.2 AA with BWT −1.5.
+
+**Phase A′ arms (seed 42, CIFAR-100, raw bank k=4 d500 unless stated):**
+- LD — latent distillation: logits stored at banking; replay adds 0.5·MSE on old-logit columns.
+- TD — token drop: each replayed latent keeps CLS + a random 50 % of patch tokens.
+- LD+TD; LD+TD+CA.
+- EP2 — LD+TD+CA with an epoch cap of 2 per task (smoke-run hint).
+- CA30 — the Amendment-5 fallback: CA 30 epochs, lr 1e-2 (alone).
+Go criterion unchanged (≥ 87.5). If met → Phase A2/B as registered with the new winner.
+If not → stop tuning; report CoLaR++ as a negative/bounded result against SLCA.

@@ -96,3 +96,28 @@ def test_compressed_store_roundtrip_and_memory(tmp_path):
     assert replay["hidden"].shape[-2:] == (17, 32) and "bbox" not in replay
     raw_bytes = len(m.store) * 17 * 32 * 2
     assert 0 < m.memory_bytes() < raw_bytes
+
+
+def test_token_drop_shortens_replay_only_when_augmenting(tmp_path):
+    model = _tiny_vit(tmp_path)
+    m = _method(model, token_drop=0.5, replay_batch_size=4)
+    m.store = [{"hidden": torch.randn(17, 32), "labels": torch.tensor(c)} for c in range(4)]
+    assert m._stack_replay(m.store)["hidden"].shape[1] == 17  # CA / logit banking: no drop
+    replay = m._sample_replay()
+    assert replay["hidden"].shape[1] == 1 + 8  # CLS + half of 16 patches
+    stored_cls = {tuple(d["hidden"][0].half().tolist()) for d in m.store}
+    for row in replay["hidden"]:
+        assert tuple(row[0].tolist()) in stored_cls  # CLS token always kept
+
+
+def test_latent_distill_banks_logits_and_adds_loss(tmp_path):
+    model = _tiny_vit(tmp_path)
+    m = _method(model, latent_distill=0.5)
+    m.after_task(TaskInfo(task_id=0, task_name="t0", label_set=["c0"]), _loader([0, 1]))
+    assert all("logits" in d and d["logits"].shape == (4,) for d in m.store)
+    replay = m._sample_replay()
+    model.train()
+    with_ld = m._replay_forward(replay).loss
+    m.latent_distill = 0.0
+    without = m._replay_forward(replay).loss
+    assert torch.isfinite(with_ld) and with_ld >= without - 1e-6

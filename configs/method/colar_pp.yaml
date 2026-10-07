@@ -18,3 +18,5 @@ weight_align: false
 replay_balance: none
 quant: none
 token_pool: 1
+latent_distill: 0.0     # LD: weight of logit-MSE on replay (Amendment 6)
+token_drop: 0.0         # TD: fraction of patch tokens dropped per replayed latent
