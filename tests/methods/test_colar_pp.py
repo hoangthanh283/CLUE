@@ -121,3 +121,27 @@ def test_latent_distill_banks_logits_and_adds_loss(tmp_path):
     m.latent_distill = 0.0
     without = m._replay_forward(replay).loss
     assert torch.isfinite(with_ld) and with_ld >= without - 1e-6
+
+
+def test_analytic_head_is_fit_and_used_for_evaluation(tmp_path):
+    model = _tiny_vit(tmp_path)
+    m = _method(model, analytic_head="rp", rp_dim=64)
+    task = TaskInfo(task_id=0, task_name="t0", label_set=["c0"])
+    m.after_task(task, _loader([0, 1, 2, 3]))
+    assert m._rp._fitted()
+    res = m.evaluate({0: _loader([0, 1, 2, 3])})
+    assert 0.0 <= res[0].f1 <= 100.0
+
+
+def test_feature_anchor_is_zero_when_trunk_unchanged(tmp_path):
+    model = _tiny_vit(tmp_path)
+    m = _method(model, feature_anchor=1.0)
+    m.after_task(TaskInfo(task_id=0, task_name="t0", label_set=["c0"]), _loader([0, 1]))
+    assert all("feat" in d for d in m.store)
+    replay = m._stack_replay(m.store[:4])
+    model.eval()  # no dropout: same trunk ⇒ same features as at banking
+    with torch.enable_grad():
+        anchored = m._replay_forward(replay).loss
+    m.feature_anchor = 0.0
+    plain = m._replay_forward(replay).loss
+    assert torch.allclose(anchored, plain, atol=1e-3)

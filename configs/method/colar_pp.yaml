@@ -20,3 +20,8 @@ quant: none
 token_pool: 1
 latent_distill: 0.0     # LD: weight of logit-MSE on replay (Amendment 6)
 token_drop: 0.0         # TD: fraction of patch tokens dropped per replayed latent
+feature_anchor: 0.0     # S2: weight of (1 - cos) between current and banked CLS feature
+analytic_head: none     # S1: "rp" = RanPAC-style ridge head re-solved on recomputed stored latents
+rp_fit: stored+current  # S1 fit set: stored latents only, or + current task full data
+rp_dim: 10000
+dump_final: false       # save final_model.pt + final_store.pt for the RCA probes

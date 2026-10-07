@@ -30,6 +30,7 @@ from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.colar import CoLaR
 from doccl.methods.colar_pp import CoLaRPP
+from doccl.methods.frozen_ptm import RanPAC, SimpleCIL
 from doccl.methods.colar_adaptive import CoLaRAdaptive
 from doccl.methods.colar_bal import CoLaRBal
 from doccl.methods.colar_cb import CoLaRCB
@@ -259,6 +260,9 @@ METHOD_REGISTRY = {
     # CoLaR++: + head alignment on real stored latents, slow trunk, WA, balanced replay,
     # int8 / token-pooled storage (image CIL; docs/IMAGE_SCOPE_PREREG.md Amendment 5).
     "colar_pp": CoLaRPP,
+    # Frozen pre-trained-model baselines (image CIL): prototypes / random-projection ridge.
+    "simplecil": SimpleCIL,
+    "ranpac": RanPAC,
     # CA-CoLaR: CoLaR with preregistered per-task (docs, rank) bank schedules under a
     # fixed doc*rank budget (docs/CACOLAR_T1_T2_2026-08-20.md).
     "colar_adaptive": CoLaRAdaptive,
