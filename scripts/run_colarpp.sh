@@ -7,13 +7,15 @@ set -u
 cd "$(dirname "$0")/.."
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export WANDB_MODE=offline
-PHASE="${PHASE:?PHASE=A|A2|B}"
+PHASE="${PHASE:?PHASE=A|A1|A2|B}"
 LOG=results/logs_vision/colarpp_queue.log; mkdir -p results/logs_vision
 COMMON="model=vit_b16 training=vision training.batch_size=16 training.num_workers=4 training.gradient_checkpointing=false training.amp=true method=colar_pp wandb.mode=offline"
 CA="method.head_align_epochs=10"; SL="method.trunk_lr_scale=0.1"; WA="method.weight_align=true"; BAL="method.replay_balance=class"
 case "$PHASE" in
   A)  SCENARIOS="cil_cifar100"; SEEDS="42"
       CELLS="${CELLS:-ppCA:$CA ppSL:$SL ppCASL:$CA,$SL ppCASLWA:$CA,$SL,$WA ppFULL:$CA,$SL,$WA,$BAL}" ;;
+  A1) SCENARIOS="cil_cifar100"; SEEDS="42"; LD="method.latent_distill=0.5"; TD="method.token_drop=0.5"
+      CELLS="${CELLS:-ppLD:$LD ppTD:$TD ppLDTD:$LD,$TD ppLDTDCA:$LD,$TD,$CA ppEP2:$LD,$TD,$CA,method.epochs=2 ppCA30:method.head_align_epochs=30,method.head_align_lr=1e-2}" ;;
   A2) SCENARIOS="cil_cifar100"; SEEDS="42"; W="${WIN:?WIN=<comma-separated winner overrides>}"
       CELLS="${CELLS:-ppR128:$W,method.rank_r=128 ppR64:$W,method.rank_r=64 ppR16:$W,method.rank_r=16 ppR16q:$W,method.rank_r=16,method.quant=int8 ppR16qp:$W,method.rank_r=16,method.quant=int8,method.token_pool=2 ppR16qp2k:$W,method.rank_r=16,method.quant=int8,method.token_pool=2,method.docs_per_task=2000}" ;;
   B)  SCENARIOS="${SCENARIOS:-cil_cifar100 cil_imagenet_r}"; SEEDS="${SEEDS:-42 7 123}"; CELLS="${CELLS:?CELLS required for phase B}" ;;
