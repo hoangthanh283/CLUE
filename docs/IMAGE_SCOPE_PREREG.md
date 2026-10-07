@@ -211,3 +211,25 @@ S1 analytic RP head re-solved each task on stored latents recomputed through the
 S3 = S1 + S2; S4 = first-task adaptation then frozen trunk (k=12) + RP head (control).
 **Go:** ≥ SLCA 87.5 **and** ≥ local RanPAC. **Claim (Phase B, 3 seeds × 2 benchmarks):** mean
 above both with 3/3 sign agreement, memory stated.
+
+## Amendment 8 (2026-10-08, before any run below)
+
+**Phase S results (seed 42, CIFAR-100):** S1 analytic RP head 78.6 (≈ raw bank 78.8 → head is not
+the bottleneck); **S2 feature anchoring 84.1** (+5.3, BWT −14.8 vs −21.0); S3 = S1+S2 81.6;
+S4 first-task adaptation + freeze + RP head 72.9. Frozen references: SimpleCIL 81.7 / 48.2,
+RanPAC (frozen, 3 seeds) 85.3 ± 0.1 / 58.6 ± 0.3 (CIFAR-100 / ImageNet-R).
+Root cause confirmed: trunk adaptation degrades old-class features (old tasks 63–79 under the
+adapted trunk vs 83–91 frozen); anchoring the trunk is the effective lever.
+Infrastructure fix (no result affected): CLS features were stored as views of the full hidden
+state (memory leak); now cloned.
+
+**Arms (seed 42, CIFAR-100, k=4, base = S2 anchoring 1.0 unless stated):**
+- I1 drift-compensated class Gaussians: full-data mean/cov per class at task time; every old
+  class mean shifted by the mean drift of its stored latents, measured exactly before/after
+  each task; head realigned SLCA-style on 256 samples/class (CA 10 ep).
+- I2 low-rank trunk adaptation: after task 0, layers ≥ k frozen and adapted only through LoRA
+  r=8 (lr 5e-4), merged after every task.
+- I4 compression for coverage: r=16, int8, 2×2 token pooling, 2 000 latents/task.
+- I1-only (no anchoring) for attribution; I1+I2+I4 (+S2) combined.
+**Go:** ≥ 87.5 (SLCA, same recipe) and ≥ 85.3 (frozen RanPAC). **Then** Phase B: 3 seeds ×
+CIFAR-100 + ImageNet-R, claim if mean above both with 3/3 sign agreement, memory stated.

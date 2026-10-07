@@ -52,6 +52,34 @@ def _pool_tokens(h: torch.Tensor, p: int) -> torch.Tensor:
     return torch.cat([cls, pooled], dim=0)
 
 
+class LoRALinear(torch.nn.Module):
+    """y = base(x) + (x Aᵀ Bᵀ)·(α/r); base frozen; B zero-init so the wrap is exact at start."""
+
+    def __init__(self, base: torch.nn.Linear, r: int, alpha: float | None = None):
+        super().__init__()
+        self.base = base
+        self.r = r
+        self.scale = (alpha or r) / r
+        self.lora_a = torch.nn.Parameter(
+            torch.empty(r, base.in_features, device=base.weight.device)
+        )
+        self.lora_b = torch.nn.Parameter(
+            torch.zeros(base.out_features, r, device=base.weight.device)
+        )
+        torch.nn.init.kaiming_uniform_(self.lora_a, a=math.sqrt(5))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return (
+            self.base(x) + (x @ self.lora_a.T.to(x.dtype)) @ self.lora_b.T.to(x.dtype) * self.scale
+        )
+
+    @torch.no_grad()
+    def merge_and_reset(self) -> None:
+        self.base.weight += (self.lora_b @ self.lora_a).to(self.base.weight.dtype) * self.scale
+        torch.nn.init.kaiming_uniform_(self.lora_a, a=math.sqrt(5))
+        self.lora_b.zero_()
+
+
 class CoLaRPP(CoLaR):
     name = "colar_pp"
 
@@ -75,6 +103,16 @@ class CoLaRPP(CoLaR):
         self.rp_fit = str(config.get("rp_fit", "stored+current"))  # stored | stored+current
         self.feature_anchor = float(config.get("feature_anchor", 0.0))
         self.dump_final = bool(config.get("dump_final", False))
+        # Amendment 8. I1: drift-compensated full-data class Gaussians for head alignment;
+        # I2: low-rank (LoRA) trunk adaptation after task 0. (I4 = storage switches above.)
+        self.drift_comp = bool(config.get("drift_comp", False))
+        self.ca_samples = int(config.get("ca_samples_per_cls", 256))
+        self.trunk_adapt = str(config.get("trunk_adapt", "full"))  # full | lora
+        self.lora_rank = int(config.get("lora_rank", 8))
+        self.lora_lr = float(config.get("lora_lr", 5e-4))
+        self._cls_mean: dict[int, torch.Tensor] = {}
+        self._cls_cov: dict[int, torch.Tensor] = {}
+        self._f_before: torch.Tensor | None = None
         self._rp = (
             RanPAC(model, {"rp_dim": config.get("rp_dim", 10000), "rp_seed": 0})
             if self.analytic_head == "rp"
@@ -225,6 +263,17 @@ class CoLaRPP(CoLaR):
 
     # ---------------------------------------------------------------- training
     def _make_optimizer(self) -> torch.optim.Optimizer:
+        if self.trunk_adapt == "lora" and any(
+            isinstance(m, LoRALinear) for m in self.model.modules()
+        ):
+            lr = self.config.get("lr", 5e-5)
+            named = [(n, p) for n, p in self.model.named_parameters() if p.requires_grad]
+            lora = [p for n, p in named if "lora_" in n]
+            rest = [p for n, p in named if "lora_" not in n]
+            return torch.optim.AdamW(
+                [{"params": rest, "lr": lr}, {"params": lora, "lr": self.lora_lr}],
+                weight_decay=self.config.get("weight_decay", 0.01),
+            )
         if self.trunk_lr_scale == 1.0:
             return super()._make_optimizer()
         lr = self.config.get("lr", 5e-5)
@@ -239,11 +288,44 @@ class CoLaRPP(CoLaR):
     def _head(self) -> torch.nn.Linear:
         return self.model.model.classifier
 
+    def _apply_freeze_map(self) -> None:
+        super()._apply_freeze_map()
+        if self.trunk_adapt != "lora":
+            return
+        for layer in self._encoder_layers()[self.split_layer_k :]:
+            for p in layer.parameters():
+                p.requires_grad = False
+            for parent in list(layer.modules()):
+                for name, child in list(parent.named_children()):
+                    if isinstance(child, torch.nn.Linear):
+                        setattr(parent, name, LoRALinear(child, self.lora_rank))
+        log.info("colar_pp: LoRA r=%d on layers >= %d", self.lora_rank, self.split_layer_k)
+
+    @torch.no_grad()
+    def _merge_lora(self) -> None:
+        for m in self.model.modules():
+            if isinstance(m, LoRALinear):
+                m.merge_and_reset()
+
+    def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
+        super().before_task(task, train_loader)
+        # I1: features of every stored (old-task) latent under the trunk BEFORE this task.
+        self._f_before = (
+            self._stored_features()[0].cpu() if self.drift_comp and self.store else None
+        )
+
     def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         if self.weight_align and self._seen_before > 0:
             self._weight_align(self._seen_before)
+        if self.trunk_adapt == "lora":
+            self._merge_lora()  # each task's update is rank-r; fresh adapters next task
+        n_old = len(self.store)
         super().after_task(task, train_loader)  # freeze map (task 0) + bank this task
-        if self.ca_epochs > 0 and self.store:
+        if self.drift_comp:
+            self._update_class_stats(train_loader, n_old)
+            if self.ca_epochs > 0:
+                self._align_head_gaussian()
+        elif self.ca_epochs > 0 and self.store:
             self._align_head()
         if self._rp is not None and self.store:
             self._fit_analytic_head(train_loader)
@@ -272,6 +354,44 @@ class CoLaRPP(CoLaR):
         return RanPAC.evaluate(self._rp, eval_loaders)
 
     @torch.no_grad()
+    def _update_class_stats(self, train_loader: DataLoader, n_old: int) -> None:
+        """I1. (a) Shift every old class mean by the mean drift of its stored latents,
+        measured exactly by re-running them through the trunk before/after this task
+        (semantic-drift compensation with exact anchors). (b) Add full-data mean/cov for
+        the classes of the task just learned."""
+        if self._f_before is not None and n_old > 0:
+            f_after, y_old = self._features_of(self.store[:n_old])
+            delta = f_after.cpu() - self._f_before
+            for c in y_old.unique().tolist():
+                if c in self._cls_mean:
+                    self._cls_mean[c] += delta[(y_old == c).cpu()].mean(0)
+        f, y = cls_features(self.model, train_loader, self.device)
+        f, y = f.cpu(), y.cpu()
+        eye = torch.eye(f.shape[1])
+        for c in y.unique().tolist():
+            fc = f[y == c]
+            self._cls_mean[c] = fc.mean(0)
+            self._cls_cov[c] = torch.cov(fc.T) + 1e-4 * eye
+        self.model.train()
+
+    def _align_head_gaussian(self) -> None:
+        """SLCA-style head alignment on samples from the drift-corrected class Gaussians."""
+        xs, ys = [], []
+        for c in sorted(self._cls_mean):
+            try:
+                dist = torch.distributions.MultivariateNormal(
+                    self._cls_mean[c], covariance_matrix=self._cls_cov[c]
+                )
+            except (ValueError, RuntimeError):
+                dist = torch.distributions.MultivariateNormal(
+                    self._cls_mean[c], covariance_matrix=torch.diag(torch.diag(self._cls_cov[c]))
+                )
+            xs.append(dist.sample((self.ca_samples,)))
+            ys.append(torch.full((self.ca_samples,), c, dtype=torch.long))
+        x, y = torch.cat(xs).to(self.device), torch.cat(ys).to(self.device)
+        self._train_head(x, y)
+
+    @torch.no_grad()
     def _weight_align(self, n_old: int) -> None:
         w = self._head().weight
         if n_old >= w.shape[0]:
@@ -298,7 +418,7 @@ class CoLaRPP(CoLaR):
                 with self._amp_autocast():
                     self._replay_forward(self._stack_replay(docs))
                 x = captured[0]
-                feats.append((x[:, 0] if x.dim() == 3 else x).float())
+                feats.append((x[:, 0] if x.dim() == 3 else x).float().clone())  # drop the view
         finally:
             hook.remove()
             if was_training:
@@ -308,6 +428,9 @@ class CoLaRPP(CoLaR):
 
     def _align_head(self) -> None:
         x, y = self._stored_features()
+        self._train_head(x, y)
+
+    def _train_head(self, x: torch.Tensor, y: torch.Tensor) -> None:
         head = self._head()
         opt = torch.optim.SGD(head.parameters(), lr=self.ca_lr, momentum=0.9, weight_decay=5e-4)
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=self.ca_epochs)
@@ -325,6 +448,4 @@ class CoLaRPP(CoLaR):
                     loss.backward()
                     opt.step()
             sched.step()
-        log.info(
-            "colar_pp: head aligned on %d stored features (%d classes)", n, int((counts > 0).sum())
-        )
+        log.info("colar_pp: head aligned on %d features (%d classes)", n, int((counts > 0).sum()))

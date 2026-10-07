@@ -41,7 +41,7 @@ def cls_features(model, loader: DataLoader, device) -> tuple[torch.Tensor, torch
         x = batch["pixel_values"].to(device)
         with torch.autocast("cuda", dtype=torch.float16, enabled=device.type == "cuda"):
             f = model.encode_query({"pixel_values": x})
-        feats.append(f.float())
+        feats.append(f.float().clone())  # f is a view of the full hidden state: copy it
         labels.append(batch["labels"].to(device))
     return torch.cat(feats), torch.cat(labels)
 

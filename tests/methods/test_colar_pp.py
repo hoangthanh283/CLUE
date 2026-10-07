@@ -145,3 +145,50 @@ def test_feature_anchor_is_zero_when_trunk_unchanged(tmp_path):
     m.feature_anchor = 0.0
     plain = m._replay_forward(replay).loss
     assert torch.allclose(anchored, plain, atol=1e-3)
+
+
+def test_lora_linear_exact_at_init_and_merge_preserves_function():
+    from doccl.methods.colar_pp import LoRALinear
+
+    torch.manual_seed(0)
+    base = torch.nn.Linear(8, 4)
+    x = torch.randn(3, 8)
+    ref = base(x).detach().clone()
+    lora = LoRALinear(base, r=2)
+    assert torch.allclose(lora(x), ref, atol=1e-6)  # B = 0 ⇒ identical
+    with torch.no_grad():
+        lora.lora_b.normal_()
+    before = lora(x).detach().clone()
+    lora.merge_and_reset()
+    assert torch.allclose(lora(x), before, atol=1e-5)  # merged weights reproduce the output
+    assert torch.count_nonzero(lora.lora_b) == 0
+
+
+def test_lora_freeze_map_trains_only_adapters_and_head(tmp_path):
+    from doccl.methods.colar_pp import LoRALinear
+
+    model = _tiny_vit(tmp_path)
+    m = _method(model, trunk_adapt="lora", lora_rank=2)
+    m._apply_freeze_map()
+    names = [n for n, p in model.named_parameters() if p.requires_grad]
+    assert names and all(("lora_" in n) or ("classifier" in n) for n in names)
+    assert any(isinstance(mod, LoRALinear) for mod in model.modules())
+
+
+def test_drift_comp_builds_stats_and_aligns_head(tmp_path):
+    model = _tiny_vit(tmp_path)
+    m = _method(model, drift_comp=True, head_align_epochs=1, ca_samples_per_cls=8)
+    t0 = TaskInfo(task_id=0, task_name="t0", label_set=["c0", "c1"])
+    m.before_task(t0, _loader([0, 1]))
+    m.after_task(t0, _loader([0, 1]))
+    assert set(m._cls_mean) == {0, 1}
+    mean0 = m._cls_mean[0].clone()
+    t1 = TaskInfo(task_id=1, task_name="t1", label_set=["c2", "c3"])
+    m.before_task(t1, _loader([2, 3]))
+    assert m._f_before is not None and m._f_before.shape[0] == len(m.store)
+    with torch.no_grad():  # simulate trunk drift
+        for p in m._encoder_layers()[-1].parameters():
+            p.add_(0.05 * torch.randn_like(p))
+    m.after_task(t1, _loader([2, 3]))
+    assert set(m._cls_mean) == {0, 1, 2, 3}
+    assert not torch.allclose(mean0, m._cls_mean[0])  # old mean shifted by measured drift
