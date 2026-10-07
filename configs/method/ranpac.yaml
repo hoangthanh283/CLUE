@@ -1,0 +1,5 @@
+name: ranpac
+epochs: 1
+rp_dim: 10000      # random-projection width M (RanPAC default)
+rp_seed: 0
+val_frac: 0.2      # held-out fraction for choosing the ridge lambda

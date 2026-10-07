@@ -189,3 +189,25 @@ stays perfect. CA cannot help because the head already fits the stored features.
 - CA30 — the Amendment-5 fallback: CA 30 epochs, lr 1e-2 (alone).
 Go criterion unchanged (≥ 87.5). If met → Phase A2/B as registered with the new winner.
 If not → stop tuning; report CoLaR++ as a negative/bounded result against SLCA.
+
+## Amendment 7 (2026-10-07, RCA; before any run below)
+
+**Phase A′ negatives (seed 42, CIFAR-100):** +CA30 80.4, +LD 79.9 (no effect vs base 80.0±0.7);
++TD **19.5** — replaying 99-token latents into layers trained on 197-token inputs makes replay
+useless (final row 0–12 on old tasks). Remaining A′ cells (all with TD) cancelled.
+Every arm shares the final row ≈ [71, 68, 80, 80, 75, 69, 82, 87, 95, 97]: the trunk fits the
+50 stored samples/class perfectly while old-class test accuracy sits at ≈70.
+
+**Phase R (diagnostic):** R1 frozen-PTM references SimpleCIL (1 run per benchmark) and RanPAC
+(M=10 000, λ on 20 % held-out, rp_seed ∈ {42,7,123}) on CIFAR-100 and ImageNet-R.
+R2 raw-bank rerun (seed 42, dump_final) + `scripts/rca_colar_probe.py` → head, NCM-full,
+NCM-stored, RP-full, RP-stored, RP-stored+current, SimpleCIL, RanPAC, feature drift.
+Readout gap = RP-full − head; representation gap = RanPAC − RP-full; memorisation = NCM-full −
+NCM-stored.
+
+**Phase S (seed 42, CIFAR-100, all four run; interpreted with R):**
+S1 analytic RP head re-solved each task on stored latents recomputed through the current trunk
++ current task data (class-balanced); S2 feature anchoring (1 − cos to banked CLS, weight 1.0);
+S3 = S1 + S2; S4 = first-task adaptation then frozen trunk (k=12) + RP head (control).
+**Go:** ≥ SLCA 87.5 **and** ≥ local RanPAC. **Claim (Phase B, 3 seeds × 2 benchmarks):** mean
+above both with 3/3 sign agreement, memory stated.

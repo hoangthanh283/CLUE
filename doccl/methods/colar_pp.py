@@ -22,12 +22,14 @@ from __future__ import annotations
 import logging
 import math
 import random
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from doccl.methods.colar import CoLaR
+from doccl.methods.frozen_ptm import RanPAC, cls_features
 from doccl.methods.latent_replay import LatentReplay
 from doccl.types import TaskInfo  # noqa: F401  (signature types)
 
@@ -67,6 +69,17 @@ class CoLaRPP(CoLaR):
         # epochs (the stored latents are memorised), so replay stops carrying signal.
         self.latent_distill = float(config.get("latent_distill", 0.0))  # LD: logit-MSE weight
         self.token_drop = float(config.get("token_drop", 0.0))  # TD: patch-token drop rate
+        # Amendment 7 (RCA-driven): S1 analytic head re-solved on stored latents recomputed
+        # through the CURRENT trunk; S2 feature anchoring of replayed latents.
+        self.analytic_head = str(config.get("analytic_head", "none"))  # none | rp
+        self.rp_fit = str(config.get("rp_fit", "stored+current"))  # stored | stored+current
+        self.feature_anchor = float(config.get("feature_anchor", 0.0))
+        self.dump_final = bool(config.get("dump_final", False))
+        self._rp = (
+            RanPAC(model, {"rp_dim": config.get("rp_dim", 10000), "rp_seed": 0})
+            if self.analytic_head == "rp"
+            else None
+        )
         self._seen_before = 0
 
     # ---------------------------------------------------------------- storage
@@ -90,6 +103,10 @@ class CoLaRPP(CoLaR):
                     d[key] = t.to(torch.float16)
         if self.latent_distill > 0:
             self._bank_logits(self.store[n_before:])
+        if self.feature_anchor > 0:
+            feats, _ = self._features_of(self.store[n_before:])
+            for d, f in zip(self.store[n_before:], feats.cpu(), strict=True):
+                d["feat"] = f.to(torch.float16)
         log.info(
             "colar_pp: encoded %d samples (rank=%d pool=%d quant=%s) store=%.1f MB",
             len(self.store) - n_before,
@@ -130,6 +147,8 @@ class CoLaRPP(CoLaR):
         for k in ("bbox", "attention_mask", "input_ids"):
             if k in docs[0]:
                 replay[k] = torch.stack([d[k] for d in docs])
+        if "feat" in docs[0]:
+            replay["feat"] = torch.stack([d["feat"] for d in docs])
         if "logits" in docs[0]:
             width = max(d["logits"].shape[0] for d in docs)
             replay["logits"] = torch.stack(
@@ -144,7 +163,23 @@ class CoLaRPP(CoLaR):
         return self._stack_replay([self.store[i] for i in self._sample_indices()], augment=True)
 
     def _replay_forward(self, replay: dict[str, torch.Tensor]):
-        out = super()._replay_forward(replay)
+        captured: list[torch.Tensor] = []
+        anchor = self.feature_anchor > 0 and "feat" in replay and torch.is_grad_enabled()
+        hook = (
+            self._head().register_forward_pre_hook(lambda _m, a: captured.append(a[0]))
+            if anchor
+            else None
+        )
+        try:
+            out = super()._replay_forward(replay)
+        finally:
+            if hook is not None:
+                hook.remove()
+        if anchor and captured and out.loss is not None:
+            x = captured[0]
+            cur = (x[:, 0] if x.dim() == 3 else x).float()
+            ref = replay["feat"].to(cur.device).float()
+            out.loss = out.loss + self.feature_anchor * (1 - F.cosine_similarity(cur, ref)).mean()
         if self.latent_distill > 0 and "logits" in replay and out.loss is not None:
             tgt = replay["logits"].to(out.logits.device)
             width = replay["logit_width"].to(out.logits.device)
@@ -210,7 +245,31 @@ class CoLaRPP(CoLaR):
         super().after_task(task, train_loader)  # freeze map (task 0) + bank this task
         if self.ca_epochs > 0 and self.store:
             self._align_head()
+        if self._rp is not None and self.store:
+            self._fit_analytic_head(train_loader)
         self._seen_before = self._head().out_features  # classes seen through this task
+        if self.dump_final and task.is_last and getattr(self, "out_dir", None):
+            out = Path(self.out_dir)
+            out.mkdir(parents=True, exist_ok=True)
+            torch.save(self.model.state_dict(), out / "final_model.pt")
+            torch.save(self.store, out / "final_store.pt")
+
+    def _fit_analytic_head(self, train_loader: DataLoader) -> None:
+        """S1: re-solve the RP ridge head from scratch on stored latents recomputed through
+        the current trunk (+ the current task's full training set), class-balanced."""
+        x, y = self._stored_features()
+        if self.rp_fit == "stored+current":
+            fc, yc = cls_features(self.model, train_loader, self.device)
+            x, y = torch.cat([x, fc]), torch.cat([y, yc])
+        counts = torch.bincount(y).float()
+        weights = (counts.max() / counts.clamp(min=1))[y]  # every class carries equal mass
+        self._rp.fit(x, y, weights)
+        self.model.train()
+
+    def evaluate(self, eval_loaders):
+        if self._rp is None or not self._rp._fitted():
+            return super().evaluate(eval_loaders)
+        return RanPAC.evaluate(self._rp, eval_loaders)
 
     @torch.no_grad()
     def _weight_align(self, n_old: int) -> None:
@@ -221,17 +280,20 @@ class CoLaRPP(CoLaR):
         new_norm = w[n_old:].norm(dim=1).mean().clamp(min=1e-8)
         w[n_old:] *= old_norm / new_norm
 
-    @torch.no_grad()
     def _stored_features(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Classifier-input features of every stored latent under the current trunk."""
+        return self._features_of(self.store)
+
+    @torch.no_grad()
+    def _features_of(self, docs_all: list[dict]) -> tuple[torch.Tensor, torch.Tensor]:
         was_training = self.model.training
         self.model.eval()
         feats: list[torch.Tensor] = []
         captured: list[torch.Tensor] = []
         hook = self._head().register_forward_pre_hook(lambda _m, a: captured.append(a[0]))
         try:
-            for i in range(0, len(self.store), self.ca_batch):
-                docs = self.store[i : i + self.ca_batch]
+            for i in range(0, len(docs_all), self.ca_batch):
+                docs = docs_all[i : i + self.ca_batch]
                 captured.clear()
                 with self._amp_autocast():
                     self._replay_forward(self._stack_replay(docs))
@@ -241,7 +303,7 @@ class CoLaRPP(CoLaR):
             hook.remove()
             if was_training:
                 self.model.train()
-        labels = torch.stack([d["labels"] for d in self.store]).to(self.device)
+        labels = torch.stack([d["labels"] for d in docs_all]).to(self.device)
         return torch.cat(feats), labels
 
     def _align_head(self) -> None:
