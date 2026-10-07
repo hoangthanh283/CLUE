@@ -25,3 +25,8 @@ analytic_head: none     # S1: "rp" = RanPAC-style ridge head re-solved on recomp
 rp_fit: stored+current  # S1 fit set: stored latents only, or + current task full data
 rp_dim: 10000
 dump_final: false       # save final_model.pt + final_store.pt for the RCA probes
+drift_comp: false        # I1: drift-compensated full-data class Gaussians for head alignment
+ca_samples_per_cls: 256
+trunk_adapt: full        # I2: "lora" = low-rank adapters on layers >= k after task 0
+lora_rank: 8
+lora_lr: 5.0e-4

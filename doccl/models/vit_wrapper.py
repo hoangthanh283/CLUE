@@ -38,7 +38,7 @@ class ViTWrapper(TokenClassificationWrapper):
 
     @torch.no_grad()
     def encode_query(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-        return self._inner(pixel_values=batch["pixel_values"]).last_hidden_state[:, 0]
+        return self._inner(pixel_values=batch["pixel_values"]).last_hidden_state[:, 0].clone()
 
     def token_features(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         """CLS feature feeding the head, kept 3-D (B, 1, D) for the token-style consumers."""
