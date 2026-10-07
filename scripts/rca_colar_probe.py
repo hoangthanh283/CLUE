@@ -69,7 +69,7 @@ def main() -> None:
     per = n_cls // args.sessions
     mk = lambda base, idx: DataLoader(  # noqa: E731
         VisionCILDataset(base, perm, head_index, train=False, allowed_idx=idx),
-        batch_size=128,
+        batch_size=32,
         num_workers=4,
     )
     train_loader, test_loader = mk(base_tr, tr_idx), mk(base_te, te_idx)
