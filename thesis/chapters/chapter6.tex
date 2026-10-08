@@ -3,7 +3,7 @@
 \label{ch:results}
 % =====================================================================
 % POPULATED FROM THE FULL GRID (all MEASURED). Section 6.1 (per-component diagnosis) is filled from the
-% pilot; the core six-method comparison, the proposed LexSlot (DIL only), the prompt family
+% pilot; the core six-method comparison, LexSlot (DIL only), the prompt family
 % (L2P, DualPrompt, CODA-Prompt), O-LoRA, CL-LoRA, C-Flat++ (er_cflat), and the external
 % text-only BERT are all MEASURED over three seeds on the scenarios where they ran, aggregated
 % by scripts/analyze_results.py. C-Flat++ is now measured on DIL (88.42, the DIL winner) and
@@ -24,7 +24,7 @@ validity (\S\ref{sec:results-discussion}).
 \paragraph{Status of these results.} The full grid is \emph{measured}. The six core
 continual-learning methods (naive, joint, EWC, LwF, ER, DER++), a depth-scaled
 consolidation probe used to test the site (head-only / late-only / uniform / full,
-\S\ref{sec:results-key-ablation}), the proposed \textbf{LexSlot} remedy on the
+\S\ref{sec:results-key-ablation}), LexSlot (where the proposed method's lexical gate is first evaluated) on the
 domain-incremental scenario, the prompt family (L2P, DualPrompt, CODA-Prompt), the
 LoRA-based O-LoRA and the 2025 CL-LoRA, the 2025 sharpness-aware C-Flat++
 (\texttt{er\_cflat}), and the external text-only BERT comparator were all run to
@@ -518,7 +518,7 @@ in \S\ref{sec:results-remedy}.
 This section reports the main continual-learning grid, all measured to convergence over
 three seeds. It covers the six core methods (the lower bound (naive), the upper bound
 (joint), the two regularisation/distillation methods (EWC, LwF), and the two replay
-methods (ER, DER++)) together with the proposed LexSlot remedy (the head/late-targeted
+methods (ER, DER++)) together with LexSlot remedy (the head/late-targeted
 isolated slot memory derived from the diagnosis, \S\ref{sec:method-lexslot}) and the additional
 prompt-/LoRA-based baselines (L2P, DualPrompt, CODA-Prompt, O-LoRA, CL-LoRA) and the
 text-only BERT comparator, each on the scenarios where it was run.
@@ -528,8 +528,8 @@ text-only BERT comparator, each on the scenarios where it was run.
 
 Table~\ref{tab:main-comparison} and Figure~\ref{fig:aa-bars} report the average accuracy
 of each method on the three scenarios, all measured to convergence over three seeds. Six
-patterns hold. The first four characterise the core six methods; the fifth reports the
-proposed LexSlot, the sixth the prompt/LoRA family.
+patterns hold. The first four characterise the core six methods; the fifth reports
+LexSlot, the origin of the proposed method's gate, the sixth the prompt/LoRA family.
 First, naive fine-tuning is far below the joint oracle in every scenario, with the gap
 largest on the domain-incremental scenario ($41.3$ vs $88.7$). Second, the
 \emph{replay} methods are the strongest non-oracle strategies by a wide margin and behave
@@ -551,7 +551,7 @@ logits it distils collapse anyway as the classifier head grows. The hardest scen
 every method is CIL-CORD, where even the joint oracle reaches only $33.3$ AA: packing all
 $60$ fine-grained CORD classes into one growing head is an intrinsically difficult
 multi-class problem, independent of forgetting.
-Fifth, and most important for this thesis, the proposed \textbf{LexSlot}
+Fifth, and most important for this thesis, \textbf{LexSlot}
 (the isolated slot memory, paired with a compact 200-exemplar replay buffer in its headline
 configuration, mean over three seeds on the domain-incremental
 scenario) \emph{approaches replay-level accuracy} (LexSlot $87.3$ vs ER $87.9$, DER++ $88.0$,
@@ -584,7 +584,7 @@ adaptation recovers the naive lower bound only where the output space is fixed.
   \centering
   \caption[Main comparison: average accuracy across scenarios]{Average entity-F1
   (AA) of each method on the three continual scenarios. Best non-oracle result per
-  column in bold. The core six methods, the proposed \textbf{LexSlot}, and the prompt
+  column in bold. The core six methods, \textbf{LexSlot}, and the prompt
   baselines (L2P, DualPrompt, CODA-Prompt) are \emph{measured} (mean\,$\pm$\,std over
   three seeds); replay matches the oracle and the frozen-backbone
   prompt methods nearly fail on this dense token-level task. \textbf{LexSlot} (the
@@ -637,7 +637,7 @@ adaptation recovers the naive lower bound only where the output space is fixed.
 \begin{figure}[!htbp]
   \centering
   \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{lexslot_dil_bars.pdf}
-  \caption[LexSlot versus replay versus oracle on DIL]{Focused comparison of the proposed
+  \caption[LexSlot versus replay versus oracle on DIL]{Focused comparison of
   \textbf{LexSlot} (isolated slot memory with a compact 200-exemplar replay buffer) against the strongest baselines and the joint
   oracle on the domain-incremental scenario (mean over three seeds, error bars $\pm$std).
   \emph{Top:} average entity-F1: LexSlot ($87.3$) approaches replay (ER $87.9$, DER++ $88.0$,
@@ -742,7 +742,7 @@ baselines.
   \caption[Backward transfer by method and scenario]{Backward transfer (BWT) of each method,
   grouped by scenario; bars hang below zero, so shorter is less forgetting. Converged EWC
   has the least forgetting on CIL-CORD and Mixed (but at a severe accuracy cost, see
-  Table~\ref{tab:main-comparison}), and replay (ER, DER++) and the proposed LexSlot drive BWT to
+  Table~\ref{tab:main-comparison}), and replay (ER, DER++) and LexSlot drive BWT to
   $\approx 0$ on DIL. Joint has BWT $=0$ by construction.}
   \label{fig:bwt-bars}
 \end{figure}
@@ -753,7 +753,7 @@ baselines.
   \caption[Average forgetting by method and scenario]{Average forgetting (AF, the magnitude
   of backward transfer; lower is better) of each method per scenario. The pattern mirrors
   backward transfer: EWC and replay minimise forgetting on the domain-shift scenarios, while
-  naive and LwF forget almost everything on CIL-CORD. The proposed LexSlot keeps DIL forgetting near zero.}
+  naive and LwF forget almost everything on CIL-CORD. LexSlot keeps DIL forgetting near zero.}
   \label{fig:af-bars}
 \end{figure}
 
@@ -809,10 +809,12 @@ placed, cannot be the remedy, and why the remedies that work (\S\ref{sec:results
 re-exercise old targets instead. The freeze arms are single-seed; the consolidation probe above
 is three-seed.
 
-\subsection{The Proposed Remedy: LexSlot}
+\subsection{The Lexical Gate at the Diagnosed Site: LexSlot}
 \label{sec:results-lexslot}
 
-The proposed remedy, \textbf{LexSlot} (\S\ref{sec:method-lexslot}), protects the
+LexSlot (\S\ref{sec:method-lexslot}) is where the proposed method's lexical gate is first
+evaluated: it gates a slot memory at the head/late site with the same drift-immune signature
+that later routes replay (\S\ref{sec:results-falsification-ext}). It protects the
 diagnosed head/late site with an \emph{isolated slot memory}, and its headline configuration
 pairs that isolation with a compact 200-exemplar replay buffer (the DocCL-hybrid setting). On the domain-incremental scenario (LayoutLMv3, three seeds) the
 isolated configuration reaches \textbf{AA $87.3 \pm 1.0$ with backward transfer $-2.3 \pm 1.2$}
@@ -1013,7 +1015,7 @@ number of \emph{trainable parameters}, essentially identical across these method
 collected across heterogeneous hardware and batch sizes during the grid and so are
 \emph{indicative rather than strictly comparable}: replay's buffers and second
 forward/backward pass add genuine memory and time (ER and DER++ carry a replay buffer,
-and DER++ additionally caches output logits). The proposed \textbf{LexSlot} is
+and DER++ additionally caches output logits). \textbf{LexSlot} is
 parameter-efficient in the opposite direction: it \emph{freezes} the backbone and
 trains only a small slot memory (head logit-slots $+$ low-rank late-layer adapters, a $\sim$1--2\%
 parameter overhead over the frozen backbone; hyperparameters in
@@ -1031,7 +1033,7 @@ this table (LexSlot is measured on DIL so far). ``Run'' denotes one full continu
   scenario. Trainable parameters ($\sim$125.4\,M) are essentially identical across these
   full-fine-tuning methods and are the only strictly comparable column. Wall-clock and
   peak-memory were collected across heterogeneous hardware and batch sizes during the grid, so
-  they are indicative, not strictly comparable: replay's buffers add real memory. The proposed
+  they are indicative, not strictly comparable: replay's buffers add real memory. 
   LexSlot (\S\ref{sec:results-lexslot}) instead freezes the backbone and trains only a small slot
   memory, paired with a compact 200-exemplar replay buffer (an order of magnitude smaller than
   the plain replay methods'); its CIL-CORD cost is not listed (measured on DIL so far).}
@@ -1113,7 +1115,7 @@ input-representation drift \emph{per se}.
   \label{fig:newscenarios-aa}
 \end{figure}
 
-\section{Why Other Remedies Fail, and the Replay Control}
+\section{Why Other Remedies Fail, and Lexically-Routed Latent Replay}
 \label{sec:results-falsification-ext}
 
 The experiments in this section post-date the main grid and sharpen its central negative
@@ -1185,14 +1187,15 @@ $58.9$, a coverage-limited partial transfer, not a method.
   \label{fig:falsification-ladder}
 \end{figure}
 
-\paragraph{CoLaR: the constructive control.}
+\paragraph{CoLaR: the memory of the proposed method.}
 The negatives above could be effort-limited. CoLaR (compressed latent replay) shows they are
 not: per-\emph{document} rank-$r$ SVD factors respect whole-document binding (unlike the
 pooled feature space, individual documents \emph{are} low-rank), giving AA $87.6$ at
 $60$\,MB ($2.7\times$ smaller than raw replay at equal document count; final-task row
 $[89.2, 76.3, 97.2]$ on FUNSD/SROIE/CORD), within $1.4$ points of the joint oracle.
 Compression that respects the consistency law works; every marginal summary collapses.
-CoLaR is a \emph{control}, not a claimed contribution. Attempts to improve it obey a
+CoLaR is the memory of the proposed method; with uniform sampling it is the control
+against which the lexical gate is measured. Attempts to improve it obey a
 conservation law: class-balanced replay losses ($87.1$), coverage-based exemplar selection
 ($86.8$), their combination ($87.3$), and entity-weighted compression ($87.1$) all trade
 FUNSD surplus for SROIE roughly $1{:}1$ without moving AA; a three-seed check confirms no
@@ -1301,7 +1304,7 @@ intervention, which also explains \emph{why} replay is so effective below
     \draw[flow] (mech) -- (out);
     \node[note, fill=gray!8, below=4mm of mech.south, anchor=north]
       {\textbf{The diagnosis-grounded alternative.} Because the site is output-facing, a
-       mechanism that targets the head/late layers \emph{directly}: the proposed
+       mechanism that targets the head/late layers \emph{directly}:
        \textbf{LexSlot}, an isolated slot memory paired with a compact 200-exemplar replay
        buffer, matches replay-level accuracy on DIL
        ($87.3$ vs the oracle's $88.7$) and forgets \emph{less} than the plain replay methods
@@ -1353,7 +1356,7 @@ were not run on the large-scale WildReceipt scenario
 (\S\ref{sec:results-extended}), where only the classical methods and the oracle are
 reported; everything else, including C-Flat++ (\texttt{er\_cflat}), the depth-targeting
 probe, and the cross-lingual scenario, is measured over three
-seeds. The proposed LexSlot is measured on DIL/LayoutLMv3 (3 seeds); its other-scenario and
+seeds. LexSlot is measured on DIL/LayoutLMv3 (3 seeds); its other-scenario and
 multi-backbone confirmation is the pending grid. The qualitative conclusions: replay strongest,
 LexSlot approaching replay on the DIL gap with a small fraction of the exemplar budget, and the depth-targeting probe
 confirming the head/late site, do not depend on the unrun cells.

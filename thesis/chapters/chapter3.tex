@@ -490,7 +490,7 @@ diagnostic of \S\ref{sec:method-diagnostic} and the FCS-CL benchmark would have 
 the headline contributions and the remedy would have been withheld. The diagnosis did
 concentrate forgetting at the head and late layers (Chapter~\ref{ch:results}), so this
 branch was \emph{not} taken: a head/late-targeted remedy is justified, and
-\S\ref{sec:method-lexslot} introduces the one this thesis proposes. We state the fallback
+\S\S\ref{sec:method-lexslot}--\ref{sec:method-routed} build the one this thesis proposes. We state the fallback
 explicitly because pre-registering it, rather than choosing the form after seeing which
 design won, is what licenses the claim that the remedy's \emph{target} was
 \emph{derived from} the measurement; and because the diagnostic's value stands
@@ -498,6 +498,15 @@ independently of the remedy's margin regardless.
 
 \section{Lexical-Slot Head-Memory Continual Learning (LexSlot)}
 \label{sec:method-lexslot}
+
+\paragraph{Role in the proposed method.} The thesis proposes one method, lexically-routed
+latent replay (\S\ref{sec:method-routed}), with three parts: \emph{where} it acts (the
+diagnosed head/late site), \emph{what} it stores (compressed per-document latents, CoLaR),
+and \emph{which} stored documents it replays (a lexical gate). This section develops the
+gate. It does so inside LexSlot, a slot memory at the diagnosed site that was designed and
+evaluated first; LexSlot's results (Chapter~\ref{ch:results}) are the evidence that the
+lexical signature is a usable, drift-immune routing signal at the head. Its slot memory is
+then replaced by CoLaR's latent memory, and its signature is kept as the gate.
 
 The diagnosis fixes \emph{where} a remedy should act, the classifier head and late encoder
 layers (\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection}), and LexSlot is the

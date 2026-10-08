@@ -308,11 +308,22 @@ validation entity-F1 after each epoch, keeps a CPU snapshot of the best-scoring
 weights, and stops once the score fails to improve for two consecutive epochs;
 \texttt{restore\_best} reloads that snapshot before the task boundary. Because the
 stopper lives in the base class, every method, regularisation, replay, distillation,
-and the proposed remedy alike, inherits the identical stopping rule for free, which
+and the proposed method alike, inherits the identical stopping rule for free, which
 is what makes the comparison fair under the protocol of
 \S\ref{sec:exp-checkpointing}.
 
-\paragraph{The proposed method (LexSlot).} LexSlot is implemented in
+\paragraph{The proposed method (lexically-routed latent replay).} The method is implemented
+in \texttt{doccl/methods/colar\_pp.py} on top of the latent-replay base class
+(\texttt{doccl/methods/latent\_replay.py}). The memory is CoLaR's: a forward hook captures
+each stored document's layer-$k$ activations, which are kept as truncated SVD factors and
+re-injected at layer $k$ during replay. The gate is a \texttt{replay\_route} key
+(\emph{none}/\emph{near}/\emph{far}/\emph{task}) with a temperature \texttt{route\_temp}:
+when it is set, each stored document keeps a sparse bag-of-token-ids signature computed at
+capture time, and the replay sampler draws indices from the softmax of the current batch's
+similarity to those signatures. With \texttt{replay\_route=none} the method reduces exactly
+to uniform CoLaR, which is the control.
+
+\paragraph{The lexical gate's origin (LexSlot).} LexSlot is implemented in
 \texttt{doccl/methods/lexslot.py} (with the slot modules in
 \texttt{doccl/methods/lexslot\_memory.py} and the lexical gate in
 \texttt{doccl/methods/lexslot\_mask.py}) over the same frozen-backbone harness as the
