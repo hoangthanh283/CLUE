@@ -1,8 +1,7 @@
 # DocCL — Master's Thesis (LaTeX)
 
-LaTeX sources for the Master's thesis *"Where Does a Document Encoder Forget? A
-Per-Component Diagnosis of Catastrophic Forgetting in LayoutLMv3 and a
-Mechanism-Targeted Remedy"* (Thanh Hoang, HUST).
+LaTeX sources for the Master's thesis *"Continual Learning for Document Understanding:
+Diagnosis-Guided Lexically-Routed Latent Replay"* (Thanh Hoang, HUST).
 
 Built on the **official HUST thesis class** `hust-thesis` (Ngoc Bui, CC BY 4.0).
 
