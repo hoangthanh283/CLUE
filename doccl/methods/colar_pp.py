@@ -19,6 +19,7 @@ Switches (all off ⇒ plain CoLaR / raw latent replay with ``rank_r: 0``):
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import random
@@ -401,6 +402,9 @@ class CoLaRPP(CoLaR):
             out.mkdir(parents=True, exist_ok=True)
             torch.save(self.model.state_dict(), out / "final_model.pt")
             torch.save(self.store, out / "final_store.pt")
+            (out / "final_labels.json").write_text(
+                json.dumps({int(k): v for k, v in self.model.id_to_label.items()})
+            )
 
     def _fit_analytic_head(self, train_loader: DataLoader) -> None:
         """S1: re-solve the RP ridge head from scratch on stored latents recomputed through
