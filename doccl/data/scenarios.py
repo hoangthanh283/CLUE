@@ -624,9 +624,15 @@ def build_pilot(order: list[int] | None = None) -> CLScenario:
     return CLScenario("pilot", ScenarioType.PILOT, tasks, train_dss, eval_dss)
 
 
-def _build_vision_cil(name: str, bases, num_sessions: int, class_order_seed: int) -> CLScenario:
+def _build_vision_cil(
+    name: str, bases, num_sessions: int, class_order_seed: int, only_task: int | None = None
+) -> CLScenario:
     """Split-<dataset> class-incremental: ``num_sessions`` equal chunks of a seeded class
-    permutation. Head index = position in the permutation, so no remapper and no ``O``."""
+    permutation. Head index = position in the permutation, so no remapper and no ``O``.
+
+    ``only_task=k`` returns a ONE-task scenario holding session ``k`` alone with a local
+    head index (labels 0..m-1): the independent per-task model of the multi-model upper
+    bound (task-ID oracle). Its name is ``<name>_indep<k>`` so runs never collide."""
     import numpy as np
 
     base_train, base_eval, split, num_classes = bases
@@ -635,6 +641,25 @@ def _build_vision_cil(name: str, bases, num_sessions: int, class_order_seed: int
     head_index = {int(c): i for i, c in enumerate(perm)}
     per = num_classes // num_sessions
     sessions = [perm[i * per : (i + 1) * per] for i in range(num_sessions)]
+    if only_task is not None:
+        if not 0 <= only_task < num_sessions:
+            raise ValueError(f"only_task={only_task} out of range for {num_sessions} sessions")
+        sess = sessions[only_task]
+        local = {int(c): i for i, c in enumerate(sess)}
+        task = TaskInfo(
+            task_id=0,
+            task_name=f"{name}_t{only_task}",
+            label_set=[f"c{c}" for c in sess],
+            is_first=True,
+            is_last=True,
+        )
+        return CLScenario(
+            f"{name}_indep{only_task}",
+            ScenarioType.CIL,
+            [task],
+            [VisionCILDataset(base_train, sess, local, True, train_idx)],
+            [VisionCILDataset(base_eval, sess, local, False, eval_idx)],
+        )
 
     train_dss = [VisionCILDataset(base_train, s, head_index, True, train_idx) for s in sessions]
     eval_dss = [VisionCILDataset(base_eval, s, head_index, False, eval_idx) for s in sessions]
@@ -654,12 +679,20 @@ def _build_vision_cil(name: str, bases, num_sessions: int, class_order_seed: int
     )
 
 
-def build_cil_cifar100(num_sessions: int = 10, class_order_seed: int = 1993) -> CLScenario:
-    return _build_vision_cil("cil_cifar100", cifar100_bases(), num_sessions, class_order_seed)
+def build_cil_cifar100(
+    num_sessions: int = 10, class_order_seed: int = 1993, only_task: int | None = None
+) -> CLScenario:
+    return _build_vision_cil(
+        "cil_cifar100", cifar100_bases(), num_sessions, class_order_seed, only_task
+    )
 
 
-def build_cil_imagenet_r(num_sessions: int = 10, class_order_seed: int = 1993) -> CLScenario:
-    return _build_vision_cil("cil_imagenet_r", imagenet_r_bases(), num_sessions, class_order_seed)
+def build_cil_imagenet_r(
+    num_sessions: int = 10, class_order_seed: int = 1993, only_task: int | None = None
+) -> CLScenario:
+    return _build_vision_cil(
+        "cil_imagenet_r", imagenet_r_bases(), num_sessions, class_order_seed, only_task
+    )
 
 
 SCENARIO_REGISTRY = {
@@ -691,13 +724,56 @@ SCENARIO_REGISTRY = {
 }
 
 
+def single_task_scenario(scenario: CLScenario, k: int) -> CLScenario:
+    """Slice task ``k`` of a FIXED-label-space scenario (DIL) into a one-task scenario:
+    the independent per-task model of the multi-model upper bound. CIL scenarios carry
+    cumulative head indices in their targets, so they must be built with ``only_task``
+    at the builder (the vision builders do); growing-head document CIL is unsupported."""
+    if scenario.scenario_type != ScenarioType.DIL:
+        raise ValueError(
+            f"only_task needs a fixed label space; {scenario.name} is "
+            f"{scenario.scenario_type.name} (growing head) — not supported"
+        )
+    if not 0 <= k < len(scenario.tasks):
+        raise ValueError(f"only_task={k} out of range for {len(scenario.tasks)} tasks")
+    src = scenario.tasks[k]
+    task = TaskInfo(
+        task_id=0,
+        task_name=src.task_name,
+        label_set=src.label_set,
+        is_first=True,
+        is_last=True,
+        metadata=dict(src.metadata),
+    )
+    return CLScenario(
+        f"{scenario.name}_indep{k}",
+        scenario.scenario_type,
+        [task],
+        [scenario.train_datasets[k]],
+        [scenario.eval_datasets[k]],
+    )
+
+
+# Scenarios whose builder takes ``only_task`` itself (CIL with per-session local heads).
+_BUILDER_ONLY_TASK = {"cil_cifar100", "cil_imagenet_r"}
+
+
 def get_scenario(name: str, *, encoder: KIEEncoder | None = None, **kwargs) -> CLScenario:
     """Build a scenario. ``encoder`` (per-backbone tokenization) is set as the
     process-wide default before the datasets are constructed, so every loader in
-    this scenario tokenizes for the active backbone. Defaults to LayoutLMv3."""
+    this scenario tokenizes for the active backbone. Defaults to LayoutLMv3.
+
+    ``only_task=k`` (any scenario) builds the one-task slice for the independent
+    per-task upper bound — see ``single_task_scenario``."""
     if name not in SCENARIO_REGISTRY:
         raise ValueError(f"Unknown scenario {name}. Available: {list(SCENARIO_REGISTRY)}")
     if encoder is not None:
         set_default_encoder(encoder)
     builder = SCENARIO_REGISTRY[name]
-    return builder(**kwargs) if kwargs else builder()
+    only_task = kwargs.pop("only_task", None)
+    if only_task is not None and name in _BUILDER_ONLY_TASK:
+        return builder(only_task=int(only_task), **kwargs)
+    scenario = builder(**kwargs) if kwargs else builder()
+    if only_task is not None:
+        scenario = single_task_scenario(scenario, int(only_task))
+    return scenario
