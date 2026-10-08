@@ -4,9 +4,9 @@
 set -u
 cd "$(dirname "$0")/.."
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-export WANDB_MODE=offline
+# W&B online by default; export WANDB_MODE=offline to run without network
 LOG=results/logs_vision/latent_diag.log; mkdir -p results/logs_vision
-COMMON="model=vit_b16 scenario=cil_cifar100 training=vision training.batch_size=16 training.num_workers=2 training.gradient_checkpointing=true wandb.mode=offline method.epochs=100 method.docs_per_task=500 method.replay_batch_size=16 +method.replay_task_balance=true"
+COMMON="model=vit_b16 scenario=cil_cifar100 training=vision training.batch_size=16 training.num_workers=2 training.gradient_checkpointing=true method.epochs=100 method.docs_per_task=500 method.replay_batch_size=16 +method.replay_task_balance=true"
 ARMS="${ARMS:-latA:method.split_layer_k=8 latB:method.split_layer_k=11 latC:method.split_layer_k=4}"
 SEEDS="${SEEDS:-42}"
 echo "=== LATENT-VIT DIAG $(date) ===" >>"$LOG"

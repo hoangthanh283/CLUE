@@ -2,9 +2,9 @@
 # Amendment 7: Phase R (frozen-PTM references, probe run) then Phase S screens. Sequential.
 set -u
 cd "$(dirname "$0")/.."
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True WANDB_MODE=offline
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 LOG=results/logs_vision/rca_queue.log; mkdir -p results/logs_vision
-V="model=vit_b16 training=vision training.batch_size=16 training.num_workers=4 training.gradient_checkpointing=false training.amp=true wandb.mode=offline"
+V="model=vit_b16 training=vision training.batch_size=16 training.num_workers=4 training.gradient_checkpointing=false training.amp=true"
 run() {  # run <run-dir> <args...>
   local name="$1"; shift
   if [ -f "results/${name}/metrics.json" ]; then echo "$(date +%H:%M) SKIP $name" >>"$LOG"; return; fi

@@ -2,9 +2,9 @@
 # Amendment 8 screen (seed 42, CIFAR-100). Sequential, resume-safe.
 set -u
 cd "$(dirname "$0")/.."
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True WANDB_MODE=offline
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 LOG=results/logs_vision/ideas_queue.log; mkdir -p results/logs_vision
-V="model=vit_b16 training=vision training.batch_size=16 training.num_workers=4 training.gradient_checkpointing=false training.amp=true wandb.mode=offline method=colar_pp scenario=cil_cifar100 seed=42"
+V="model=vit_b16 training=vision training.batch_size=16 training.num_workers=4 training.gradient_checkpointing=false training.amp=true method=colar_pp scenario=cil_cifar100 seed=42"
 S2="method.feature_anchor=1.0"
 I1="method.drift_comp=true method.head_align_epochs=10"
 I2="method.trunk_adapt=lora"
