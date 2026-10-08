@@ -66,6 +66,10 @@ Lexically-Routed Latent Replay}
 
 % Draft marker for numbers that await a registered experiment (remove before submission).
 \providecommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+% ESTIMATE MARKER: values wrapped in \est{} are projections pending the routing runs
+% (scripts/run_doc_route.sh). Replace each with the measured value from metrics.json, then
+% drop the wrapper. Find them all with: grep -rn '\\est{' chapters frontmatter
+\providecommand{\est}[1]{\underline{#1}}
 
 \begin{document}
 

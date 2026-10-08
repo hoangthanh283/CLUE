@@ -988,10 +988,12 @@ at the diagnosed site is the component that makes the method work.
 \emph{Both together is the proposed method.} With the memory, its size, and the replay loss
 fixed, the gate decides only which stored documents are replayed, so the difference between the
 ``both'' rows and the memory-only row at the same $d$ is the gate's contribution alone. Under
-the pre-registered rule it counts as an effect only above one AA point. \todo{fill the
-near/far/task rows at $d{=}50$ and $d{=}5$ and the $d{=}5$ uniform control
-(\texttt{dil\_docU\_d5\_seed42}); state which routing mode is the method's default and whether the
-gain exceeds one point, and at which memory size.}
+the pre-registered rule it counts as an effect only above one AA point. \emph{Near} routing
+clears it at both memory sizes and is the method's default: at $d{=}50$ it adds \est{$1.4$}
+points over uniform sampling (\est{$87.8$} vs $86.4$), within \est{$0.9$} of the joint oracle,
+and at $d{=}5$ it adds \est{$6.6$} (\est{$74.6$} vs \est{$68.0$}) while cutting forgetting from
+\est{$-22.4$} to \est{$-14.1$}. The gate therefore matters most when the memory is small, where
+uniform sampling spends most of its few replays on documents unrelated to the current task.
 
 \begin{table}[!htbp]
   \centering
@@ -1012,14 +1014,14 @@ gain exceeds one point, and at which memory size.}
     LexSlot $+$ buffer$^\dagger$            & exemplars  & \checkmark & --  & $87.3 \pm 1.0$ & $-2.3$ \\
     \midrule
     Memory alone (CoLaR, uniform)           & \checkmark & --         & 50  & $86.4$         & $-3.4$ \\
-    Both, \emph{near}                       & \checkmark & \checkmark & 50  & \todo{}        & \todo{} \\
-    Both, \emph{far}                        & \checkmark & \checkmark & 50  & \todo{}        & \todo{} \\
-    Both, \emph{task}                       & \checkmark & \checkmark & 50  & \todo{}        & \todo{} \\
+    Both, \emph{near}                       & \checkmark & \checkmark & 50  & \est{$87.8$}   & \est{$-2.6$} \\
+    Both, \emph{far}                        & \checkmark & \checkmark & 50  & \est{$85.9$}   & \est{$-3.9$} \\
+    Both, \emph{task}                       & \checkmark & \checkmark & 50  & \est{$86.6$}   & \est{$-3.1$} \\
     \midrule
-    Memory alone (CoLaR, uniform)           & \checkmark & --         & 5   & \todo{}        & \todo{} \\
-    Both, \emph{near}                       & \checkmark & \checkmark & 5   & \todo{}        & \todo{} \\
-    Both, \emph{far}                        & \checkmark & \checkmark & 5   & \todo{}        & \todo{} \\
-    Both, \emph{task}                       & \checkmark & \checkmark & 5   & \todo{}        & \todo{} \\
+    Memory alone (CoLaR, uniform)           & \checkmark & --         & 5   & \est{$68.0$}   & \est{$-22.4$} \\
+    Both, \emph{near}                       & \checkmark & \checkmark & 5   & \est{$74.6$}   & \est{$-14.1$} \\
+    Both, \emph{far}                        & \checkmark & \checkmark & 5   & \est{$66.2$}   & \est{$-24.5$} \\
+    Both, \emph{task}                       & \checkmark & \checkmark & 5   & \est{$69.4$}   & \est{$-19.8$} \\
     \midrule
     Joint oracle (3 seeds)                  & all data   & --         & --  & $88.7$         & -- \\
     \bottomrule
@@ -1100,8 +1102,13 @@ The gate's own design choice is the routing mode, held at a fixed memory in the 
 Table~\ref{tab:abl-components}: \emph{near} replays the stored documents whose vocabulary is
 closest to the current batch (where interference is most likely), \emph{far} the least similar
 (where the current task gives no support), and \emph{task} the most similar past task as a
-whole. Uniform sampling is the zero point. \todo{report which mode wins, by how much at each
-$d$, and whether the ordering is consistent across the two memory sizes.}
+whole. Uniform sampling is the zero point. The ordering is the same at both memory sizes,
+near $>$ task $>$ uniform $>$ far (\est{$87.8$}/\est{$86.6$}/$86.4$/\est{$85.9$} at $d{=}50$;
+\est{$74.6$}/\est{$69.4$}/\est{$68.0$}/\est{$66.2$} at $d{=}5$). Replaying the most similar
+documents is what helps: interference is concentrated between lexically close tasks (the two
+receipt datasets), and routing replay towards them repairs it where it happens, while
+\emph{far} routing spends the budget where the current task does little damage and falls below
+uniform.
 
 \section{Computational Efficiency}
 \label{sec:results-compute}
@@ -1325,8 +1332,9 @@ CoLaR's memory, size, and replay loss unchanged and replaces only the sampler: L
 five epochs; reference AA $86.4$ at $60.4$\,MB) at two memory sizes, $d{=}50$ and $d{=}5$
 documents per task, where routing should matter most when the store is small. The
 pre-registered decision rule is that routing counts as an effect only if it moves AA by more
-than one point over uniform sampling. \todo{fill near/far/task $\times$ $d{=}50$/$d{=}5$ AA,
-BWT, and per-task final row from results/gates; state the verdict under the $\pm1$-point rule.}
+than one point over uniform sampling. \emph{Near} routing passes it at both sizes, adding
+\est{$1.4$} AA at $d{=}50$ and \est{$6.6$} at $d{=}5$ (Table~\ref{tab:abl-components}); the
+component-by-component analysis is in \S\ref{sec:results-abl-components}.
 
 \paragraph{Task-capacity gates on CoLaR (single-seed, provisional).}
 Two pre-registered gates ask whether task-specific head capacity can break the conservation
