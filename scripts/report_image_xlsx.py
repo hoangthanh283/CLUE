@@ -29,22 +29,23 @@ def load_runs() -> pd.DataFrame:
             m = os.path.join(d, "metrics.json")
             if not os.path.exists(m):
                 continue
-            j = json.load(open(m))
+            with open(m) as fh:
+                j = json.load(fh)
             name, me, sd = os.path.basename(d), j["method"], j["seed"]
             var = name.replace(f"{sc}_", "", 1).replace(f"_seed{sd}", "").replace("_vit", "")
             var = "" if var == me else re.sub(f"^{me}_?", "", var)
-            M = np.array(j["matrix"], dtype=float)
-            curve = [float(np.nanmean(M[t, : t + 1])) for t in range(M.shape[0])]
+            mat = np.array(j["matrix"], dtype=float)
+            curve = [float(np.nanmean(mat[t, : t + 1])) for t in range(mat.shape[0])]
             rows.append(
-                dict(
-                    scenario=sc,
-                    method_label=f"{me} [{var}]" if var else me,
-                    seed=sd,
-                    AA=j["AA"],
-                    BWT=j["BWT"],
-                    AF=j["AF"],
-                    curve=curve,
-                )
+                {
+                    "scenario": sc,
+                    "method_label": f"{me} [{var}]" if var else me,
+                    "seed": sd,
+                    "AA": j["AA"],
+                    "BWT": j["BWT"],
+                    "AF": j["AF"],
+                    "curve": curve,
+                }
             )
     return pd.DataFrame(rows)
 
@@ -78,7 +79,7 @@ def write_scenario_sheet(wb: Workbook, df: pd.DataFrame, sc: str) -> None:
     order = [m for m in summ.method_label if m in cur]
     anchors = [m for m in ("joint", "naive") if m in order]
     series = anchors + [m for m in order if m not in anchors][: MAX_LINE_SERIES - len(anchors)]
-    T = len(next(iter(cur.values())))
+    nt = len(next(iter(cur.values())))
     crow = last + 3
     ws.cell(
         row=crow - 1, column=1, value="Mean seen-task accuracy after each task (mean over seeds)"
@@ -87,7 +88,7 @@ def write_scenario_sheet(wb: Workbook, df: pd.DataFrame, sc: str) -> None:
     ws.cell(row=crow, column=1, value="Task")
     for j, m in enumerate(series, start=2):
         ws.cell(row=crow, column=j, value=m)
-    for t in range(T):
+    for t in range(nt):
         ws.cell(row=crow + 1 + t, column=1, value=t + 1)
         for j, m in enumerate(series, start=2):
             v = cur[m][t]
@@ -113,10 +114,10 @@ def write_scenario_sheet(wb: Workbook, df: pd.DataFrame, sc: str) -> None:
         "task",
     )
     lc.add_data(
-        Reference(ws, min_col=2, max_col=1 + len(series), min_row=crow, max_row=crow + T),
+        Reference(ws, min_col=2, max_col=1 + len(series), min_row=crow, max_row=crow + nt),
         titles_from_data=True,
     )
-    lc.set_categories(Reference(ws, min_col=1, min_row=crow + 1, max_row=crow + T))
+    lc.set_categories(Reference(ws, min_col=1, min_row=crow + 1, max_row=crow + nt))
     lc.width, lc.height = 28, 11
     ws.add_chart(lc, "I43")
 
