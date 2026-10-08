@@ -17,6 +17,15 @@ ordering B+ 22–30% > diagnostic-as-is 12–18% > method-paper 8–12% at ICML/
 existing code on Vast.ai. CoLaR is the *constructive control*, PLaR the *bounded-negative*, not
 method contributions.
 
+### RESUME HERE (2026-10-08)
+1. Adjudicate the GPU chain as it lands: doc D (position-axis compression) / B (drift-compensated
+   Gaussians) / codec probe / routing cells (Amendments 9–10; routing within ±1 pp of uniform →
+   revert the thesis title per the kill rule), then the independent bound (`scripts/run_indep.sh`).
+2. Add the `independent` row to the thesis/paper DIL tables (`analyze_results.py` already emits
+   it) and the Task-IL oracle column to the image appendix; refresh the Reports sheet via
+   `scripts/report_addendum_xlsx.py` + `report_image_xlsx.py`.
+3. Reconcile RESULTS_REPORT §3.1 pilot AA/BWT with the ord210-excluded aggregation.
+
 ### RESUME HERE (2026-09-23)
 1. **Sep 25 AoE: submit ICLR 2027** — `paper/main.tex`: fill App. B, ledger HGT/CUBER number,
    trim, strip TODO/vnum macros, anonymisation check, upload PDF to OpenReview.

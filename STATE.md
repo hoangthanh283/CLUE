@@ -1,3 +1,26 @@
+## RESUME HERE (2026-10-08): W&B back online; Reports sheet extended; independent bound queued
+
+- **W&B online again.** All runner scripts dropped the forced `WANDB_MODE=offline` (80ae89e);
+  the 503 offline runs since 2026-07-02 were synced into `thanh-workspace/doccl-aaai2027`
+  (`results/wandb_backlog_sync.log`). Jobs launched before the change (ppI124, docD1) still ran
+  offline → `wandb sync --sync-all --include-offline` once more when the chain drains.
+- **Google "Reports" sheet** (`1Oa98rqXXs7hRL2hfWA4dwSLKPJJ2G-TR0OCtVpYV_BA`): added `Image All
+  Runs`, `Image Summary` (CSV import via the Sheets picker — it lists real files only, not Google
+  Sheets). Chart-bearing tabs come from `scripts/report_addendum_xlsx.py` (Diagnosis locus,
+  Approaches by dataset, Metrics, cil_cifar100/imagenet_r (vit)) → xlsx handed to the user for
+  File→Import→Upload. **Lesson:** binary files cannot go through the Drive MCP base64 path
+  (transcription corrupts bytes; verified by download+cmp) — hand the file over instead.
+- **Independent per-task upper bound** (one model per task, task-ID oracle) implemented
+  (7ce4bec): `scenario.kwargs.only_task=k` → run dir `<scenario>_indep<k>_naive_seed<s>`;
+  `analyze_results.py` folds them into an `independent` row under joint. Valid bound on DIL
+  (fixed labels); on CIL it is the Task-IL oracle — report as such, never as a CIL bound.
+  Queue `scripts/run_indep.sh` (DIL ×3×3; CIFAR-100 + ImageNet-R ×10×3) armed behind the
+  routing cells (`/tmp/claude-1000/indep_after.sh`). Chain: docD1 (running) → D2 → B1 → B2 →
+  codec probe → routing near/far/task × d50/d5 → independent bound.
+- Diagnosis AA/BWT in the sheet come from the pilot JSONs with the `_ord210` reversed-order runs
+  excluded (LayoutLMv3 full 28.3/−89.8); `docs/RESULTS_REPORT_2026-10.md` §3.1 quotes 31.6/−81.3
+  for the same arm — reconcile which aggregation the report used.
+
 ## Latent replay × gradient checkpointing bug (found 2026-10-06; scope NARROWED same day)
 
 HF checkpointing recomputes `layer.__call__` in backward and re-fires the layer-k injection
