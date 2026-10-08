@@ -30,3 +30,6 @@ ca_samples_per_cls: 256
 trunk_adapt: full        # I2: "lora" = low-rank adapters on layers >= k after task 0
 lora_rank: 8
 lora_lr: 5.0e-4
+keep_tokens: all         # D (documents): "labeled" keeps only labelled first-subword text positions
+visual_tokens: keep      # D (documents): "drop" discards the 197 visual patch positions
+max_tokens_per_cls: 20000

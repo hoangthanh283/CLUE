@@ -192,3 +192,54 @@ def test_drift_comp_builds_stats_and_aligns_head(tmp_path):
     m.after_task(t1, _loader([2, 3]))
     assert set(m._cls_mean) == {0, 1, 2, 3}
     assert not torch.allclose(mean0, m._cls_mean[0])  # old mean shifted by measured drift
+
+
+def _doc(n_text=6, n_vis=3, d=32, labelled=(1, 3, 4)):
+    labels = torch.full((n_text,), -100)
+    for i, c in zip(labelled, (0, 1, 2), strict=False):
+        labels[i] = c
+    return {
+        "hidden": torch.randn(n_text + n_vis, d),
+        "labels": labels,
+        "bbox": torch.arange(n_text * 4).reshape(n_text, 4),
+        "attention_mask": torch.ones(n_text, dtype=torch.long),
+    }
+
+
+def test_position_compression_keeps_labelled_text_only(tmp_path):
+    model = _tiny_vit(tmp_path)
+    m = _method(model, keep_tokens="labeled", visual_tokens="drop")
+    d = _doc()
+    h = m._compress_positions(d, d.pop("hidden").float())
+    assert h.shape[0] == 3 and d["n_text"] == 3 and d["vis_drop"]
+    assert d["labels"].tolist() == [0, 1, 2] and d["bbox"].shape == (3, 4)
+    m2 = _method(model, keep_tokens="labeled", visual_tokens="keep")
+    d2 = _doc()
+    h2 = m2._compress_positions(d2, d2.pop("hidden").float())
+    assert h2.shape[0] == 3 + 3 and "vis_drop" not in d2
+
+
+def test_stack_replay_pads_variable_length_documents(tmp_path):
+    model = _tiny_vit(tmp_path)
+    m = _method(model, keep_tokens="labeled", visual_tokens="keep", rank_r=0)
+    docs = []
+    for labelled in ((1, 3, 4), (0, 2)):
+        d = _doc(labelled=labelled)
+        h = m._compress_positions(d, d.pop("hidden").float())
+        d["hidden"] = h.to(torch.float16)
+        docs.append(d)
+    r = m._stack_replay(docs)
+    assert r["hidden"].shape == (2, 3 + 3, 32)  # max text (3) + visual (3)
+    assert r["labels"].shape == (2, 3) and r["labels"][1].tolist()[-1] == -100
+    assert r["attention_mask"][1].tolist() == [1, 1, 0]
+    # dropped-visual store: text only, hook pads with the live visual block
+    m3 = _method(model, keep_tokens="labeled", visual_tokens="drop", rank_r=0)
+    d3 = _doc()
+    d3["hidden"] = m3._compress_positions(d3, d3.pop("hidden").float()).to(torch.float16)
+    r3 = m3._stack_replay([d3])
+    assert r3["hidden"].shape == (1, 3, 32)
+    m3._inject = r3["hidden"]
+    live = torch.zeros(1, 3 + 5, 32)
+    out = m3._pre_hook(None, (live,), {})
+    assert out[0][0].shape == (1, 8, 32) and torch.equal(out[0][0][:, 3:], live[:, 3:])
+    m3._inject = None

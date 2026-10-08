@@ -233,3 +233,42 @@ state (memory leak); now cloned.
 - I1-only (no anchoring) for attribution; I1+I2+I4 (+S2) combined.
 **Go:** ≥ 87.5 (SLCA, same recipe) and ≥ 85.3 (frozen RanPAC). **Then** Phase B: 3 seeds ×
 CIFAR-100 + ImageNet-R, claim if mean above both with 3/3 sign agreement, memory stated.
+
+## Amendment 9 (2026-10-08, documents; before any run below) — "what beats replay on documents"
+
+Constraints from the RCA: the head must be re-exercised with old-task labels (kill-tests);
+the gradient must come through whole, position-bound documents (+27 AA consistency law);
+documents are low-rank, tokens are not (CoLaR r128 lossless). Accuracy is already at the
+oracle with replay (≈88 vs 88.7); the contest is **bytes** (and privacy). Reference cell:
+CoLaR k=4, 50 docs/task, r=128, 5 epochs, DIL seed 42 = **86.38 AA @ 60.4 MB**
+(`results/dil_colar_seed42_k4_d50_r128`). All cells below use that recipe.
+
+**D — position-axis compression** (lossless by construction if the binding holds):
+D1 keep only labelled first-subword text tokens (+ their bbox), visual block kept;
+D2 as D1 and the 197 visual patch positions dropped (replay runs on the model's own
+dummy-image visual block). Support = within 1 pp of 86.38 at ≥ 3× fewer bytes.
+Kill = > 3 pp drop (binding broken by dropping context tokens).
+
+**B — drift-compensated full-data token Gaussians** (Idea 1 ported): per-BIO-class
+mean/cov over every labelled token of the task; old-class means shifted by the measured
+drift of the stored tokens before/after each task; head realigned on samples (256/class).
+B1 at 5 docs/task (reference: latent replay d5 66.5 ± 3.0; CoLaR d5/r64 60.8);
+B2 at 50 docs/task r128 (does it add to 86.38?). Support for B1 = ≥ 80 (a 10× byte cut
+that keeps most of the accuracy); kill = ≤ 70 (summaries stay dead on documents even
+with exact drift gauges).
+
+**A — learned per-document codec**: probe only (reconstruction → frozen-upper-layer token
+F1); registered after D/B results, before any replay cell.
+Seeds: 42 for the screen; any supported cell confirmed on 7/123.
+
+### Addendum to Amendment 8/9 (2026-10-08, probe landed after both were registered)
+
+`scripts/rca_colar_probe.py` on the raw-bank run (CIFAR-100, seed 42, AA 78.8):
+RP-ridge on **full-data** features of the adapted trunk = **88.6** (> frozen RanPAC 85.2);
+RP-ridge / NCM on the **stored** 50 samples/class = 80.7 / 78.8; NCM full = 80.7.
+Readout-coverage gap +9.8, representation gap **−3.4** (adaptation *improves* the features).
+Revised root cause: not trunk damage but **readout statistics estimated from 10 % coverage**.
+This is the mechanism Idea 1 / B target (full-data statistics kept valid by exact drift gauges);
+I1 = 84.4 on the first screen. I4 (r16 + int8 + 2×2 token pooling @ 2000) collapsed to 16.3:
+token pooling changes the sequence length like token-drop did — pooling is a negative;
+rank/quantisation without pooling remains to be tested.

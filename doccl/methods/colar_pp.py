@@ -113,6 +113,13 @@ class CoLaRPP(CoLaR):
         self._cls_mean: dict[int, torch.Tensor] = {}
         self._cls_cov: dict[int, torch.Tensor] = {}
         self._f_before: torch.Tensor | None = None
+        # Amendment 9 (documents). D: position-axis compression — keep only labelled
+        # first-subword text tokens (keep_tokens=labeled) and optionally drop the visual
+        # patch tokens (visual_tokens=drop); the replay forward then runs on the shortened
+        # sequence, which the attention mask already supports.
+        self.keep_tokens = str(config.get("keep_tokens", "all"))
+        self.visual_tokens = str(config.get("visual_tokens", "keep"))
+        self.max_tokens_per_cls = int(config.get("max_tokens_per_cls", 20000))
         self._rp = (
             RanPAC(model, {"rp_dim": config.get("rp_dim", 10000), "rp_seed": 0})
             if self.analytic_head == "rp"
@@ -126,7 +133,9 @@ class CoLaRPP(CoLaR):
         LatentReplay._capture_task(self, train_loader)  # raw bank first, then encode
         for d in self.store[n_before:]:
             h = d.pop("hidden").float()
-            if self.token_pool > 1:
+            if "attention_mask" in d:  # document: (text + visual) positions
+                h = self._compress_positions(d, h)
+            elif self.token_pool > 1:
                 h = _pool_tokens(h, self.token_pool)
             if self.rank_r > 0:
                 u, s, vh = torch.linalg.svd(h, full_matrices=False)
@@ -154,6 +163,29 @@ class CoLaRPP(CoLaR):
             self.memory_bytes() / 1e6,
         )
 
+    def _compress_positions(self, d: dict, h: torch.Tensor) -> torch.Tensor:
+        """D: drop unlabelled text positions and/or the visual patch block of one document."""
+        text_len = d["attention_mask"].shape[0]
+        text, visual = h[:text_len], h[text_len:]
+        if self.keep_tokens == "labeled":
+            m = d["labels"] != -100
+            text = text[m]
+            for k in ("labels", "bbox", "attention_mask", "input_ids"):
+                if k in d:
+                    d[k] = d[k][m]
+        d["n_text"] = int(text.shape[0])
+        if self.visual_tokens == "drop":
+            d["vis_drop"] = True
+            return text
+        return torch.cat([text, visual], dim=0)
+
+    @staticmethod
+    def _pad_rows(t: torch.Tensor, n: int, value) -> torch.Tensor:
+        if t.shape[0] >= n:
+            return t
+        pad = torch.full((n - t.shape[0], *t.shape[1:]), value, dtype=t.dtype)
+        return torch.cat([t, pad], dim=0)
+
     @staticmethod
     def _deq(d: dict, key: str) -> torch.Tensor:
         t = d[key]
@@ -167,6 +199,8 @@ class CoLaRPP(CoLaR):
     def _stack_replay(
         self, docs: list[dict[str, torch.Tensor]], augment: bool = False
     ) -> dict[str, torch.Tensor]:
+        if "n_text" in docs[0]:
+            return self._stack_documents(docs)
         hidden = torch.stack([self._decode(d) for d in docs])
         if augment and self.token_drop > 0 and "bbox" not in docs[0] and hidden.shape[1] > 2:
             # keep CLS + a random subset of patch tokens (same count per batch, own draw per
@@ -193,6 +227,29 @@ class CoLaRPP(CoLaR):
                 [F.pad(d["logits"].float(), (0, width - d["logits"].shape[0])) for d in docs]
             )
             replay["logit_width"] = torch.tensor([d["logits"].shape[0] for d in docs])
+        return replay
+
+    def _stack_documents(self, docs: list[dict]) -> dict[str, torch.Tensor]:
+        """Position-compressed documents: pad text positions to the batch max."""
+        n = max(d["n_text"] for d in docs)
+        dec = [self._decode(d) for d in docs]
+        if docs[0].get("vis_drop"):
+            hidden = torch.stack([self._pad_rows(x, n, 0.0) for x in dec])
+        else:
+            hidden = torch.stack(
+                [
+                    torch.cat([self._pad_rows(x[: d["n_text"]], n, 0.0), x[d["n_text"] :]])
+                    for x, d in zip(dec, docs, strict=True)
+                ]
+            )
+        pad_val = {"labels": -100, "bbox": 0, "attention_mask": 0, "input_ids": 0}
+        replay = {
+            "hidden": hidden.to(torch.float16),
+            "labels": torch.stack([self._pad_rows(d["labels"], n, -100) for d in docs]),
+        }
+        for k in ("bbox", "attention_mask", "input_ids"):
+            if k in docs[0]:
+                replay[k] = torch.stack([self._pad_rows(d[k], n, pad_val[k]) for d in docs])
         return replay
 
     def _sample_replay(self) -> dict[str, torch.Tensor] | None:
@@ -260,6 +317,15 @@ class CoLaRPP(CoLaR):
             for t in d.values()
             if torch.is_tensor(t)
         )
+
+    def _pre_hook(self, module, args, kwargs):
+        if self._inject is not None:
+            hidden = args[0] if args else kwargs["hidden_states"]
+            if self._inject.shape[1] < hidden.shape[1]:
+                # stored text positions only: keep the model's own (dummy-image) visual block
+                inj = self._inject.to(device=hidden.device, dtype=hidden.dtype)
+                self._inject = torch.cat([inj, hidden[:, inj.shape[1] :]], dim=1)
+        return super()._pre_hook(module, args, kwargs)
 
     # ---------------------------------------------------------------- training
     def _make_optimizer(self) -> torch.optim.Optimizer:
@@ -365,14 +431,36 @@ class CoLaRPP(CoLaR):
             for c in y_old.unique().tolist():
                 if c in self._cls_mean:
                     self._cls_mean[c] += delta[(y_old == c).cpu()].mean(0)
-        f, y = cls_features(self.model, train_loader, self.device)
+        f, y = self._task_features(train_loader)
         f, y = f.cpu(), y.cpu()
         eye = torch.eye(f.shape[1])
         for c in y.unique().tolist():
             fc = f[y == c]
+            if fc.shape[0] > self.max_tokens_per_cls:
+                fc = fc[torch.randperm(fc.shape[0])[: self.max_tokens_per_cls]]
+            if fc.shape[0] < 2:
+                continue
             self._cls_mean[c] = fc.mean(0)
             self._cls_cov[c] = torch.cov(fc.T) + 1e-4 * eye
         self.model.train()
+
+    @torch.no_grad()
+    def _task_features(self, loader: DataLoader) -> tuple[torch.Tensor, torch.Tensor]:
+        """Classifier-input features of a task's full training set: CLS (images) or every
+        labelled token (documents)."""
+        if getattr(self.model, "task_type", "token") == "image":
+            return cls_features(self.model, loader, self.device)
+        self.model.eval()
+        feats, labs = [], []
+        for batch in loader:
+            batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
+            with self._amp_autocast():
+                x = self.model.token_features(batch)
+            lab = batch["labels"][:, : x.shape[1]]
+            m = lab != -100
+            feats.append(x[m].float().cpu())
+            labs.append(lab[m].cpu())
+        return torch.cat(feats), torch.cat(labs)
 
     def _align_head_gaussian(self) -> None:
         """SLCA-style head alignment on samples from the drift-corrected class Gaussians."""
@@ -409,6 +497,7 @@ class CoLaRPP(CoLaR):
         was_training = self.model.training
         self.model.eval()
         feats: list[torch.Tensor] = []
+        labs: list[torch.Tensor] = []
         captured: list[torch.Tensor] = []
         hook = self._head().register_forward_pre_hook(lambda _m, a: captured.append(a[0]))
         try:
@@ -418,13 +507,21 @@ class CoLaRPP(CoLaR):
                 with self._amp_autocast():
                     self._replay_forward(self._stack_replay(docs))
                 x = captured[0]
-                feats.append((x[:, 0] if x.dim() == 3 else x).float().clone())  # drop the view
+                if "attention_mask" in docs[0]:  # document: labelled token features
+                    lab = torch.stack(
+                        [self._pad_rows(d["labels"], x.shape[1], -100) for d in docs]
+                    ).to(x.device)
+                    m = lab != -100
+                    feats.append(x[m].float().clone())
+                    labs.append(lab[m])
+                else:
+                    feats.append((x[:, 0] if x.dim() == 3 else x).float().clone())
+                    labs.append(torch.stack([d["labels"] for d in docs]).to(x.device))
         finally:
             hook.remove()
             if was_training:
                 self.model.train()
-        labels = torch.stack([d["labels"] for d in docs_all]).to(self.device)
-        return torch.cat(feats), labels
+        return torch.cat(feats), torch.cat(labs)
 
     def _align_head(self) -> None:
         x, y = self._stored_features()
