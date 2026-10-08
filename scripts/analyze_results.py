@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -67,6 +68,7 @@ METHOD_ORDER = [
 METHOD_DISPLAY = {
     "naive": "Naive (lower bound)",
     "joint": "Joint (upper bound)",
+    "independent": "Independent (one model per task, task-ID oracle)",
     "ewc": "EWC",
     "lwf": "LwF",
     "er": "ER",
@@ -406,8 +408,9 @@ def write_main_table(
 
     for m in methods:
         lines.append(row(m))
-    if "joint" in mean.index:
-        lines += ["\\midrule", row("joint")]
+    bounds = [m for m in ("joint", "independent") if m in mean.index]
+    if bounds:
+        lines += ["\\midrule", *[row(m) for m in bounds]]
     lines += ["\\bottomrule", "\\end{tabular}"]
 
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -693,6 +696,46 @@ def compute_fwt_per_run(
     return float(np.mean(diffs)) if diffs else float("nan")
 
 
+_INDEP_RE = re.compile(r"^(?P<base>.+)_indep(?P<k>\d+)$")
+
+
+def add_independent_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Synthesise the multi-model (independent per-task) upper bound.
+
+    ``train.py`` with ``scenario.kwargs.only_task=k`` writes one run per task under the
+    scenario name ``<base>_indep<k>`` (its AA is that task's single-model score). Here they
+    are averaged over k per (base scenario, backbone, seed) into one ``independent`` row
+    so the tables can show it next to ``joint``. Partial task sets are kept (``AF`` holds
+    the task count so a reader can see coverage); BWT is 0 by construction.
+    """
+    m = df["scenario"].astype(str).str.extract(_INDEP_RE)
+    ind = df[m["base"].notna()].copy()
+    if ind.empty:
+        return df
+    ind["base"] = m.loc[ind.index, "base"]
+    g = ind.groupby(["base", "model_family", "seed"])
+    rows = []
+    for (base, fam, seed), grp in g:
+        rows.append(
+            {
+                "name": f"{base}_independent_seed{seed}_{fam}",
+                "state": "finished",
+                "method": "independent",
+                "model_family": fam,
+                "scenario": base,
+                "seed": seed,
+                "AA": float(grp["AA"].mean()),
+                "BWT": 0.0,
+                "AF": float(len(grp)),
+                "FWT": float("nan"),
+                "mean_time_per_task_s": float(grp["mean_time_per_task_s"].mean()),
+                "peak_gpu_mem_mb": float(grp["peak_gpu_mem_mb"].max()),
+                "matrix": None,
+            }
+        )
+    return pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+
+
 def add_fwt_column(df: pd.DataFrame, baselines: dict[str, dict[str, float]]) -> pd.DataFrame:
     """Populate df['FWT'] from saved matrices + single-task baselines (true FWT)."""
     df = df.copy()
@@ -825,6 +868,7 @@ def main():
     # primary subset keeps a secondary-backbone single-task run from skewing b_i.
     baselines = compute_single_task_baselines(_primary_only(df))
     df = add_fwt_column(df, baselines)
+    df = add_independent_rows(df)  # multi-model bound from <scenario>_indep<k> runs
     df = _add_target_column(df)  # unify target_depth / target_component → "target"
 
     # all_runs.csv keeps EVERY run (incl. secondary backbones) with the model_family
@@ -849,7 +893,9 @@ def main():
     write_main_table(prim, args.output_dir / "table_main.tex", metric="AA", proposed=args.proposed)
     # BWT companion to the main table, so every backward-transfer headline number
     # is traceable to a generated artifact rather than hand-kept in the thesis prose.
-    write_main_table(prim, args.output_dir / "table_main_BWT.tex", metric="BWT", proposed=args.proposed)
+    write_main_table(
+        prim, args.output_dir / "table_main_BWT.tex", metric="BWT", proposed=args.proposed
+    )
     write_ablation_table(
         prim,
         args.output_dir / "table_ablation.tex",

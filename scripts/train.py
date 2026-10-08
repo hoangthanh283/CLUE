@@ -360,6 +360,7 @@ def save_run_metrics(
     tracker: CLMetricsTracker,
     method,
     task_times: list[float],
+    scenario_key: str | None = None,
 ) -> None:
     """Persist a structured per-run ``metrics.json`` for offline ingestion.
 
@@ -374,7 +375,7 @@ def save_run_metrics(
         peak_mem_mb = torch.cuda.max_memory_allocated() / (1024**2)
     metrics = {
         "method": cfg.method.get("run_alias") or cfg.method.name,
-        "scenario": cfg.scenario.name,
+        "scenario": scenario_key or cfg.scenario.name,
         "seed": int(cfg.seed),
         # Backbone family so the result pipeline can distinguish e.g. a text-only
         # BERT "naive" run from the LayoutLMv3 "naive" run (same method string).
@@ -484,7 +485,13 @@ def main(cfg: DictConfig) -> None:
     # run_alias lets a config variant (e.g. slca = lca w/o merge; er_b2000) own its run dir
     # and metrics "method" key while keeping the registry name for class dispatch.
     method_key = cfg.method.get("run_alias") or cfg.method.name
-    run_name = f"{cfg.scenario.name}_{method_key}_seed{cfg.seed}"
+    # ``scenario.kwargs.only_task=k`` trains the independent per-task model (multi-model
+    # upper bound); its run dir / metrics carry the ``_indep<k>`` scenario suffix.
+    only_task = (cfg.scenario.get("kwargs") or {}).get("only_task")
+    scenario_key = cfg.scenario.name
+    if only_task is not None:
+        scenario_key += f"_indep{int(only_task)}"
+    run_name = f"{scenario_key}_{method_key}_seed{cfg.seed}"
     # Non-default backbones (BERT text-only, LiLT, BROS) suffix the run so their
     # result dirs/metrics don't collide with the LayoutLMv3 run of the same method.
     model_family = cfg.model.get("family", "layoutlmv3")
@@ -739,7 +746,11 @@ def main(cfg: DictConfig) -> None:
     # Seed the tracker with single-task baselines b_i so it can compute a real per-run
     # FWT (alongside AA/BWT/AF) once the zero-shot upper-triangular term is recorded
     # below. None if baselines aren't available yet → FWT stays NaN (honest).
-    fwt_baselines = load_fwt_baselines(scenario, Path("results/table_single_task_baselines.csv"))
+    fwt_baselines = (
+        None
+        if only_task is not None  # a one-task slice has no forward transfer to measure
+        else load_fwt_baselines(scenario, Path("results/table_single_task_baselines.csv"))
+    )
     if fwt_baselines is not None:
         log.info(
             "Loaded FWT baselines b_i for %s: %s",
@@ -844,7 +855,7 @@ def main(cfg: DictConfig) -> None:
 
         out_dir.mkdir(parents=True, exist_ok=True)
         np.save(out_dir / "matrix.npy", tracker.matrix)
-        save_run_metrics(out_dir, cfg, tracker, method, [joint_time])
+        save_run_metrics(out_dir, cfg, tracker, method, [joint_time], scenario_key)
 
         wandb.finish()
         return
@@ -966,7 +977,7 @@ def main(cfg: DictConfig) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     np.save(out_dir / "matrix.npy", tracker.matrix)
     log.info("Saved matrix to %s", out_dir)
-    save_run_metrics(out_dir, cfg, tracker, method, task_times)
+    save_run_metrics(out_dir, cfg, tracker, method, task_times, scenario_key)
 
     # Per-class F1 on the final model — DIL-degeneracy evidence (review M5).
     # Standard-forward methods only (prompt/LoRA methods have a custom forward).
