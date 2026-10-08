@@ -790,11 +790,24 @@ under-fitting) when spread evenly. The \emph{head-only} ($86.1$) and \emph{late-
 restrictions each recover essentially the full accuracy, indicating the head term carries most of
 the effect and the late-layer term is largely redundant with it. The probe is therefore
 consistent with the diagnosis and is the strongest available causal evidence short of a direct
-freezing intervention, which we flag as the cleaner control (a freeze of the high-displacement
-bucket) for future work; it does not, on its own, isolate forgetting from capacity. It motivates LexSlot's design directly: place capacity at the head/late
+freezing intervention, reported next; on its own it does not isolate forgetting from capacity. It motivates LexSlot's design directly: place capacity at the head/late
 locus, leave the rest frozen; and LexSlot's own placement ablation (\S\ref{sec:results-lexslot})
 re-confirms the same targeting effect with the slot mechanism (hypotheses
 H\textsubscript{target}/H\textsubscript{head} of \S\ref{sec:method-component-hypotheses}).
+
+\paragraph{Protecting the locus moves the drift.} The direct intervention freezes parameters
+instead of penalising them (DIL, LayoutLMv3, seed 42). Freezing everything after the first
+task gives AA $41.1$ with BWT $-0.0$: nothing is forgotten and nothing new is learned.
+Freezing only the diagnosed head and late layers, leaving the early and mid encoder plastic,
+gives AA $38.8$ with BWT $-76.8$, naive-level forgetting, and the early/mid CKA, $\approx 1.0$
+under naive training, falls to $0.19$. The drift did not disappear; it moved to whatever stayed
+plastic. A control that adds a memory to the frozen locus without protecting the rest
+($38.9$, $-75.6$) is indistinguishable, so drift, not the absence of a memory, is the
+bottleneck. We read this as a conservation statement: under an architectural constraint the
+total forgetting is redistributed, not removed. It is why parameter-space protection, however
+placed, cannot be the remedy, and why the remedies that work (\S\ref{sec:results-falsification-ext})
+re-exercise old targets instead. The freeze arms are single-seed; the consolidation probe above
+is three-seed.
 
 \subsection{The Proposed Remedy: LexSlot}
 \label{sec:results-lexslot}
@@ -1201,6 +1214,18 @@ weaker reader or stiffened.
   collapse. Memory figures are serialized replay-store bytes as instrumented per run.}
   \label{fig:colar-pareto}
 \end{figure}
+
+\paragraph{Lexically-routed latent replay.}
+CoLaR samples its store uniformly. Lexically-routed replay (\S\ref{sec:method-routed}) keeps
+CoLaR's memory, size, and replay loss unchanged and replaces only the sampler: LexSlot's
+\gls{ocr}-vocabulary signature selects the stored documents nearest to the current batch
+(\emph{near}), farthest from it (\emph{far}), or from the most similar past task
+(\emph{task}). The comparison is run against uniform CoLaR at the same budget ($k{=}4$, $r{=}128$,
+five epochs; reference AA $86.4$ at $60.4$\,MB) at two memory sizes, $d{=}50$ and $d{=}5$
+documents per task, where routing should matter most when the store is small. The
+pre-registered decision rule is that routing counts as an effect only if it moves AA by more
+than one point over uniform sampling. \todo{fill near/far/task $\times$ $d{=}50$/$d{=}5$ AA,
+BWT, and per-task final row from results/gates; state the verdict under the $\pm1$-point rule.}
 
 \paragraph{Task-capacity gates on CoLaR (single-seed, provisional).}
 Two pre-registered gates ask whether task-specific head capacity can break the conservation
