@@ -3,12 +3,14 @@
 \label{ch:methodology}
 % =====================================================================
 
-This chapter presents the two methodological contributions of the thesis. First,
-a \emph{per-component forgetting diagnostic} for tri-modal document encoders
-(\S\ref{sec:method-diagnostic}). Second, a \emph{mechanism-targeted continual-learning
-method}, LexSlot, whose target is derived from the diagnosis rather than chosen in
-advance (\S\ref{sec:method-remedy}). The ordering is deliberate: the diagnosis is
-the primary contribution and constrains the remedy.
+This chapter presents the methods that answer the two research questions of
+\S\ref{sec:intro-problem}. For RQ1 it builds a \emph{per-component forgetting diagnostic} for
+tri-modal document encoders (\S\ref{sec:method-diagnostic}). For RQ2 it derives, from that
+diagnosis, where a remedy may attach (\S\ref{sec:method-remedy}), designs LexSlot, a
+lexically-gated slot memory at the diagnosed locus (\S\ref{sec:method-lexslot}), and joins
+LexSlot's gate to a compressed per-document latent memory in \emph{lexically-routed latent
+replay} (\S\ref{sec:method-routed}). The ordering is deliberate: the diagnosis comes first and
+constrains every remedy that follows.
 
 \section{Problem Formulation}
 \label{sec:method-formulation}
@@ -47,6 +49,18 @@ privacy-preserving methods). The object of
 study is how performance on earlier tasks degrades as later tasks are learned,
 and, uniquely here, how that degradation is distributed across the
 \emph{components} of $\theta$.
+
+The stream follows one of three regimes. In \gls{cil} the label space grows,
+$\mathcal{L}_1 \subset \mathcal{L}_2 \subset \cdots$, and the head is expanded at each
+session; in \gls{dil} the label space is fixed and only the document distribution shifts, so
+forgetting is pure representation drift; the mixed regime combines both. The memory $M$ never
+holds the full past data: in this thesis it holds either a small set of exemplars or, for
+latent replay, the layer-$k$ activations of past documents, stored in compressed form, so no
+raw page is retained. The two research questions then read, in this notation: \textbf{RQ1}
+asks how the loss on $\mathcal{T}_{<t}$ after training on $\mathcal{T}_t$ is distributed over
+the components of $\theta$ defined below; \textbf{RQ2} asks what $M$ must contain at the
+diagnosed component for the loss on $\mathcal{T}_{<t}$ to stay near its joint-training value,
+and how the entries of $M$ should be chosen for replay given the current input $x$.
 
 \subsection{Defining a Component}
 \label{sec:method-components}
@@ -494,8 +508,10 @@ inputs. LexSlot answers it with an \emph{isolated, write-once slot memory}: smal
 adapters placed at the head and late layers over a partially-frozen backbone (lower encoder
 frozen, head and late layers trainable), where each task writes its own slots and a drift-immune
 lexical signature gates both updates and activations so earlier tasks are protected
-structurally: no rehearsal buffer, no consolidation penalty to tune
-(Figure~\ref{fig:lexslot-arch}).
+structurally: the slot mechanism itself needs no rehearsal buffer and no consolidation
+penalty to tune (Figure~\ref{fig:lexslot-arch}); its headline configuration adds a compact
+200-exemplar buffer (Chapter~\ref{ch:results}). The lexical signature that gates the slots is
+the part of LexSlot that carries over to replay (\S\ref{sec:method-routed}).
 
 \subsection{Slot Memories at the Diagnosed Locus}
 \label{sec:method-lexslot-slots}
@@ -710,6 +726,42 @@ rehearsal buffer, so the method's standing cost is just the small slot parameter
 ($\sim$1--2\% over the frozen lower encoder, plus the trainable late blocks and head). Slot
 counts, ranks, and the per-task budget are listed in Appendix~\ref{app:hyperparameters}.
 
+\section{Lexically-Routed Latent Replay}
+\label{sec:method-routed}
+
+The diagnosis says \emph{where} old-task evidence must be re-supplied (the head and late
+layers); the falsification results of Chapter~\ref{ch:results} say \emph{what form} it must
+take (whole documents, whose feature, position, and label stay bound together). Lexically-routed
+latent replay adds the remaining decision: \emph{which} stored documents to replay for the
+document currently being learned. It has two parts.
+
+\paragraph{The memory: compressed per-document latents (CoLaR).} The encoder is split at
+layer $k$; layers below $k$ are frozen after the first task. For each of up to $d$ documents per
+task, the layer-$k$ activation matrix $H \in \mathbb{R}^{n \times h}$ ($n$ positions, hidden
+size $h$) is stored as truncated SVD factors $H \approx U_r \Sigma_r V_r^\top$, together with the
+document's bounding boxes, attention mask, and labels. Because a single document is low-rank
+even though the pooled feature space is not, rank $r$ keeps the whole-document binding at a
+fraction of the raw size. During training on task $t$, each step adds a replay loss: stored
+latents are reconstructed and injected at layer $k$, run through the upper layers and the
+head, and scored against their stored labels.
+
+\paragraph{The gate: lexical routing.} Each stored document $j$ keeps a sparse bag-of-token-ids
+signature $\sigma_j$ computed from its \gls{ocr} tokens at capture time, the same input-derived,
+drift-immune signal that gates LexSlot's slots. For the current batch, with mean signature
+$\sigma(x)$, the similarity to each stored document is $s_j = \sigma(x)^\top \sigma_j$, and replay
+indices are drawn from
+\[
+  p_j \;=\; \operatorname{softmax}_j\!\big(\pm s_j / \tau\big),
+\]
+where the sign selects \emph{near} routing ($+$, replay the stored documents whose vocabulary is
+closest to the current one, where interference is most likely) or \emph{far} routing ($-$,
+replay the least similar ones, where the current task gives no support), and $\tau$ is a
+temperature. A third mode, \emph{task} routing, first averages $s_j$ within each past task,
+applies the softmax over tasks, and then samples uniformly within the chosen task. Uniform
+sampling of the store ($p_j = 1/|M|$) is the CoLaR baseline that every routing mode is compared
+against. Routing changes only which latents are replayed: the memory, its size, and the replay
+loss are identical, so any difference is attributable to the gate alone.
+
 \section{Summary}
 \label{sec:method-summary}
 
@@ -718,9 +770,10 @@ document encoder, a controlled modality-ablation protocol with an external unimo
 contrast, and complementary metrics (per-token CKA, per-group importance, an
 old-task-Fisher-weighted displacement (the forgetting localiser), and the
 forgetting matrix) that together localise forgetting by depth, stream, and head.
-From that measurement we derive a single head/late-targeted remedy, \textbf{LexSlot}: an
-isolated slot memory placed at the diagnosed locus, gated by a drift-immune
-lexical signature and paired with a compact 200-exemplar replay buffer in its headline
-configuration, whose \emph{target} follows from the diagnosis under a pre-registered,
-adequately powered decision rule. The next chapter describes how this methodology is realised in
+From that measurement we derive where a remedy may attach, and two remedies that attach
+there: \textbf{LexSlot}, an isolated slot memory at the diagnosed locus, gated by a
+drift-immune lexical signature and paired with a compact 200-exemplar replay buffer in its
+headline configuration; and \textbf{lexically-routed latent replay}, which keeps LexSlot's
+signature as the gate and replaces its memory with compressed per-document latents (CoLaR) at
+layer $k$, so the gate decides which stored documents are replayed. The next chapter describes how this methodology is realised in
 software.

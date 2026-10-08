@@ -62,75 +62,65 @@ LayoutLMv3),
 and its lexical gate is expected to be ineffective on class-incremental learning, where
 same-dataset sessions collapse the signature contrast the gate relies on, so its claims are
 deliberately confined to the domain-shift setting, which is why we frame it as promising rather
-than established. Finally, results rest on three
+than established. Ninth, lexically-routed latent replay is evaluated on the
+domain-incremental scenario and LayoutLMv3 at two memory sizes, so its transfer to other
+scenarios and backbones is untested. Finally, results rest on three
 seeds; more seeds would tighten the confidence intervals around the smaller
 effects.
 
 \section{Conclusions}
 \label{sec:concl-conclusions}
 
-This thesis set out to answer \emph{where} a tri-modal document encoder forgets,
-and to use that answer to design a continual-learning remedy. Its first
-contribution is a forgetting-localisation diagnostic that locates catastrophic
-forgetting along the depth of LayoutLMv3 and across its separable input streams and
-classifier head, under a controlled modality-ablation protocol and against a true
-unimodal (BERT) baseline, using complementary per-token representational (CKA) and
-old-task-Fisher-weighted displacement metrics together with standard forgetting
-measures.
+This thesis studied a stream of key-information-extraction tasks learned sequentially by a
+pre-trained tri-modal document encoder, under class-incremental, domain-incremental, and mixed
+regimes, with a bounded memory and no access to past raw documents. It asked two questions:
+\emph{where} in the encoder forgetting concentrates (RQ1), and \emph{what} a memory-bounded
+remedy must supply at that locus, and \emph{which} stored evidence it should re-expose (RQ2).
 
-The diagnosis returns a clear and somewhat counter-intuitive finding: under naive
-sequential fine-tuning LayoutLMv3 forgets almost totally (an earlier task that
-scores $88$ entity-F1 collapses to $\sim$2 F1 after a single subsequent task), and
-this forgetting is \emph{output-side}. It concentrates in the classifier head and
-the late encoder layers: per-token CKA drift rises monotonically with depth (from
-$1.00$ at the input encoders to $0.25$ at the late layers and $0.16$ at the head) and the
-Fisher-weighted
-displacement of the old task's parameters is largest there, while the input encoders
-are essentially unchanged. We are careful about what this does and does not claim:
-because LayoutLMv3 is single-stream we do \emph{not} assert a ``fusion-specific''
-effect (fusion is not a measurable parameter component here), and the question of
-whether the multimodal encoder forgets in a different \emph{place} than a unimodal
-one is answered by the BERT contrast and an adequately powered, distribution-targeting
-test rather than by the underpowered scalar magnitude comparison of an earlier pass.
+\paragraph{RQ1: where forgetting lives.} A per-component diagnostic (controlled modality
+masking of a single LayoutLMv3, read out by per-token CKA drift, per-group Fisher information,
+and old-task-Fisher-weighted displacement, and repeated on LiLT, BROS, and a text-only BERT)
+gives three answers. Forgetting is \emph{output-side}: under naive sequential fine-tuning an
+earlier task that scores $88$ entity-F1 collapses to $\sim$2 F1 after one further task, the head
+carries more than an order of magnitude more Fisher importance than any other group, and CKA
+drift rises monotonically with depth (from $1.00$ at the input encoders to $0.25$ at the late
+layers and $0.16$ at the head). It is \emph{architecture-general}: every backbone, the unimodal
+one included, reproduces the locus, so it is not a multimodal artefact; because LayoutLMv3 is
+single-stream we do not claim a fusion-specific effect. And it is \emph{conserved}: freezing the
+diagnosed head and late layers leaves naive-level forgetting (BWT $-76.8$) and moves the drift
+into the previously stable early and mid layers (CKA $\approx 1.0 \rightarrow 0.19$), while a fixed
+consolidation budget is usable only when concentrated on the locus ($\sim$85 AA) and under-fits
+when spread uniformly ($42.6$ AA).
 
-The benchmark of continual-learning strategies confirms what this diagnosis predicts.
-Across the three scenarios the ordering is unambiguous: replay $\gg$ regularisation
-$\gg$ distillation, and it follows directly from \emph{where} forgetting lives:
-because the damage is at the head, \emph{replay}, which re-exposes old-class targets at
-the output, is the most effective remedy. On domain-incremental learning both replay
-methods (ER, DER++) reach the joint upper bound (AA $\approx 88$ vs the oracle's $88.7$,
-backward transfer $\approx 0$), closing essentially the entire $\sim$47-point forgetting
-gap (interpreted with per-class F1, as the unified schema is VALUE-dominant); EWC
-sharply curbs forgetting wherever a domain shift is present (DIL/Mixed BWT
-$-2.8$/$-8.4$ vs naive $-73.1$/$-66.9$, and its strongest retention is on CIL-CORD at BWT
-$-54.8$, though at an accuracy cost); and LwF tracks the naive lower bound throughout, as
-its distilled old-class logits decay once the growing head stops reinforcing them.
+\paragraph{RQ2: what the remedy must supply.} The benchmark ordering follows the diagnosis:
+replay $\gg$ regularisation $\gg$ distillation. Replay re-exercises old targets at the head and
+reaches the joint upper bound on domain-incremental learning (AA $\approx 88$ vs the oracle's
+$88.7$, BWT $\approx 0$); EWC curbs forgetting under a domain shift at an accuracy cost; LwF and
+the prompt/LoRA families track the naive bound. The buffer-free methods fail for one reason: the
+head's output marginal on old tasks snaps to the newest task's label marginal while the
+representation beneath it drifts, and pre-registered eval-time and marginal-level corrections
+recover nothing, because the old-class probability mass is destroyed before any correction can
+act. What replay must then preserve is \emph{whole-document consistency}: replaying intact
+documents retains $87.3$ AA, while every summary that breaks the binding of feature, position,
+and label (a rank-16 projection, per-class Gaussians, even real $k$-means centroids) collapses to
+the naive level. CoLaR, which stores each document as its own rank-$r$ SVD factors, respects that
+law and reaches $87.6$ AA with a $60$\,MB memory, $2.7\times$ smaller than raw replay, without
+retaining any raw page.
 
-Its second contribution is \textbf{LexSlot}, a head/late-targeted method whose target is
-derived directly from the diagnosis: an isolated slot memory placed at the
-classifier head and late encoder layers over a frozen backbone, where each task writes only its
-own slots so earlier tasks are protected structurally, with no consolidation penalty
-to tune; its headline configuration pairs this isolation with a compact 200-exemplar replay
-buffer. Measured over three seeds on domain-incremental learning, LexSlot
-\emph{approaches replay-level accuracy} (AA $87.3 \pm 1.0$ vs the oracle's $88.7$, within
-$\sim$1 point of ER/DER++) while forgetting \emph{less} than the plain replay methods (backward
-transfer $-2.3$ versus $-2.8$/$-3.4$), with an order-of-magnitude smaller exemplar budget than
-the plain replay methods. The honest finding is
-that diagnosis-driven head/late targeting is competitive with, but does not exceed, data replay
-on the domain shift, with the chief advantage being qualitative: replay-level retention
-at a small fraction of the exemplar budget. A depth-targeting probe supports the locus as a budget-placement claim (a fixed
-consolidation budget recovers $\sim$85 AA when concentrated on the head/late locus but
-under-fits and collapses to $42.6$ AA when spread uniformly across depth, though the uniform
-variant forgets no more, it simply cannot fit the tasks), and LexSlot's own placement ablation
-reproduces the accuracy ordering with the slot mechanism; a direct freezing intervention is left
-as the cleaner causal control.
-We report LexSlot honestly as \emph{promising rather than settled}: it is so far evaluated on the
-domain-incremental scenario and LayoutLMv3, with the multi-scenario and multi-backbone
-confirmation the pending grid (\S\ref{sec:concl-future}). The diagnostic
-contribution stands on its own regardless: it provides a reusable
-tool and a shared benchmark for studying forgetting in multimodal document
-encoders (together with the finding that replay remains the strongest single
-remedy), which the prior, fragmented literature lacked.
+\paragraph{RQ2: which evidence to re-expose.} LexSlot, an isolated slot memory at the diagnosed
+locus, approaches replay-level accuracy on domain-incremental learning (AA $87.3 \pm 1.0$, BWT
+$-2.3$ versus $-2.8$/$-3.4$ for plain replay) with a compact 200-exemplar buffer; its lasting
+element is the drift-immune \gls{ocr}-vocabulary signature that gates it. Lexically-routed
+latent replay joins that gate to CoLaR's memory: for each incoming document it replays the stored
+latents chosen by lexical similarity rather than uniformly, with the memory and loss held fixed so
+that any change is the gate's alone. \todo{state the routing verdict under the pre-registered
+$\pm1$-point rule, with the $d{=}50$ and $d{=}5$ numbers.}
+
+Taken together, the diagnosis decides \emph{where} a remedy attaches, the falsification decides
+\emph{what form} its memory must take, and the lexical gate decides \emph{what} it replays. The
+diagnostic protocol, the benchmark, and the tooling stand independently of the remedy, as an
+instrument for designing continual-learning methods for multimodal document encoders that the
+prior, fragmented literature lacked.
 
 \section{Future Work}
 \label{sec:concl-future}
