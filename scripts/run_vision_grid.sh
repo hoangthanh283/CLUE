@@ -7,7 +7,7 @@
 set -u
 cd "$(dirname "$0")/.."
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-export WANDB_MODE=offline
+# W&B online by default; export WANDB_MODE=offline to run without network
 SCENARIOS="${SCENARIOS:-cil_cifar100 cil_imagenet_r}"
 METHODS="${METHODS:-naive joint ewc lwf er der_pp slca}"
 SEEDS="${SEEDS:-42 7 123}"
@@ -26,7 +26,7 @@ for sc in $SCENARIOS; do for me in $METHODS; do for sd in $SEEDS; do
   echo "$(date +%H:%M) START $run" >>"$LOG"
   uv run python scripts/train.py method=$me scenario=$sc model=vit_b16 seed=$sd \
     training=vision training.batch_size=$BATCH_SIZE training.num_workers=$NUM_WORKERS \
-    training.gradient_checkpointing=$GRAD_CKPT $ep wandb.mode=offline \
+    training.gradient_checkpointing=$GRAD_CKPT $ep \
     > "$LOGDIR/${run}.log" 2>&1
   rc=$?
   if [ $rc -eq 0 ] && [ -f "results/${run}/metrics.json" ]; then

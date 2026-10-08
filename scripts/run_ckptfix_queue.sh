@@ -7,13 +7,13 @@
 set -u
 cd "$(dirname "$0")/.."
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-export WANDB_MODE=offline
+# W&B online by default; export WANDB_MODE=offline to run without network
 LOG=results/logs_vision/ckptfix_queue.log; mkdir -p results/logs_vision
 run() {  # run <run-dir-glob> <log-name> <args...>
   local glob="$1" name="$2"; shift 2
   if ls results/${glob}/metrics.json >/dev/null 2>&1; then echo "$(date +%H:%M) SKIP $name" >>"$LOG"; return; fi
   echo "$(date +%H:%M) START $name" >>"$LOG"
-  uv run python scripts/train.py "$@" wandb.mode=offline > "results/logs_vision/${name}.log" 2>&1
+  uv run python scripts/train.py "$@" > "results/logs_vision/${name}.log" 2>&1
   if [ $? -eq 0 ] && ls results/${glob}/metrics.json >/dev/null 2>&1; then echo "$(date +%H:%M) DONE  $name" >>"$LOG"
   else echo "$(date +%H:%M) FAIL  $name" >>"$LOG"; fi
 }

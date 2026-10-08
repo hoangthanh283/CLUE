@@ -6,10 +6,10 @@
 set -u
 cd "$(dirname "$0")/.."
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-export WANDB_MODE=offline
+# W&B online by default; export WANDB_MODE=offline to run without network
 PHASE="${PHASE:?PHASE=A|A1|A2|B}"
 LOG=results/logs_vision/colarpp_queue.log; mkdir -p results/logs_vision
-COMMON="model=vit_b16 training=vision training.batch_size=16 training.num_workers=4 training.gradient_checkpointing=false training.amp=true method=colar_pp wandb.mode=offline"
+COMMON="model=vit_b16 training=vision training.batch_size=16 training.num_workers=4 training.gradient_checkpointing=false training.amp=true method=colar_pp"
 CA="method.head_align_epochs=10"; SL="method.trunk_lr_scale=0.1"; WA="method.weight_align=true"; BAL="method.replay_balance=class"
 case "$PHASE" in
   A)  SCENARIOS="cil_cifar100"; SEEDS="42"
