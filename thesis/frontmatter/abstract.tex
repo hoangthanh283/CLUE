@@ -24,8 +24,8 @@ domain-incremental, and mixed regimes, learned sequentially by a pre-trained tri
 with a bounded memory and no access to past raw data; the output is a single model that
 extracts entities from every task seen so far. It asks two questions. \emph{Where} in the
 encoder (text, layout, or visual stream, shared layers by depth, or the classifier head) does
-forgetting concentrate, and is that locus specific to multimodal fusion or general to the
-architecture? And, given the locus, \emph{what} must a memory-bounded remedy supply there, and
+forgetting concentrate, and is that site specific to multimodal fusion or general to the
+architecture? And, given the site, \emph{what} must a memory-bounded remedy supply there, and
 \emph{which} stored evidence should it re-expose for a given incoming document?
 
 The diagnosis comes first: a per-component protocol masks the input modalities of a single
@@ -34,7 +34,7 @@ per-group Fisher information, and Fisher-weighted parameter displacement at ever
 boundary, contrasted with LiLT, BROS, and a text-only BERT. Forgetting is \emph{output-side}:
 the head carries more than an order of magnitude more Fisher importance than any other group
 and CKA drift rises monotonically with depth (from $1.00$ at the input encoders to $0.25$ at
-the late layers and $0.16$ at the head). The locus is \emph{architecture-general}, recurring on
+the late layers and $0.16$ at the head). The site is \emph{architecture-general}, recurring on
 every backbone including the unimodal one, and it is \emph{conserved}: freezing the diagnosed
 head and late layers does not remove the drift but moves it to whatever stays plastic.
 
@@ -49,7 +49,7 @@ while every summary that breaks the binding of feature, position, and label coll
 naive level, even when built from real activations. Per-document compressed latent replay
 (CoLaR) respects that law, reaching $87.6$ with a $60$\,MB memory, $2.7\times$ smaller than raw
 replay. Building on both, this thesis proposes \textbf{lexically-routed latent replay}: the
-drift-immune OCR-vocabulary signature of LexSlot, a slot memory placed at the diagnosed locus
+drift-immune OCR-vocabulary signature of LexSlot, a slot memory placed at the diagnosed site
 (average entity-F1 $87.3$ with a compact 200-exemplar buffer), serves as the gate that decides
 \emph{which} stored document latents are replayed for the incoming document. The thesis
 releases the diagnostic protocol, the benchmark, and the tooling as an instrument for designing

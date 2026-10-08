@@ -75,7 +75,7 @@ This thesis studied a stream of key-information-extraction tasks learned sequent
 pre-trained tri-modal document encoder, under class-incremental, domain-incremental, and mixed
 regimes, with a bounded memory and no access to past raw documents. It asked two questions:
 \emph{where} in the encoder forgetting concentrates (RQ1), and \emph{what} a memory-bounded
-remedy must supply at that locus, and \emph{which} stored evidence it should re-expose (RQ2).
+remedy must supply at that site, and \emph{which} stored evidence it should re-expose (RQ2).
 
 \paragraph{RQ1: where forgetting lives.} A per-component diagnostic (controlled modality
 masking of a single LayoutLMv3, read out by per-token CKA drift, per-group Fisher information,
@@ -85,11 +85,11 @@ earlier task that scores $88$ entity-F1 collapses to $\sim$2 F1 after one furthe
 carries more than an order of magnitude more Fisher importance than any other group, and CKA
 drift rises monotonically with depth (from $1.00$ at the input encoders to $0.25$ at the late
 layers and $0.16$ at the head). It is \emph{architecture-general}: every backbone, the unimodal
-one included, reproduces the locus, so it is not a multimodal artefact; because LayoutLMv3 is
+one included, reproduces the site, so it is not a multimodal artefact; because LayoutLMv3 is
 single-stream we do not claim a fusion-specific effect. And it is \emph{conserved}: freezing the
 diagnosed head and late layers leaves naive-level forgetting (BWT $-76.8$) and moves the drift
 into the previously stable early and mid layers (CKA $\approx 1.0 \rightarrow 0.19$), while a fixed
-consolidation budget is usable only when concentrated on the locus ($\sim$85 AA) and under-fits
+consolidation budget is usable only when concentrated on the site ($\sim$85 AA) and under-fits
 when spread uniformly ($42.6$ AA).
 
 \paragraph{RQ2: what the remedy must supply.} The benchmark ordering follows the diagnosis:
@@ -108,7 +108,7 @@ law and reaches $87.6$ AA with a $60$\,MB memory, $2.7\times$ smaller than raw r
 retaining any raw page.
 
 \paragraph{RQ2: which evidence to re-expose.} LexSlot, an isolated slot memory at the diagnosed
-locus, approaches replay-level accuracy on domain-incremental learning (AA $87.3 \pm 1.0$, BWT
+site, approaches replay-level accuracy on domain-incremental learning (AA $87.3 \pm 1.0$, BWT
 $-2.3$ versus $-2.8$/$-3.4$ for plain replay) with a compact 200-exemplar buffer; its lasting
 element is the drift-immune \gls{ocr}-vocabulary signature that gates it. Lexically-routed
 latent replay joins that gate to CoLaR's memory: for each incoming document it replays the stored
@@ -142,7 +142,7 @@ established for an encoder-only, base-scale backbone. A natural next step is to
 re-run the same per-component protocol on larger and architecturally different
 backbones: LayoutLMv3-large, the multilingual LayoutXLM, and decoder-based or
 instruction-tuned document MLLMs such as InternVL3, to test whether the
-dominant-forgetting locus is a property of the LayoutLMv3-base design or a more
+dominant-forgetting site is a property of the LayoutLMv3-base design or a more
 general feature of tri-modal document encoders. A particularly important extension
 is to a \emph{two-stream} backbone (for example LiLT, whose text and layout streams
 are physically separate parameter blocks): there the per-stream \emph{attention}
