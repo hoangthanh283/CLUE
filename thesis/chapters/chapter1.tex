@@ -133,7 +133,7 @@ The thesis pursues four objectives, one per step of the approach:
         information, and old-task-Fisher-weighted parameter displacement at every task
         boundary, and repeated on LiLT, BROS, and a text-only BERT
         (Chapter~\ref{ch:methodology}, \S\ref{sec:method-diagnostic}).
-  \item \textbf{Falsify the remedies the diagnosis rules out (RQ2).} Test regularisation,
+  \item \textbf{Rule out the remedies the diagnosis rules out (RQ2).} Test regularisation,
         distillation, prompt and LoRA methods, eval-time and marginal-level corrections, and
         summarised replay against the diagnosed site, and identify the single reason they fail
         (Chapter~\ref{ch:results}, \S\S\ref{sec:results-remedy}--\ref{sec:results-falsification-ext}).
@@ -158,7 +158,7 @@ SROIE, extended with WildReceipt and XFUND) under one configuration system
 \begin{enumerate}
   \item a \textbf{forgetting-localisation diagnosis} of tri-modal document encoders, showing
         that forgetting is output-side, architecture-general, and conserved under constraint;
-  \item a \textbf{falsification of the buffer-free remedies} with one identified cause, the
+  \item an \textbf{explanation of why buffer-free remedies fail} with one identified cause, the
         readout-marginal snap on a drifting representation, and the law that replay must
         preserve \emph{whole-document consistency};
   \item \textbf{lexically-routed latent replay}, a remedy derived from both: a compressed,
@@ -201,7 +201,7 @@ root-cause analysis names the single mechanism: the head's output marginal on ol
 to the just-trained task's label marginal (cosine $0.997$), and classes that are not
 re-exercised are extinguished to $0.0$ F1 under every modality mask. Pre-registered eval-time
 and marginal-level corrections all recover nothing, because the old-class probability mass has
-already been destroyed. What replay must preserve is then isolated by a falsification ladder at
+already been destroyed. What replay must preserve is then isolated by an elimination ladder at
 a fixed layer: replaying real whole documents retains AA $87.3$, while a rank-16 summary
 ($41.9$), per-class Gaussians ($39.4$), and even real $k$-means centroids ($36.7$) collapse.
 The binding of feature, position, and label within one document is the necessary ingredient.

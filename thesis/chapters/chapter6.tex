@@ -1113,7 +1113,7 @@ input-representation drift \emph{per se}.
   \label{fig:newscenarios-aa}
 \end{figure}
 
-\section{Extended Falsification Results and the Replay Control}
+\section{Why Other Remedies Fail, and the Replay Control}
 \label{sec:results-falsification-ext}
 
 The experiments in this section post-date the main grid and sharpen its central negative
@@ -1155,7 +1155,7 @@ re-exercise (replay) prevents it. This closes the ``did you try cheap recalibrat
 objection with registered nulls rather than absence of evidence.
 
 \paragraph{Whole-document consistency is the necessary replay ingredient.}
-Given that only replay works, \emph{what about replay} is load-bearing? A falsification
+Given that only replay works, \emph{what about replay} is load-bearing? An elimination
 ladder over latent replay at a fixed frozen boundary (layer $k=8$) isolates it. Replaying
 \emph{real} banked activations of whole documents retains AA $87.3$ (converged). Every
 summarised variant collapses to naive level: a rank-16 spectral summary of the same store
@@ -1175,7 +1175,7 @@ $58.9$, a coverage-limited partial transfer, not a method.
   \centering
   \IfFileExists{figures/falsification_ladder.pdf}{%
     \includegraphics[width=0.9\linewidth]{falsification_ladder.pdf}}{}
-  \caption[The latent-replay falsification ladder]{The latent-replay falsification
+  \caption[The latent-replay elimination ladder]{The latent-replay elimination
   ladder at a fixed frozen boundary (layer $k{=}8$, DIL). Only whole-document replay
   (blue) retains accuracy; every summarised representation, including \emph{real}
   $k$-means centroids, collapses to the naive level, and the matched-budget
