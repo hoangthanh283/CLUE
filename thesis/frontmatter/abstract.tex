@@ -1,7 +1,8 @@
 % =====================================================================
 %  Abstract  (rendered via the class \abstractpage command).
-%  Structure: problem -> motivation/challenges -> setting (input/output)
-%  -> approach -> findings -> method. Keep aligned with Ch.1 SS1.2-1.4.
+%  Structure: problem -> setting (input/output) -> RQs + the ONE method
+%  -> Where (diagnosis) -> What (why remedies fail, memory) -> Which (gate).
+%  Keep aligned with Ch.1 SS1.2-1.4.
 % =====================================================================
 \abstractpage{
 Deployed document-understanding systems must absorb new document types, schemas, and
@@ -9,53 +10,58 @@ domains over time without forgetting what they already know, and they usually ca
 the raw documents they were trained on. Multimodal document encoders such as LayoutLMv3
 meet the demand for multimodal understanding by fusing text, layout, and visual pathways
 into a single network; that network is architecturally heterogeneous, and it remains
-unknown \emph{which} part of it drives catastrophic forgetting. This gap matters because
-prevailing continual-learning methods are blind to such structure: they regularise the
-network uniformly or freeze layers by hand-tuned heuristics, while modern parameter-efficient
-and modular adaptation implicitly presupposes knowing where to intervene. The setting adds
-two further difficulties: key-information extraction is dense token-level sequence labelling
-rather than the image or sentence classification most continual-learning methods were built
-for, and document features are close to full rank, so a memory of past tasks cannot simply be
-compressed into a small summary.
+unknown \emph{which} part of it drives catastrophic forgetting. Prevailing continual-learning
+methods are blind to such structure: they regularise the network uniformly or freeze layers
+by hand-tuned heuristics, while parameter-efficient and modular adaptation presupposes
+knowing where to intervene. Two further difficulties make the problem hard: key-information
+extraction is dense token-level sequence labelling, not the classification most
+continual-learning methods were built for, and document features are close to full rank, so
+past tasks cannot be compressed into a small summary.
 
 This thesis studies a stream of key-information-extraction tasks (scanned documents given as
 page image, OCR tokens, and bounding boxes, with BIO entity labels) under class-incremental,
 domain-incremental, and mixed regimes, learned sequentially by a pre-trained tri-modal encoder
-with a bounded memory and no access to past raw data; the output is a single model that
-extracts entities from every task seen so far. It asks two questions. \emph{Where} in the
-encoder (text, layout, or visual stream, shared layers by depth, or the classifier head) does
-forgetting concentrate, and is that site specific to multimodal fusion or general to the
-architecture? And, given the site, \emph{what} must a memory-bounded remedy supply there, and
-\emph{which} stored evidence should it re-expose for a given incoming document?
+with a bounded memory and no access to past raw documents; the output is a single model that
+extracts entities from every task seen so far. It asks \emph{where} in the encoder forgetting
+concentrates, and, given that, \emph{what} a memory-bounded remedy must store and \emph{which}
+stored evidence it should re-expose. The answer is one method,
+\textbf{lexically-routed latent replay}, whose three design choices are each fixed by a
+measurement: \emph{where} it acts comes from a diagnosis, \emph{what} it stores comes from
+testing why other remedies fail, and \emph{which} documents it replays is decided by a lexical
+gate.
 
-The diagnosis comes first: a per-component protocol masks the input modalities of a single
-LayoutLMv3, holding the architecture fixed, and reads forgetting out through linear CKA drift,
-per-group Fisher information, and Fisher-weighted parameter displacement at every task
-boundary, contrasted with LiLT, BROS, and a text-only BERT. Forgetting is \emph{output-side}:
-the head carries more than an order of magnitude more Fisher importance than any other group
-and CKA drift rises monotonically with depth (from $1.00$ at the input encoders to $0.25$ at
-the late layers and $0.16$ at the head). The site is \emph{architecture-general}, recurring on
-every backbone including the unimodal one, and it is \emph{conserved}: freezing the diagnosed
-head and late layers does not remove the drift but moves it to whatever stays plastic.
+\emph{Where.} A per-component diagnosis masks the input modalities of a single LayoutLMv3 and
+reads forgetting out through linear CKA drift, per-group Fisher information, and
+Fisher-weighted parameter displacement at every task boundary, with LiLT, BROS, and a
+text-only BERT as contrasts. Forgetting is \emph{output-side}: the classifier head carries more
+than an order of magnitude more Fisher importance than any other group, and CKA drift rises
+monotonically with depth (from $1.00$ at the input encoders to $0.25$ at the late layers and
+$0.16$ at the head). The site is architecture-general, recurring on every backbone including
+the unimodal one, and conserved: freezing the head and late layers does not remove the drift
+but moves it to whatever stays plastic. The method therefore re-supplies old-task evidence at
+the head and late layers rather than protecting parameters.
 
-A series of controlled tests then checks the remedies the diagnosis rules in or out across a
-ten-method suite over three seeds. Regularisation, distillation, and prompt/LoRA methods fail
-for one identified reason: the head's output marginal snaps to the newest task and the drift
-beneath it cannot be undone, and pre-registered eval-time and marginal-level corrections are
-all nulls. Only replay, which re-exercises old targets at the output, closes the gap (average
-entity-F1 $\approx 88$ on domain-incremental learning versus the joint oracle's $88.7$), and
-what it must preserve is \emph{whole-document consistency}: replaying intact documents works,
-while every summary that breaks the binding of feature, position, and label collapses to the
-naive level, even when built from real activations. Per-document compressed latent replay
-(CoLaR) respects that law, reaching $87.6$ with a $60$\,MB memory, $2.7\times$ smaller than raw
-replay. Building on both, this thesis proposes \textbf{lexically-routed latent replay}: the
-drift-immune OCR-vocabulary signature of LexSlot, a slot memory placed at the diagnosed site
-(average entity-F1 $87.3$ with a compact 200-exemplar buffer), serves as the gate that decides
-\emph{which} stored document latents are replayed for the incoming document. The thesis
-releases the diagnostic protocol, the benchmark, and the tooling as an instrument for designing
-continual-learning methods for multimodal document encoders.\footnote{Source code:
-\url{https://github.com/hoangthanh283/doccl} (\texttt{doccl} branch); experiments tracked on
-Weights \& Biases at \url{https://wandb.ai/thanh-workspace/doccl-aaai2027}.}
+\emph{What.} Across a ten-method suite over three seeds, regularisation, distillation, and
+prompt/LoRA methods fail for one reason: the head's output marginal snaps to the newest task
+while the representation beneath it drifts, and pre-registered eval-time and marginal-level
+corrections recover nothing. Only replay closes the gap (average entity-F1 $\approx 88$ on
+domain-incremental learning versus the joint oracle's $88.7$), and only if it keeps
+\emph{whole documents}: every summary that breaks the binding of feature, position, and label
+collapses to the naive level, even when built from real activations. The method's memory is
+therefore CoLaR, which stores each past document as its own low-rank factors at an
+intermediate layer; it reaches $87.6$ with a $60$\,MB memory, $2.7\times$ smaller than raw
+replay, without keeping any raw page.
+
+\emph{Which.} Instead of sampling that memory uniformly, the method routes it: each stored
+document keeps an OCR-vocabulary signature, which depends only on the input and so cannot
+drift, and replay draws the stored documents whose signature matches the incoming batch. The
+signature was first validated as the gate of LexSlot, a slot memory at the same site
+(average entity-F1 $87.3$ with a compact 200-exemplar buffer, forgetting less than plain
+replay). The thesis releases the diagnostic protocol, the benchmark, and the tooling as an
+instrument for designing continual-learning methods for multimodal document
+encoders.\footnote{Source code: \url{https://github.com/hoangthanh283/doccl} (\texttt{doccl}
+branch); experiments tracked on Weights \& Biases at
+\url{https://wandb.ai/thanh-workspace/doccl-aaai2027}.}
 
 \vspace{0.5em}
 \noindent\textbf{Keywords:} continual learning, catastrophic forgetting, document
