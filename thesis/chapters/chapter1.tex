@@ -95,9 +95,9 @@ transfer (BWT), forgetting, and the size of its memory in bytes.
 \begin{description}
   \item[RQ1 (diagnosis).] Where in a heterogeneous multimodal encoder (the text, layout, and
         visual streams, the shared layers by depth, or the classifier head) does catastrophic
-        forgetting concentrate under sequential \gls{kie}, and is that locus specific to
+        forgetting concentrate under sequential \gls{kie}, and is that site specific to
         multimodal fusion or general to the architecture?
-  \item[RQ2 (remedy).] Given the locus, what must a memory-bounded remedy supply there to
+  \item[RQ2 (remedy).] Given the site, what must a memory-bounded remedy supply there to
         recover joint-training accuracy, and \emph{which} stored evidence should it re-expose
         for a given incoming document?
 \end{description}
@@ -135,15 +135,15 @@ The thesis pursues four objectives, one per step of the approach:
         (Chapter~\ref{ch:methodology}, \S\ref{sec:method-diagnostic}).
   \item \textbf{Falsify the remedies the diagnosis rules out (RQ2).} Test regularisation,
         distillation, prompt and LoRA methods, eval-time and marginal-level corrections, and
-        summarised replay against the diagnosed locus, and identify the single reason they fail
+        summarised replay against the diagnosed site, and identify the single reason they fail
         (Chapter~\ref{ch:results}, \S\S\ref{sec:results-remedy}--\ref{sec:results-falsification-ext}).
-  \item \textbf{Replay at the locus, within a bounded memory (RQ2).} Establish what replay must
+  \item \textbf{Replay at the site, within a bounded memory (RQ2).} Establish what replay must
         preserve to work, and show that a compressed latent memory respecting it (CoLaR,
         per-document SVD factors at layer $k$) keeps replay-level accuracy at a fraction of the
         storage (\S\ref{sec:results-falsification-ext}).
   \item \textbf{Route the replay lexically (RQ2).} Use LexSlot's drift-immune
         \gls{ocr}-vocabulary signature, designed as the gate of a slot memory at the diagnosed
-        locus, to decide which stored document latents are replayed for the incoming document
+        site, to decide which stored document latents are replayed for the incoming document
         (\S\ref{sec:method-lexslot}).
 \end{enumerate}
 \noindent All results are reported over three seeds on a released benchmark (FUNSD, CORD,
@@ -162,7 +162,7 @@ SROIE, extended with WildReceipt and XFUND) under one configuration system
         readout-marginal snap on a drifting representation, and the law that replay must
         preserve \emph{whole-document consistency};
   \item \textbf{lexically-routed latent replay}, a remedy derived from both: a compressed,
-        per-document latent memory (CoLaR) at the diagnosed locus, with LexSlot's lexical
+        per-document latent memory (CoLaR) at the diagnosed site, with LexSlot's lexical
         signature as the gate that selects what is replayed;
   \item the \textbf{FCS-CL benchmark} and reproducible diagnostic tooling.
 \end{enumerate}
@@ -183,13 +183,13 @@ collapses to $\sim$2 F1 after one further task, the head carries more than an or
 magnitude more Fisher importance than any other group, and per-token CKA drift rises
 monotonically with depth (from $1.00$ at the input encoders to $0.25$ at the late layers and
 $0.16$ at the head), while the input encoders barely move. It is \emph{architecture-general}:
-the same head-concentrated pattern holds on LiLT, BROS, and a text-only BERT, so the locus is
+the same head-concentrated pattern holds on LiLT, BROS, and a text-only BERT, so the site is
 the general output side, not a multimodal artefact, and we do \emph{not} claim a
 fusion-specific effect. And it is \emph{conserved}: freezing everything after the first task
 forgets nothing but learns nothing (AA $41.1$), while freezing only the diagnosed head and
 late layers leaves naive-level forgetting (BWT $-76.8$) and the early and mid layers, stable
 under naive training, now drift (CKA $\approx 1.0 \rightarrow 0.19$). The drift is moved, not
-removed; a fixed consolidation budget recovers $\sim$85 AA when placed on the head/late locus
+removed; a fixed consolidation budget recovers $\sim$85 AA when placed on the head/late site
 but collapses to $42.6$ AA when spread uniformly across depth.
 
 \noindent\textbf{Why buffer-free remedies fail (RQ2).} The benchmark ordering follows the

@@ -7,7 +7,7 @@ This chapter presents the methods that answer the two research questions of
 \S\ref{sec:intro-problem}. For RQ1 it builds a \emph{per-component forgetting diagnostic} for
 tri-modal document encoders (\S\ref{sec:method-diagnostic}). For RQ2 it derives, from that
 diagnosis, where a remedy may attach (\S\ref{sec:method-remedy}), designs LexSlot, a
-lexically-gated slot memory at the diagnosed locus (\S\ref{sec:method-lexslot}), and joins
+lexically-gated slot memory at the diagnosed site (\S\ref{sec:method-lexslot}), and joins
 LexSlot's gate to a compressed per-document latent memory in \emph{lexically-routed latent
 replay} (\S\ref{sec:method-routed}). The ordering is deliberate: the diagnosis comes first and
 constrains every remedy that follows.
@@ -371,7 +371,7 @@ the characterisation-only fallback rather than to a method.
       edge/.style={-{Latex[length=2mm]}, thick},
       lbl/.style={midway, fill=white, inner sep=1pt, font=\scriptsize}]
     \node[diag] (root) {Per-component diagnosis\\(Fisher-weighted displacement by depth)};
-    \node[rem]  (ha) [below left=12mm and 6mm of root]  {\textbf{LexSlot}\\isolated slots at\\head/late locus};
+    \node[rem]  (ha) [below left=12mm and 6mm of root]  {\textbf{LexSlot}\\isolated slots at\\head/late site};
     \node[box]  (hb) [below=14mm of root]               {uniform\\mechanism};
     \node[fall] (h0) [below right=12mm and 6mm of root] {characterisation-\\only fallback};
     \draw[edge] (root) -- (ha) node[lbl, near end] {$H_a$: head/late-dominant};
@@ -381,7 +381,7 @@ the characterisation-only fallback rather than to a method.
   \caption[Decision tree mapping diagnostic outcomes to the remedy]{The decision
   rule as a tree over \emph{measurable} outcomes. A head/late-layer concentration
   ($H_a$, the outcome the diagnosis returns) selects a head/late-targeted remedy, here
-  \textbf{LexSlot}, an isolated slot memory at that locus; a uniform-across-depth pattern
+  \textbf{LexSlot}, an isolated slot memory at that site; a uniform-across-depth pattern
   ($H_b$) would instead select a uniform mechanism; no significant concentration (at adequate
   power, $H_0$) selects the characterisation-only fallback. Unrealisable branches
   (fusion- or visual-attention-dominant) are excluded because a single-stream
@@ -396,7 +396,7 @@ The diagnosis localises forgetting to a specific region of the network, the clas
 head and late encoder layers (Chapter~\ref{ch:results}), without prescribing how to protect
 it. This thesis derives one remedy from that measurement: \textbf{LexSlot}
 (\S\ref{sec:method-lexslot}), a parameter-efficient, isolated \emph{slot memory} placed at the
-diagnosed head/late locus, paired in its headline configuration with a compact 200-exemplar
+diagnosed head/late site, paired in its headline configuration with a compact 200-exemplar
 replay buffer. The motivation, design-space analysis,
 and selection criterion below (\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection})
 fix \emph{where} a mechanism should attach; LexSlot is the mechanism we put there.
@@ -458,7 +458,7 @@ Two method-level hypotheses are pre-registered and map one-to-one to the
 component-targeting ablation in Chapter~\ref{ch:results}:
 
 \begin{itemize}
-  \item \textbf{H\textsubscript{target}.} Placing the slot memory at the diagnosed locus
+  \item \textbf{H\textsubscript{target}.} Placing the slot memory at the diagnosed site
         (the classifier head and late encoder layers, \texttt{slot\_depth=head\_late})
         outperforms spreading slots uniformly across every depth (the \emph{uniform}
         ablation) on the domain-incremental scenario.
@@ -501,7 +501,7 @@ independently of the remedy's margin regardless.
 
 The diagnosis fixes \emph{where} a remedy should act, the classifier head and late encoder
 layers (\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection}), and LexSlot is the
-mechanism this thesis puts there. The guiding question is whether the diagnosed locus can be
+mechanism this thesis puts there. The guiding question is whether the diagnosed site can be
 protected by a \emph{parameter-efficient structured memory that stores no past inputs at all},
 rather than by a consolidation budget that keeps a frozen teacher in memory and rehearses stored
 inputs. LexSlot answers it with an \emph{isolated, write-once slot memory}: small additive slot
@@ -513,7 +513,7 @@ penalty to tune (Figure~\ref{fig:lexslot-arch}); its headline configuration adds
 200-exemplar buffer (Chapter~\ref{ch:results}). The lexical signature that gates the slots is
 the part of LexSlot that carries over to replay (\S\ref{sec:method-routed}).
 
-\subsection{Slot Memories at the Diagnosed Locus}
+\subsection{Slot Memories at the Diagnosed Site}
 \label{sec:method-lexslot-slots}
 
 LexSlot freezes the lower encoder and inserts small additive \emph{slot} modules exactly
@@ -531,11 +531,11 @@ r}$ down, $U\in\mathbb{R}^{r\times d}$ up). All slot up-projections are \emph{ze
 (LoRA-style), so an untrained slot is an exact no-op and adding slots never perturbs the
 network until they are trained. Placement is governed by a \texttt{slot\_depth} control
 (\emph{head\_only}, \emph{head\_late}, \emph{uniform}); the canonical setting is
-\emph{head\_late} (head $+$ late third), matching the diagnosed locus, and \emph{uniform}
+\emph{head\_late} (head $+$ late third), matching the diagnosed site, and \emph{uniform}
 (slots on every layer) is the targeting ablation. Crucially the freeze boundary coincides
 with the slot boundary: the layers that carry slots are exactly the layers that stay
 trainable, so stable pretrained features flow into the slots without drifting while the
-slot-bearing locus remains plastic.
+slot-bearing site remains plastic.
 
 \begin{figure}[!htbp]
   \centering
@@ -577,7 +577,7 @@ slot-bearing locus remains plastic.
     \draw[gfl] (gt.west) -- (rslot.east);
   \end{tikzpicture}
   \caption[LexSlot architecture]{LexSlot places small additive slot adapters at the
-  diagnosed forgetting locus over a \emph{partially-frozen} backbone. The lower $2/3$
+  diagnosed forgetting site over a \emph{partially-frozen} backbone. The lower $2/3$
   encoder (grey) is frozen so stable pretrained features flow into the slots without
   drifting; the late blocks and the classifier head (white) stay trainable and carry the
   slots, the trainable set is exactly the slot-bearing set, and the dashed line marks the
@@ -771,7 +771,7 @@ contrast, and complementary metrics (per-token CKA, per-group importance, an
 old-task-Fisher-weighted displacement (the forgetting localiser), and the
 forgetting matrix) that together localise forgetting by depth, stream, and head.
 From that measurement we derive where a remedy may attach, and two remedies that attach
-there: \textbf{LexSlot}, an isolated slot memory at the diagnosed locus, gated by a
+there: \textbf{LexSlot}, an isolated slot memory at the diagnosed site, gated by a
 drift-immune lexical signature and paired with a compact 200-exemplar replay buffer in its
 headline configuration; and \textbf{lexically-routed latent replay}, which keeps LexSlot's
 signature as the gate and replaces its memory with compressed per-document latents (CoLaR) at
