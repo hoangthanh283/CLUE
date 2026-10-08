@@ -140,6 +140,7 @@ class LatentReplay(NaiveFineTune):
                     ce_loss = cur_out.loss
                     replay_loss = torch.zeros((), device=self.device)
 
+                    self._cur_batch = batch  # routed variants read the current documents
                     replay = self._sample_replay()
                     if replay is not None:
                         replay_loss = self._replay_forward(replay).loss

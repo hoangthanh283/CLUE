@@ -243,3 +243,41 @@ def test_stack_replay_pads_variable_length_documents(tmp_path):
     out = m3._pre_hook(None, (live,), {})
     assert out[0][0].shape == (1, 8, 32) and torch.equal(out[0][0][:, 3:], live[:, 3:])
     m3._inject = None
+
+
+def test_lexical_routing_prefers_similar_documents(tmp_path):
+    model = _tiny_vit(tmp_path)
+    model.model.config.vocab_size = 50
+    m = _method(model, replay_route="near", route_temp=0.05, replay_batch_size=2)
+    docs = []
+    for ids, task in (
+        ([1, 2, 3, 4], 0),
+        ([1, 2, 3, 5], 0),
+        ([40, 41, 42, 43], 1),
+        ([44, 45, 46, 47], 1),
+    ):
+        d = {
+            "hidden": torch.zeros(4, 32),
+            "labels": torch.tensor([0, 1, -100, -100]),
+            "attention_mask": torch.ones(4, dtype=torch.long),
+            "input_ids": torch.tensor(ids),
+        }
+        m._cur_task_id = task
+        m._store_signature(d)
+        d["task"] = task
+        assert "input_ids" not in d and d["sig_idx"].numel() == 4
+        docs.append(d)
+    m.store = docs
+    m._cur_batch = {
+        "input_ids": torch.tensor([[1, 2, 3, 9]]),
+        "attention_mask": torch.ones(1, 4, dtype=torch.long),
+    }
+    w = m._route_weights()
+    assert w[:2].sum() > 0.9  # near: mass on the lexically similar task-0 docs
+    m.replay_route = "far"
+    assert m._route_weights()[2:].sum() > 0.9
+    m.replay_route = "task"
+    wt = m._route_weights()
+    assert wt[:2].sum() > 0.9 and torch.allclose(wt[0], wt[1])
+    idx = m._sample_indices()
+    assert len(idx) == 2 and len(set(idx)) == 2

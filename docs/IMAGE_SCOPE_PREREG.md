@@ -272,3 +272,27 @@ This is the mechanism Idea 1 / B target (full-data statistics kept valid by exac
 I1 = 84.4 on the first screen. I4 (r16 + int8 + 2×2 token pooling @ 2000) collapsed to 16.3:
 token pooling changes the sequence length like token-drop did — pooling is a negative;
 rank/quantisation without pooling remains to be tested.
+
+## Amendment 10 (2026-10-08, before any run): lexically-routed latent replay (thesis framing)
+
+**Framing.** The LexSlot lexical gate (drift-immune OCR bag-of-token-ids; routes tasks at
+0.92 on DIL) becomes the *router* and CoLaR's latent store the *memory*: the gate decides
+WHICH stored documents are replayed against the current batch. Read-side routing at
+inference was already falsified (CoLaSlot-R/RF; kNN readout), so routing acts on the
+**write/replay side** only. Closest prior work: MIR (Aljundi et al., 2019) retrieves the
+samples whose loss would rise most; the lexical signature is a zero-forward proxy for that.
+
+**Arms (DIL, LayoutLMv3, seed 42, CoLaR k=4 r=128, 5 epochs; reference 86.38 @ 60.4 MB):**
+R-near (similar documents first, τ=0.1), R-far (coverage), R-task (gate picks a stored task,
+uniform within) at 50 docs/task; the same three at 5 docs/task (reference latent d5 66.5,
+CoLaR d5/r64 60.8), where routing should matter most. Signatures cost ≈1–2 KB/doc and are
+counted in memory.
+**Support:** any routed arm ≥ reference + 1 pp (d50) or ≥ +5 pp (d5) on seed 42, confirmed
+on seeds 7/123 with 3/3 sign agreement. **Kill:** all routed arms within ±1 pp of uniform —
+then the gate adds nothing beyond replay, and the thesis title must revert to the
+diagnosis/replay framing.
+**Known negatives this does not reopen:** buffer-free LexSlot (42.2), CoLaSlot gates.
+
+### Image screen update (seed 42, CIFAR-100)
+I1 (drift-comp Gaussians) + S2 anchoring = 84.4; **I1 alone = 78.0** → the gain is the
+anchoring, drift-compensated head alignment adds nothing on top of it or on its own.

@@ -31,6 +31,7 @@ from torch.utils.data import DataLoader
 
 from doccl.methods.colar import CoLaR
 from doccl.methods.frozen_ptm import RanPAC, cls_features
+from doccl.methods.hybrid_routed_prompt import sparse_doc_vectors
 from doccl.methods.latent_replay import LatentReplay
 from doccl.types import TaskInfo  # noqa: F401  (signature types)
 
@@ -121,6 +122,18 @@ class CoLaRPP(CoLaR):
         self.keep_tokens = str(config.get("keep_tokens", "all"))
         self.visual_tokens = str(config.get("visual_tokens", "keep"))
         self.max_tokens_per_cls = int(config.get("max_tokens_per_cls", 20000))
+        # Amendment 10: lexically-routed replay. The LexSlot gate (OCR bag-of-token-ids,
+        # drift-immune) chooses WHICH stored latents to replay against the current batch:
+        #   near  — most lexically similar stored documents (interference proxy, cf. MIR)
+        #   far   — least similar (coverage)
+        #   task  — pick a stored task by signature similarity, uniform within it
+        self.replay_route = str(config.get("replay_route", "none"))
+        self.route_temp = float(config.get("route_temp", 0.1))
+        self._cur_batch: dict | None = None
+        self._cur_task_id = 0
+        if self.replay_route != "none":
+            self.config["store_input_ids"] = True  # the base capture must keep the ids
+        self.keep_input_ids = bool(config.get("keep_input_ids", False))
         self._rp = (
             RanPAC(model, {"rp_dim": config.get("rp_dim", 10000), "rp_seed": 0})
             if self.analytic_head == "rp"
@@ -134,6 +147,9 @@ class CoLaRPP(CoLaR):
         LatentReplay._capture_task(self, train_loader)  # raw bank first, then encode
         for d in self.store[n_before:]:
             h = d.pop("hidden").float()
+            if self.replay_route != "none" and "input_ids" in d:
+                self._store_signature(d)
+            d["task"] = self._cur_task_id
             if "attention_mask" in d:  # document: (text + visual) positions
                 h = self._compress_positions(d, h)
             elif self.token_pool > 1:
@@ -163,6 +179,46 @@ class CoLaRPP(CoLaR):
             self.quant,
             self.memory_bytes() / 1e6,
         )
+
+    def _store_signature(self, d: dict) -> None:
+        """Sparse L2-normalised bag-of-token-ids of one stored document (≈ 1–2 KB)."""
+        v = sparse_doc_vectors(
+            d["input_ids"][None],
+            self.model.model.config.vocab_size,
+            attention_mask=d["attention_mask"][None],
+        )[0]
+        idx = v.nonzero().squeeze(1)
+        d["sig_idx"], d["sig_val"] = idx.to(torch.int32), v[idx].to(torch.float16)
+        if not self.keep_input_ids:
+            del d["input_ids"]  # the ≈1 KB signature replaces the 4 KB id sequence
+
+    def _route_weights(self) -> torch.Tensor | None:
+        b = self._cur_batch
+        if b is None or "input_ids" not in b or "sig_idx" not in self.store[0]:
+            return None
+        cur = (
+            sparse_doc_vectors(
+                b["input_ids"],
+                self.model.model.config.vocab_size,
+                attention_mask=b.get("attention_mask"),
+            )
+            .mean(0)
+            .cpu()
+        )
+        sims = torch.tensor(
+            [float(cur[d["sig_idx"].long()] @ d["sig_val"].float()) for d in self.store]
+        )
+        if self.replay_route == "task":
+            tasks = torch.tensor([d["task"] for d in self.store])
+            task_sim = torch.stack([sims[tasks == t].mean() for t in tasks.unique()])
+            p_task = torch.softmax(task_sim / self.route_temp, 0)
+            w = torch.zeros(len(self.store))
+            for t, pt in zip(tasks.unique(), p_task, strict=True):
+                m = tasks == t
+                w[m] = pt / m.sum()
+            return w
+        sign = 1.0 if self.replay_route == "near" else -1.0
+        return torch.softmax(sign * sims / self.route_temp, 0)
 
     def _compress_positions(self, d: dict, h: torch.Tensor) -> torch.Tensor:
         """D: drop unlabelled text positions and/or the visual patch block of one document."""
@@ -303,6 +359,10 @@ class CoLaRPP(CoLaR):
 
     def _sample_indices(self) -> list[int]:
         n = min(self.replay_batch_size, len(self.store))
+        if self.replay_route != "none":
+            w = self._route_weights()
+            if w is not None:
+                return torch.multinomial(w, n, replacement=False).tolist()
         if self.replay_balance != "class" or self.store[0]["labels"].dim() != 0:
             return random.sample(range(len(self.store)), n)
         by_cls: dict[int, list[int]] = {}
@@ -382,6 +442,7 @@ class CoLaRPP(CoLaR):
         )
 
     def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
+        self._cur_task_id = task.task_id
         if self.weight_align and self._seen_before > 0:
             self._weight_align(self._seen_before)
         if self.trunk_adapt == "lora":

@@ -33,3 +33,7 @@ lora_lr: 5.0e-4
 keep_tokens: all         # D (documents): "labeled" keeps only labelled first-subword text positions
 visual_tokens: keep      # D (documents): "drop" discards the 197 visual patch positions
 max_tokens_per_cls: 20000
+replay_route: none       # Amendment 10: none | near | far | task (lexical routing of replay)
+route_temp: 0.1
+store_input_ids: false
+keep_input_ids: false
