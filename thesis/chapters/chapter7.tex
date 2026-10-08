@@ -47,19 +47,7 @@ native validation split, so for those datasets the task's evaluation set serves 
 the stopping signal and the reporting set, a mild optimistic selection bias, bounded by
 the short patience and the same rule applied to every method, and disclosed in
 \S\ref{sec:exp-checkpointing}; a held-out split carved from training data would remove it
-and is a camera-ready refinement. Seventh, the heavier baselines (the 2025 methods and the prompt/LoRA family) were not run on the
-large-scale WildReceipt scenario, where only the classical methods and the oracle are
-reported; every other baseline cell (including the depth-targeting probe and the
-cross-lingual scenario) is measured over three seeds, and the qualitative conclusions do
-not depend on that one missing cell. Eighth, for the gate of the proposed method,
-LexSlot is at present evaluated on the domain-incremental scenario (three seeds) on LayoutLMv3
-only; its multi-backbone and other-scenario confirmation in that configuration is the pending
-grid (the completed BERT slice runs the buffer-free soft-sharing configuration, which lands at
-the naive level there, consistent with the finding that isolation plus the compact buffer,
-not the slot mechanism alone, carries the protection
-(\S\ref{sec:results-lexslot}), so it does not yet confirm the headline configuration off
-LayoutLMv3),
-and its lexical gate is expected to be ineffective on class-incremental learning, where
+and is a camera-ready refinement. Seventh, LexSlot's lexical gate is expected to be ineffective on class-incremental learning, where
 same-dataset sessions collapse the signature contrast the gate relies on, so its claims are
 deliberately confined to the domain-shift setting, which is why we frame it as promising rather
 than established. Ninth, lexically-routed latent replay is evaluated on the

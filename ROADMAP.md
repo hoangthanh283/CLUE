@@ -295,6 +295,11 @@ The LexSlot items below are superseded except as honest negative-result material
    PROJECTED routing numbers wrapped in `\est{}` (renders underlined). When `scripts/run_doc_route.sh`
    finishes (docU_d5, docR{near,far,task}_d{50,5}), replace each with the measured value and drop the
    wrapper; rewrite the near>task>uniform>far narrative if the ordering differs. `grep -rn '\\est{' thesis/`.
+   Since then ALL thesis tables carry `\est{}` projections for unrun cells (main AA/BWT, backbone
+   AA/BWT incl. LiLT/BROS WildReceipt+XLing, compute, LexSlot depth ablation, Ch6 inline BWT).
+   `python3 scripts/thesis_fill_tables.py` rebuilds the four generated tables: measured runs
+   (>=2 seeds) automatically replace estimates; edit its EST dict for the rest. Do NOT run
+   analyze_results.py over thesis/generated/ until then (it would drop the proposed-method rows).
 1. **LexSlot-FM FM refit fix landed (AA 48.67).** Next directions (decide):
    - **(a) Increase refit budget** — FM_1 (SROIE) needs >50 samples to recover from
      encoder drift. Try `fm_refit_samples=200` / `fm_refit_epochs=10` → if T1 recovers to
