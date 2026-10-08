@@ -31,7 +31,7 @@ The diagnosis masks the input modalities of a single LayoutLMv3, holding the arc
 fixed, and reads forgetting out through linear CKA drift, per-group Fisher information, and
 Fisher-weighted parameter displacement at every task boundary, with LiLT, BROS, and a
 text-only BERT as contrasts. It shows that forgetting is output-side: the classifier head
-carries more than an order of magnitude more Fisher importance than any other group, and CKA
+has over ten times the Fisher importance of any other parameter group, and CKA
 drift rises monotonically with depth, from $1.00$ at the input encoders to $0.25$ at the late
 layers and $0.16$ at the head. The same site recurs on every backbone, including the unimodal
 one, so it is not a multimodal artefact. Protecting it does not help, however: freezing the

@@ -70,7 +70,7 @@ masking of a single LayoutLMv3, read out by per-token CKA drift, per-group Fishe
 and old-task-Fisher-weighted displacement, and repeated on LiLT, BROS, and a text-only BERT)
 gives three answers. Forgetting is \emph{output-side}: under naive sequential fine-tuning an
 earlier task that scores $88$ entity-F1 collapses to $\sim$2 F1 after one further task, the head
-carries more than an order of magnitude more Fisher importance than any other group, and CKA
+has over ten times the Fisher importance of any other parameter group, and CKA
 drift rises monotonically with depth (from $1.00$ at the input encoders to $0.25$ at the late
 layers and $0.16$ at the head). It is \emph{architecture-general}: every backbone, the unimodal
 one included, reproduces the site, so it is not a multimodal artefact; because LayoutLMv3 is

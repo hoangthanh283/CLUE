@@ -95,15 +95,15 @@ def pilot_tables():
     f1 = df[df.metric == "f1"]
     rows = []
     for (c, s), g in f1.groupby(["condition", "seed"]):
-        M = g.pivot(index="task_idx", columns="evaluated_task", values="value").to_numpy()
-        T = M.shape[0]
+        mat = g.pivot(index="task_idx", columns="evaluated_task", values="value").to_numpy()
+        nt = mat.shape[0]
         rows.append(
-            dict(
-                condition=c,
-                seed=s,
-                AA=np.nanmean(M[T - 1, :T]),
-                BWT=np.mean([M[T - 1, i] - M[i, i] for i in range(T - 1)]),
-            )
+            {
+                "condition": c,
+                "seed": s,
+                "AA": np.nanmean(mat[nt - 1, :nt]),
+                "BWT": np.mean([mat[nt - 1, i] - mat[i, i] for i in range(nt - 1)]),
+            }
         )
     forget = pd.DataFrame(rows).groupby("condition")[["AA", "BWT"]].mean()
     # Fisher-weighted displacement summed over boundaries, per depth bucket; share in %.
@@ -120,7 +120,7 @@ def pilot_tables():
     # CKA by canonical depth, mean over seeds and boundaries (ViT embeddings CKA is undefined).
     ck = df[df.metric == "cka"].copy()
     ck["depth"] = ck.layer.map(
-        lambda L: next((v for k, v in CKA_DEPTH.items() if L.endswith(k)), None)
+        lambda name: next((v for k, v in CKA_DEPTH.items() if name.endswith(k)), None)
     )
     ck = ck.dropna(subset=["depth"])
     ck = ck[~(ck.condition.str.startswith("cv_") & (ck.depth == "embeddings"))]
@@ -215,10 +215,8 @@ def write_diagnosis(wb):
         "Representation drift — linear CKA between consecutive task checkpoints, by depth (1 = unchanged)",
     )
     _header(ws, ["condition", "embeddings", "L0", "L6", "L11", "head"])
-    t2_first = ws.max_row + 1
     for c in cka.index:
         ws.append([COND[c], *[None if np.isnan(v) else round(float(v), 3) for v in cka.loc[c]]])
-    t2_last = ws.max_row
     # Transposed block so the line chart runs over depth (x) with one series per condition.
     ws.append([])
     _header(ws, ["depth", *[COND[c] for c in cka.index]])
@@ -654,7 +652,7 @@ def write_metrics(wb):
     _header(ws, ["metric", "what it measures", "definition", "range / direction", "notes"])
     for r in METRICS:
         ws.append(list(r))
-    for col, w in zip("ABCDE", (28, 28, 70, 22, 60)):
+    for col, w in zip("ABCDE", (28, 28, 70, 22, 60), strict=True):
         ws.column_dimensions[col].width = w
 
 
