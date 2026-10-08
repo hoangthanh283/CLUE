@@ -79,14 +79,17 @@ def main() -> None:
     args = ap.parse_args()
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     store = torch.load(args.run / "final_store.pt", map_location="cpu")
-    meta = json.loads((args.run / "metrics.json").read_text())
     n_labels = max(int(d["labels"].max()) for d in store) + 1
     model = LayoutLMv3Wrapper(num_labels=n_labels)
     model.load_state_dict(torch.load(args.run / "final_model.pt", map_location="cpu"))
     model = model.to(dev).eval()
-    model.id_to_label = {i: lbl for i, lbl in enumerate(meta.get("label_names", []))} or {
-        i: str(i) for i in range(n_labels)
-    }
+    labels_file = args.run / "final_labels.json"
+    if labels_file.exists():
+        model.id_to_label = {int(k): v for k, v in json.loads(labels_file.read_text()).items()}
+    else:  # DIL runs use the fixed unified schema
+        from doccl.data.dil_remapping import DIL_UNIFIED_LABELS
+
+        model.id_to_label = dict(enumerate(DIL_UNIFIED_LABELS))
     m = CoLaRPP(model, {"split_layer_k": args.k, "rank_r": 0})
     m.device = dev
     m._pixel_shape = (3, 224, 224)
