@@ -957,9 +957,82 @@ empirical ordering is not an artefact of one backbone, or of multimodality itsel
 \section{Ablation Studies}
 \label{sec:results-ablation}
 
-The depth-targeting probe restricts a depth-scaled consolidation penalty to a subset of
-depths to test whether the diagnosed head/late target is what matters, a causal check on the
-diagnosis, independent of the proposed remedy. The variants (head-only / late-only / uniform /
+The proposed method has three components, one per design question: \emph{where} it acts
+(the diagnosed head/late site, reached by injecting at layer $k$), \emph{what} it stores (CoLaR,
+compressed per-document latents), and \emph{which} stored documents it replays (the lexical
+gate). The ablations remove components one at a time. \S\ref{sec:results-abl-components}
+evaluates the memory alone, the gate alone, and both together on one matched budget;
+\S\S\ref{sec:results-abl-where}--\ref{sec:results-abl-which} then vary each component's own
+design choice with the others fixed.
+
+\subsection{Component Ablation: Memory Alone, Gate Alone, and Both}
+\label{sec:results-abl-components}
+
+Table~\ref{tab:abl-components} holds the backbone (LayoutLMv3), scenario (DIL), seed (42),
+injection layer ($k{=}4$), rank ($r{=}128$), and training budget (five epochs per task)
+fixed, and switches each component on or off at two memory sizes, $d{=}50$ and $d{=}5$
+documents per task. Three readings follow.
+
+\emph{The gate alone does not protect.} LexSlot without any memory, task-private slots at the
+head and late layers selected by the lexical gate, retains AA $42.2$, inside the naive range
+($40.1$--$43.0$): the earlier tasks are lost (final row $[25.1, 4.8, 96.8]$). A drift-immune
+routing signal is not, by itself, a defence against drift, because the slots it selects sit on a
+representation that still moves. LexSlot's $87.3$ is reached only when the slots are paired with
+a 200-exemplar buffer, distillation, and a Fisher penalty; it is listed for reference, on a
+different budget, and its accuracy comes from that buffer rather than the gate.
+
+\emph{The memory alone carries the protection.} CoLaR with uniform sampling retains AA $86.4$
+at $d{=}50$ ($57.6$\,MB), within $2.3$ points of the joint oracle; whole-document latent replay
+at the diagnosed site is the component that makes the method work.
+
+\emph{Both together is the proposed method.} With the memory, its size, and the replay loss
+fixed, the gate decides only which stored documents are replayed, so the difference between the
+``both'' rows and the memory-only row at the same $d$ is the gate's contribution alone. Under
+the pre-registered rule it counts as an effect only above one AA point. \todo{fill the
+near/far/task rows at $d{=}50$ and $d{=}5$ and the $d{=}5$ uniform control
+(\texttt{dil\_docU\_d5\_seed42}); state which routing mode is the method's default and whether the
+gain exceeds one point, and at which memory size.}
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Component ablation of the proposed method]{Component ablation of
+  lexically-routed latent replay on DIL (LayoutLMv3, seed 42, $k{=}4$, $r{=}128$, five epochs
+  per task). \emph{Memory} = CoLaR per-document latents; \emph{gate} = the lexical
+  OCR-vocabulary signature. The gate alone (LexSlot without a memory) stays at the naive level;
+  the memory alone carries the protection; the ``both'' rows isolate the gate's contribution on a
+  fixed memory. $^\dagger$Different budget (three seeds, trained to convergence), with a
+  200-exemplar buffer, distillation, and a Fisher penalty; shown for reference only.}
+  \label{tab:abl-components}
+  \begin{tabular}{lccccc}
+    \toprule
+    \textbf{Variant} & \textbf{Memory} & \textbf{Gate} & $\boldsymbol{d}$ & \textbf{AA} & \textbf{BWT} \\
+    \midrule
+    Naive (3 seeds)                         & --         & --         & --  & $41.3 \pm 1.5$ & $-73.1$ \\
+    Gate alone (LexSlot, no memory)         & --         & \checkmark & --  & $42.2$         & $-67.2$ \\
+    LexSlot $+$ buffer$^\dagger$            & exemplars  & \checkmark & --  & $87.3 \pm 1.0$ & $-2.3$ \\
+    \midrule
+    Memory alone (CoLaR, uniform)           & \checkmark & --         & 50  & $86.4$         & $-3.4$ \\
+    Both, \emph{near}                       & \checkmark & \checkmark & 50  & \todo{}        & \todo{} \\
+    Both, \emph{far}                        & \checkmark & \checkmark & 50  & \todo{}        & \todo{} \\
+    Both, \emph{task}                       & \checkmark & \checkmark & 50  & \todo{}        & \todo{} \\
+    \midrule
+    Memory alone (CoLaR, uniform)           & \checkmark & --         & 5   & \todo{}        & \todo{} \\
+    Both, \emph{near}                       & \checkmark & \checkmark & 5   & \todo{}        & \todo{} \\
+    Both, \emph{far}                        & \checkmark & \checkmark & 5   & \todo{}        & \todo{} \\
+    Both, \emph{task}                       & \checkmark & \checkmark & 5   & \todo{}        & \todo{} \\
+    \midrule
+    Joint oracle (3 seeds)                  & all data   & --         & --  & $88.7$         & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Where: Depth-Targeting Probe}
+\label{sec:results-abl-where}
+
+The \emph{where} component is ablated by the depth-targeting probe, which restricts a
+depth-scaled consolidation penalty to a subset of depths to test whether the diagnosed head/late
+target is what matters, a causal check on the diagnosis that does not depend on the memory or the
+gate. The variants (head-only / late-only / uniform /
 full) were run on DIL over three seeds
 (Table~\ref{tab:ablation}). The result is decisive: the \emph{uniform} variant collapses
 to $42.6$ AA, less than half the targeted variants and barely above naive, whereas
@@ -1004,6 +1077,31 @@ claim is established for the domain shift and left open for the harder scenarios
     \bottomrule
   \end{tabular}}
 \end{table}
+
+\subsection{What: The Form of the Memory}
+\label{sec:results-abl-what}
+
+The memory component is ablated by the elimination ladder of
+\S\ref{sec:results-falsification-ext} (Figure~\ref{fig:falsification-ladder}): at a fixed layer,
+replaying real whole documents retains AA $87.3$, while every summary that breaks the binding of
+feature, position, and label (rank-16 projection $41.9$, per-class Gaussians $39.4$, real
+$k$-means centroids $36.7$) collapses to the naive level, and the matched single-variable
+control (whole documents $63.8$ vs the same features on decoupled carriers $36.7$) isolates that
+binding. CoLaR keeps the binding while compressing each document separately, which is why it
+keeps the accuracy ($87.6$ at $60$\,MB, Figure~\ref{fig:colar-pareto}). Memory size is the
+second axis: CoLaR at $k{=}4$ falls from $86.4$ at $d{=}50$ to $71.9$ at $d{=}10$, so the store
+must hold enough documents per task, and the $d{=}5$ rows of Table~\ref{tab:abl-components}
+test whether the gate can compensate for a small store.
+
+\subsection{Which: The Routing Mode}
+\label{sec:results-abl-which}
+
+The gate's own design choice is the routing mode, held at a fixed memory in the ``both'' rows of
+Table~\ref{tab:abl-components}: \emph{near} replays the stored documents whose vocabulary is
+closest to the current batch (where interference is most likely), \emph{far} the least similar
+(where the current task gives no support), and \emph{task} the most similar past task as a
+whole. Uniform sampling is the zero point. \todo{report which mode wins, by how much at each
+$d$, and whether the ordering is consistent across the two memory sizes.}
 
 \section{Computational Efficiency}
 \label{sec:results-compute}
