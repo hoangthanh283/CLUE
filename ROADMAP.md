@@ -291,6 +291,10 @@ The LexSlot items below are superseded except as honest negative-result material
   hand-kept inline); add a component-separability defense paragraph up front in ch2/ch3.
 
 ## Next Up
+0. **Replace thesis estimates (2026-10-08).** Ch6 component table + text and Ch7 conclusion carry
+   PROJECTED routing numbers wrapped in `\est{}` (renders underlined). When `scripts/run_doc_route.sh`
+   finishes (docU_d5, docR{near,far,task}_d{50,5}), replace each with the measured value and drop the
+   wrapper; rewrite the near>task>uniform>far narrative if the ordering differs. `grep -rn '\\est{' thesis/`.
 1. **LexSlot-FM FM refit fix landed (AA 48.67).** Next directions (decide):
    - **(a) Increase refit budget** — FM_1 (SROIE) needs >50 samples to recover from
      encoder drift. Try `fm_refit_samples=200` / `fm_refit_epochs=10` → if T1 recovers to

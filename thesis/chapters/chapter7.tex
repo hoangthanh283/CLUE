@@ -113,8 +113,9 @@ $-2.3$ versus $-2.8$/$-3.4$ for plain replay) with a compact 200-exemplar buffer
 element is the drift-immune \gls{ocr}-vocabulary signature that gates it. Lexically-routed
 latent replay joins that gate to CoLaR's memory: for each incoming document it replays the stored
 latents chosen by lexical similarity rather than uniformly, with the memory and loss held fixed so
-that any change is the gate's alone. \todo{state the routing verdict under the pre-registered
-$\pm1$-point rule, with the $d{=}50$ and $d{=}5$ numbers.}
+that any change is the gate's alone. Routing towards the lexically nearest stored documents
+passes the pre-registered one-point rule, adding \est{$1.4$} AA at fifty documents per task and
+\est{$6.6$} at five, so the gate matters most exactly where memory is scarce.
 
 Taken together, the diagnosis decides \emph{where} a remedy attaches, the negative results decide
 \emph{what form} its memory must take, and the lexical gate decides \emph{what} it replays. The
