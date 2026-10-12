@@ -1,3 +1,26 @@
+## RESUME HERE (2026-10-13): chain drained; routing `far` is the only live arm; independent bound in
+
+- **Routing (Amendment 10, seed 42, CoLaR k4 r128 5 ep).** d50 vs uniform 86.4: **far 88.2 (+1.8)**,
+  task 87.3 (+0.9), near 86.5 (+0.1). d5 vs uniform control `docU_d5` 75.9: far 77.8 (+1.9 < +5),
+  task 73.4, near 64.0 (near-routing *hurts* at small buffers — replaying lexically-similar docs
+  starves the far task). Only `far@d50` clears the support bar → confirmation seeds 7/123 running
+  (`scripts/run_doc_route_confirm.sh`), then uniform d50 seeds 7/123 for sign agreement
+  (`/tmp/claude-1000/route_confirm_then_rest.sh`), then the codec probe (head-size bug fixed).
+  Kill rule unchanged: no 3/3 sign agreement → thesis title reverts.
+- **Doc D/B (seed 42).** D1 labeled-tokens-only 79.6 @ 41.6 MB (SROIE 81→59); D2 +drop visual
+  tokens 61.2 @ 23.4 MB (SROIE 12) — position-axis compression breaks whole-doc consistency on
+  the dense receipt task; registered negative. B1 drift-comp Gaussians d5 74.6 @ 6 MB (vs uniform
+  d5 75.9) — null. B2 (d50) OOM on the 6 GB box — not run.
+- **CoLaR on ImageNet-R (3 seeds, k4, 500/task).** raw bank **55.1 ± 1.3**, r128 **55.3 ± 1.4**
+  (BWT ≈ −37). Pre-run estimate was 59 / 58 (ranges 54–63 / 53–62): measured inside the range,
+  low end — CoLaR ≈ ER@2000 (54.8) < RanPAC 58.6 < SLCA 65.0. Sheet rows 57–58 `measured_*` filled.
+- **Independent per-task bound (3 seeds).** DIL **88.8 ± 0.6** (joint 88.7 — no interference
+  gain; replay 87.9 is 1 pp short of both); CIFAR-100 Task-IL oracle 98.1; ImageNet-R 90.2
+  (CIL joint 89.5 / 77.6 — the task-ID oracle, NOT a CIL bound).
+- Reports sheet: Image Summary carries 4 native charts + an "ESTIMATES — NOT MEASURED" block
+  (rows 55–67) with its own chart; Image All Runs has a per-run AA chart. The Diagnosis /
+  Approaches-by-dataset / Metrics tabs still need the user to import `clue_report_addendum.xlsx`.
+
 ## RESUME HERE (2026-10-08): W&B back online; Reports sheet extended; independent bound queued
 
 - **W&B online again.** All runner scripts dropped the forced `WANDB_MODE=offline` (80ae89e);
