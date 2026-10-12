@@ -14,7 +14,10 @@
   fixed in `scripts/colar_codec_probe.py` (one `.to(m.device)`), rerun launched 05:05 via
   `/tmp/claude-1000/probe_then_b2b.sh` → `results/logs_vision/codec_probe.txt`,
   `results/dil_docD1_seed42/codec_probe.json`.
-- **B2 retry (`docB2b`)**: d50 drift-comp + head-align 10 ep with `method.head_align_batch=8`
+- **B2b DONE (06:09): AA 86.2 vs uniform d50 86.4 → null.** Drift-comp head alignment is dead on
+  documents at both d5 (74.6) and d50. BWT +8.7 is a diagonal artefact (see prereg). GPU idle;
+  `wandb sync --sync-all --include-offline` launched 06:46 (`results/wandb_backlog_sync.log`).
+- (history) B2 retry (`docB2b`): d50 drift-comp + head-align 10 ep with `method.head_align_batch=8`
   (default 64 stacked 150 docs' latents → 1.1 GB alloc OOM). Runs after the probe (~75 min);
   log `results/logs_vision/dil_docB2b_seed42.log`, status in `doc_dba_queue.log`.
 
