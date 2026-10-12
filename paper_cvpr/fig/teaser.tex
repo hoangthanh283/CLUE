@@ -33,10 +33,10 @@
 % where / what / which tags
 \node[tag, fill=ourteal, above=1pt of head.north west, anchor=south west] {WHERE: forgetting lives here};
 \node[tag, fill=memgreen, below=1pt of memory.south west, anchor=north west] {WHAT: whole documents, compressed};
-\node[tag, fill=lexorange, below=1pt of router.south west, anchor=north west] {WHICH: lexically nearest};
+\node[tag, fill=lexorange, below=1pt of router.south west, anchor=north west] {WHICH: drift-free OCR signature};
 \end{tikzpicture}
 \captionsetup{hypcap=false}
-\captionof{figure}{\textbf{Diagnosis-guided, lexically-routed latent replay.} The diagnosis fixes \emph{where} to act (head and late layers, \cref{sec:anatomy}) and \emph{what} memory must hold (whole documents, \cref{sec:buffer}); the drift-free OCR signature of the batch picks \emph{which} stored documents are rebuilt from their SVD factors and replayed at layer $k$.}
+\captionof{figure}{\textbf{Diagnosis-guided compressed latent replay (CoLaR).} The anatomy of \cref{sec:anatomy} fixes \emph{where} to act (head and late layers) and \emph{what} memory must hold (whole documents, \cref{sec:buffer}): each past document is stored as a truncated SVD of its layer-$k$ activations ($60$\,MB per $d{=}50$ task) and rebuilt during replay. An optional drift-free OCR signature routes \emph{which} stored document a batch replays (ablated in \cref{sec:buffer}).}
 \captionsetup{hypcap=true}
 \label{fig:teaser}
 \end{strip}
