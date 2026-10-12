@@ -1,3 +1,20 @@
+## RESUME HERE (2026-10-13 05:00, auto mode): Amendment 10 KILLED; B2 retry + codec probe running
+
+- **Routing confirmation is in — KILL.** far@d50 vs uniform d50 by seed: 42 +1.8, 7 +0.4
+  (87.0 vs 86.6), 123 **−0.6** (86.3 vs 86.9). Sign agreement 2/3, mean +0.5 pp (far 87.2±0.9,
+  uniform 86.6±0.2). Pre-registered rule → the lexical gate adds nothing beyond replay; **thesis
+  title must revert to the diagnosis/replay framing.** Verdict recorded in
+  `docs/IMAGE_SCOPE_PREREG.md` (Amendment 10 verdict). Still to do: revert the title in the thesis
+  LaTeX / CVPR port, move the routing rows into the falsification-chain table, update the Reports
+  sheet (doc routing block) with the three confirmation cells.
+- **Codec probe** failed twice (04:51: CPU/GPU device mismatch — stored hidden vs AE on cuda);
+  fixed in `scripts/colar_codec_probe.py` (one `.to(m.device)`), rerun launched 05:05 via
+  `/tmp/claude-1000/probe_then_b2b.sh` → `results/logs_vision/codec_probe.txt`,
+  `results/dil_docD1_seed42/codec_probe.json`.
+- **B2 retry (`docB2b`)**: d50 drift-comp + head-align 10 ep with `method.head_align_batch=8`
+  (default 64 stacked 150 docs' latents → 1.1 GB alloc OOM). Runs after the probe (~75 min);
+  log `results/logs_vision/dil_docB2b_seed42.log`, status in `doc_dba_queue.log`.
+
 ## RESUME HERE (2026-10-13): chain drained; routing `far` is the only live arm; independent bound in
 
 - **Routing (Amendment 10, seed 42, CoLaR k4 r128 5 ep).** d50 vs uniform 86.4: **far 88.2 (+1.8)**,
