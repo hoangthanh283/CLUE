@@ -293,6 +293,24 @@ then the gate adds nothing beyond replay, and the thesis title must revert to th
 diagnosis/replay framing.
 **Known negatives this does not reopen:** buffer-free LexSlot (42.2), CoLaSlot gates.
 
+### Amendment 10 verdict (2026-10-13): KILL — routing does not survive seed confirmation
+Seed 42 screen: d50 vs uniform 86.4 → far 88.2 (+1.8), task 87.3 (+0.9), near 86.5 (+0.1);
+d5 vs uniform-d5 75.9 → far 77.8 (+1.9 < +5), task 73.4, near 64.0. Only `far@d50` cleared the
+screen bar. Confirmation (far@d50 vs uniform d50, same recipe):
+
+| seed | far | uniform | Δ |
+|---|---|---|---|
+| 42 | 88.2 | 86.4 | +1.8 |
+| 7 | 87.0 | 86.6 | +0.4 |
+| 123 | 86.3 | 86.9 | −0.6 |
+
+Mean far 87.2 ± 0.9 vs uniform 86.6 ± 0.2; sign agreement **2/3**, mean gain +0.5 pp, inside
+the uniform seed spread. By the pre-registered rule the arm is **killed**: the lexical gate
+adds nothing beyond replay. The seed-42 +1.8 was seed noise, not a routing effect.
+Consequence: the thesis title reverts to the diagnosis/replay framing; LexSlot stays a
+falsified-chain entry (buffer-free 42.2; as a router: null). Runs:
+`results/dil_docRfar_d50_seed{42,7,123}`, `results/dil_docU_d50_seed{42,7,123}`.
+
 ### Image screen update (seed 42, CIFAR-100)
 I1 (drift-comp Gaussians) + S2 anchoring = 84.4; **I1 alone = 78.0** → the gain is the
 anchoring, drift-compensated head alignment adds nothing on top of it or on its own.

@@ -59,7 +59,7 @@ def f1_through_model(m: CoLaRPP, docs: list[dict], hidden_fn, id_to_label) -> fl
     for i in range(0, len(docs), 4):
         chunk = docs[i : i + 4]
         replay = m._stack_replay(chunk)
-        h = replay["hidden"].float()
+        h = replay["hidden"].float().to(m.device)  # store is CPU, AE lives on m.device
         replay["hidden"] = torch.stack([hidden_fn(x) for x in h]).to(torch.float16)
         out = m._replay_forward(
             {k: v for k, v in replay.items() if k != "labels"} | {"labels": replay["labels"]}
