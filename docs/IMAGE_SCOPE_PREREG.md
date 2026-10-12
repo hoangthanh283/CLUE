@@ -267,7 +267,10 @@ Seeds: 42 for the screen; any supported cell confirmed on 7/123.
   the dense receipt task → both registered negatives.
 - **B1** drift-comp Gaussians d5: 74.6 @ 6 MB vs uniform d5 75.9 → null (between the 70 kill
   and 80 support marks; no gain over plain latent d5). **B2** (d50): OOM at head-align batch 64;
-  rerun as `docB2b` with batch 8 — result below when it lands.
+  rerun as `docB2b` with batch 8 → **AA 86.2** (vs uniform d50 86.4) → **null**: drift-compensated
+  head alignment adds nothing at d50 either. Retention matrix final row 85.1 / 77.0 / 96.5;
+  the diagonal is depressed (77.9 / 66.9) so the reported BWT is +8.7 — an artefact of the
+  diagonal being read before later alignments lift old tasks, not positive transfer.
 - **A — learned codec probe** (`scripts/colar_codec_probe.py` on `dil_docD1_seed42`,
   frozen upper layers + head, token F1 on the stored documents; bytes/doc in fp16):
 
