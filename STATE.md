@@ -7,7 +7,10 @@
   `docs/IMAGE_SCOPE_PREREG.md` (Amendment 10 verdict). Still to do: revert the title in the thesis
   LaTeX / CVPR port, move the routing rows into the falsification-chain table, update the Reports
   sheet (doc routing block) with the three confirmation cells.
-- **Codec probe** failed twice (04:51: CPU/GPU device mismatch — stored hidden vs AE on cuda);
+- **Codec probe DONE (05:03).** token F1 through frozen upper layers: exact 97.6; SVD r16/32/64 =
+  40.9/65.6/89.6; AE c16/32/64 = 21.2/27.0/31.5 — learned codec loses to per-doc SVD at matched
+  bytes → Amendment 9 cell A is a negative, no replay cell. Table in `docs/IMAGE_SCOPE_PREREG.md`.
+- (history) Codec probe failed twice (04:51: CPU/GPU device mismatch — stored hidden vs AE on cuda);
   fixed in `scripts/colar_codec_probe.py` (one `.to(m.device)`), rerun launched 05:05 via
   `/tmp/claude-1000/probe_then_b2b.sh` → `results/logs_vision/codec_probe.txt`,
   `results/dil_docD1_seed42/codec_probe.json`.

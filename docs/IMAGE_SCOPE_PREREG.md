@@ -261,6 +261,27 @@ with exact drift gauges).
 F1); registered after D/B results, before any replay cell.
 Seeds: 42 for the screen; any supported cell confirmed on 7/123.
 
+### Amendment 9 results (seed 42, DIL, CoLaR k4 r128 5 ep; recorded 2026-10-13)
+- **D1** labeled-tokens-only: 79.6 @ 41.6 MB (SROIE 81→59). **D2** D1 + drop visual tokens:
+  61.2 @ 23.4 MB (SROIE 12). Position-axis compression breaks whole-document consistency on
+  the dense receipt task → both registered negatives.
+- **B1** drift-comp Gaussians d5: 74.6 @ 6 MB vs uniform d5 75.9 → null (between the 70 kill
+  and 80 support marks; no gain over plain latent d5). **B2** (d50): OOM at head-align batch 64;
+  rerun as `docB2b` with batch 8 — result below when it lands.
+- **A — learned codec probe** (`scripts/colar_codec_probe.py` on `dil_docD1_seed42`,
+  frozen upper layers + head, token F1 on the stored documents; bytes/doc in fp16):
+
+  | codec | token F1 | bytes/doc |
+  |---|---|---|
+  | exact latents | 97.6 | 675 840 |
+  | SVD r=16 / 32 / 64 | 40.9 / 65.6 / 89.6 | 38 656 / 77 312 / 154 624 |
+  | AE c=16 / 32 / 64 | 21.2 / 27.0 / 31.5 | 14 080 / 28 160 / 56 320 |
+
+  At matched bytes the learned per-token autoencoder (trained on task-0 tokens) is far below
+  per-document SVD (AE c=64 at 56 KB = 31.5 vs SVD r=16 at 39 KB = 40.9; SVD r=32 at 77 KB =
+  65.6). A shared token codec discards the per-document structure SVD keeps → **negative; no
+  replay cell for A.** Consistent with Finding 3b (whole-document consistency is the ingredient).
+
 ### Addendum to Amendment 8/9 (2026-10-08, probe landed after both were registered)
 
 `scripts/rca_colar_probe.py` on the raw-bank run (CIFAR-100, seed 42, AA 78.8):
