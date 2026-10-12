@@ -1,0 +1,23 @@
+% CoLaR: per-document SVD of the layer-k activations (adapted from the explainer artifact).
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[font=\footnotesize, >=Stealth,
+  m/.style={draw=memgreen, very thick, fill=memgreen!15, align=center}]
+\node[m, minimum width=1.5cm, minimum height=2.3cm] (H) {\large$H$\\[2pt]{\scriptsize$709{\times}768$}};
+\node[right=0.12cm of H] (eq) {$\approx$};
+\node[m, fill=memgreen!30, minimum width=0.45cm, minimum height=2.3cm, right=0.12cm of eq, anchor=west] (U) {};
+\node[m, fill=memgreen!50, minimum width=0.45cm, minimum height=0.45cm, right=0.1cm of U.north east, anchor=north west] (S) {};
+\node[m, fill=memgreen!30, minimum width=1.5cm, minimum height=0.45cm, right=0.1cm of S.east, anchor=west] (V) {};
+\node[below=1pt of U, font=\scriptsize] {$U_r$};
+\node[below=1pt of S, font=\scriptsize] {$\Sigma_r$};
+\node[below=1pt of V, font=\scriptsize] {$V_r^{\top}$};
+\node[below=0.15cm of H, font=\scriptsize, align=center] {one document at layer $k{=}4$\\$\approx$1.09\,MB (fp16)};
+\node[anchor=north west, align=left, font=\scriptsize] at ([yshift=-0.45cm]S.south west)
+  {$r{=}128$: $128{\times}(709{+}768)$ numbers\\
+   + boxes, mask, labels\\
+   $\approx$0.40\,MB per document\\
+   \textcolor{memgreen}{\textbf{2.7$\times$ smaller, AA 87.6 vs.\ 87.3}}};
+\end{tikzpicture}
+\caption{\textbf{CoLaR stores whole documents, compressed one at a time.} The pooled layer-$k$ feature space is near full-rank (rank 16 keeps 43\% of the variance), but a single document's activations are low-rank: its tokens share one layout and one vocabulary. Truncated SVD per document keeps every token's feature at its own position with its own label, which is the binding that every marginal summary destroys (\cref{fig:ladder}).}
+\label{fig:colar}
+\end{figure}

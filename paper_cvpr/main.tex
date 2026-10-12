@@ -12,6 +12,14 @@
 \usepackage[table]{xcolor}
 \usepackage{amsmath}
 \usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,patterns}
+\usepackage{cuted}   % two-column teaser (kit preamble.tex)
+\usepackage{caption}
+\usepackage{microtype}  % kit preamble.tex: tighter layout
+\definecolor{ourteal}{HTML}{0D5C63}
+\definecolor{memgreen}{HTML}{2F8F83}
+\definecolor{lexorange}{HTML}{C4841D}
 
 % Numbers still to be re-read from regenerated tables (analyze_results.py). Remove before submission.
 \newcommand{\vnum}[1]{\textcolor{red}{#1}}
@@ -31,6 +39,7 @@
 
 \begin{document}
 \maketitle
+\input{fig/teaser}
 
 \begin{abstract}
 Continual-learning (CL) methods are developed almost exclusively on unimodal classification and treat the network as a homogeneous block. We ask what forgetting actually looks like inside a multimodal document encoder performing continual key-information extraction, and whether standard remedies act on it. Using per-group Fisher displacement and layer-wise CKA across four backbones (LayoutLMv3, LiLT, BROS, BERT), three scenarios (domain-, class-, and mixed-incremental) and three seeds, we find that forgetting is \emph{output-localised}---it concentrates in the shared classifier head and late encoder layers while input encoders stay nearly stable---and \emph{architecture-general}: the naive-to-joint gap agrees to within 2.5 points across all four backbones. Protecting the locus does not remove forgetting: freezing the head and late layers migrates the drift into early layers (CKA $1.00\rightarrow0.19$) with no change in accuracy, i.e.\ forgetting is \emph{conserved} under architectural constraint. This anatomy predicts, and our benchmark confirms, that only mechanisms which re-ground the head recover old competence: replay (ER, DER++) reaches the joint bound on domain-incremental learning ($\approx$88 vs.\ 88.7 average F1), regularisation and distillation stay at the naive floor (41--44), and a remedy's benefit is backbone-dependent (EWC ranges from $-12$ to $+5$ points). We then try to break the prediction with five buffer-free consolidation families---weight merging, subspace transfer, parametric slot memories, input-anchored memory, and feature-Gaussian generative replay---and each fails for the same identified reason: nothing they store reproduces replay's gradient on the head. A constructive control isolates what a buffer must contain: per-document SVD replay is lossless at $2.7\times$ compression, whereas every marginal or per-class summary collapses, with +27 points attributable to whole-document consistency alone. For document understanding the question is therefore not how to avoid the buffer, but how small it can be and what it must hold.
@@ -102,7 +111,12 @@ which is large exactly where parameters that mattered for the previous task have
 
 \paragraph{Finding 1$'$: architecture-general.} Permuting LiLT's and BROS's per-depth displacement profiles against the LayoutLMv3 reference fails to reject a shared \emph{location} ($p=0.38$, $0.51$), and BERT reproduces the same head-dominant, depth-monotone pattern. We claim only shared location: at three seeds a cross-backbone comparison of forgetting \emph{magnitude} is underpowered, and we do not read the small differences in AA or BWT between backbones as meaningful.
 
-\paragraph{Finding 2: protecting the locus relocates the drift.} If forgetting lives at the head and late layers, the natural intervention is to protect them. On DIL/LayoutLMv3 (seed 42) freezing everything after task~1 gives AA $41.1$, BWT $-0.0$: nothing is forgotten and nothing is learned. Freezing only the diagnosed head and late layers, leaving the early and mid encoder plastic, gives AA $38.8$ with BWT $-76.8$---naive-level forgetting---while early/mid CKA, which is $\approx1.0$ under naive training, collapses to $0.19$. The drift did not disappear; it migrated to whatever remained plastic. A control that adds a memory to the frozen locus without protecting it ($38.9$, $-75.6$) is indistinguishable, so drift, not the absence of a memory, is the bottleneck. This is why uniform protection fails too: a depth-scaled consolidation penalty spread equally across every bucket collapses to $42.6$ AA (it cannot fit the tasks), whereas the same budget concentrated on the head/late locus recovers $84.7$, and head-only ($86.1$) or late-only ($86.2$) each recover essentially all of it (three seeds). We read this as a conservation statement: under architectural constraint the total forgetting is redistributed, not removed. Finding~2 is established on DIL with LayoutLMv3 (seed~42 for the freeze arms, three seeds for the consolidation probe); its extension is in Appendix~\ref{app:extra}.
+\begin{figure*}[t]\centering
+\includegraphics[height=3.5cm]{figures/backbone_cka_gradient.pdf}\hfill
+\includegraphics[height=3.5cm]{figures/conservation.pdf}
+\caption{\textbf{Forgetting has an address, and protecting it moves it.} Left: linear CKA between checkpoints before and after the second task falls with depth on all four backbones (1.0 = no drift). Right: freezing the head and late layers leaves backward transfer unchanged, (a) whatever the number of frozen layers and (b) on three DIL task orders and a ten-session CIL-CORD stream (LayoutLMv3, seed 42, no memory). The drift relocates to the layers left plastic.}
+\label{fig:conservation}\end{figure*}
+\paragraph{Finding 2: protecting the locus relocates the drift.} If forgetting lives at the head and late layers, the natural intervention is to protect them. On DIL/LayoutLMv3 (seed 42) freezing everything after task~1 gives AA $41.1$, BWT $-0.0$: nothing is forgotten and nothing is learned. Freezing only the diagnosed head and late layers, leaving the early and mid encoder plastic, gives AA $38.8$ with BWT $-76.8$---naive-level forgetting---while early/mid CKA, which is $\approx1.0$ under naive training, collapses to $0.19$. The drift did not disappear; it migrated to whatever remained plastic. A control that adds a memory to the frozen locus without protecting it ($38.9$, $-75.6$) is indistinguishable, so drift, not the absence of a memory, is the bottleneck. This is why uniform protection fails too: a depth-scaled consolidation penalty spread equally across every bucket collapses to $42.6$ AA (it cannot fit the tasks), whereas the same budget concentrated on the head/late locus recovers $84.7$, and head-only ($86.1$) or late-only ($86.2$) each recover essentially all of it (three seeds). We read this as a conservation statement: under architectural constraint the total forgetting is redistributed, not removed. Finding~2 is established on DIL with LayoutLMv3 (seed~42 for the freeze arms, three seeds for the consolidation probe); \cref{fig:conservation} extends the freeze arm to three task orders and a long class-incremental stream.
 
 \paragraph{Prediction.} The anatomy is output-facing and conserved under constraint. It therefore predicts that (i) only a mechanism that re-grounds the head on old-task targets can recover competence, (ii) parameter-space protection---however placed---cannot, and (iii) the ordering should transfer across backbones because the locus does. The next three sections test each.
 
@@ -188,6 +202,11 @@ Feature-Gaussian replay & LexMem v3b (positive control) & $66.0$ & partial: reco
 \label{sec:buffer}
 If only replay works, what about replay is load-bearing? We answer with a falsification ladder over \emph{latent} replay: activations banked at a frozen encoder boundary (layer $k$) and replayed through the plastic upper layers and head, so that storage content can be varied while the mechanism is held fixed (DIL/LayoutLMv3; single-seed diagnostic runs except where noted).
 
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{figures/falsification_ladder.pdf}
+\caption{\textbf{What the memory must hold} (DIL, LayoutLMv3, layer $k{=}8$). Whole documents retain; summaries of the same store fall to the naive level (41.3), and the identical features on decoupled layout carriers lose 27 points against matched whole documents.}
+\label{fig:ladder}\end{figure}
+\input{fig/colar}
 \paragraph{Whole documents retain; every summary collapses.} Replaying the real banked activations of 50 whole documents per task retains AA $87.3$ (converged, $k{=}4$). Summaries of the \emph{same} store collapse to the naive level: a rank-16 spectral summary $41.9$, per-class full-dimensional Gaussians $39.4$, and even real $k$-means centroids of the banked activations $36.7$--$39.7$---so the failure is not synthesis fidelity. The single-variable control isolates the ingredient: four whole replayed documents retain $63.8$ at a matched five-epoch budget, while the identical features pasted onto decoupled layout carriers retain $36.7$. The intact (feature, position, label) binding of a document is worth $+27$ AA by itself. With five whole documents per task the small-buffer point is $66.5\pm3.0$ over three seeds.
 
 \begin{figure}[t]\centering
