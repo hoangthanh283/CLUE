@@ -79,9 +79,12 @@ def main() -> None:
     args = ap.parse_args()
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     store = torch.load(args.run / "final_store.pt", map_location="cpu")
-    n_labels = max(int(d["labels"].max()) for d in store) + 1
+    # Head size comes from the checkpoint, not the store: a DIL store may never contain the
+    # last label ids, which made the probe build a 7-way head for a 9-way checkpoint.
+    state = torch.load(args.run / "final_model.pt", map_location="cpu")
+    n_labels = int(state["model.classifier.weight"].shape[0])
     model = LayoutLMv3Wrapper(num_labels=n_labels)
-    model.load_state_dict(torch.load(args.run / "final_model.pt", map_location="cpu"))
+    model.load_state_dict(state)
     model = model.to(dev).eval()
     labels_file = args.run / "final_labels.json"
     if labels_file.exists():
