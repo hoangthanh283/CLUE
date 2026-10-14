@@ -8,6 +8,7 @@ Reference:
     Jaume et al., "FUNSD: A Dataset for Form Understanding in Noisy Scanned Documents",
     ICDAR-OST 2019, arXiv:1905.13538
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -16,7 +17,7 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import Dataset
 
-from doccl.data.encoders import KIEEncoder, get_default_encoder
+from doccl.data.encoders import KIEEncoder, encode_with_full_labels, get_default_encoder
 
 # Process-wide cache keyed by ``split`` so the FUNSD splits reused across scenarios
 # (dil + mixed build FUNSD up to 3× via the CIL sessions and the revisit task) share one
@@ -112,7 +113,7 @@ class FUNSDDataset(Dataset):
             if not (set(ex["ner_tags"]) & target_entity_ids):
                 continue
             masked_tags = [t if t in target_entity_ids else o_id for t in ex["ner_tags"]]
-            filtered.append({**ex, "ner_tags": masked_tags})
+            filtered.append({**ex, "ner_tags": masked_tags, "ner_tags_full": ex["ner_tags"]})
         return filtered
 
     def __len__(self) -> int:
@@ -123,6 +124,17 @@ class FUNSDDataset(Dataset):
         # Decode the page image only for image-bearing backbones; vision-free
         # encoders (LiLT/BROS) ignore it.
         image = self._ds[ex["row"]]["image"] if self.encoder.has_image else None
+        if "ner_tags_full" in ex:
+            return encode_with_full_labels(
+                self.encoder,
+                image,
+                ex["tokens"],
+                ex["bboxes"],
+                ex["ner_tags"],
+                ex["ner_tags_full"],
+                len(self.label_to_id),
+                self.max_length,
+            )
         return self.encoder.encode(
             image, ex["tokens"], ex["bboxes"], ex["ner_tags"], self.max_length
         )

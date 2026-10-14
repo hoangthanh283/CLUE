@@ -20,8 +20,8 @@ from torch.utils.data import Dataset
 
 from doccl.data.cil_remapping import CIL_LabelRemapper
 from doccl.data.cord import CORDDataset
+from doccl.data.dil_remapping import DIL_UNIFIED_LABELS, DIL_LabelRemapper
 from doccl.data.encoders import KIEEncoder, set_default_encoder
-from doccl.data.dil_remapping import DIL_LabelRemapper, DIL_UNIFIED_LABELS
 from doccl.data.funsd import FUNSDDataset
 from doccl.data.receipt_remapping import RECEIPT_UNIFIED_LABELS, Receipt_LabelRemapper
 from doccl.data.sroie import SROIEDataset
@@ -193,14 +193,14 @@ def build_cil_cord(num_sessions: int = 5, order: list[int] | None = None) -> CLS
     # into the head-index space so targets line up with the (growing) classifier head.
     snapshots, label_sets = _cil_head_snapshots(bio_splits)
 
-    def _wrap(split: str) -> list[Dataset]:
+    def _wrap(split: str, full_head: dict[str, int] | None = None) -> list[Dataset]:
         wrapped = []
         for i, lbls in enumerate(bio_splits):
             base = CORDDataset(split=split, granularity="fine", label_filter=lbls)
-            wrapped.append(CIL_LabelRemapper(base, base.id_to_label, snapshots[i]))
+            wrapped.append(CIL_LabelRemapper(base, base.id_to_label, snapshots[i], full_head))
         return wrapped
 
-    train_dss = _wrap("train")
+    train_dss = _wrap("train", full_head=snapshots[-1])  # labels_full for label-refresh replay
     eval_dss = _wrap("test")
 
     # Joint upper-bound pool: ONE full-label CORD dataset (every receipt once with ALL its
@@ -510,7 +510,7 @@ def build_mixed() -> CLScenario:
     # session's native dataset so its ids land in the head-index space for that session.
     snapshots, label_sets = _cil_head_snapshots([s["labels"] for s in sessions])
     train_dss = [
-        CIL_LabelRemapper(s["train"], s["train"].id_to_label, snapshots[i])
+        CIL_LabelRemapper(s["train"], s["train"].id_to_label, snapshots[i], snapshots[-1])
         for i, s in enumerate(sessions)
     ]
 

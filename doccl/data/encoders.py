@@ -65,6 +65,32 @@ class LayoutLMv3Encoder:
         return {k: v.squeeze(0) for k, v in encoding.items()}
 
 
+def encode_with_full_labels(
+    encoder: KIEEncoder,
+    image: Any,
+    words: list[str],
+    boxes: list[list[int]],
+    word_labels: list[int],
+    word_labels_full: list[int],
+    n_native: int,
+    max_length: int = 512,
+) -> dict[str, torch.Tensor]:
+    """Encode once, carrying a second (unmasked) label sequence through the same alignment.
+
+    CIL session datasets mask out-of-session entities to O; label-refreshing replay needs
+    the unmasked tags too. Tokenisation is the expensive step, so both word-level label
+    lists are packed into one int (``masked * n_native + full``), aligned by the encoder's
+    normal first-subword rule, then unpacked. ``-100`` survives in both outputs.
+    """
+    packed = [m * n_native + f for m, f in zip(word_labels, word_labels_full, strict=True)]
+    out = encoder.encode(image, words, boxes, packed, max_length)
+    combined = out["labels"]
+    ignore = combined == -100
+    out["labels"] = torch.where(ignore, combined, combined // n_native)
+    out["labels_full"] = torch.where(ignore, combined, combined % n_native)
+    return out
+
+
 class _SubwordKIEEncoder:
     """Vision-free encoder: subword tokenization with box + BIO-label propagation.
 

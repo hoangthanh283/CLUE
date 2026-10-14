@@ -15,10 +15,12 @@ mapping any out-of-session / unknown native id to ``O`` (head index 0). Remappin
 done lazily in ``__getitem__`` (no extra storage) and ``-100`` (the HuggingFace
 ignore index) is preserved.
 """
+
 from __future__ import annotations
 
 from typing import Any
 
+import torch
 from torch.utils.data import Dataset
 
 
@@ -41,6 +43,7 @@ class CIL_LabelRemapper(Dataset):
         underlying: Dataset,
         native_id_to_label: dict[int, str],
         head_label_to_id: dict[str, int],
+        full_head_label_to_id: dict[str, int] | None = None,
     ):
         self.underlying = underlying
         self.head_label_to_id = head_label_to_id
@@ -49,6 +52,23 @@ class CIL_LabelRemapper(Dataset):
             native_id: head_label_to_id.get(native_name, o_id)
             for native_id, native_name in native_id_to_label.items()
         }
+        # Optional: also emit ``labels_full`` in the FINAL cumulative head space, so a
+        # replay memory can later unmask classes introduced after capture.
+        self._full_translation: dict[int, int] | None = None
+        if full_head_label_to_id is not None:
+            full_o = full_head_label_to_id["O"]
+            self._full_translation = {
+                native_id: full_head_label_to_id.get(native_name, full_o)
+                for native_id, native_name in native_id_to_label.items()
+            }
+
+    @staticmethod
+    def _translate(labels: torch.Tensor, table: dict[int, int]) -> torch.Tensor:
+        remapped = labels.clone()
+        for native, head in table.items():
+            remapped[labels == native] = head
+        remapped[labels == -100] = -100  # preserve ignore index
+        return remapped
 
     def __len__(self) -> int:
         return len(self.underlying)
@@ -56,8 +76,11 @@ class CIL_LabelRemapper(Dataset):
     def __getitem__(self, idx: int) -> dict[str, Any]:
         item = self.underlying[idx]
         labels = item["labels"]
-        remapped = labels.clone()
-        for native, head in self._id_translation.items():
-            remapped[labels == native] = head
-        remapped[labels == -100] = -100  # preserve ignore index
-        return {**item, "labels": remapped}
+        out = {**item, "labels": self._translate(labels, self._id_translation)}
+        if self._full_translation is not None:
+            # unfiltered datasets (no masking) carry no labels_full; their labels ARE full
+            native_full = item.get("labels_full", labels)
+            out["labels_full"] = self._translate(native_full, self._full_translation)
+        else:
+            out.pop("labels_full", None)
+        return out

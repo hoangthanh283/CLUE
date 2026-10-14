@@ -29,13 +29,13 @@ from doccl.methods.aglr_replay import AGLRReplay
 from doccl.methods.cl_lora import CLLoRA
 from doccl.methods.coda_prompt import CODAPrompt
 from doccl.methods.colar import CoLaR
-from doccl.methods.colar_pp import CoLaRPP
-from doccl.methods.frozen_ptm import RanPAC, SimpleCIL
 from doccl.methods.colar_adaptive import CoLaRAdaptive
 from doccl.methods.colar_bal import CoLaRBal
 from doccl.methods.colar_cb import CoLaRCB
 from doccl.methods.colar_knn import CoLaRKNN
 from doccl.methods.colar_meta import CoLaRMeta
+from doccl.methods.colar_pp import CoLaRPP
+from doccl.methods.colar_r import CoLaRRefresh
 from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.colaslot import CoLaSlot
 from doccl.methods.colaslot_fd import CoLaSlotFD
@@ -59,6 +59,7 @@ from doccl.methods.er import ER
 from doccl.methods.er_cflat import ERCFlat
 from doccl.methods.ewc import EWC
 from doccl.methods.fisher_mask import FisherMaskFreeze
+from doccl.methods.frozen_ptm import RanPAC, SimpleCIL
 from doccl.methods.gauss_replay import GaussReplay
 from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
@@ -257,6 +258,7 @@ METHOD_REGISTRY = {
     # CoLaR: latent_replay with per-DOCUMENT rank-r SVD storage — d50 coverage at ~d5 bytes
     # (whole-doc binding preserved; per-doc matrices ARE low-rank though the pooled space isn't).
     "colar": CoLaR,
+    "colar_r": CoLaRRefresh,
     # CoLaR++: + head alignment on real stored latents, slow trunk, WA, balanced replay,
     # int8 / token-pooled storage (image CIL; docs/IMAGE_SCOPE_PREREG.md Amendment 5).
     "colar_pp": CoLaRPP,
@@ -545,6 +547,7 @@ def main(cfg: DictConfig) -> None:
             run_name += "_kc"
     elif cfg.method.name in (
         "colar",
+        "colar_r",
         "colaslot",
         "colaslot_r",
         "colaslot_sidecar",
@@ -1015,6 +1018,7 @@ def main(cfg: DictConfig) -> None:
         "coreset_memory",
         "proxy_latent_replay",
         "colar",
+        "colar_r",
         "colar_adaptive",
         "colaslot",
         "colaslot_r",

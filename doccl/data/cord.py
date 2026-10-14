@@ -13,6 +13,7 @@ format compatible with LayoutLMv3 token classification. We use 30 fine-grained
 classes (61 BIO tags) for class-incremental scenarios, with optional super-class
 mapping (11 BIO tags) for domain-incremental scenarios.
 """
+
 from __future__ import annotations
 
 import json
@@ -22,7 +23,8 @@ import torch
 from datasets import load_dataset
 from PIL import Image
 from torch.utils.data import Dataset
-from doccl.data.encoders import KIEEncoder, get_default_encoder
+
+from doccl.data.encoders import KIEEncoder, encode_with_full_labels, get_default_encoder
 
 # Process-wide caches keyed by ``split`` so that the N class-incremental sessions of a
 # scenario (e.g. cil_cord builds 10 CORDDataset instances) share ONE underlying HF Arrow
@@ -298,7 +300,7 @@ class CORDDataset(Dataset):
             if not (set(ex["ner_tags"]) & target_entity_ids):
                 continue
             masked_tags = [t if t in target_entity_ids else o_id for t in ex["ner_tags"]]
-            filtered.append({**ex, "ner_tags": masked_tags})
+            filtered.append({**ex, "ner_tags": masked_tags, "ner_tags_full": ex["ner_tags"]})
         return filtered
 
     def __len__(self) -> int:
@@ -307,6 +309,17 @@ class CORDDataset(Dataset):
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         ex = self.data[idx]
         image = self._ds[ex["row"]]["image"] if self.encoder.has_image else None
+        if "ner_tags_full" in ex:
+            return encode_with_full_labels(
+                self.encoder,
+                image,
+                ex["tokens"],
+                ex["bboxes"],
+                ex["ner_tags"],
+                ex["ner_tags_full"],
+                len(self.label_to_id),
+                self.max_length,
+            )
         return self.encoder.encode(
             image, ex["tokens"], ex["bboxes"], ex["ner_tags"], self.max_length
         )

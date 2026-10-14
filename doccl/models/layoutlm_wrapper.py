@@ -217,6 +217,7 @@ class LayoutLMv3Wrapper(nn.Module):
         attention_mask: torch.Tensor | None = None,
         labels: torch.Tensor | None = None,
         modality_mask: ModalityMask = ModalityMask.FULL,
+        **kwargs: Any,  # noqa: ARG002 — tolerate extra batch keys (labels_full) from the loop
     ) -> Any:
         """Forward pass. Modality masking zeros out specific input streams.
 
@@ -412,7 +413,7 @@ class LayoutLMv3Wrapper(nn.Module):
         return [
             "model.layoutlmv3.embeddings",
             "model.layoutlmv3.patch_embed",
-            f"model.layoutlmv3.encoder.layer.0",
+            "model.layoutlmv3.encoder.layer.0",
             f"model.layoutlmv3.encoder.layer.{mid}",
             f"model.layoutlmv3.encoder.layer.{last}",
             "model.classifier",

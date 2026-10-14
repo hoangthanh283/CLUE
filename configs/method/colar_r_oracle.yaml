@@ -1,0 +1,15 @@
+name: colar_r
+run_alias: colar_r_oracle
+# CoLaR + ORACLE label refresh: after each task, stored documents have their true labels
+# unmasked for every class now present in the head (needs labels_full from the CIL
+# remapper). Upper bound on what any label-refresh can recover. Same CoLaR axes/defaults;
+# the headline recipe is k=4 / d=50 / r=128 via CLI override.
+refresh: oracle
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64
