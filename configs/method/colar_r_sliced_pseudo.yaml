@@ -1,0 +1,19 @@
+name: colar_r
+run_alias: colar_r_sliced_pseudo
+# CoLaR + SLICED replay loss during each task + PSEUDO label refresh after it (deployable,
+# teacher-free). R2 pseudo seed 42 relabelled 1/0/0 tokens (oracle 101/760/1461): replaying
+# a stale O label trains the model to say O on exactly the memory tokens the refresh then
+# inspects, so no candidate survives. Slicing (softmax over capture-time classes only)
+# removes that signal; the post-task model's new-class predictions on memory then come from
+# live data alone and the CPFD median-entropy rule has something to relabel.
+refresh: sliced_pseudo
+refresh_entropy_floor: 0.001
+refresh_quantile: 0.5
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64
