@@ -160,7 +160,7 @@ Sections~\ref{sec:anatomy}--\ref{sec:benchmark} say replay works because it re-e
 
 \begin{table*}[t]
 \centering\small
-\caption{Falsification ledger, DIL/LayoutLMv3 (naive floor $41.3$, replay $\approx88$). Each family is the strongest instance we could build of its mechanism; the failure reason is from a per-boundary root-cause analysis, not inferred from the score. $^\dagger$run at a frozen-backbone/3-epoch operating point (see text).}
+\caption{Falsification ledger, DIL/LayoutLMv3 (naive floor $41.3$, replay $\approx88$). Each family is the strongest instance we could build of its mechanism; the failure reason is from a per-boundary root-cause analysis, not inferred from the score. $^\dagger$run at a frozen-backbone, short-schedule (3--5 epoch) operating point whose own naive floor is given in the cell.}
 \label{tab:ledger}
 \setlength{\tabcolsep}{4pt}
 \resizebox{\linewidth}{!}{%
@@ -170,7 +170,7 @@ Family & Instance & Best AA & Why it fails \\
 \midrule
 Weight merging & TIES/Fisher head merge$^\dagger$ & $21.6$ (no-merge $21.9$) & merge of head vectors cancels; near no-op \\
 Merge + realignment & LCA~\citep{lca2026} (ported) & $41.9$ & backbone merge halves BWT; Gaussian realignment kills acquisition \\
-Subspace transfer & HGT / CUBER (ported) & \vnum{--} & protected subspace grows; head unconstrained \\
+Subspace transfer & HGT / CUBER (ported)$^\dagger$ & $39.8$ (own naive $38.7$); HGT $\le25.3$ & protected subspace grows; head unconstrained; $\alpha$ is a pure stability--plasticity dial \\
 Parametric slots & LexSlot (no buffer) & $42.2$ & isolated head slots cannot re-ground shared head \\
 Input-anchored memory & Ledger$^\dagger$ & FUNSD $21$ / SROIE $23$ & own-vs-cumulative gap is training-free \\
 Feature-Gaussian replay & LexMem v3b (positive control) & $66.0$ & partial: recovers dense-label tasks only \\
@@ -242,7 +242,29 @@ Replay works because it re-exercises the head on inputs that keep their old join
 
 \section{Additional results}
 \label{app:extra}
-\todo{Per-backbone BWT/AF tables (from \texttt{results/table\_backbone\_BWT.tex}); prompt/LoRA/C-Flat++ baselines on LayoutLMv3; Finding~2 extension; PLaR sweep; CoLaSlot gates.}
+\paragraph{Prompt-, LoRA- and flatness-based baselines.} \cref{tab:prompt_lora} reports the frozen-backbone prompt family (L2P, DualPrompt, CODA-Prompt), the orthogonal/continual LoRA family and ER with C-Flat++ sharpness-aware optimisation on DIL, three seeds, LayoutLMv3 and BERT. The prompt family forgets little but never acquires the task (AA $\approx30$--$35$, below the naive floor of $41.3$): a frozen document encoder with a drifting shared head cannot be routed back into place. LoRA adapters acquire but forget as much as naive training does, because the adapter does not protect the head. Only the replay-based variant reaches the replay ceiling, and its sharpness term adds nothing over plain ER ($88.4$ vs.\ $87.9$ on LayoutLMv3), consistent with \S\ref{sec:benchmark}: the remedy ordering is set by whether the head is re-grounded, not by the optimiser.
+
+\begin{table}[t]
+\centering\small
+\caption{Prompt/LoRA/C-Flat++ baselines, DIL, AA and BWT, mean$\pm$std over seeds 42/7/123. Naive floor $41.3$ (LayoutLMv3), ER $87.9$.}
+\label{tab:prompt_lora}
+\setlength{\tabcolsep}{2pt}\scriptsize
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{LayoutLMv3} & \multicolumn{2}{c}{BERT} \\
+Method & AA & BWT & AA & BWT \\
+\midrule
+L2P & $30.4\pm0.4$ & $-11.5\pm0.1$ & $34.4\pm0.7$ & $-38.5\pm1.0$ \\
+DualPrompt & $29.9\pm0.6$ & $-11.1\pm0.2$ & $34.0\pm0.2$ & $-40.2\pm1.1$ \\
+CODA-Prompt & $32.5\pm1.2$ & $-10.5\pm0.2$ & $35.2\pm0.7$ & $-40.7\pm1.3$ \\
+O-LoRA & $40.8\pm0.3$ & $-56.8\pm1.0$ & $37.4\pm0.3$ & $-53.4\pm0.9$ \\
+CL-LoRA & $41.1\pm0.3$ & $-58.8\pm2.1$ & $38.6\pm0.4$ & $-31.6\pm1.9$ \\
+ER + C-Flat++ & $88.4\pm0.1$ & $-1.8\pm0.6$ & $78.3\pm0.4$ & $-2.2\pm0.1$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Per-backbone forgetting.} The full BWT and AF tables for every backbone$\times$scenario$\times$method cell of the generality grid are generated from the released run directories (\texttt{results/table\_backbone\_\{BWT,AF\}.tex}) and will ship with the code; Table~\ref{tab:grid} already carries the AA view.
 
 \paragraph{Budget-adaptive allocation is a frontier, not a gain.} Allocating a fixed compressed-replay budget unevenly across tasks (documents $[18,5,2]$, ranks $[64,128,64]$ vs.\ a uniform $10$ documents at rank $64$; 5 epochs, $k{=}4$) gave $+4.0$ AA on seed 42 while passing a pre-registered per-domain guard. On seeds 7 and 123 the same comparison gave $-8.0$ and $+5.7$: $+0.6\pm7.5$ over three seeds, a null. The seed-42 result was a point on a Pareto frontier (old-domain retention traded against the final domain at $\approx9{:}1$), not a shift of the frontier, and we report it as such.
 
