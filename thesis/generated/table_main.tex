@@ -16,12 +16,14 @@ O-LoRA & 4.74\;{\scriptsize $\pm$ 8.21} & 15.50\;{\scriptsize $\pm$ 0.68} & 40.8
 CL-LoRA (2025) & 8.92\;{\scriptsize $\pm$ 7.74} & \est{14.80\;{\scriptsize $\pm$ 0.90}} & 41.14\;{\scriptsize $\pm$ 0.28} & \est{49.60\;{\scriptsize $\pm$ 2.10}} & 31.37\;{\scriptsize $\pm$ 0.63} \\
 DocCL (legacy) & 16.11\;{\scriptsize $\pm$ 0.90} & 18.87\;{\scriptsize $\pm$ 0.07} & 84.71\;{\scriptsize $\pm$ 1.70} & 75.03\;{\scriptsize $\pm$ 0.72} & 57.64\;{\scriptsize $\pm$ 2.38} \\
 LexSlot ($+$ buffer) & \est{16.40\;{\scriptsize $\pm$ 0.90}} & \est{19.10\;{\scriptsize $\pm$ 0.20}} & 87.33\;{\scriptsize $\pm$ 1.03} & \est{77.90\;{\scriptsize $\pm$ 0.80}} & \est{59.20\;{\scriptsize $\pm$ 2.10}} \\
-CoLaR (memory only) & \est{21.20\;{\scriptsize $\pm$ 0.80}} & \est{22.00\;{\scriptsize $\pm$ 0.40}} & \est{87.60\;{\scriptsize $\pm$ 0.40}} & \est{80.40\;{\scriptsize $\pm$ 0.50}} & \est{61.90\;{\scriptsize $\pm$ 1.60}} \\
+CoLaR (memory only) & \est{21.20\;{\scriptsize $\pm$ 0.80}} & \est{22.00\;{\scriptsize $\pm$ 0.40}} & 87.75\;{\scriptsize $\pm$ 0.47} & \est{80.40\;{\scriptsize $\pm$ 0.50}} & \est{61.90\;{\scriptsize $\pm$ 1.60}} \\
 \textbf{Lexically-routed latent replay (ours)} & \textbf{\est{22.40\;{\scriptsize $\pm$ 0.70}}} & \textbf{\est{23.10\;{\scriptsize $\pm$ 0.40}}} & \est{88.30\;{\scriptsize $\pm$ 0.50}} & \textbf{\est{80.90\;{\scriptsize $\pm$ 0.40}}} & \textbf{\est{63.40\;{\scriptsize $\pm$ 1.20}}} \\
 \midrule
 Independent (per-dataset)\textsuperscript{\dag} & \textsc{n/a} & \textsc{n/a} & 88.23\;{\scriptsize $\pm$ 1.00} & \textsc{n/a} & \textsc{n/a} \\
 Joint (upper bound) & 33.32\;{\scriptsize $\pm$ 0.33} & 33.89\;{\scriptsize $\pm$ 0.33} & 88.73\;{\scriptsize $\pm$ 1.13} & 78.51\;{\scriptsize $\pm$ 4.04} & 67.51\;{\scriptsize $\pm$ 0.82} \\
 \bottomrule
 \end{tabular}
+% CoLaR DIL = 10-epoch protocol, seeds 42/7/123 = 87.58/88.30/87.38 (train.log; seed-42 dir later
+% overwritten by the 5-epoch Amendment-9 control 86.38; re-run queued as colar_e10).
 % \textsuperscript{\dag}Independent = per-dataset upper bound (three LayoutLMv3 models,
 % one per dataset, three-seed macro over FUNSD/SROIE/CORD). Defined only on DIL.
