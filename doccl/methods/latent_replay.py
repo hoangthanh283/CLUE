@@ -310,8 +310,14 @@ class LatentReplay(NaiveFineTune):
                 for i in range(hidden.shape[0]):
                     if len(candidates) >= quota:
                         break
-                    candidate = {"hidden": hidden[i], "labels": batch["labels"][i].cpu()}
-                    for k in ("bbox", "attention_mask"):  # absent for image backbones
+                    candidate = {
+                        "hidden": hidden[i],
+                        "labels": batch["labels"][i].cpu(),
+                        # head size at capture: label-refresh needs to know which classes
+                        # were still masked to O when this document was banked
+                        "n_labels": torch.tensor(len(getattr(self.model, "label_to_id", {}))),
+                    }
+                    for k in ("bbox", "attention_mask", "labels_full"):  # absent for images
                         if k in batch:
                             candidate[k] = batch[k][i].cpu()
                     if self.config.get("store_input_ids", False):

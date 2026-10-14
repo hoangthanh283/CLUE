@@ -1,0 +1,17 @@
+name: colar_r
+run_alias: colar_r_pseudo
+# CoLaR + PSEUDO label refresh (deployable): after each task the stored latents are run
+# through the current upper stack; O tokens confidently predicted as a post-capture class
+# are relabelled (per-class median-entropy threshold, CPFD rule, clamped >= floor).
+# Teacher-free, never sees the true labels.
+refresh: pseudo
+refresh_entropy_floor: 0.001
+refresh_quantile: 0.5
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64

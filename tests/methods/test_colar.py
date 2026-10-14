@@ -782,7 +782,7 @@ def test_wsvd_uses_colar_factor_footprint():
     m = _colar_wsvd(rank=2, docs=2, entity_weight=4.0)
     m._capture_task([_batch(2)])
     d = m.store[0]
-    assert set(d) == {"us", "v", "bbox", "attention_mask", "labels"}
+    assert set(d) == {"us", "v", "bbox", "attention_mask", "labels", "n_labels"}
     assert d["us"].shape == (L, 2) and d["v"].shape == (2, D)
     assert m.memory_bytes() == sum(
         (doc["us"].numel() + doc["v"].numel()) * 2

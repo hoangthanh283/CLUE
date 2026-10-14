@@ -1,3 +1,27 @@
+## RESUME HERE (2026-10-14 23:00, auto mode): R2 queue armed; CoLaR-R plumbing landed; CVPR pivot
+
+- **Direction (CVPR 2027, deadline ~2026-11-13).** DIL is saturated (Independent 88.2 ≈ Joint 88.7;
+  Indep > Joint on LiLT 85.3 / BROS 88.8). Headroom is CIL-CORD (gap 14, ER 16.0 < naive 19.0) and
+  Mixed (gap 5). Cause (code-verified): every buffer banks labels in the capture-session head space
+  (post-capture classes masked to O). Plan + evidence: `docs/RESEARCH_PLAN_2026-10_next_mechanism.md`
+  §0', `docs/RESULTS_SYNTHESIS_CVPR2027_2026-10-14.md`. Head-Gaussian / token-coreset directions
+  retracted (pre-falsified by Amendment 9 B2 and D1/D2).
+- **CoLaR-R (`doccl/methods/colar_r.py`, configs `colar_r_oracle` / `colar_r_pseudo`).** Label refresh
+  of the stored memory after each task: oracle unmasks true labels (`labels_full` now emitted by
+  CIL remappers built with `full_head_label_to_id`; cil_cord + mixed train sets wired), pseudo
+  relabels O tokens confidently predicted as post-capture classes (CPFD median-entropy rule on
+  the memory). Store docs carry `n_labels` (head size at capture). Tests: `tests/methods/test_colar_r.py`;
+  fast suite 470 green.
+- **R2 queue running** (`scripts/run_r2_queue.sh`, log `results/logs_vision/r2_queue.log`): waits for
+  the Independent grid (last BERT cell), then per seed 42/7/123 × {cil_cord, mixed}: colar k4/d50/r128,
+  colar_r_oracle, colar_r_pseudo, cpfd (bs1), is3 (bs1). Resume-safe. Pre-reg bars in plan §0'.
+- **Independent grid** (`results/logs_vision/indep_queue.log`): LiLT 85.34±0.66, BROS 88.75±0.08, BERT
+  pending 1 cell. Then: replace the three `\tbd` cells in `paper_cvpr/main.tex` Table 1 + thesis table.
+- **Next (no GPU):** formalise the forgetting-localisation pipeline as a named, model-agnostic
+  protocol (inputs: checkpoint pair + `param_groups_by_depth` partition + probe loader; outputs:
+  per-group old-task-Fisher displacement, depth-matched CKA, permutation test for shared location,
+  protect-and-migrate experiment) — algorithm box in paper §4 + one `doccl` entry point (user ask).
+
 ## RESUME HERE (2026-10-13 05:00, auto mode): Amendment 10 KILLED; B2 retry + codec probe running
 
 - **Routing confirmation is in — KILL.** far@d50 vs uniform d50 by seed: 42 +1.8, 7 +0.4

@@ -18,6 +18,7 @@ Format expected per example:
         "ner_tags": list[int],
     }
 """
+
 from __future__ import annotations
 
 import json
@@ -27,7 +28,8 @@ from typing import Any
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
-from doccl.data.encoders import KIEEncoder, get_default_encoder
+
+from doccl.data.encoders import KIEEncoder, encode_with_full_labels, get_default_encoder
 
 # Process-wide cache keyed by (hf_name, split) so the SROIE split reused across scenarios
 # (dil + mixed) shares one HF Arrow handle instead of each materialising its own copy.
@@ -240,7 +242,7 @@ class SROIEDataset(Dataset):
             if not (set(ex["ner_tags"]) & target_entity_ids):
                 continue
             masked_tags = [t if t in target_entity_ids else o_id for t in ex["ner_tags"]]
-            filtered.append({**ex, "ner_tags": masked_tags})
+            filtered.append({**ex, "ner_tags": masked_tags, "ner_tags_full": ex["ner_tags"]})
         return filtered
 
     def __len__(self) -> int:
@@ -254,6 +256,17 @@ class SROIEDataset(Dataset):
                 image = self._hf_ds[ex["row"]][self._image_key].convert("RGB")
             else:  # local source: open from disk
                 image = Image.open(self._image_root / ex["image_filename"]).convert("RGB")
+        if "ner_tags_full" in ex:
+            return encode_with_full_labels(
+                self.encoder,
+                image,
+                ex["tokens"],
+                ex["bboxes"],
+                ex["ner_tags"],
+                ex["ner_tags_full"],
+                len(self.label_to_id),
+                self.max_length,
+            )
         return self.encoder.encode(
             image, ex["tokens"], ex["bboxes"], ex["ner_tags"], self.max_length
         )
