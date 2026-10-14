@@ -3,6 +3,32 @@
 Date: 2026-10-14. Owner: this session. Related: `STATE.md`, `docs/FINDINGS_ANALYSIS_PAPER_2026-07.md`,
 `docs/KT_2026-07-14_colar_lexslot.md`, `docs/CACOLAR_T1_T2_2026-08-20.md`.
 
+## 0''. TOURNAMENT VERDICT (2026-10-15 00:30) — idea selection closed
+
+Two-round tournament (5 lenses × ≥12 candidates = 67, red-team + recombination; files
+`sources/brainstorm_r1_*.md`, `sources/brainstorm_r2_redteam.md`). Converged; no further rounds.
+
+**New measured fact.** CIL-CORD re-shows 100 % of its documents (every later session is a
+subset of session 0's 800 receipts); Mixed re-shows FUNSD fully (revisit) and CORD 798/800.
+Hence the "oracle" label refresh is implementable from the stream as a ≤ 1 MB per-document
+label ledger — not privileged information. Caveat for the paper: disjoint-slice CNER
+protocols (CFNER/ExtendNER) get nothing from a ledger; only the label-free variants apply there.
+
+| Rank | Package | Headline claim (falsifiable) | GPU | Kill |
+|---|---|---|---|---|
+| **P1** | **Live labels for a drift-free memory** | Replay is below naive on class-incremental document streams because buffered labels are stale; keeping them live — exactly via the label ledger (= `colar_r_oracle`), or label-free via pseudo-refresh / sliced-softmax replay CE (`colar_r_sliced`, new) — recovers ≥ 4 AA of the 14-pt CIL-CORD gap and ≥ 1 on Mixed, three seeds. Controls: CoLaR-plain, CPFD, IS3, ER+ledger, stale-label audit (GPU-free), head-row gradient-conflict hook. | ~110 h queued + ~50 h | ledger ≤ plain + 1 |
+| P2 | Evaluation methodology for document CL | Joint−Independent headroom must be certified before ranking (≤ 0.5; negative on LiLT/BROS); head-statistics methods invert rank across domains (win on image CIL, null on token-level documents) because the readout needs binding. SLCA-token port + 3 DIL runs. | ~8 h | SLCA-token ≥ CoLaR − 1 on DIL |
+| P3 | Where forgetting lives inside the sequence | Drift is text-position-localised (visual positions CKA ≈ 1.0); visual positions are structural replay carriers (silent-modality probe); conservation reproduces on ViT. | ~15 h | visual-pos CKA within 0.05 of text; ViT early/mid CKA > 0.9 under freeze |
+
+Convergence: #1 = P1, stable across rounds and strengthened by the re-show measurement.
+**If the running CoLaR-R cells are null, #1 becomes P2** and P1 reduces to a ledger row plus
+the stale-label audit; P3 unaffected. Killed/demoted after red-team: depth-targeted replay
+gradients, keep-correctable cap, abstention refresh, modality-asymmetric ranking.
+
+Queue consequence: R2 (30 cells) runs to ~Oct 19–20 at the observed ~9 min/epoch; cap seeds
+7/123 of CPFD/IS3 on Mixed at `method.epochs=5` if Gate 1 slips. `scripts/run_r2b_queue.sh`
+appends the sliced-softmax control (6 cells) after R2.
+
 ## 0'. REVISION (2026-10-14 evening) — supersedes §§2–3a below
 
 **Retraction.** Re-reading `docs/IMAGE_SCOPE_PREREG.md` Amendment 9 shows two of the three

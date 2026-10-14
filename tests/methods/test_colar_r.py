@@ -14,6 +14,7 @@ from doccl.methods.colar_r import (
     oracle_refresh,
     pseudo_refresh,
     pseudo_thresholds,
+    sliced_replay_loss,
     token_entropy,
 )
 
@@ -125,7 +126,7 @@ def test_oracle_pass_refreshes_stale_docs_once_and_counts_tokens():
 
 
 def test_capture_drops_labels_full_unless_oracle():
-    for refresh, keep in (("oracle", True), ("pseudo", False), ("none", False)):
+    for refresh, keep in (("oracle", True), ("pseudo", False), ("sliced", False), ("none", False)):
         m = _method(refresh)
 
         def fake_capture(self, loader):
@@ -136,3 +137,35 @@ def test_capture_drops_labels_full_unless_oracle():
         assert ("labels_full" in m.store[0]) is keep
         if keep:
             assert m.store[0]["labels_full"].dtype == torch.int16
+
+
+def test_sliced_replay_loss_ignores_post_capture_classes():
+    # one doc banked with 2 classes; class 2 was introduced later and gets a huge logit on an O token
+    logits = torch.tensor([[[0.0, 0.0, 9.0], [0.0, 3.0, 9.0], [0.0, 0.0, 0.0]]], requires_grad=True)
+    labels = torch.tensor([[0, 1, -100]])
+    n_capture = torch.tensor([2])
+    loss = sliced_replay_loss(logits, labels, n_capture)
+    full = torch.nn.functional.cross_entropy(
+        logits.reshape(-1, 3), labels.reshape(-1), ignore_index=-100
+    )
+    assert loss < full  # the stale O no longer competes with class 2
+    loss.backward()
+    assert torch.all(logits.grad[0, :, 2] == 0)  # no gradient reaches the post-capture row
+    # per-doc capture sizes: a doc banked with all 3 classes keeps the full softmax
+    logits2 = torch.tensor([[[0.0, 0.0, 9.0]], [[0.0, 0.0, 9.0]]])
+    labels2 = torch.tensor([[0], [0]])
+    per_doc = sliced_replay_loss(logits2, labels2, torch.tensor([2, 3]))
+    only_full = torch.nn.functional.cross_entropy(logits2[1], labels2[1])
+    # doc 0's softmax is over its 2 capture-time classes only -> ln 2; doc 1 keeps all 3
+    expected = (torch.log(torch.tensor(2.0)).item() + only_full.item()) / 2
+    assert abs(per_doc.item() - expected) < 1e-5
+
+
+def test_sliced_mode_accepted_and_refresh_skipped():
+    m = _method("sliced")
+    m.store = [{"labels": torch.tensor([0]), "n_labels": torch.tensor(1)}]
+    m.model.label_to_id = {"O": 0, "a": 1}
+    # after_task would refresh for oracle/pseudo; sliced must not touch labels
+    with patch.object(CoLaR, "after_task", lambda self, _t, _l: None):
+        m.after_task(type("T", (), {"task_id": 1})(), None)
+    assert m.refresh_log == [] and m.store[0]["labels"].tolist() == [0]

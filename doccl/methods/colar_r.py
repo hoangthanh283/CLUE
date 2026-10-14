@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 
 import torch
+import torch.nn.functional as F  # noqa: N812
 from torch.utils.data import DataLoader
 
 from doccl.methods.colar import CoLaR
@@ -75,14 +76,31 @@ def pseudo_refresh(
     return torch.where(cand, pred, labels)
 
 
+def sliced_replay_loss(
+    logits: torch.Tensor, labels: torch.Tensor, n_capture: torch.Tensor
+) -> torch.Tensor:
+    """Replay CE over each document's capture-time label space only.
+
+    Classes introduced after a document was banked are removed from its softmax, so a stale
+    O label cannot push them down (label-free analogue of the refresh; cf. SS-IL / ER-ACE).
+    logits (B, L, C), labels (B, L) with -100 ignored, n_capture (B,) head size at capture.
+    """
+    n_cls = logits.shape[-1]
+    allowed = torch.arange(n_cls, device=logits.device)[None, None, :] < n_capture[:, None, None]
+    masked = logits.masked_fill(~allowed, float("-inf"))
+    return F.cross_entropy(masked.reshape(-1, n_cls), labels.reshape(-1), ignore_index=-100)
+
+
 class CoLaRRefresh(CoLaR):
     name = "colar_r"
 
     def __init__(self, model, config):
         super().__init__(model, config)
         self.refresh = str(config.get("refresh", "oracle"))
-        if self.refresh not in ("oracle", "pseudo", "none"):
-            raise ValueError(f"colar_r.refresh must be oracle|pseudo|none, got {self.refresh!r}")
+        if self.refresh not in ("oracle", "pseudo", "sliced", "none"):
+            raise ValueError(
+                f"colar_r.refresh must be oracle|pseudo|sliced|none, got {self.refresh!r}"
+            )
         self.entropy_floor = float(config.get("refresh_entropy_floor", 1e-3))
         self.refresh_quantile = float(config.get("refresh_quantile", 0.5))
         self.refresh_log: list[dict] = []
@@ -106,9 +124,24 @@ class CoLaRRefresh(CoLaR):
     def _head_size(self) -> int:
         return len(getattr(self.model, "label_to_id", {}))
 
+    def _stack_replay(self, docs: list[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
+        replay = super()._stack_replay(docs)
+        replay["n_labels"] = torch.stack([d["n_labels"] for d in docs])
+        return replay
+
+    def _replay_forward(self, replay: dict[str, torch.Tensor]):
+        out = super()._replay_forward(replay)
+        if self.refresh == "sliced":
+            out.loss = sliced_replay_loss(
+                out.logits,
+                replay["labels"].to(self.device),
+                replay["n_labels"].to(self.device),
+            )
+        return out
+
     def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         super().after_task(task, train_loader)
-        if self.refresh != "none":
+        if self.refresh in ("oracle", "pseudo"):
             self._refresh_memory(task.task_id)
 
     def _refresh_memory(self, task_id: int) -> None:
