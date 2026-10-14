@@ -76,11 +76,11 @@ The CL literature offers a mature toolbox---importance-weighted regularisation~\
 \label{sec:setup}
 \paragraph{Task.} A document is a triple $D=(W,B,I)$ of OCR tokens, normalised bounding boxes and the page image; the model $f_\theta$ emits BIO labels per token and is trained with token-level cross-entropy. Performance is entity-level F1 with BIO-aware span matching (\texttt{seqeval}). In the continual setting the learner sees tasks $\mathcal{T}_1,\dots,\mathcal{T}_T$ and at task $t$ may access only $\mathcal{D}_t$ and, for replay methods, a bounded memory. OCR and boxes are dataset-provided throughout, so no OCR engine enters the loop.
 
-\paragraph{Datasets and scenarios.} We use FUNSD (149/50 train/test forms, 7 BIO tags), CORD (800/100/100 receipts, 30 fine-grained classes, 61 tags) and SROIE (626/347 receipts, 9 tags). \textbf{DIL}: FUNSD$\rightarrow$SROIE$\rightarrow$CORD under a fixed unified schema \{HEADER, KEY, VALUE, OTHER\}; the label space is constant and only the input distribution shifts, so forgetting is pure representation drift. \textbf{CIL-CORD}: CORD's 30 classes introduced six at a time over five sessions in a fixed easy-to-hard curriculum; the head grows, and tokens of not-yet-introduced classes are absorbed into ``O'', whose meaning therefore shifts. \textbf{Mixed}: a six-session sequence alternating new-class transitions within CORD with new-domain transitions to FUNSD and SROIE, ending in a FUNSD revisit. Session details and the DIL mapping are in Appendix~\ref{app:setup}.
+\paragraph{Datasets and scenarios.} We use FUNSD (149/50 train/test forms, 7 BIO tags), CORD (800/100/100 receipts, 30 fine-grained classes, 61 tags) and SROIE (626/347 receipts, 9 tags). \textbf{DIL}: FUNSD$\rightarrow$SROIE$\rightarrow$CORD under a fixed unified schema \{HEADER, KEY, VALUE, OTHER\}; the label space is constant and only the input distribution shifts, so forgetting is pure representation drift. \textbf{CIL-CORD}: CORD's 30 classes introduced six at a time over five sessions in a fixed easy-to-hard curriculum; the head grows, and tokens of not-yet-introduced classes are absorbed into ``O'', whose meaning therefore shifts. \textbf{Mixed}: a six-session sequence alternating new-class transitions within CORD with new-domain transitions to FUNSD and SROIE, ending in a FUNSD revisit. Session details and the DIL mapping are in the supplementary material (Sec.~A).
 
 \paragraph{Backbones.} LayoutLMv3-base~\citep{huang2022layoutlmv3} is the primary tri-modal encoder (text, layout, image; single-stream). LiLT-base~\citep{wang2022lilt} and BROS-base~\citep{hong2022bros} are layout-aware but vision-free; BERT-base is a text-only external comparator. Every method runs unchanged on all four through a shared wrapper contract (head expansion, parameter groups, gradient checkpointing); heads are plain linear layers.
 
-\paragraph{Methods.} The generality grid covers the six classical strategies---naive sequential fine-tuning (lower bound), joint multi-task training on the pooled data (oracle upper bound), EWC, LwF, ER and DER++---on every backbone and scenario. Defaults: EWC $\lambda{=}10^3$ with Fisher over 200 samples; LwF $T{=}2$; ER/DER++ buffer of 200 documents, DER++ $\alpha{=}\beta{=}0.5$. The falsified buffer-free families of \S\ref{sec:falsification} and the compressed-replay controls of \S\ref{sec:buffer} run on LayoutLMv3/DIL unless stated. Prompt- and LoRA-based baselines (CODA-Prompt, O-LoRA, CL-LoRA, ER+C-Flat++) are reported in Appendix~\ref{app:extra}.
+\paragraph{Methods.} The generality grid covers the six classical strategies---naive sequential fine-tuning (lower bound), joint multi-task training on the pooled data (oracle upper bound), EWC, LwF, ER and DER++---on every backbone and scenario. Defaults: EWC $\lambda{=}10^3$ with Fisher over 200 samples; LwF $T{=}2$; ER/DER++ buffer of 200 documents, DER++ $\alpha{=}\beta{=}0.5$. The falsified buffer-free families of \S\ref{sec:falsification} and the compressed-replay controls of \S\ref{sec:buffer} run on LayoutLMv3/DIL unless stated. Prompt- and LoRA-based baselines (CODA-Prompt, O-LoRA, CL-LoRA, ER+C-Flat++) are reported in the supplementary material (Sec.~B).
 
 \paragraph{Protocol.} AdamW, learning rate $5{\times}10^{-5}$, weight decay $0.01$, gradient clipping $1.0$. Each task trains \emph{to convergence}: early stopping on the task's validation entity-F1 (patience 2, $\delta{=}0.1$) under a 100-epoch ceiling that never binds, restoring the best-validation checkpoint at each boundary. FUNSD and SROIE have no validation split; for them the stopping signal is read from the evaluation set, a mild optimistic bias shared by every method. Grid results are mean $\pm$ s.d.\ over seeds $\{42,7,123\}$.
 
@@ -206,7 +206,7 @@ Replay works because it re-exercises the head on inputs that keep their old join
 
 \paragraph{Routing which stored document to replay (null).} The OCR vocabulary of a document is set by the input and does not drift with training, which suggests a drift-free sampler (\cref{fig:teaser}): a softmax over term-frequency signature scores $s_j=\sigma(x)^{\top}\sigma_j$ in three directions (\emph{near}, \emph{far}, \emph{task}), uniform as the zero-point. The seed-42 reading was promising (far $+1.8$ over uniform $86.4$ at $d{=}50$), so we pre-registered that single arm for confirmation. Across three seeds the gap collapses to $+1.8/+0.4/-0.6$, mean $+0.5$ pp with a sign flip, inside the uniform-sampling spread: lexical routing is a null, and the memory-only headline does not depend on it.
 
-\paragraph{A bounded positive on the storage side.} Replaying pseudo-labelled \emph{public} documents through the same mechanism (zero private bytes) recovers dense-label tasks (FUNSD $76.1$) but not one the proxy pool does not cover (SROIE $\sim7$), topping out at $58.9$: coverage-limited transfer. Budget-adaptive allocation across tasks moves along a Pareto frontier, not beyond it (\cref{app:extra}).
+\paragraph{A bounded positive on the storage side.} Replaying pseudo-labelled \emph{public} documents through the same mechanism (zero private bytes) recovers dense-label tasks (FUNSD $76.1$) but not one the proxy pool does not cover (SROIE $\sim7$), topping out at $58.9$: coverage-limited transfer. Budget-adaptive allocation across tasks moves along a Pareto frontier, not beyond it (supplementary Sec.~B).
 
 \section{Limitations}
 \label{sec:limitations}
@@ -219,53 +219,5 @@ Replay works because it re-exercises the head on inputs that keep their old join
     \bibliographystyle{ieeenat_fullname}
     \bibliography{refs}
 }
-
-% Supplementary material (split off for submission)
-\clearpage
-\setcounter{page}{1}
-\maketitlesupplementary
-\appendix
-\section{Setup details}
-\label{app:setup}
-
-\paragraph{DIL unified schema.} A single four-entity label space \{HEADER, KEY, VALUE, OTHER\} (9 BIO tags) is held fixed over FUNSD$\rightarrow$SROIE$\rightarrow$CORD. FUNSD: HEADER$\rightarrow$HEADER, QUESTION$\rightarrow$KEY, ANSWER$\rightarrow$VALUE. SROIE: COMPANY$\rightarrow$KEY; ADDRESS/DATE/TOTAL$\rightarrow$VALUE. CORD: menu/sub\_total/total$\rightarrow$VALUE; void\_menu/sub$\rightarrow$OTHER. KEY originates only from FUNSD and SROIE, so the schema is VALUE-dominant; we report per-class F1 for every DIL result and treat a high aggregate as retention only if the sparse classes are retained. The reverse order is used as a robustness check.
-
-\paragraph{CIL-CORD sessions.} CORD's 30 fine-grained classes in five sessions of six, ordered easy-to-hard by super-class: (0) core menu fields; (1) extended menu + sub; (2) sub\_total fields; (3) total / payment methods; (4) residual total + void/auxiliary. Every receipt containing at least one in-session entity is kept, with out-of-session tokens relabelled to ``O'', giving per-session training pools of 800/382/549/723/780 receipts. Class imbalance across sessions is deliberately left unmodified. Joint uses the full-label pool (each receipt once with all its labels) rather than the concatenation of the masked per-session copies, which would feed conflicting labels for the same document.
-
-\paragraph{Mixed.} Six sessions: CORD-menu $\rightarrow$ FUNSD $\rightarrow$ CORD-menu-extended $\rightarrow$ SROIE $\rightarrow$ CORD-sub\_total $\rightarrow$ FUNSD-revisit; boundaries alternate new-class and new-domain transitions and the final session is an explicit retention check.
-
-\paragraph{Datasets.} FUNSD (\texttt{nielsr/funsd-layoutlmv3}; 149/50), CORD (\texttt{naver-clova-ix/cord-v2}; 800/100/100), SROIE (\texttt{mp-02/sroie}; 626/347). Dataset-provided OCR and boxes throughout; images 224$\times$224; sequence length 512.
-
-\paragraph{Hyperparameters.} AdamW, lr $5\times10^{-5}$ constant, weight decay $0.01$, clipping $1.0$, batch size 8 on the primary grid (1--2 with gradient checkpointing on the 6\,GB secondary-backbone machine; replay batch 2, or 1 for DER++ on BROS, whose HF implementation lacks checkpointing). EWC $\lambda{=}10^3$, Fisher over 200 documents; LwF $T{=}2$, $\alpha{=}1$; ER/DER++ buffer 200 documents, DER++ $\alpha{=}\beta{=}0.5$. Early stopping on task val F1, patience 2, $\delta{=}0.1$, cap 100 epochs (never binding; tasks converge in 4--8). Seeds 42/7/123. Primary-grid runs used bf16 autocast on a 24\,GB GPU; the secondary-backbone cells ran in fp32 or fp16 on a 6\,GB GPU.
-
-\paragraph{Compute.} Every run fits a single GPU; the full generality grid is roughly 200 GPU-hours on a 24\,GB card.
-
-\section{Additional results}
-\label{app:extra}
-\paragraph{Prompt-, LoRA- and flatness-based baselines.} \cref{tab:prompt_lora} reports the frozen-backbone prompt family (L2P, DualPrompt, CODA-Prompt), the orthogonal/continual LoRA family and ER with C-Flat++ sharpness-aware optimisation on DIL, three seeds, LayoutLMv3 and BERT. The prompt family forgets little but never acquires the task (AA $\approx30$--$35$, below the naive floor of $41.3$): a frozen document encoder with a drifting shared head cannot be routed back into place. LoRA adapters acquire but forget as much as naive training does, because the adapter does not protect the head. Only the replay-based variant reaches the replay ceiling, and its sharpness term adds nothing over plain ER ($88.4$ vs.\ $87.9$ on LayoutLMv3), consistent with \S\ref{sec:benchmark}: the remedy ordering is set by whether the head is re-grounded, not by the optimiser.
-
-\begin{table}[t]
-\centering\small
-\caption{Prompt/LoRA/C-Flat++ baselines, DIL, AA and BWT, mean$\pm$std over seeds 42/7/123. Naive floor $41.3$ (LayoutLMv3), ER $87.9$.}
-\label{tab:prompt_lora}
-\setlength{\tabcolsep}{2pt}\scriptsize
-\begin{tabular}{lcccc}
-\toprule
- & \multicolumn{2}{c}{LayoutLMv3} & \multicolumn{2}{c}{BERT} \\
-Method & AA & BWT & AA & BWT \\
-\midrule
-L2P & $30.4\pm0.4$ & $-11.5\pm0.1$ & $34.4\pm0.7$ & $-38.5\pm1.0$ \\
-DualPrompt & $29.9\pm0.6$ & $-11.1\pm0.2$ & $34.0\pm0.2$ & $-40.2\pm1.1$ \\
-CODA-Prompt & $32.5\pm1.2$ & $-10.5\pm0.2$ & $35.2\pm0.7$ & $-40.7\pm1.3$ \\
-O-LoRA & $40.8\pm0.3$ & $-56.8\pm1.0$ & $37.4\pm0.3$ & $-53.4\pm0.9$ \\
-CL-LoRA & $41.1\pm0.3$ & $-58.8\pm2.1$ & $38.6\pm0.4$ & $-31.6\pm1.9$ \\
-ER + C-Flat++ & $88.4\pm0.1$ & $-1.8\pm0.6$ & $78.3\pm0.4$ & $-2.2\pm0.1$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Per-backbone forgetting.} The full BWT and AF tables for every backbone$\times$scenario$\times$method cell of the generality grid are generated from the released run directories (\texttt{results/table\_backbone\_\{BWT,AF\}.tex}) and will ship with the code; Table~\ref{tab:grid} already carries the AA view.
-
-\paragraph{Budget-adaptive allocation is a frontier, not a gain.} Allocating a fixed compressed-replay budget unevenly across tasks (documents $[18,5,2]$, ranks $[64,128,64]$ vs.\ a uniform $10$ documents at rank $64$; 5 epochs, $k{=}4$) gave $+4.0$ AA on seed 42 while passing a pre-registered per-domain guard. On seeds 7 and 123 the same comparison gave $-8.0$ and $+5.7$: $+0.6\pm7.5$ over three seeds, a null. The seed-42 result was a point on a Pareto frontier (old-domain retention traded against the final domain at $\approx9{:}1$), not a shift of the frontier, and we report it as such.
 
 \end{document}
