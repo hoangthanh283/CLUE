@@ -17,7 +17,10 @@
   colar_r_oracle, colar_r_pseudo, cpfd (bs1), is3 (bs1). Resume-safe. Pre-reg bars in plan §0'.
 - **Independent grid** (`results/logs_vision/indep_queue.log`): LiLT 85.34±0.66, BROS 88.75±0.08, BERT
   pending 1 cell. Then: replace the three `\tbd` cells in `paper_cvpr/main.tex` Table 1 + thesis table.
-- **Next (no GPU):** formalise the forgetting-localisation pipeline as a named, model-agnostic
+- **DONE 23:10 — localisation protocol formalised:** `doccl/diag/protocol.py` (`ForgettingLocaliser`
+  arm/measure, `dominance_test`, `shared_location_test`, `freeze_groups`), doc
+  `docs/PROTOCOL_FORGETTING_LOCALISATION.md`, paper §3 paragraph rewritten as the named protocol
+  (body still 8 pp). Overleaf copy of `paper_cvpr/main.tex` NOT yet re-uploaded. Original note: formalise the forgetting-localisation pipeline as a named, model-agnostic
   protocol (inputs: checkpoint pair + `param_groups_by_depth` partition + probe loader; outputs:
   per-group old-task-Fisher displacement, depth-matched CKA, permutation test for shared location,
   protect-and-migrate experiment) — algorithm box in paper §4 + one `doccl` entry point (user ask).
