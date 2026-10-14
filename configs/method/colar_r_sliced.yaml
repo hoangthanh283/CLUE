@@ -1,0 +1,16 @@
+name: colar_r
+run_alias: colar_r_sliced
+# CoLaR + SLICED-SOFTMAX replay CE (label-free control for CoLaR-R): the replay loss of a
+# stored document is computed over the logits of the classes that existed when it was
+# banked, so a stale O never pushes post-capture classes toward O. No label is changed and
+# no true label is seen. Isolates "remove the stale negative gradient" from "add the new
+# positive label" (oracle/pseudo). Ancestors: SS-IL / ER-ACE (image CIL), IS3 (live data).
+refresh: sliced
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64

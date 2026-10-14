@@ -1,3 +1,16 @@
+## RESUME HERE (2026-10-15 00:30): tournament converged → P1 "live labels"; sliced-softmax control added
+
+- **Idea tournament closed** (67 candidates, 5 lenses, red-team round): P1 live-labels package
+  (CoLaR-R oracle = stream-implementable label ledger since CIL-CORD re-shows 100 % of docs;
+  pseudo + new `colar_r_sliced` as label-free variants) > P2 evaluation methodology (headroom
+  certification + SLCA-token inversion) > P3 sequence-position anatomy. Verdict + table in
+  `docs/RESEARCH_PLAN_2026-10_next_mechanism.md` §0''. If CoLaR-R is null, P2 becomes headline.
+- **Ops loop** armed (hourly ticks; `docs/RESEARCH_OPS_LOOP.md`, `scripts/r2_status.py`).
+  R2 queue at cil_cord/colar/seed42 T0 ep5 (~9 min/epoch → ~7 h per CoLaR run; 30 cells ≈ Oct 19–20).
+  `scripts/run_r2b_queue.sh` (sliced control, 6 cells) chains after R2 — launch it once
+  `colar_r_sliced` tests are green.
+- Deadlines (sourced): registration **Nov 10**, paper **Nov 16** AoE, supp Nov 23.
+
 ## RESUME HERE (2026-10-14 23:00, auto mode): R2 queue armed; CoLaR-R plumbing landed; CVPR pivot
 
 - **Direction (CVPR 2027, deadline ~2026-11-13).** DIL is saturated (Independent 88.2 ≈ Joint 88.7;
