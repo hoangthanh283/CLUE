@@ -563,9 +563,11 @@ labelled \emph{Independent} in Table~\ref{tab:main-comparison} carries this valu
 
 Independent is undefined for CIL-CORD (a single dataset split by label into six sessions ---
 there is no separate dataset to fine-tune a sibling model on) and for Mixed (a composed
-stream whose boundaries are not aligned to dataset identity). Secondary-backbone
-Independent cells (LiLT, BROS, BERT) are running at the time of writing; they appear
-in Section~\ref{sec:results-backbone} once the grid completes.
+stream whose boundaries are not aligned to dataset identity). On the secondary backbones
+the same three-seed bound is $85.3 \pm 0.8$ (LiLT), $88.8 \pm 0.1$ (BROS) and
+$77.3 \pm 0.5$ (BERT) --- \emph{above} the pooled Joint oracle on LiLT ($83.8$) and BROS
+($87.5$) --- so pooling the three datasets buys no transfer on DIL for any backbone
+(Section~\ref{sec:results-backbone}).
 
 \subsection{Main Comparison}
 \label{sec:results-main-table}
