@@ -1,4 +1,5 @@
 ## RESUME HERE (2026-10-15 00:30): tournament converged → P1 "live labels"; sliced-softmax control added
+- **Tick 01:10 — CoLaR headline reconciled:** 10-ep protocol 3-seed = 87.75±0.47 (87.58/88.30/87.38, log-sourced); 5-ep control = 86.62±0.25; stray 86.8±0.4 removed from paper/thesis. R2c queue (colar_e10 ×3) chained after R2b to make the headline disk-backed. R2: cil_cord/colar/seed42 at T3 (early stop ⇒ ~1.5 h/run, not 7).
 
 - **Idea tournament closed** (67 candidates, 5 lenses, red-team round): P1 live-labels package
   (CoLaR-R oracle = stream-implementable label ledger since CIL-CORD re-shows 100 % of docs;

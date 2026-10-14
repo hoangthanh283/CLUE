@@ -246,8 +246,12 @@ figure/paragraph that a CVPR audience will recognise immediately.
 - **M2 Coverage.** Grid 68/72 cells; missing cells disclosed, none a DIL replay cell. Finding 2
   freeze arms and the memory ladder are seed-42 diagnostics with three-seed checks at the stated
   points.
-- **M3 Headline discrepancy.** Thesis/paper CoLaR three-seed = 86.8 ± 0.4; the Amendment-10
-  uniform cells give 86.62 ± 0.25. Rankings unchanged; reconcile the provenance before submission.
+- **M3 Headline — RESOLVED 2026-10-15.** Two recipes were conflated. Paper protocol (10 epochs,
+  early-stopped): seeds 42/7/123 = 87.58/88.30/87.38 → **87.75 ± 0.47** (= the "87.8 base" of the
+  conservation check). Amendment-9/10 control recipe (5 epochs): 86.38/86.62/86.87 → 86.62 ± 0.25.
+  The stray "86.8 ± 0.4" matched neither and is replaced by 87.8 ± 0.5 in paper and thesis.
+  Hygiene: the 10-epoch seed-42 dir was overwritten by the 5-epoch control; seeds 7/123 have
+  train.log but no metrics.json → re-run queued (`colar_e10`, R2c) so the headline is disk-backed.
 - **M4 Order sensitivity.** Reversing DIL moves naive BWT −81 → −75; all single-order claims
   carry the caveat (`fig:conservation` covers three orders).
 - **M5 Backbone-specific.** Latent replay is lossless on LayoutLMv3/BERT/BROS; LiLT's separate
