@@ -1,0 +1,87 @@
+% CVPR 2027 submission — SUPPLEMENTARY MATERIAL (separate PDF); template: https://github.com/cvpr-org/author-kit (CVPR2026-v1 kit, year bumped)
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+%%%%%%%%% PAPER TYPE
+% \usepackage{cvpr}              % camera-ready
+\usepackage[review]{cvpr}      % review version
+% \usepackage[pagenumbers]{cvpr} % arXiv version
+
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage[table]{xcolor}
+\usepackage{amsmath}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,patterns}
+\usepackage{cuted}   % two-column teaser (kit preamble.tex)
+\usepackage{caption}
+\usepackage{microtype}  % kit preamble.tex: tighter layout
+\definecolor{ourteal}{HTML}{0D5C63}
+\definecolor{memgreen}{HTML}{2F8F83}
+\definecolor{lexorange}{HTML}{C4841D}
+
+% Numbers still to be re-read from regenerated tables (analyze_results.py). Remove before submission.
+\newcommand{\vnum}[1]{\textcolor{red}{#1}}
+\newcommand{\todo}[1]{\textcolor{blue}{[TODO: #1]}}
+
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
+
+%%%%%%%%% PAPER ID
+\def\paperID{*****}
+\def\confName{CVPR}
+\def\confYear{2027}
+
+\title{Diagnosis-Guided Compressed Latent Replay for Continual Document Understanding}
+
+\author{Anonymous CVPR submission}
+
+\begin{document}
+\maketitlesupplementary
+\appendix
+
+\section{Setup details}
+\label{app:setup}
+
+\paragraph{DIL unified schema.} A single four-entity label space \{HEADER, KEY, VALUE, OTHER\} (9 BIO tags) is held fixed over FUNSD$\rightarrow$SROIE$\rightarrow$CORD. FUNSD: HEADER$\rightarrow$HEADER, QUESTION$\rightarrow$KEY, ANSWER$\rightarrow$VALUE. SROIE: COMPANY$\rightarrow$KEY; ADDRESS/DATE/TOTAL$\rightarrow$VALUE. CORD: menu/sub\_total/total$\rightarrow$VALUE; void\_menu/sub$\rightarrow$OTHER. KEY originates only from FUNSD and SROIE, so the schema is VALUE-dominant; we report per-class F1 for every DIL result and treat a high aggregate as retention only if the sparse classes are retained. The reverse order is used as a robustness check.
+
+\paragraph{CIL-CORD sessions.} CORD's 30 fine-grained classes in five sessions of six, ordered easy-to-hard by super-class: (0) core menu fields; (1) extended menu + sub; (2) sub\_total fields; (3) total / payment methods; (4) residual total + void/auxiliary. Every receipt containing at least one in-session entity is kept, with out-of-session tokens relabelled to ``O'', giving per-session training pools of 800/382/549/723/780 receipts. Class imbalance across sessions is deliberately left unmodified. Joint uses the full-label pool (each receipt once with all its labels) rather than the concatenation of the masked per-session copies, which would feed conflicting labels for the same document.
+
+\paragraph{Mixed.} Six sessions: CORD-menu $\rightarrow$ FUNSD $\rightarrow$ CORD-menu-extended $\rightarrow$ SROIE $\rightarrow$ CORD-sub\_total $\rightarrow$ FUNSD-revisit; boundaries alternate new-class and new-domain transitions and the final session is an explicit retention check.
+
+\paragraph{Datasets.} FUNSD (\texttt{nielsr/funsd-layoutlmv3}; 149/50), CORD (\texttt{naver-clova-ix/cord-v2}; 800/100/100), SROIE (\texttt{mp-02/sroie}; 626/347). Dataset-provided OCR and boxes throughout; images 224$\times$224; sequence length 512.
+
+\paragraph{Hyperparameters.} AdamW, lr $5\times10^{-5}$ constant, weight decay $0.01$, clipping $1.0$, batch size 8 on the primary grid (1--2 with gradient checkpointing on the 6\,GB secondary-backbone machine; replay batch 2, or 1 for DER++ on BROS, whose HF implementation lacks checkpointing). EWC $\lambda{=}10^3$, Fisher over 200 documents; LwF $T{=}2$, $\alpha{=}1$; ER/DER++ buffer 200 documents, DER++ $\alpha{=}\beta{=}0.5$. Early stopping on task val F1, patience 2, $\delta{=}0.1$, cap 100 epochs (never binding; tasks converge in 4--8). Seeds 42/7/123. Primary-grid runs used bf16 autocast on a 24\,GB GPU; the secondary-backbone cells ran in fp32 or fp16 on a 6\,GB GPU.
+
+\paragraph{Compute.} Every run fits a single GPU; the full generality grid is roughly 200 GPU-hours on a 24\,GB card.
+
+\section{Additional results}
+\label{app:extra}
+\paragraph{Prompt-, LoRA- and flatness-based baselines.} \cref{tab:prompt_lora} reports the frozen-backbone prompt family (L2P, DualPrompt, CODA-Prompt), the orthogonal/continual LoRA family and ER with C-Flat++ sharpness-aware optimisation on DIL, three seeds, LayoutLMv3 and BERT. The prompt family forgets little but never acquires the task (AA $\approx30$--$35$, below the naive floor of $41.3$): a frozen document encoder with a drifting shared head cannot be routed back into place. LoRA adapters acquire but forget as much as naive training does, because the adapter does not protect the head. Only the replay-based variant reaches the replay ceiling, and its sharpness term adds nothing over plain ER ($88.4$ vs.\ $87.9$ on LayoutLMv3), consistent with Sec.~5 of the main paper: the remedy ordering is set by whether the head is re-grounded, not by the optimiser.
+
+\begin{table}[t]
+\centering\small
+\caption{Prompt/LoRA/C-Flat++ baselines, DIL, AA and BWT, mean$\pm$std over seeds 42/7/123. Naive floor $41.3$ (LayoutLMv3), ER $87.9$.}
+\label{tab:prompt_lora}
+\setlength{\tabcolsep}{2pt}\scriptsize
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{LayoutLMv3} & \multicolumn{2}{c}{BERT} \\
+Method & AA & BWT & AA & BWT \\
+\midrule
+L2P & $30.4\pm0.4$ & $-11.5\pm0.1$ & $34.4\pm0.7$ & $-38.5\pm1.0$ \\
+DualPrompt & $29.9\pm0.6$ & $-11.1\pm0.2$ & $34.0\pm0.2$ & $-40.2\pm1.1$ \\
+CODA-Prompt & $32.5\pm1.2$ & $-10.5\pm0.2$ & $35.2\pm0.7$ & $-40.7\pm1.3$ \\
+O-LoRA & $40.8\pm0.3$ & $-56.8\pm1.0$ & $37.4\pm0.3$ & $-53.4\pm0.9$ \\
+CL-LoRA & $41.1\pm0.3$ & $-58.8\pm2.1$ & $38.6\pm0.4$ & $-31.6\pm1.9$ \\
+ER + C-Flat++ & $88.4\pm0.1$ & $-1.8\pm0.6$ & $78.3\pm0.4$ & $-2.2\pm0.1$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Per-backbone forgetting.} The full BWT and AF tables for every backbone$\times$scenario$\times$method cell of the generality grid are generated from the released run directories (\texttt{results/table\_backbone\_\{BWT,AF\}.tex}) and will ship with the code; Table~1 of the main paper already carries the AA view.
+
+\paragraph{Budget-adaptive allocation is a frontier, not a gain.} Allocating a fixed compressed-replay budget unevenly across tasks (documents $[18,5,2]$, ranks $[64,128,64]$ vs.\ a uniform $10$ documents at rank $64$; 5 epochs, $k{=}4$) gave $+4.0$ AA on seed 42 while passing a pre-registered per-domain guard. On seeds 7 and 123 the same comparison gave $-8.0$ and $+5.7$: $+0.6\pm7.5$ over three seeds, a null. The seed-42 result was a point on a Pareto frontier (old-domain retention traded against the final domain at $\approx9{:}1$), not a shift of the frontier, and we report it as such.
+
+\end{document}
