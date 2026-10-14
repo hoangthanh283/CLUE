@@ -93,6 +93,11 @@ class BertTokenClassificationWrapper(nn.Module):
         self.label_to_id = {l: i for i, l in enumerate(all_labels)}
 
     @property
+    def classifier(self) -> nn.Module:
+        """The (plain Linear) token head on the inner HF model; what CPFD/IS3 read and slice."""
+        return self.model.classifier
+
+    @property
     def cka_layers(self) -> list[str]:
         last = self.num_layers - 1
         mid = self.num_layers // 2
