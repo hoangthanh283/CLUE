@@ -24,6 +24,7 @@
 % Numbers still to be re-read from regenerated tables (analyze_results.py). Remove before submission.
 \newcommand{\vnum}[1]{\textcolor{red}{#1}}
 \newcommand{\todo}[1]{\textcolor{blue}{[TODO: #1]}}
+\newcommand{\tbd}{\textcolor{gray}{\emph{running}}}
 
 \definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
 \usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
@@ -113,36 +114,36 @@ Table~\ref{tab:grid} reports the six classical strategies on four backbones and 
 
 \begin{table*}[t]
 \centering\small
-\caption{Generality grid: average accuracy (mean $\pm$ s.d., three seeds) of the six classical strategies on four backbones and three scenarios. Joint is the pooled-data oracle. Grey cells did not fit the available GPU memory (see text). Replay reaches the joint bound on DIL on every backbone; regularisation and distillation stay near the naive floor; on CIL-CORD every method, replay included, sits near the floor.}
+\caption{Generality grid: average accuracy (mean $\pm$ s.d., three seeds) of the six classical strategies on four backbones and three scenarios. \emph{Indep.} is the per-dataset upper bound (one model trained independently on each dataset, three-seed macro over FUNSD/SROIE/CORD). \emph{Joint} is the pooled-data oracle (one model, all three datasets). Independent is only meaningful on DIL, where the task stream is three distinct datasets; CIL-CORD is one dataset split by label and Mixed is a composed stream, so Indep.\ is undefined there and marked \textsc{n/a}. Grey cells did not fit the available GPU memory (see text). Replay reaches the joint bound on DIL on every backbone; regularisation and distillation stay near the naive floor; on CIL-CORD every method, replay included, sits near the floor.}
 \label{tab:grid}
 \setlength{\tabcolsep}{4pt}
 \resizebox{\linewidth}{!}{%
-\begin{tabular}{llcccccc}
+\begin{tabular}{llccccccc}
 \toprule
-Scenario & Backbone & Naive & Joint & EWC & LwF & ER & DER++ \\
+Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 \midrule
 \multirow{4}{*}{DIL}
- & LayoutLMv3 & $41.3{\pm}1.5$ & $88.7{\pm}1.1$ & $41.2{\pm}1.1$ & $43.7{\pm}1.1$ & $87.9{\pm}1.4$ & $88.0{\pm}0.9$ \\
- & LiLT       & $40.1{\pm}0.5$ & $83.8{\pm}1.2$ & $48.4{\pm}5.9$ & \cellcolor{gray!25}-- & $85.7{\pm}0.5$ & $84.4{\pm}0.3$ \\
- & BROS       & $40.3{\pm}1.8$ & $87.5{\pm}1.3$ & $45.0{\pm}4.9$ & $35.2{\pm}3.1$ & $87.8{\pm}0.4$ & $87.6{\pm}1.1$ \\
- & BERT       & $39.4{\pm}0.3$ & $77.2{\pm}0.4$ & $46.6{\pm}3.0$ & $40.5{\pm}0.1$ & $77.1{\pm}1.0$ & $77.4{\pm}0.6$ \\
+ & LayoutLMv3 & $41.3{\pm}1.5$ & $88.2{\pm}1.0$ & $88.7{\pm}1.1$ & $41.2{\pm}1.1$ & $43.7{\pm}1.1$ & $87.9{\pm}1.4$ & $88.0{\pm}0.9$ \\
+ & LiLT       & $40.1{\pm}0.5$ & \tbd           & $83.8{\pm}1.2$ & $48.4{\pm}5.9$ & \cellcolor{gray!25}-- & $85.7{\pm}0.5$ & $84.4{\pm}0.3$ \\
+ & BROS       & $40.3{\pm}1.8$ & \tbd           & $87.5{\pm}1.3$ & $45.0{\pm}4.9$ & $35.2{\pm}3.1$ & $87.8{\pm}0.4$ & $87.6{\pm}1.1$ \\
+ & BERT       & $39.4{\pm}0.3$ & \tbd           & $77.2{\pm}0.4$ & $46.6{\pm}3.0$ & $40.5{\pm}0.1$ & $77.1{\pm}1.0$ & $77.4{\pm}0.6$ \\
 \midrule
 \multirow{4}{*}{CIL-CORD}
- & LayoutLMv3 & $19.0{\pm}0.2$ & $33.3{\pm}0.3$ & $0.5{\pm}0.6$ & $18.8{\pm}0.2$ & $16.0{\pm}1.4$ & $18.2{\pm}0.3$ \\
- & LiLT       & $19.1{\pm}0.3$ & $32.4{\pm}0.4$ & \cellcolor{gray!25}-- & \cellcolor{gray!25}-- & $17.9{\pm}0.5$ & $18.0{\pm}1.0$ \\
- & BROS       & $19.2{\pm}0.1$ & $32.9{\pm}0.0$ & $17.3{\pm}0.8$ & $23.1{\pm}1.2$ & $18.3{\pm}1.5$ & $17.7{\pm}1.1$ \\
- & BERT       & $19.3{\pm}0.1$ & $32.4{\pm}0.2$ & $17.9{\pm}0.3$ & $24.3{\pm}0.3$ & $17.1{\pm}1.6$ & $19.2{\pm}1.9$ \\
+ & LayoutLMv3 & $19.0{\pm}0.2$ & \textsc{n/a} & $33.3{\pm}0.3$ & $0.5{\pm}0.6$ & $18.8{\pm}0.2$ & $16.0{\pm}1.4$ & $18.2{\pm}0.3$ \\
+ & LiLT       & $19.1{\pm}0.3$ & \textsc{n/a} & $32.4{\pm}0.4$ & \cellcolor{gray!25}-- & \cellcolor{gray!25}-- & $17.9{\pm}0.5$ & $18.0{\pm}1.0$ \\
+ & BROS       & $19.2{\pm}0.1$ & \textsc{n/a} & $32.9{\pm}0.0$ & $17.3{\pm}0.8$ & $23.1{\pm}1.2$ & $18.3{\pm}1.5$ & $17.7{\pm}1.1$ \\
+ & BERT       & $19.3{\pm}0.1$ & \textsc{n/a} & $32.4{\pm}0.2$ & $17.9{\pm}0.3$ & $24.3{\pm}0.3$ & $17.1{\pm}1.6$ & $19.2{\pm}1.9$ \\
 \midrule
 \multirow{4}{*}{Mixed}
- & LayoutLMv3 & $33.9{\pm}0.3$ & $67.5{\pm}0.8$ & $22.0{\pm}9.4$ & $35.2{\pm}1.2$ & $60.3{\pm}5.3$ & $60.8{\pm}2.7$ \\
- & LiLT       & $30.7{\pm}0.7$ & $61.8{\pm}0.6$ & $28.1{\pm}3.0$ & \cellcolor{gray!25}-- & $57.0{\pm}1.4$ & $55.1{\pm}2.9$ \\
- & BROS       & $33.9{\pm}0.4$ & $65.3{\pm}2.1$ & $37.4{\pm}3.3$ & $34.4{\pm}0.5$ & $61.1{\pm}1.4$ & $63.0{\pm}0.4$ \\
- & BERT       & $23.4{\pm}0.3$ & $55.0{\pm}0.6$ & $28.6{\pm}0.9$ & $29.4{\pm}4.2$ & $50.2{\pm}0.6$ & $50.7{\pm}1.3$ \\
+ & LayoutLMv3 & $33.9{\pm}0.3$ & \textsc{n/a} & $67.5{\pm}0.8$ & $22.0{\pm}9.4$ & $35.2{\pm}1.2$ & $60.3{\pm}5.3$ & $60.8{\pm}2.7$ \\
+ & LiLT       & $30.7{\pm}0.7$ & \textsc{n/a} & $61.8{\pm}0.6$ & $28.1{\pm}3.0$ & \cellcolor{gray!25}-- & $57.0{\pm}1.4$ & $55.1{\pm}2.9$ \\
+ & BROS       & $33.9{\pm}0.4$ & \textsc{n/a} & $65.3{\pm}2.1$ & $37.4{\pm}3.3$ & $34.4{\pm}0.5$ & $61.1{\pm}1.4$ & $63.0{\pm}0.4$ \\
+ & BERT       & $23.4{\pm}0.3$ & \textsc{n/a} & $55.0{\pm}0.6$ & $28.6{\pm}0.9$ & $29.4{\pm}4.2$ & $50.2{\pm}0.6$ & $50.7{\pm}1.3$ \\
 \bottomrule
 \end{tabular}}
 \end{table*}
 
-\paragraph{Replay re-grounds the head and reaches the oracle on DIL, on every backbone.} ER and DER++ match the joint bound on all four backbones---$87.9/88.0$ vs.\ $88.7$ on LayoutLMv3, $87.8/87.6$ vs.\ $87.5$ on BROS, $77.1/77.4$ vs.\ $77.2$ on BERT, $85.7/84.4$ vs.\ $83.8$ on LiLT\footnote{Replay slightly exceeds the pooled-data oracle on LiLT; joint on LiLT appears under-fitted by the shared early-stopping rule.}---with BWT of $-1$ to $-3.5$. On Mixed, replay closes most of the gap ($60.3$--$63.0$ vs.\ oracles $65$--$68$ on layout-aware backbones; BERT $50.2/50.7$ vs.\ $55.0$); the class-incremental transitions inside the sequence are where residual forgetting sits.
+\paragraph{Replay re-grounds the head and reaches the oracle on DIL, on every backbone.} ER and DER++ match the joint bound on all four backbones---$87.9/88.0$ vs.\ $88.7$ on LayoutLMv3, $87.8/87.6$ vs.\ $87.5$ on BROS, $77.1/77.4$ vs.\ $77.2$ on BERT, $85.7/84.4$ vs.\ $83.8$ on LiLT\footnote{Replay slightly exceeds the pooled-data oracle on LiLT; joint on LiLT appears under-fitted by the shared early-stopping rule.}---with BWT of $-1$ to $-3.5$. The independent per-dataset upper bound (three models, one per dataset) is $88.2$ on LayoutLMv3---within $0.5$ of pooled joint and essentially tied with the replay cells---so the transfer headroom beyond the independent-deployment baseline is sub-point, and the question for a continual learner is whether a single-model solution captures it at a storage cost smaller than $3\times$ model weights. On Mixed, replay closes most of the gap ($60.3$--$63.0$ vs.\ oracles $65$--$68$ on layout-aware backbones; BERT $50.2/50.7$ vs.\ $55.0$); the class-incremental transitions inside the sequence are where residual forgetting sits.
 
 \paragraph{Parameter-space protection does not.} EWC and LwF remain at the naive floor on DIL for LayoutLMv3 ($41.2$, $43.7$ vs.\ $41.3$). Both mechanisms act on parameters or on whole-network outputs; neither places an old-task gradient on the head, and the anatomy says that is the only place it would matter. EWC's Fisher penalty, computed at the head-dominant locus, does reduce backward transfer ($-2.8$ vs.\ $-73$ for naive on LayoutLMv3) but at the cost of not fitting the new tasks---the same under-fitting mode as the uniform consolidation probe of \S\ref{sec:anatomy}.
 

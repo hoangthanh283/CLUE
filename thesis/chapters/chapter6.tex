@@ -516,6 +516,57 @@ isolated slot memory derived from the diagnosis, \S\ref{sec:method-lexslot}) and
 prompt-/LoRA-based baselines (L2P, DualPrompt, CODA-Prompt, O-LoRA, CL-LoRA) and the
 text-only BERT comparator, each on the scenarios where it was run.
 
+\subsection{Independent Per-Dataset Upper Bound}
+\label{sec:results-independent}
+
+Before comparing continual methods against the pooled-data \emph{Joint} oracle, we fix the
+stronger practical comparator: the \emph{Independent} per-dataset upper bound, i.e.\ three
+separate models trained from scratch on FUNSD, SROIE, and CORD. This is the deployment that
+the continual learner is asked to improve on. If the per-dataset upper bound already matches
+or exceeds Joint, then the only remaining question for the CL method is whether it reaches
+the same accuracy at a smaller storage cost ($1\times$ model weights plus any replay buffer,
+versus $3\times$ model weights). Table~\ref{tab:single-task-baselines} reports
+the per-dataset single-task F1 (three seeds, LayoutLMv3 base, trained to convergence under
+the shared early-stopping rule).
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Independent per-dataset upper bounds]{Per-dataset single-task F1 (mean\,$\pm$\,std
+  over three seeds, LayoutLMv3 base). The three datasets of the DIL stream (FUNSD, SROIE,
+  CORD) macro-average to $88.23$ --- the \emph{Independent} upper bound used in
+  Table~\ref{tab:main-comparison}. WildReceipt and XFUND are included for completeness: they
+  are the fourth and fifth independent models that extended variants of this benchmark can use.}
+  \label{tab:single-task-baselines}
+  \IfFileExists{generated/table_single_task_baselines.tex}{\input{generated/table_single_task_baselines}}{%
+  \begin{tabular}{lc}
+    \toprule
+    \textbf{Dataset} & \textbf{Single-task F1} \\
+    \midrule
+    FUNSD       & $87.41 \pm 1.40$ \\
+    CORD        & $94.15 \pm 0.47$ \\
+    SROIE       & $83.13 \pm 0.61$ \\
+    WildReceipt & $85.19 \pm 0.45$ \\
+    XFUND       & $79.20 \pm 2.51$ \\
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+The DIL macro over FUNSD/SROIE/CORD is $88.23$. The pooled-data Joint oracle is $88.73$ on
+the same stream, so the transfer headroom beyond independent-deployment --- the only
+accuracy a continual learner could add on top of ``just fine-tune one model per domain'' ---
+is $+0.5$ AA. The question that this chapter answers is whether a single continually-trained
+model captures that headroom (or at least the independent macro) at a storage cost smaller
+than $3\times$ model weights; CoLaR captures $\approx 85\%$ of the headroom at
+$1\times$ model weights plus a $60$\,MB replay buffer, and the replay baselines ER, DER++,
+and C-Flat++ capture essentially all of it with a $200$-exemplar raw buffer. The row
+labelled \emph{Independent} in Table~\ref{tab:main-comparison} carries this value.
+
+Independent is undefined for CIL-CORD (a single dataset split by label into six sessions ---
+there is no separate dataset to fine-tune a sibling model on) and for Mixed (a composed
+stream whose boundaries are not aligned to dataset identity). Secondary-backbone
+Independent cells (LiLT, BROS, BERT) are running at the time of writing; they appear
+in Section~\ref{sec:results-backbone} once the grid completes.
+
 \subsection{Main Comparison}
 \label{sec:results-main-table}
 
@@ -608,9 +659,21 @@ adaptation recovers the naive lower bound only where the output space is fixed.
     O-LoRA                & $4.7 \pm 8.2$ & $40.8 \pm 0.3$ & $13.4 \pm 0.7$ \\
     CL-LoRA (2025)        & $8.9 \pm 7.7$ & $41.1 \pm 0.3$ & $31.4 \pm 0.6$ \\
     \midrule
+    Independent (per-dataset)\textsuperscript{\dag} & \textsc{n/a} & $88.2 \pm 1.0$ & \textsc{n/a} \\
     Joint (upper bound)   & $33.3 \pm 0.3$ & $88.7 \pm 1.1$ & $67.5 \pm 0.7$ \\
     \bottomrule
   \end{tabular}}
+
+  \smallskip
+  {\footnotesize \textsuperscript{\dag}\emph{Independent} is the per-dataset upper bound: three
+  models trained from scratch on FUNSD, SROIE, and CORD independently (no CL), three-seed macro.
+  It is a stronger comparator than Joint for the deployment question ``why not just fine-tune
+  one model per domain?''\ --- the gap it leaves open to Joint ($+0.5$) is the entire
+  transfer headroom on DIL/LayoutLMv3, and CoLaR captures $\approx 85\%$ of it at $1\times$
+  model storage plus a $60$\,MB replay buffer. The row is undefined for CIL-CORD (one dataset
+  split by label) and Mixed (composed stream). Per-dataset numbers in
+  Table~\ref{tab:single-task-baselines}; secondary-backbone cells are running (see
+  Section~\ref{sec:concl-limitations}).}
 \end{table}
 
 \begin{figure}[!htbp]

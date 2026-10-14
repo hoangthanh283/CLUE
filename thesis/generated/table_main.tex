@@ -19,6 +19,9 @@ LexSlot ($+$ buffer) & \est{16.40\;{\scriptsize $\pm$ 0.90}} & \est{19.10\;{\scr
 CoLaR (memory only) & \est{21.20\;{\scriptsize $\pm$ 0.80}} & \est{22.00\;{\scriptsize $\pm$ 0.40}} & \est{87.60\;{\scriptsize $\pm$ 0.40}} & \est{80.40\;{\scriptsize $\pm$ 0.50}} & \est{61.90\;{\scriptsize $\pm$ 1.60}} \\
 \textbf{Lexically-routed latent replay (ours)} & \textbf{\est{22.40\;{\scriptsize $\pm$ 0.70}}} & \textbf{\est{23.10\;{\scriptsize $\pm$ 0.40}}} & \est{88.30\;{\scriptsize $\pm$ 0.50}} & \textbf{\est{80.90\;{\scriptsize $\pm$ 0.40}}} & \textbf{\est{63.40\;{\scriptsize $\pm$ 1.20}}} \\
 \midrule
+Independent (per-dataset)\textsuperscript{\dag} & \textsc{n/a} & \textsc{n/a} & 88.23\;{\scriptsize $\pm$ 1.00} & \textsc{n/a} & \textsc{n/a} \\
 Joint (upper bound) & 33.32\;{\scriptsize $\pm$ 0.33} & 33.89\;{\scriptsize $\pm$ 0.33} & 88.73\;{\scriptsize $\pm$ 1.13} & 78.51\;{\scriptsize $\pm$ 4.04} & 67.51\;{\scriptsize $\pm$ 0.82} \\
 \bottomrule
 \end{tabular}
+% \textsuperscript{\dag}Independent = per-dataset upper bound (three LayoutLMv3 models,
+% one per dataset, three-seed macro over FUNSD/SROIE/CORD). Defined only on DIL.
