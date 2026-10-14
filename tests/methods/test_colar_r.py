@@ -169,3 +169,29 @@ def test_sliced_mode_accepted_and_refresh_skipped():
     with patch.object(CoLaR, "after_task", lambda self, _t, _l: None):
         m.after_task(type("T", (), {"task_id": 1})(), None)
     assert m.refresh_log == [] and m.store[0]["labels"].tolist() == [0]
+
+
+def test_sliced_pseudo_slices_loss_and_refreshes_with_candidate_count():
+    m = _method("sliced_pseudo")
+    m.entropy_floor, m.refresh_quantile, m.device = 1e-3, 0.5, "cpu"
+    # one stale doc banked with 2 classes; the current (3-class) model predicts class 2 on two
+    # O tokens (one confident, one not) and stays O on the third
+    m.store = [
+        {
+            "labels": torch.tensor([0, 0, 0]),
+            "attention_mask": torch.tensor([1, 1, 1]),
+            "n_labels": torch.tensor(2),
+        }
+    ]
+    m.model.label_to_id = {"O": 0, "a": 1, "b": 2}
+    probs = torch.tensor([[0.01, 0.01, 0.98], [0.3, 0.3, 0.4], [0.98, 0.01, 0.01]])
+    with patch.object(CoLaRRefresh, "_memory_probs", lambda self, docs: [probs]):
+        m._refresh_memory(task_id=1)
+    # median rule: only the candidate strictly below the per-class median entropy flips
+    assert m.store[0]["labels"].tolist() == [2, 0, 0]
+    assert m.refresh_log == [{"task_id": 1, "docs": 1, "tokens_relabelled": 1, "candidates": 2}]
+    # the sliced loss is active for this mode too
+    out = type("O", (), {"logits": torch.zeros(1, 1, 3), "loss": None})()
+    with patch.object(CoLaR, "_replay_forward", lambda self, r: out):
+        got = m._replay_forward({"labels": torch.tensor([[0]]), "n_labels": torch.tensor([2])})
+    assert abs(got.loss.item() - torch.log(torch.tensor(2.0)).item()) < 1e-5

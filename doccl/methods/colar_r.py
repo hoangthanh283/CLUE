@@ -14,6 +14,12 @@ refresh: pseudo  — run the stored latents through the current upper stack afte
                    and relabel O tokens whose confident prediction is a post-capture class
                    (CPFD's per-class median-entropy rule, applied to the memory instead of
                    to live data; teacher-free, deployable).
+refresh: sliced  — no relabelling; replay CE over each document's capture-time classes
+                   only, so a stale O never pushes a post-capture class down.
+refresh: sliced_pseudo — sliced loss during the task, pseudo refresh after it. Plain
+                   pseudo relabels ~0 tokens because replaying stale O labels teaches the
+                   model "O" on exactly the memory tokens it is later asked to relabel;
+                   slicing removes that self-defeating signal so candidates survive.
 refresh: none    — plain CoLaR (control).
 """
 
@@ -93,14 +99,13 @@ def sliced_replay_loss(
 
 class CoLaRRefresh(CoLaR):
     name = "colar_r"
+    MODES = ("oracle", "pseudo", "sliced", "sliced_pseudo", "none")
 
     def __init__(self, model, config):
         super().__init__(model, config)
         self.refresh = str(config.get("refresh", "oracle"))
-        if self.refresh not in ("oracle", "pseudo", "sliced", "none"):
-            raise ValueError(
-                f"colar_r.refresh must be oracle|pseudo|sliced|none, got {self.refresh!r}"
-            )
+        if self.refresh not in self.MODES:
+            raise ValueError(f"colar_r.refresh must be one of {self.MODES}, got {self.refresh!r}")
         self.entropy_floor = float(config.get("refresh_entropy_floor", 1e-3))
         self.refresh_quantile = float(config.get("refresh_quantile", 0.5))
         self.refresh_log: list[dict] = []
@@ -131,7 +136,7 @@ class CoLaRRefresh(CoLaR):
 
     def _replay_forward(self, replay: dict[str, torch.Tensor]):
         out = super()._replay_forward(replay)
-        if self.refresh == "sliced":
+        if self.refresh in ("sliced", "sliced_pseudo"):
             out.loss = sliced_replay_loss(
                 out.logits,
                 replay["labels"].to(self.device),
@@ -141,7 +146,7 @@ class CoLaRRefresh(CoLaR):
 
     def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         super().after_task(task, train_loader)
-        if self.refresh in ("oracle", "pseudo"):
+        if self.refresh in ("oracle", "pseudo", "sliced_pseudo"):
             self._refresh_memory(task.task_id)
 
     def _refresh_memory(self, task_id: int) -> None:
@@ -149,20 +154,20 @@ class CoLaRRefresh(CoLaR):
         stale = [d for d in self.store if int(d["n_labels"]) < n_cur]
         if not stale:
             return
-        changed = (
-            self._oracle_pass(stale, n_cur)
-            if self.refresh == "oracle"
-            else self._pseudo_pass(stale, n_cur)
-        )
+        entry = {"task_id": task_id, "docs": len(stale)}
+        if self.refresh == "oracle":
+            entry["tokens_relabelled"] = self._oracle_pass(stale, n_cur)
+        else:
+            entry["tokens_relabelled"], entry["candidates"] = self._pseudo_pass(stale, n_cur)
         for d in stale:
             d["n_labels"] = torch.tensor(n_cur)
-        entry = {"task_id": task_id, "docs": len(stale), "tokens_relabelled": changed}
         self.refresh_log.append(entry)
         log.info(
-            "colar_r[%s]: refreshed %d docs, %d tokens relabelled",
+            "colar_r[%s]: refreshed %d docs, %d tokens relabelled (%s candidates)",
             self.refresh,
             len(stale),
-            changed,
+            entry["tokens_relabelled"],
+            entry.get("candidates", "n/a"),
         )
 
     def _oracle_pass(self, stale: list[dict], n_cur: int) -> int:
@@ -190,7 +195,8 @@ class CoLaRRefresh(CoLaR):
                 self.model.train()
         return probs
 
-    def _pseudo_pass(self, stale: list[dict], n_cur: int) -> int:
+    def _pseudo_pass(self, stale: list[dict], n_cur: int) -> tuple[int, int]:
+        """Returns (tokens relabelled, candidate tokens = stale-O tokens predicted post-capture)."""
         probs = self._memory_probs(stale)
         ents, preds = [], []
         for d, p in zip(stale, probs, strict=True):
@@ -198,8 +204,9 @@ class CoLaRRefresh(CoLaR):
             ents.append(token_entropy(p)[cand])
             preds.append(p.argmax(-1)[cand])
         ents_all, preds_all = torch.cat(ents), torch.cat(preds)
-        if ents_all.numel() == 0:
-            return 0
+        n_cand = int(ents_all.numel())
+        if n_cand == 0:
+            return 0, 0
         thr = pseudo_thresholds(
             ents_all, preds_all, n_cur, self.entropy_floor, self.refresh_quantile
         )
@@ -208,4 +215,4 @@ class CoLaRRefresh(CoLaR):
             new = pseudo_refresh(d["labels"], p, d["attention_mask"], int(d["n_labels"]), thr)
             changed += int((new != d["labels"]).sum())
             d["labels"] = new
-        return changed
+        return changed, n_cand
