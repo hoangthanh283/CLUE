@@ -123,8 +123,9 @@ head-locus prior):
 
 ## 3a. Deadline constraint (overrides §3)
 
-Target venue: **CVPR 2027**. Submission deadline assumed **~2026-11-13** (CVPR 2026 closed
-2025-11-14; confirm against the CFP when posted). That is **30 days** from this plan. The paper
+Target venue: **CVPR 2027**. Deadlines (cvpr.thecvf.com, read 2026-10-14): **registration
+2026-11-10**, **paper 2026-11-16 AoE**, supplementary 2026-11-23. That is **33 days** from this plan;
+the registration deadline fixes title/abstract six days earlier. Operating loop: `docs/RESEARCH_OPS_LOOP.md`. The paper
 already exists (`paper_cvpr/main.tex`, 8 pp body, Overleaf synced) with CoLaR as constructive
 control, so the research chain only has to produce *at most one* new row — or a certified null.
 
