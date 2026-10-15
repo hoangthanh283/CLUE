@@ -196,7 +196,12 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 %%  Mixed seed 7 (2026-10-16 02:55): CoLaR plain 59.6 (BWT -23.8) final row [63.1 54.9 75.1 25.9 50.4 88.0]; two-seed plain
 %%    58.5±1.5. Same shape as seed 42: cord_s0 is again the weakest slot (25.9 vs 11.2), funsd/sroie hold at 50-75.
 %%    funsd_s0 went 88.8 -> 0.0 -> 1.2 -> 29.4 -> 25.3 -> 63.1 (transient collapse, recovered by replay as in seed 42).
-%%    Oracle seed 7 running (started 02:55): first boundary refreshed 50 docs / 3307 tok (seed 42: 3120).
+%%  Oracle seed 7 (2026-10-16 05:23): CoLaR-R oracle 66.5 (BWT -17.7) final row [66.0 53.9 76.2 78.4 34.8 89.9]; refresh
+%%    3307/2932/0/316 tok (seed 42: 3120/2640/0/316 -- the cord_s1 refresh relabels the same 316 tokens on both seeds).
+%%    +6.9 over plain seed 7 (59.6); two-seed oracle 65.0±2.1 vs plain 58.5±1.5, both seeds above the 63.2 bar and ER 60.3.
+%%    cord_s0 retention 25.9 (plain) -> 78.4 after the cord_s1 refresh (seed 42: 11.2 -> 38.6): the stale-O slot is the lever.
+%%    cord_s1 anomaly does NOT reproduce as oracle-specific: oracle diag 39.4 vs plain 32.2 on this seed (seed 42: 12.8 vs
+%%    71.1), so the seed-42 gap is a seed-specific early-stop event; final cord_s1 34.8 (plain 50.4) is the one slot oracle loses.
 %%  CPFD / IS3 seed-42 Mixed cells INVALID (2026-10-15): both snapshotted the teacher after the loop had already grown
 %%    the head (n_old == n_total), so KD distilled the random-init new rows on every O token; CPFD 6.0 AA (diag 0.0 on
 %%    FUNSD sessions) discarded, IS3 killed (its first-task CE also skipped O tokens: T0 F1 48.7). Fixed (teacher
