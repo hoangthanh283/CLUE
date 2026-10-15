@@ -12,6 +12,8 @@ import statistics as st
 import sys
 from pathlib import Path
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 SEEDS = (42, 7, 123)
 SCENARIOS = ("cil_cord", "mixed")
@@ -36,7 +38,19 @@ def cell(sc: str, label: str, seed: int) -> dict | None:
     if not p.exists():
         return None
     m = json.loads(p.read_text())
-    return {"AA": float(m["AA"]), "BWT": float(m.get("BWT", float("nan")))}
+    mat = p.with_name("matrix.npy")
+    row = np.load(mat)[-1].tolist() if mat.exists() else None  # final-state retention row
+    return {"AA": float(m["AA"]), "BWT": float(m.get("BWT", float("nan"))), "row": row}
+
+
+def row_summary(cells: dict) -> str:
+    """mean±sd of the final retention row over the seeds that have a matrix.npy."""
+    rows = [c["row"] for c in cells.values() if c and c["row"]]
+    if not rows:
+        return ""
+    cols = list(zip(*rows, strict=True))
+    sd = [st.stdev(c) if len(c) > 1 else 0.0 for c in cols]
+    return " ".join(f"{st.mean(c):.1f}±{d:.1f}" for c, d in zip(cols, sd, strict=True))
 
 
 def summarise(sc: str) -> dict[str, dict]:
@@ -103,6 +117,8 @@ def main() -> int:
             )
             mean = f"{r['mean']:.2f}±{r['sd']:.2f}" if r["mean"] is not None else "   --  "
             print(f"  {label:15s} n={r['n']} mean={mean:>12s}  {row}")
+            if rs := row_summary(r["cells"]):
+                print(f"  {'':15s} final row [{rs}]")
             pending += 3 - r["n"]
         for line in gate(sc, s):
             print("  GATE", line)
