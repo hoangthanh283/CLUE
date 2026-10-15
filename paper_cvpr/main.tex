@@ -224,6 +224,29 @@ Replay works because it re-exercises the head on inputs that keep their old join
 
 \paragraph{CoLaR at $r{=}128$ matches raw-exemplar replay.} CoLaR retains AA $87.6$ ($87.8\pm0.5$ over three seeds) at $60$\,MB, within $1.1$ points of the joint oracle, matching raw-exemplar ER ($87.9$, $200$ documents) at a budget that stores no private bytes, and $2.7\times$ smaller than raw latent replay at equal document count ($87.3$ at $163$\,MB); $r{=}64$ gives $80.6$ at $32$\,MB (\cref{fig:pareto}). Attempts to shift the memory-side frontier obey a conservation law---class-balanced losses $87.1$, coverage-based selection $86.8$, entity-weighted compression $87.1$ all trade FUNSD for SROIE about $1{:}1$ without moving AA; a three-seed check finds no lever beats the base (balanced $87.8$, $k$-centre $87.0$). Read-side extensions ($k$NN readout blend, metaplastic consolidation) are clean negatives.
 
+%% GATE-1 DRAFT §7 paragraph (CoLaR-R; do not render until the three-seed means replace the \vnum{--} placeholders;
+%% seed-42 numbers below are n=1 and CIL-CORD carries a ~2-point single-seed spread).
+%\paragraph{The replay buffer is annotated with stale labels, and latents make it re-annotatable.} Every replay buffer
+%stores a document with the labels it had at capture time. Under class-incremental growth those labels are stale by
+%construction: a token tagged $\mathrm{O}$ at capture because its class had not yet been introduced is still replayed as
+%$\mathrm{O}$ after the class arrives, so the buffer actively trains the model to \emph{miss} the classes it was meant to
+%protect. Raw-pixel replay cannot repair this without re-running the annotator; a latent memory can, because the stored
+%activations sit below the frozen boundary and the current head can be run over them. We test the ceiling of this
+%\emph{label refresh} with an oracle (CoLaR-R; the stored full-label sequence is unmasked as classes arrive) and then ask
+%whether the model's own confident post-capture predictions recover it. The oracle moves CIL-CORD from $21.7$ to $26.8$
+%AA (BWT $-15.9\to-11.3$; three seeds $\vnum{--}$ vs.\ $\vnum{--}$) and Mixed from $57.5$ to $63.5$ (BWT $-33.3\to-15.1$;
+%$\vnum{--}$ vs.\ $\vnum{--}$), above raw-exemplar ER ($60.3$) and the strongest tuned baseline ($62.2$); on Mixed the
+%refresh acts only at the within-dataset incremental steps (3120, 2640 and 316 tokens after the FUNSD, SROIE and CORD
+%session boundaries, none at the cross-dataset step) and recovers the CORD session that plain replay collapses
+%($11.2\to38.6$). Self-refresh does not recover it: the pseudo-label pass relabels $1$--$3$ tokens per boundary on
+%CIL-CORD and \emph{zero} candidates on Mixed, and its gain ($23.7$ on CIL-CORD) is inside the single-seed spread. The
+%null has a mechanism rather than a tuning cause: replaying the stale $\mathrm{O}$ labels is exactly what trains the
+%model to predict $\mathrm{O}$ on the memory tokens the refresh then inspects, so no entropy quantile exposes candidates.
+%A sliced-softmax variant that removes the post-capture classes from the replay loss (so the buffer stops teaching the
+%miss) before the pseudo pass is the pre-registered test of that explanation (\vnum{--}). Stale labels are therefore a
+%measured, not hypothetical, cost of every replay buffer in the class-incremental regime, and the latent form of the
+%memory is what makes the cost recoverable.
+
 \paragraph{Routing which stored document to replay (null).} The OCR vocabulary of a document is set by the input and does not drift with training, which suggests a drift-free sampler (\cref{fig:teaser}): a softmax over term-frequency signature scores $s_j=\sigma(x)^{\top}\sigma_j$ in three directions (\emph{near}, \emph{far}, \emph{task}), uniform as the zero-point. The seed-42 reading was promising (far $+1.8$ over uniform $86.4$ at $d{=}50$), so we pre-registered that single arm for confirmation. Across three seeds the gap collapses to $+1.8/+0.4/-0.6$, mean $+0.5$ pp with a sign flip, inside the uniform-sampling spread: lexical routing is a null, and the memory-only headline does not depend on it.
 
 \paragraph{A bounded positive on the storage side.} Replaying pseudo-labelled \emph{public} documents through the same mechanism (zero private bytes) recovers dense-label tasks (FUNSD $76.1$) but not one the proxy pool does not cover (SROIE $\sim7$), topping out at $58.9$: coverage-limited transfer. Budget-adaptive allocation across tasks moves along a Pareto frontier, not beyond it (supplementary Sec.~B).
