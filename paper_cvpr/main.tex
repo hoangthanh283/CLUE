@@ -143,6 +143,13 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 %%       than seed 42 (diag 25.5/27.3/14.6 vs 5.9/4.5/3.2) but forgets far more (BWT -37 vs -16): same AA band,
 %%       opposite plasticity/stability mix, so CIL-CORD single-seed rows are not interpretable row-by-row.
 %%       The seed-42 "last session at 3.2 in all arms" is seed-specific (seed 7: 14.6) -- not a mechanism.
+%%  CoLaR-R oracle seed 7 (running 2026-10-15 19:10, task 4/5): refresh 66/944 tok at the first two boundaries
+%%    (seed 42: 101/760). After task 2 row [14.7 34.7 32.1] vs plain seed 7 [36.6 58.4 25.5]: the refresh is
+%%    BEHIND plain on both old sessions at this point (seed 42 oracle after task 2 [41.1 70.5 13.6] vs plain
+%%    [47.1 60.6 5.9] was mixed too, and its +5.1 AA came from the final row, task 0: 45.6 vs 6.2). Judge on AA only.
+%%  CIL-CORD seed-7 cells still needed for Gate 1: oracle (due ~20:00), pseudo (~22:30), then cpfd/is3 seed 7 --
+%%    the FIRST post-fix CPFD/IS3 runs: check the log says 'old classes' == pre-expansion head size and that the
+%%    task-2 diagonal is non-zero before trusting them. Then the same five cells at seed 123.
 %% Mixed, LayoutLMv3, seed 42 (n=1), same k/d/r. Bar 63.2; ER 60.3, DER++ 60.8, best 62.2, joint 67.5.
 %%  CoLaR            57.5  (BWT -33.3)  final row [64.3 53.6 64.9 11.2 62.4 88.6]
 %%    -> domain steps (FUNSD/SROIE) hold at 54-65; the one collapse (11.2) is mixed_cord_s0, the
