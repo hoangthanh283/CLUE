@@ -129,6 +129,14 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 \midrule
 \multirow{4}{*}{CIL-CORD}
  & LayoutLMv3 & $19.0{\pm}0.2$ & \textsc{n/a} & $33.3{\pm}0.3$ & $0.5{\pm}0.6$ & $18.8{\pm}0.2$ & $16.0{\pm}1.4$ & $18.2{\pm}0.3$ \\
+%% GATE-1 DRAFT (do not render until 3 seeds): CoLaR / CoLaR-R rows for CIL-CORD, LayoutLMv3,
+%% seed 42 only (n=1), k=4 d=50 r=128. Needs three extra columns (CoLaR & CoLaR-R\,or. & CoLaR-R\,ps.)
+%% or a dedicated small table in Sec. 7. Pre-reg bar 23.0 (naive+4) and >= CPFD/IS3; oracle > pseudo.
+%%  CoLaR            21.7  (BWT -15.9)  final row [6.2 54.5 30.4 14.1 3.2]
+%%  CoLaR-R oracle   26.8  (BWT -11.3)  final row [45.6 28.5 22.4 34.1 3.2]  refresh 101/760/1461/1402 tok
+%%  CoLaR-R pseudo   23.7  (BWT -12.6)  final row [1.8 22.1 46.5 45.1 3.2]   refresh 1/0/0/2 tok (= plain)
+%%  Caveat: plain vs pseudo differ by 2.1 pp with near-identical training -> seed-42 spread on CIL-CORD
+%%  is ~2 pp; the oracle +5.1 is n=1 and must clear seeds 7/123 before any sentence enters the body.
  & LiLT       & $19.1{\pm}0.3$ & \textsc{n/a} & $32.4{\pm}0.4$ & \cellcolor{gray!25}-- & \cellcolor{gray!25}-- & $17.9{\pm}0.5$ & $18.0{\pm}1.0$ \\
  & BROS       & $19.2{\pm}0.1$ & \textsc{n/a} & $32.9{\pm}0.0$ & $17.3{\pm}0.8$ & $23.1{\pm}1.2$ & $18.3{\pm}1.5$ & $17.7{\pm}1.1$ \\
  & BERT       & $19.3{\pm}0.1$ & \textsc{n/a} & $32.4{\pm}0.2$ & $17.9{\pm}0.3$ & $24.3{\pm}0.3$ & $17.1{\pm}1.6$ & $19.2{\pm}1.9$ \\
@@ -212,7 +220,7 @@ Replay works because it re-exercises the head on inputs that keep their old join
 \label{sec:limitations}
 \paragraph{Scope of each claim.} Finding~1 (location) rests on four backbones, three seeds and two instruments; cross-backbone magnitude comparisons are underpowered and not claimed. The benchmark ordering (\cref{sec:benchmark}) is three seeds on $68$ of $72$ cells, missing cells disclosed, not imputed. Finding~2 (migration) and the buffer-content ladder (\cref{sec:buffer}) are seed-42 DIL/LayoutLMv3 diagnostics with three-seed checks only at the points stated; CoLaR's headline is three-seed. Task order matters (DIL reversed: naive BWT $-81\to-75$).
 
-\paragraph{What we do not claim.} CoLaR is still a replay method: it needs a store proportional to the number of past tasks. CIL-CORD is a floor regime dominated by the O-tag shift; whether continual-NER protocols recover it on top of CoLaR is untested. LiLT's separate layout stream is not stored, so latent replay there is approximate.
+\paragraph{What we do not claim.} CoLaR is still a replay method: it needs a store proportional to the number of past tasks. CIL-CORD is a floor regime dominated by the O-tag shift, and its single-seed readings are noisy: two runs that differ only by three relabelled memory tokens differ by $2$ AA points, so no CIL-CORD claim below three seeds is made. Whether continual-NER protocols recover it on top of CoLaR is untested. LiLT's separate layout stream is not stored, so latent replay there is approximate.
 
 {
     \small
