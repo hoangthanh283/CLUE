@@ -152,7 +152,17 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 %%       behind plain on both old sessions (after task 2: [14.7 34.7 32.1] vs [36.6 58.4 25.5]), so only final AA is
 %%       interpretable. Last-session diagonal 0.3 is the lowest of any arm: the refreshed buffer's replay loss is
 %%       crowding out a 50-doc final session; worth a sentence in the limitations if it repeats at seed 123.
-%%  CIL-CORD seed-7 cells still needed for Gate 1: pseudo (started 19:37, ~22:00), then cpfd/is3 seed 7 --
+%%  CoLaR-R pseudo   15.6  (BWT -43.3)  final row [4.8 8.0 8.9 51.7 4.4]  diag [95.4 81.4 39.2 30.5 4.4]
+%%                   refresh 4->2 / 0->0 / 2->0 / 4->2 (candidates->relabelled tok; seed 42: 1/0/0/2 tok)
+%%    -> -3.4 vs plain seed 7 (19.0); seed 42 was +2.0: the pseudo-vs-plain sign FLIPS across seeds (two-seed pseudo
+%%       19.7±5.8 vs plain 20.3±1.9). NOT bit-identical to plain: the 2 relabels at boundary 1 diverge the run from
+%%       task 2 on (after task 2: 34.9/51.5/39.2 vs plain 36.6/58.4/25.5), so a handful of relabels moves single-seed
+%%       rows by 5-15 pp -- the CIL-CORD "spread" is relabel sensitivity on a deterministic run, not seed noise.
+%%       Mechanism null holds (<= 4 candidates at every boundary). Oracle 22.5 > pseudo 15.6: gate order holds (n=2).
+%%       Pre-reg reading at n=2: pseudo mean <= plain + 1.0 and sign disagrees -> heading to KILL unless seed 123 is
+%%       anomalous; no action until n=3.
+%%  CIL-CORD seed-7 cells still needed for Gate 1: cpfd (started 22:41, first post-fix CPFD run: task 2 reports
+%%    13 old classes = pre-expansion head, fix confirmed), then is3 seed 7 --
 %%    the FIRST post-fix CPFD/IS3 runs: check the log says 'old classes' == pre-expansion head size and that the
 %%    task-2 diagonal is non-zero before trusting them. Then the same five cells at seed 123.
 %% Mixed, LayoutLMv3, seed 42 (n=1), same k/d/r. Bar 63.2; ER 60.3, DER++ 60.8, best 62.2, joint 67.5.
