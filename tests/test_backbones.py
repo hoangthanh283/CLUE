@@ -329,3 +329,22 @@ def test_lexslot_lifecycle_all_backbones(wrapper_cls):
     assert set(results) == {0, 1}
     for tid, m in results.items():
         assert 0.0 <= m.f1 <= 100.0, f"{wrapper_cls.__name__}: task {tid} F1 out of range"
+
+
+@pytest.mark.integration
+def test_layoutlmv3_token_features_is_differentiable():
+    """AGENT FIX regression: IS3 trains its encoder through ``token_features``; it must not be
+    a no_grad path (it was, so IS3 trained only the head: T0 F1 ~70 vs ~94 naive)."""
+    model = LayoutLMv3Wrapper(num_labels=5)
+    model.train()
+    batch = {
+        "input_ids": torch.randint(5, 100, (1, 8)),
+        "attention_mask": torch.ones(1, 8, dtype=torch.long),
+        "bbox": torch.zeros(1, 8, 4, dtype=torch.long),
+        "pixel_values": torch.zeros(1, 3, 224, 224),
+    }
+    feats = model.token_features(batch)
+    assert feats.shape[:2] == (1, 8)
+    assert feats.requires_grad
+    feats.sum().backward()
+    assert model.model.layoutlmv3.encoder.layer[0].attention.self.query.weight.grad is not None

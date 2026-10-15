@@ -191,3 +191,17 @@ def test_first_task_ce_supervises_o_tokens():
     batch = {"input_ids": torch.randn(1, 3, 8), "labels": torch.zeros(1, 3, dtype=torch.long)}
     metrics = m.train_task(SimpleNamespace(task_id=0), [batch], None)
     assert metrics.loss > 0  # all-O batch must still produce a CE term on the first task
+
+
+def test_first_task_step_updates_the_encoder_not_only_the_head():
+    """AGENT FIX regression: the student forward goes through ``token_features``; the encoder
+    must receive gradients (on LayoutLMv3 it was a no_grad path and only the head trained)."""
+    m = _make_is3(n_cls=4)
+    batch = {
+        "input_ids": torch.randn(2, 3, 8),
+        "labels": torch.tensor([[0, 1, 2], [3, 0, -100]]),
+    }
+    before = m.model.encoder.weight.detach().clone()
+    m.train_task(SimpleNamespace(task_id=0), [batch], None)
+    assert m.model.encoder.weight.grad is not None
+    assert not torch.equal(before, m.model.encoder.weight.detach())
