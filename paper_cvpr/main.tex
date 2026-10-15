@@ -141,7 +141,14 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 %%  CoLaR            57.5  (BWT -33.3)  final row [64.3 53.6 64.9 11.2 62.4 88.6]
 %%    -> domain steps (FUNSD/SROIE) hold at 54-65; the one collapse (11.2) is mixed_cord_s0, the
 %%       class-incremental step inside CORD = the stale-O slot the refresh targets.
-%%  CoLaR-R oracle   running 08:34; refresh 3120 / 2640 tok after T1 / T2 (head grows at both).
+%%  CoLaR-R oracle   63.5  (BWT -15.1)  final row [65.6 54.2 78.1 38.6 54.9 89.8]  refresh 3120/2640/0/316
+%%    -> +6.1 over plain, above ER 60.3 / DER++ 60.8 / best 62.2 and the 63.2 bar (by 0.3; n=1).
+%%       cord_s0 retention 11.2 -> 38.6 after the cord_s1 refresh (316 tok); funsd_s0 26.0 -> 30.2 and
+%%       funsd_s1 52.0 -> 69.9 already at the SROIE row from the 3120-token funsd_s1 refresh.
+%%       On Mixed the refresh acts only at within-dataset CIL steps (cord_s0 growth relabels 0: no
+%%       stale doc is CORD yet). Anomaly to check: oracle cord_s1 diagonal 12.8 (plain 71.1), recovers
+%%       to 54.9 after the FUNSD revisit -- early-stop / eval quirk or seed noise; do not cite before seeds 7/123.
+%%  CoLaR-R pseudo   running 11:19; first refresh 0 tokens, 0 candidates (mechanism confirmed).
  & LiLT       & $19.1{\pm}0.3$ & \textsc{n/a} & $32.4{\pm}0.4$ & \cellcolor{gray!25}-- & \cellcolor{gray!25}-- & $17.9{\pm}0.5$ & $18.0{\pm}1.0$ \\
  & BROS       & $19.2{\pm}0.1$ & \textsc{n/a} & $32.9{\pm}0.0$ & $17.3{\pm}0.8$ & $23.1{\pm}1.2$ & $18.3{\pm}1.5$ & $17.7{\pm}1.1$ \\
  & BERT       & $19.3{\pm}0.1$ & \textsc{n/a} & $32.4{\pm}0.2$ & $17.9{\pm}0.3$ & $24.3{\pm}0.3$ & $17.1{\pm}1.6$ & $19.2{\pm}1.9$ \\
