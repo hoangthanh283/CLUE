@@ -161,12 +161,16 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 %%       Mechanism null holds (<= 4 candidates at every boundary). Oracle 22.5 > pseudo 15.6: gate order holds (n=2).
 %%       Pre-reg reading at n=2: pseudo mean <= plain + 1.0 and sign disagrees -> heading to KILL unless seed 123 is
 %%       anomalous; no action until n=3.
+%%  n=2 summary (CIL-CORD, 2026-10-16): plain 20.3±1.9, oracle 24.6±3.0 (+5.1/+3.5), pseudo 19.7±5.8 (+2.0/-3.4, sign flip);
+%%    oracle > pseudo on both seeds. Pre-reg reading: pseudo heading to KILL; oracle clears the 23.0 bar on the two-seed mean only.
 %%  Comparators (2026-10-16 00:30): CPFD seed 7 = AA 0.0 (every F1 exactly 0 from task 1 on, incl. its own task 0;
 %%    teacher fix confirmed by the old-class counts, so a second problem -- suspect the classif_adaptive_factor CE
 %%    scaling on sparse sessions; NOT root-caused; quarantined). IS3 seed 7 killed: LayoutLMv3Wrapper.token_features
 %%    was @torch.no_grad() so the IS3 encoder never trained (T0 F1 69.7 vs 94 naive) -- fixed, re-queued (retry3).
 %%    No valid CPFD/IS3 cell exists; if CPFD stays unconverged, disclose it in the supplement as a port that did not
 %%    converge on sparse sessions and keep the ER / DER++ / best-tuned bars as the comparators.
+%%    CPU probe (tests/methods/test_cpfd_sparse_signal.py, 2026-10-16 01:33) rules out classif_adaptive_factor as the
+%%    CPFD collapse cause (confident teacher -> factor 1.0, new-entity CE = log 25); KD / attention-MSE remain suspects.
 %%  CIL-CORD seed-7 cells still needed for Gate 1: is3 seed 7 (retry3), cpfd undecided --
 %%    the FIRST post-fix CPFD/IS3 runs: check the log says 'old classes' == pre-expansion head size and that the
 %%    task-2 diagonal is non-zero before trusting them. Then the same five cells at seed 123.
