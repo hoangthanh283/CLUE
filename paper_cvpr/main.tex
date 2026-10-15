@@ -137,6 +137,12 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 %%  CoLaR-R pseudo   23.7  (BWT -12.6)  final row [1.8 22.1 46.5 45.1 3.2]   refresh 1/0/0/2 tok (= plain)
 %%  Caveat: plain vs pseudo differ by 2.1 pp with near-identical training -> seed-42 spread on CIL-CORD
 %%  is ~2 pp; the oracle +5.1 is n=1 and must clear seeds 7/123 before any sentence enters the body.
+%%  seed 7 (2026-10-15 17:28):
+%%  CoLaR            19.0  (BWT -37.3)  final row [10.8 30.5 29.7 9.4 14.6]  diag [95.4 81.4 25.5 27.3 14.6]
+%%    -> two-seed plain mean 20.3±1.9 = naive 19.0, below the 23.0 bar. Seed 7 learns sessions 3-5 far better
+%%       than seed 42 (diag 25.5/27.3/14.6 vs 5.9/4.5/3.2) but forgets far more (BWT -37 vs -16): same AA band,
+%%       opposite plasticity/stability mix, so CIL-CORD single-seed rows are not interpretable row-by-row.
+%%       The seed-42 "last session at 3.2 in all arms" is seed-specific (seed 7: 14.6) -- not a mechanism.
 %% Mixed, LayoutLMv3, seed 42 (n=1), same k/d/r. Bar 63.2; ER 60.3, DER++ 60.8, best 62.2, joint 67.5.
 %%  CoLaR            57.5  (BWT -33.3)  final row [64.3 53.6 64.9 11.2 62.4 88.6]
 %%    -> domain steps (FUNSD/SROIE) hold at 54-65; the one collapse (11.2) is mixed_cord_s0, the
