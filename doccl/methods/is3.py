@@ -79,17 +79,18 @@ class IS3(NaiveFineTune):
         self._n_old: int = 0  # n seen classes at previous task boundary
         self.prototypes: dict[int, torch.Tensor] = {}  # class_id → (D,) L2-normed mean feature
 
-    def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
-        if task.task_id > 0:
-            # Snapshot frozen teacher.
-            self._teacher = copy.deepcopy(self.model)
-            self._teacher.to(self.device).eval()
-            for p in self._teacher.parameters():
-                p.requires_grad_(False)
-            # Disable gradient checkpointing on the teacher (read-only inference only).
-            if hasattr(self._teacher, "disable_gradient_checkpointing"):
-                self._teacher.disable_gradient_checkpointing()
-            self._n_old = self.model.classifier.out_features
+    def _snapshot_teacher(self) -> None:
+        # AGENT FIX: called from after_task, i.e. BEFORE the CL loop expands the head for the
+        # next task. Snapshotting in before_task (after expansion) gave n_old == n_total: the KD
+        # distilled the random-init new rows on every O token and the grad surgery scaled the
+        # new rows as if they were old (mixed seed-42 run invalid).
+        self._teacher = copy.deepcopy(self.model)
+        self._teacher.to(self.device).eval()
+        for p in self._teacher.parameters():
+            p.requires_grad_(False)
+        if hasattr(self._teacher, "disable_gradient_checkpointing"):
+            self._teacher.disable_gradient_checkpointing()
+        self._n_old = self.model.classifier.out_features
 
     def train_task(
         self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None
@@ -128,7 +129,10 @@ class IS3(NaiveFineTune):
                 # Token partition (IS3 reference lines 217-218):
                 #   ce_mask      → new-entity tokens (not padding, not O)
                 #   distill_mask → O-labeled tokens (includes relabeled old entities)
-                ce_mask = (flat_labels != -100) & (flat_labels != 0)
+                # AGENT FIX: the first task has no teacher to supervise O tokens, so it must use
+                # the full CE (excluding O there left the model unable to predict O: T0 F1 48.7).
+                valid = flat_labels != -100
+                ce_mask = valid if is_first_task else valid & (flat_labels != 0)
                 distill_mask = flat_labels == 0
 
                 ce_loss = (
@@ -193,6 +197,7 @@ class IS3(NaiveFineTune):
             "is3: built prototypes for %d classes after task %d", len(self.prototypes), task.task_id
         )
         self.model.train()
+        self._snapshot_teacher()
 
     def _kd_distill(
         self,
