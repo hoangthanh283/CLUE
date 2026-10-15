@@ -381,9 +381,13 @@ class LayoutLMv3Wrapper(nn.Module):
         }
         return self.model.layoutlmv3(**inputs).last_hidden_state[:, 0]
 
-    @torch.no_grad()
     def token_features(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         """Per-token encoder features — the input the classifier head consumes. (B, L, D).
+
+        AGENT FIX: differentiable. This used to be ``@torch.no_grad()`` (written for LCA's
+        read-only statistics), but IS3 builds its student forward from it, so the encoder
+        never received gradients and IS3 trained only its head (T0 F1 ~70 vs ~94 naive).
+        Read-only callers (LCA, HGT, CoLaR++, IS3 prototypes/teacher) wrap it in no_grad.
 
         These are the ``sequence_output`` LayoutLMv3 feeds to ``classifier`` (the text-token
         hidden states span ``[0, input_ids.shape[1])`` of ``last_hidden_state``; the trailing
