@@ -54,6 +54,7 @@ def _make_is3(**kwargs) -> IS3:
     m.prototypes = {}
     m.device = torch.device("cpu")
     m.amp_enabled = False
+    m.tb_diag = None
     return m
 
 
@@ -165,3 +166,28 @@ def test_after_task_builds_prototype_per_class():
     assert m.prototypes[1].shape == (4,)
     # O (=0) and padding (-100) must not be stored.
     assert 0 not in m.prototypes and -100 not in m.prototypes
+
+
+def test_after_task_snapshots_teacher_so_surgery_and_kd_see_the_old_head():
+    m = _make_is3(hidden=8, n_cls=4)
+    m.after_task(SimpleNamespace(task_id=0), [])
+    assert m._n_old == 4 and m._teacher.classifier.out_features == 4
+    m.model.classifier = nn.Linear(8, 6)  # the loop grows the head before the next before_task
+    head = m.model.classifier
+    head.weight.grad = torch.ones(6, 8)
+    head.bias.grad = torch.ones(6)
+    m._apply_grad_surgery()
+    assert torch.all(head.weight.grad[0] == 1.0)
+    assert torch.all(head.weight.grad[1:4] == 0.6)
+    assert torch.all(head.weight.grad[4:] == 1.0)  # new rows are not "old"
+    kd = m._kd_distill(
+        torch.randn(6, 6), {"input_ids": torch.zeros(2, 3, 8)}, torch.ones(6, dtype=torch.bool)
+    )
+    assert kd.item() >= 0  # teacher's 4 dims vs the student's first 4
+
+
+def test_first_task_ce_supervises_o_tokens():
+    m = _make_is3(hidden=8, n_cls=4)
+    batch = {"input_ids": torch.randn(1, 3, 8), "labels": torch.zeros(1, 3, dtype=torch.long)}
+    metrics = m.train_task(SimpleNamespace(task_id=0), [batch], None)
+    assert metrics.loss > 0  # all-O batch must still produce a CE term on the first task

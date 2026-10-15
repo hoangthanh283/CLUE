@@ -185,18 +185,24 @@ class CPFD(NaiveFineTune):
         factor = (num / (den + 1e-6)).clamp(min=self.adaptive_ce_min)  # (B, 1)
         return labels, factor
 
+    def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
+        # AGENT FIX: the CL loop expands the head BEFORE before_task, so a teacher snapshotted
+        # there already carried the random-init rows of the new classes and n_old == n_total;
+        # KD then distilled those rows on every O token and suppressed new-class learning
+        # (mixed seed-42 diag 0.0 on FUNSD sessions). Snapshot at the end of the previous task.
+        self._n_old = self.model.classifier.out_features
+        self._teacher = copy.deepcopy(self.model)
+        self._teacher.to(self.device).eval()
+        for p in self._teacher.parameters():
+            p.requires_grad_(False)
+        if hasattr(self._teacher, "disable_gradient_checkpointing"):
+            self._teacher.disable_gradient_checkpointing()
+
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         if task.task_id > 0:
-            self._n_old = self.model.classifier.out_features
-            # Snapshot teacher (deepcopy before the head is expanded for this task,
-            # so it covers exactly the old label set).
-            self._teacher = copy.deepcopy(self.model)
-            self._teacher.to(self.device).eval()
-            for p in self._teacher.parameters():
-                p.requires_grad_(False)
-            if hasattr(self._teacher, "disable_gradient_checkpointing"):
-                self._teacher.disable_gradient_checkpointing()
-            # Precompute per-class entropy thresholds.
+            if self._teacher is None:
+                raise RuntimeError("cpfd: no teacher — after_task of the previous task did not run")
+            # Precompute per-class entropy thresholds with the (old-head) teacher.
             self._find_median_thresholds(train_loader)
 
     def train_task(
@@ -287,5 +293,3 @@ class CPFD(NaiveFineTune):
         return TrainMetrics(
             task_id=task.task_id, loss=total_loss / max(n_steps, 1), n_steps=n_steps
         )
-
-    # after_task: inherited no-op (CPFD has no replay buffer)

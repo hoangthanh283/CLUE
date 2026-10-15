@@ -153,6 +153,14 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 %%    - the pseudo run is BIT-IDENTICAL to plain through task 4 (same "After task 4" row), so the +2.0 over plain 57.5
 %%      is entirely the last-boundary relabel effect and the runs are deterministic (the CIL-CORD 2-pp "spread" is the
 %%      effect of a few relabels, not non-determinism). Still below ER 60.3 and the 63.2 bar. Oracle 63.5 > pseudo: gate holds.
+%%  Oracle anomaly (open, n=1): cord_s1 diagonal 12.8 vs plain 71.1 — both runs early-stopped after 3 epochs on that
+%%    task (best = epoch 1), so it is a low best-epoch val-F1, not a later collapse; recovers to 54.9 after funsd_revisit.
+%%    Do not cite before seeds 7/123.
+%%  CPFD / IS3 seed-42 Mixed cells INVALID (2026-10-15): both snapshotted the teacher after the loop had already grown
+%%    the head (n_old == n_total), so KD distilled the random-init new rows on every O token; CPFD 6.0 AA (diag 0.0 on
+%%    FUNSD sessions) discarded, IS3 killed (its first-task CE also skipped O tokens: T0 F1 48.7). Fixed (teacher
+%%    snapshot moved to after_task; IS3 first task full CE); reruns chained in scripts/run_r2_retry2.sh. Earlier CPFD/IS3
+%%    numbers in Table 1, if any, must be re-checked against this bug before submission.
  & LiLT       & $19.1{\pm}0.3$ & \textsc{n/a} & $32.4{\pm}0.4$ & \cellcolor{gray!25}-- & \cellcolor{gray!25}-- & $17.9{\pm}0.5$ & $18.0{\pm}1.0$ \\
  & BROS       & $19.2{\pm}0.1$ & \textsc{n/a} & $32.9{\pm}0.0$ & $17.3{\pm}0.8$ & $23.1{\pm}1.2$ & $18.3{\pm}1.5$ & $17.7{\pm}1.1$ \\
  & BERT       & $19.3{\pm}0.1$ & \textsc{n/a} & $32.4{\pm}0.2$ & $17.9{\pm}0.3$ & $24.3{\pm}0.3$ & $17.1{\pm}1.6$ & $19.2{\pm}1.9$ \\

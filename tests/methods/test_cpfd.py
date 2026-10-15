@@ -140,3 +140,22 @@ def test_attn_mse_empty_returns_zero():
     m = _make_cpfd()
     loss = m._attn_mse((), ())
     assert loss.item() == 0.0
+
+
+def test_after_task_snapshots_teacher_before_the_loop_grows_the_head():
+    # The CL loop expands the head BEFORE before_task; the teacher must be the end-of-task model.
+    import math
+    from types import SimpleNamespace
+
+    class _M(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.classifier = nn.Linear(4, 3)
+
+    m = _make_cpfd()
+    m.model = _M()
+    m.after_task(SimpleNamespace(task_id=0), None)
+    m.model.classifier = nn.Linear(4, 5)  # what the loop does next
+    assert m._n_old == 3 and m._teacher.classifier.out_features == 3
+    assert abs(m._adaptive_coef(3, 5) - math.sqrt(2 / 2)) < 1e-9
+    m.before_task(SimpleNamespace(task_id=0), None)  # first task: no thresholds needed
