@@ -271,6 +271,9 @@ Family & Instance & Best AA & Why it fails \\
 Weight merging & TIES/Fisher head merge$^\dagger$ & $21.6$ (no-merge $21.9$) & merge of head vectors cancels; near no-op \\
 Merge + realignment & LCA~\citep{lca2026} (ported) & $41.9$ & backbone merge halves BWT; Gaussian realignment kills acquisition \\
 Subspace transfer & HGT / CUBER (ported)$^\dagger$ & $39.8$ (own naive $38.7$); HGT $\le25.3$ & protected subspace grows; head unconstrained; $\alpha$ is a pure stability--plasticity dial \\
+%% PROVENANCE (2026-10-16 21:18): results/hgt_ablation/<variant>/dil_*_seed42/metrics.json, DIL/LayoutLMv3 seed 42, 5-epoch frozen-backbone
+%%   operating point (2026-06-26): naive 38.65/-75.2, ER 86.21/-3.3 (buffer reference), CUBER 39.80/-73.04, HGT alpha=0/0.5/1 = 24.80/25.29/24.90
+%%   (BWT -7.9/-21.1/-23.2). Cell verified against disk; the former \vnum{--} placeholder and the app:extra \todo are both gone (no \todo call remains).
 Parametric slots & LexSlot (no buffer) & $42.2$ & isolated head slots cannot re-ground shared head \\
 Input-anchored memory & Ledger$^\dagger$ & FUNSD $21$ / SROIE $23$ & own-vs-cumulative gap is training-free \\
 Feature-Gaussian replay & LexMem v3b (positive control) & $66.0$ & partial: recovers dense-label tasks only \\
