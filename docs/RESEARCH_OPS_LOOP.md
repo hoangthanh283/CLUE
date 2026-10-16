@@ -41,8 +41,8 @@ a null and keep the five.
      run logs (`colar_r[...]: refreshed N docs, M tokens relabelled`), fix before any writing.
 5. **Resource check**: `nvidia-smi` VRAM < 5 GB, `free -g` RAM < 14 GB; never start a second
    dataset-building job while the queue runs.
-6. **Writing while GPU is busy** (pick the first undone): reconcile CoLaR headline (86.8±0.4 vs
-   86.62±0.25); fill/delete HGT `\vnum{--}` and app:extra `\todo`; F9 inversion paragraph
+6. **Writing while GPU is busy** (pick the first undone): [CoLaR headline reconciled 2026-10-15, provenance comment in
+   main.tex §7 — done]; fill/delete HGT `\vnum{--}` and app:extra `\todo`; F9 inversion paragraph
    (SLCA vs CoLaR × images/documents); supplementary PDF skeleton; Overleaf re-upload.
 7. Commit anything changed; `git pull --rebase && git push`. One-line STATE.md update.
 
