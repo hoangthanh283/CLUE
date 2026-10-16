@@ -176,9 +176,12 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 %%    55.7 at task 2, then everything 0 from task 3). classif_adaptive_factor ruled out; KD / attention-MSE suspected;
 %%    user decision pending. If dropped, supplement wording: "the CPFD port did not converge on sparse sessions (two
 %%    seeds, two scenarios)".
-%%    IS3 post-fix (2026-10-16 10:53, mixed_is3_seed7 in progress): encoder trains (T0 85.9 vs 69.6 frozen-encoder run)
-%%    but every old task reads exactly 0.00 at each boundary (after task 1 [0.0 55.1]; after task 2 [0.0 0.0 9.3]) and
-%%    the sparse sroie session peaks at 9.3 while dense cord_s0 reaches 88 -- prototype-classifier behaviour to inspect.
+%%    IS3 post-fix (2026-10-16 11:55, mixed_is3_seed7 DONE): AA 31.2 / BWT -31.3. Encoder trains (T0 85.9 vs 69.6 frozen)
+%%    but every old task reads exactly 0.00 after each class-adding boundary; final row [57.0 45.9 0.0 0.0 4.7 79.5]
+%%    (tasks 0/1 recover only at task 5, which adds no classes). Read-only diagnosis: non-first-task CE covers new-entity
+%%    tokens only (is3.py:135) and KD constrains logits[:n_old] only (is3.py:216), so new head rows get no negatives on
+%%    O / relabelled-old tokens and win the argmax everywhere -- a port-level flaw, not an encoder bug. Decision pending
+%%    with the user alongside CPFD (comparator row would be the IS3 port, not the published method).
 %%  CIL-CORD seed-7 cells still needed for Gate 1: is3 seed 7 (retry3), cpfd undecided --
 %%    the FIRST post-fix CPFD/IS3 runs: check the log says 'old classes' == pre-expansion head size and that the
 %%    task-2 diagonal is non-zero before trusting them. Then the same five cells at seed 123.
