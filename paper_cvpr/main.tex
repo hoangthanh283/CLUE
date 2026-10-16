@@ -176,6 +176,9 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 %%    55.7 at task 2, then everything 0 from task 3). classif_adaptive_factor ruled out; KD / attention-MSE suspected;
 %%    user decision pending. If dropped, supplement wording: "the CPFD port did not converge on sparse sessions (two
 %%    seeds, two scenarios)".
+%%    IS3 post-fix (2026-10-16 10:53, mixed_is3_seed7 in progress): encoder trains (T0 85.9 vs 69.6 frozen-encoder run)
+%%    but every old task reads exactly 0.00 at each boundary (after task 1 [0.0 55.1]; after task 2 [0.0 0.0 9.3]) and
+%%    the sparse sroie session peaks at 9.3 while dense cord_s0 reaches 88 -- prototype-classifier behaviour to inspect.
 %%  CIL-CORD seed-7 cells still needed for Gate 1: is3 seed 7 (retry3), cpfd undecided --
 %%    the FIRST post-fix CPFD/IS3 runs: check the log says 'old classes' == pre-expansion head size and that the
 %%    task-2 diagonal is non-zero before trusting them. Then the same five cells at seed 123.
