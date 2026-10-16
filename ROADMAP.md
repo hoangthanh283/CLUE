@@ -240,9 +240,10 @@ tune against final test F1. Evidence:
 `results/gates/colaslot_r_margin_feasibility_seed42.json`.
 
 ### Next Up (the B+ critical path, priority order)
-0. **CoLaR-R label refresh — Gate 1 CIL-CORD: KILL (2026-10-16 18:09).** Pseudo 20.0±4.1 vs bar 23.0 (plain 20.4);
-   oracle 26.3±3.6 is the true-label ceiling. Ledger row written (`tab:ledger`, ‡). Remaining: Mixed Gate 1 (seed 123
-   × plain/oracle/pseudo, in the R2 queue), then R2b sliced / R2c dil colar_e10 / R2d sliced_pseudo / retries.
+0. **CoLaR-R label refresh — Gate 1 CLOSED on both scenarios: CIL-CORD KILL (2026-10-16 18:09), Mixed KILL (2026-10-17 05:40).**
+   CIL-CORD pseudo 20.0±4.1 vs plain 20.4 (oracle 26.3); Mixed pseudo 59.5±0.0 vs plain 58.8 (oracle 64.4±1.9, bar 63.2, joint 67.5).
+   Both written as the ‡ `tab:ledger` row + caption. Still in the queue (no verdict depends on them): R2b sliced / R2c dil colar_e10 /
+   R2d sliced_pseudo / CPFD-IS3 retries.
    User decisions pending: CPFD + IS3 ports (drop + supplement disclosure, or fix IS3 CE mask + 18 GPU-h);
    whether to kill `cil_cord_cpfd_seed123` / `cil_cord_is3_seed123` now running ahead of the Mixed seed-123 cells.
 1. **B+ generalization grid — THE +12pp MOVE (critical path).** Every headline row at **3 seeds
