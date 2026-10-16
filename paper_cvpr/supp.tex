@@ -84,4 +84,15 @@ ER + C-Flat++ & $88.4\pm0.1$ & $-1.8\pm0.6$ & $78.3\pm0.4$ & $-2.2\pm0.1$ \\
 
 \paragraph{Budget-adaptive allocation is a frontier, not a gain.} Allocating a fixed compressed-replay budget unevenly across tasks (documents $[18,5,2]$, ranks $[64,128,64]$ vs.\ a uniform $10$ documents at rank $64$; 5 epochs, $k{=}4$) gave $+4.0$ AA on seed 42 while passing a pre-registered per-domain guard. On seeds 7 and 123 the same comparison gave $-8.0$ and $+5.7$: $+0.6\pm7.5$ over three seeds, a null. The seed-42 result was a point on a Pareto frontier (old-domain retention traded against the final domain at $\approx9{:}1$), not a shift of the frontier, and we report it as such.
 
+%% DRAFT — depends on user decision (a) drop CPFD/IS3 with disclosure vs (b) fix IS3 CE mask + rerun (2026-10-16 23:23).
+%% Uncomment the paragraph below under (a); under (b) replace with the re-run numbers. Data: results/{cil_cord,mixed}_{cpfd,is3}_seed*/metrics.json.
+%\paragraph{Continual-NER comparators (CPFD, IS3): port status.} We ported the two continual-NER methods closest to our setting,
+%CPFD~\citep{zhang2023cpfd} and IS3 (ACL 2024; %% no refs.bib entry yet — add before uncommenting), onto the single growing token-classification head used by every other method here
+%(the reference implementations keep per-task classifiers). Neither converged on the sparse-session scenarios: CPFD reads
+%AA $0.0$ on CIL-CORD (seeds 7 and 123; first session $94$--$95$, every task $0.00$ from the first class-adding boundary) and
+%$0.0$ on Mixed (seed 7); IS3 reads $2.0$ on CIL-CORD (seed 123) and $31.2$ on Mixed (seed 7), with every previously learned
+%task at exactly $0.00$ after each class-adding boundary and partial recovery only in a session that adds no classes.
+%The failure is a property of the single-head adaptation---new-class logits receive no negatives on O and relabelled tokens,
+%so they win the arg-max everywhere---not of the sessions, so we report the ports as non-converged rather than as scores.
+
 \end{document}
