@@ -42,7 +42,7 @@ a null and keep the five.
 5. **Resource check**: `nvidia-smi` VRAM < 5 GB, `free -g` RAM < 14 GB; never start a second
    dataset-building job while the queue runs.
 6. **Writing while GPU is busy** (pick the first undone): [CoLaR headline reconciled 2026-10-15, provenance comment in
-   main.tex §7 — done]; fill/delete HGT `\vnum{--}` and app:extra `\todo`; F9 inversion paragraph
+   main.tex §7 — done]; [HGT/CUBER cell filled 2026-10-16 02:15, verified vs disk 21:18; no `\todo` left — done]; F9 inversion paragraph
    (SLCA vs CoLaR × images/documents); supplementary PDF skeleton; Overleaf re-upload.
 7. Commit anything changed; `git pull --rebase && git push`. One-line STATE.md update.
 
