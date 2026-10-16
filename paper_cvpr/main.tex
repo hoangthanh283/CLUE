@@ -202,6 +202,11 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 %%    cord_s0 retention 25.9 (plain) -> 78.4 after the cord_s1 refresh (seed 42: 11.2 -> 38.6): the stale-O slot is the lever.
 %%    cord_s1 anomaly does NOT reproduce as oracle-specific: oracle diag 39.4 vs plain 32.2 on this seed (seed 42: 12.8 vs
 %%    71.1), so the seed-42 gap is a seed-specific early-stop event; final cord_s1 34.8 (plain 50.4) is the one slot oracle loses.
+%%  Pseudo seed 7 (2026-10-16 07:47): CoLaR-R pseudo 59.6 (BWT -23.8) -- 0 candidates / 0 relabels at ALL four boundaries, so the
+%%    run is BIT-IDENTICAL to plain seed 7 (every "After task" row matches to the digit); pseudo gain 0.0 on this seed (seed 42:
+%%    +2.0 from 84 relabels at the last boundary only). Two-seed Mixed pseudo 59.5±0.1 vs plain 58.5±1.5 vs oracle 65.0±2.1.
+%%    Oracle > pseudo holds on both seeds. Pre-reg reading: pseudo mean <= plain + 1.0 -> heading to KILL on Mixed as on
+%%    CIL-CORD; the mechanism null (teacher confident on ~0 stale-O tokens) is the cause, not noise. No action until n=3.
 %%  CPFD / IS3 seed-42 Mixed cells INVALID (2026-10-15): both snapshotted the teacher after the loop had already grown
 %%    the head (n_old == n_total), so KD distilled the random-init new rows on every O token; CPFD 6.0 AA (diag 0.0 on
 %%    FUNSD sessions) discarded, IS3 killed (its first-task CE also skipped O tokens: T0 F1 48.7). Fixed (teacher
