@@ -1,0 +1,83 @@
+# Pass 3 — Flaw map (plasticity × recovery)
+
+- **High plasticity** = diag_mean ≥ 90 (new tasks are learned well).
+- **Recovers** = ≥1 off-diagonal `M[t][k] > M[k][k] + 1`.
+- **Boundary drop** = immediate `M[k][k] - M[k+1][k]`; **long-run drop** = `M[k][k] - M[T][k]`.
+
+| family | scenario | seed | diag | final_old | plastic | recov | boundary | long-run | slope |
+|---|---|---|---|---|---|---|---|---|---|
+| colar_r_oracle | cil_cord | 123 | 30.3 | 36.9 | LOW | yes (4) | -15.5 | 0.8 | -12.98 |
+| colar_r_oracle | cil_cord | 42 | 35.8 | 32.7 | LOW | yes (4) | -7.9 | 11.3 | -7.93 |
+| colar_r_oracle | cil_cord | 7 | 43.2 | 28.0 | LOW | yes (2) | 10.1 | 25.9 | -4.48 |
+| colar_r_pseudo | cil_cord | 123 | 30.3 | 25.3 | LOW | yes (4) | -6.0 | 12.1 | -8.55 |
+| colar_r_pseudo | cil_cord | 42 | 33.9 | 28.9 | LOW | yes (4) | -14.2 | 12.6 | +2.59 |
+| colar_r_pseudo | cil_cord | 7 | 50.2 | 18.3 | LOW | yes (1) | 19.7 | 43.3 | +4.30 |
+| colar_r_sliced_pseudo | cil_cord | 123 | 38.6 | 22.4 | LOW | yes (2) | 3.6 | 21.7 | -4.32 |
+| colar_r_sliced_pseudo | cil_cord | 42 | 34.5 | 23.1 | LOW | yes (4) | -9.5 | 18.7 | -2.00 |
+| colar_r_sliced_pseudo | cil_cord | 7 | 57.4 | 21.0 | LOW | no (0) | 33.2 | 45.2 | +1.59 |
+| colar_r_sliced | cil_cord | 123 | 47.2 | 29.7 | LOW | yes (2) | 3.7 | 27.1 | -5.09 |
+| colar_r_sliced | cil_cord | 42 | 33.2 | 34.1 | LOW | yes (4) | -23.8 | 6.9 | +1.63 |
+| colar_r_sliced | cil_cord | 7 | 60.2 | 22.6 | LOW | no (0) | 31.1 | 46.6 | +4.16 |
+| colar | cil_cord | 123 | 31.5 | 24.8 | LOW | yes (4) | -4.1 | 13.8 | -4.12 |
+| colar | cil_cord | 42 | 34.4 | 26.3 | LOW | yes (3) | 1.2 | 15.9 | -4.64 |
+| colar | cil_cord | 7 | 48.9 | 20.1 | LOW | yes (1) | 27.6 | 37.3 | -1.35 |
+| lexslot | cil_cord | 123 | 91.3 | 0.0 | HIGH | no (0) | 90.5 | 90.5 | +18.89 |
+| lexslot | cil_cord | 42 | 91.8 | 0.0 | HIGH | no (0) | 90.9 | 90.9 | +19.09 |
+| lexslot | cil_cord | 7 | 91.2 | 0.0 | HIGH | no (0) | 90.7 | 90.7 | +18.60 |
+| colar | cil_imagenet_r | 123 | 88.3 | 51.8 | LOW | no (0) | 17.4 | 36.7 | +4.51 |
+| colar | cil_imagenet_r | 42 | 88.4 | 50.2 | LOW | no (0) | 17.9 | 38.4 | +4.46 |
+| colar | cil_imagenet_r | 7 | 88.6 | 53.3 | LOW | no (0) | 17.5 | 35.4 | +4.20 |
+| colar_adaptive | dil | 123 | 87.8 | 64.8 | LOW | no (0) | 18.0 | 18.7 | +7.57 |
+| colar_adaptive | dil | 42 | 88.3 | 70.4 | LOW | no (0) | 16.7 | 13.9 | +7.52 |
+| colar_adaptive | dil | 7 | 88.2 | 58.6 | LOW | no (0) | 26.2 | 25.5 | +8.11 |
+| colar_e10 | dil | 123 | 89.6 | 82.7 | LOW | no (0) | 4.3 | 3.3 | +4.38 |
+| colar_e10 | dil | 42 | 88.7 | 82.7 | LOW | yes (1) | 3.6 | 1.7 | +4.03 |
+| colar_e10 | dil | 7 | 88.6 | 83.9 | LOW | no (0) | 1.1 | 0.5 | +5.06 |
+| colar | dil | 123 | 87.7 | 56.4 | LOW | no (0) | 30.6 | 27.1 | +13.57 |
+| colar | dil | 123 | 87.9 | 56.4 | LOW | no (0) | 28.6 | 27.4 | +11.15 |
+| colar | dil | 42 | 88.4 | 59.3 | LOW | no (0) | 28.7 | 24.8 | +13.51 |
+| colar | dil | 42 | 88.6 | 81.1 | LOW | no (0) | 3.0 | 3.4 | +5.85 |
+| colar | dil | 7 | 87.8 | 49.5 | LOW | no (0) | 36.5 | 34.1 | +14.14 |
+| colar | dil | 7 | 88.1 | 70.3 | LOW | no (0) | 15.3 | 13.4 | +9.49 |
+| docB1 | dil | 42 | 82.7 | 64.1 | LOW | no (0) | 7.7 | 12.2 | +16.75 |
+| docB2b | dil | 42 | 80.4 | 81.1 | LOW | yes (3) | -9.9 | -8.7 | +5.68 |
+| docD1 | dil | 42 | 88.4 | 70.5 | LOW | no (0) | 14.5 | 13.2 | +7.91 |
+| docD2 | dil | 42 | 88.4 | 43.3 | LOW | no (0) | 50.7 | 40.8 | +11.23 |
+| docRfar | dil | 123 | 88.0 | 81.3 | LOW | no (0) | 1.0 | 2.6 | +6.26 |
+| docRfar | dil | 42 | 88.3 | 83.9 | LOW | yes (1) | 1.7 | 0.1 | +4.37 |
+| docRfar | dil | 7 | 88.1 | 82.0 | LOW | yes (1) | 2.8 | 1.6 | +4.37 |
+| docRfar | dil | 42 | 88.9 | 68.2 | LOW | no (0) | 17.7 | 16.5 | +14.93 |
+| docRnear | dil | 42 | 88.8 | 81.3 | LOW | no (0) | 3.2 | 3.4 | +5.10 |
+| docRnear | dil | 42 | 88.4 | 47.6 | LOW | no (0) | 32.1 | 36.6 | +17.77 |
+| docRtask | dil | 42 | 88.6 | 82.1 | LOW | yes (1) | 1.0 | 1.9 | +5.58 |
+| docRtask | dil | 42 | 88.9 | 61.5 | LOW | no (0) | 27.2 | 23.3 | +13.89 |
+| docU | dil | 123 | 88.4 | 81.5 | LOW | no (0) | 2.3 | 2.3 | +5.92 |
+| docU | dil | 7 | 88.3 | 81.5 | LOW | yes (2) | 3.0 | 2.6 | +4.30 |
+| docU | dil | 42 | 88.9 | 65.1 | LOW | no (0) | 26.8 | 19.5 | +11.93 |
+| lexslot | dil | 123 | 76.1 | 8.3 | LOW | no (0) | 61.7 | 57.8 | +42.18 |
+| lexslot | dil | 123 | 88.7 | 81.1 | LOW | no (0) | 3.0 | 3.6 | +5.61 |
+| lexslot | dil | 42 | 75.2 | 10.2 | LOW | no (0) | 61.2 | 55.1 | +40.18 |
+| lexslot | dil | 42 | 89.2 | 82.5 | LOW | no (0) | 1.0 | 3.1 | +5.79 |
+| lexslot | dil | 42 | 89.2 | 84.0 | LOW | no (0) | 0.4 | 1.1 | +5.03 |
+| lexslot | dil | 42 | 89.2 | 84.0 | LOW | no (0) | 0.4 | 1.1 | +5.03 |
+| lexslot | dil | 42 | 86.1 | 80.2 | LOW | no (0) | 1.8 | 2.0 | +3.36 |
+| lexslot | dil | 7 | 75.6 | 8.8 | LOW | no (0) | 62.5 | 56.7 | +41.63 |
+| lexslot | dil | 7 | 88.7 | 83.5 | LOW | yes (1) | 0.7 | 2.1 | +4.76 |
+| colar_r_oracle | mixed | 123 | 75.6 | 57.9 | LOW | yes (1) | 23.1 | 15.2 | +2.37 |
+| colar_r_oracle | mixed | 42 | 76.1 | 58.3 | LOW | yes (1) | 21.5 | 15.1 | +2.39 |
+| colar_r_oracle | mixed | 7 | 81.3 | 61.8 | LOW | no (0) | 35.0 | 17.7 | +1.84 |
+| colar_r_pseudo | mixed | 123 | 83.0 | 53.6 | LOW | yes (1) | 36.7 | 28.2 | +3.54 |
+| colar_r_pseudo | mixed | 42 | 85.2 | 53.7 | LOW | no (0) | 45.3 | 30.9 | +2.33 |
+| colar_r_pseudo | mixed | 7 | 79.4 | 53.9 | LOW | yes (1) | 33.1 | 23.8 | +1.78 |
+| colar_r_sliced_pseudo | mixed | 123 | 85.3 | 55.6 | LOW | no (0) | 43.2 | 29.3 | +3.48 |
+| colar_r_sliced_pseudo | mixed | 42 | 84.4 | 55.2 | LOW | no (0) | 41.0 | 28.8 | +1.68 |
+| colar_r_sliced_pseudo | mixed | 7 | 87.5 | 52.8 | LOW | no (0) | 50.7 | 34.3 | +3.00 |
+| colar_r_sliced | mixed | 123 | 83.0 | 53.3 | LOW | yes (1) | 33.7 | 28.6 | +3.20 |
+| colar_r_sliced | mixed | 42 | 82.3 | 56.8 | LOW | no (0) | 32.6 | 24.3 | +2.78 |
+| colar_r_sliced | mixed | 7 | 89.7 | 57.3 | LOW | no (0) | 44.7 | 32.4 | +3.75 |
+| colar | mixed | 123 | 81.6 | 53.4 | LOW | no (0) | 47.5 | 26.9 | +0.49 |
+| colar | mixed | 42 | 85.3 | 51.3 | LOW | no (0) | 44.4 | 33.3 | +2.69 |
+| colar | mixed | 7 | 79.4 | 53.9 | LOW | yes (1) | 33.1 | 23.8 | +1.78 |
+| lexslot | mixed | 123 | 71.6 | 18.9 | LOW | no (0) | 69.8 | 56.3 | +1.30 |
+| lexslot | mixed | 42 | 70.7 | 21.9 | LOW | no (0) | 65.7 | 52.4 | +2.68 |
+| lexslot | mixed | 7 | 72.4 | 23.0 | LOW | no (0) | 66.8 | 52.8 | +2.85 |
