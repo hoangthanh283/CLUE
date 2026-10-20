@@ -405,3 +405,16 @@ class LexSlot(NaiveFineTune):
             self.slot_sharing,
             self._late_idx,
         )
+        # Optional dump for the RCA ridge probe (Pass 2b). Matches CoLaR's convention:
+        # dump_final=true + out_dir => save the final backbone state (no store for LexSlot).
+        if (
+            task.is_last
+            and bool(self.config.get("dump_final", False))
+            and getattr(self, "out_dir", None)
+        ):
+            import pathlib as _p
+            import torch as _torch
+            out = _p.Path(self.out_dir)
+            out.mkdir(parents=True, exist_ok=True)
+            _torch.save(self.model.state_dict(), out / "final_model.pt")
+            log.info("lexslot: dumped final_model.pt to %s", out)

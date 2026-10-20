@@ -183,3 +183,52 @@ Generated from:
 - `rca/pass3_flaw_map.md` — plasticity × recovery
 - `rca/pass5_sign_rule_v2.md` — recipe-matched 3-seed verdicts
 - `scripts/rca/build_ledger.py`, `scripts/rca/analyze_ledger.py`
+
+## Pass 2b probe decomposition (8 cells, seed 42)
+
+| cell | AA (metrics.json) | head (probe) | rp_full | rp_stored | head_gap | coverage_gap | trunk_gap |
+|---|---|---|---|---|---|---|---|
+| CIFAR-100 CoLaR (ViT) | 80.5 | 78.8 | 88.3 | 80.8 | **9.5** | **7.5** | **+2.9** |
+| ImageNet-R CoLaR (ViT) | 56.4 | 56.2 | 72.3 | 58.0 | **16.1** | **14.3** | **+15.0** |
+| DIL CoLaR (LMv3) | 87.1 | 90.9 | 91.3 | 91.1 | 0.3 | 0.2 | — |
+| DIL LexSlot (LMv3) | 40.5 | 28.9 | 86.2 | 83.6 | **57.3** | 2.6 | — |
+| CIL-CORD CoLaR (LMv3) | 19.1 | 67.5 | 75.2 | 75.2 | **7.7** | 0.0 | — |
+| CIL-CORD LexSlot (LMv3) | 19.2 | 70.6 | 75.5 | 75.5 | 4.9 | 0.0 | — |
+| Mixed CoLaR (LMv3) | 58.8 | 70.9 | 71.6 | 71.4 | 0.7 | 0.2 | — |
+| Mixed LexSlot (LMv3) | 33.1 | 48.8 | 71.6 | 70.1 | **22.8** | 1.5 | — |
+
+### Reading guide
+
+- **head** vs **rp_full**: how much the plastic classifier leaves on the table vs an analytic ridge on the same adapted trunk's full-data features.
+- **coverage_gap = rp_full − rp_stored**: how much a ridge gains from full data over the ~50 stored docs/task equivalent subsample.
+- **trunk_gap = rp_full(adapted) − rp_full(frozen)**: how much adaptation improves the features vs the frozen PTM.
+- **head gap** large + **coverage gap** large → readout is the leak, fixable by analytic head.
+- **head gap** large + **coverage gap** ≈ 0 → labels/structure, not features (CIL-CORD, Mixed LexSlot).
+- **head gap** ≈ 0 → nothing to gain here (DIL CoLaR, Mixed CoLaR).
+
+### Scenario-conditional diagnosis
+
+**Image CIL (ViT, pretrained-trunk-helpful territory):**
+- CIFAR: 7.5 pp coverage, 2.9 pp trunk improvement. The 9.5 pp head gap is mostly readout coverage; analytic head targeting coverage would cross SLCA's 87.5 ceiling.
+- ImageNet-R: 14.3 pp coverage, 15.0 pp trunk improvement — **both huge**. The adapted trunk's ridge ceiling (72.3) beats SLCA (65.0) by 7 pp. This is where CoLaR-RP would land its biggest win.
+
+**Document CIL (LayoutLMv3, no trunk-vs-frozen test here):**
+- DIL CoLaR: already at the ridge ceiling (90.9 vs 91.3). *No headroom.* Any new method on DIL has to compete on bytes, not accuracy.
+- Mixed CoLaR: head 70.9 vs ridge 71.6 — plastic head not the leak. The real Mixed shortfall (AA 58.8 vs joint 67.5) is seqeval structure cost, not readout coverage.
+- CIL-CORD CoLaR: head 67.5 vs ridge 75.2 — **7.7 pp uncashed from an analytic head on the same stored features**, with coverage already at ceiling (full and stored give identical ridge). This is the lever: analytic head alone would push seed-42 AA from 20.4 to ~26-27, matching sliced-softmax (R2b +5.0).
+
+**LexSlot:**
+- DIL LexSlot: head 28.9 vs ridge 86.2 — **57-pp collapse in the plastic head while features are intact**. The gradient-mask isolation worked at the trunk level but the slot classifier head catastrophically forgets. A simple ridge refit per task would recover LexSlot from AA 40 → ~86, i.e. match plain CoLaR.
+- CIL-CORD LexSlot: head 70.6 ≈ CoLaR 67.5; LexSlot vs CoLaR ridge ceilings identical (75.5 vs 75.2) → trunks are equivalent, the different methods just route it through the plastic head differently.
+- Mixed LexSlot: head 48.8 vs ridge 71.6, head_gap 22.8. Same story: features fine, plastic head wrecked.
+
+### Takeaway for method design
+
+The pattern across image and document is identical: **the plastic classifier head is the biggest single waste on every cell that still has headroom to joint**. The trunk is doing its job on ImageNet-R (big trunk_gap), carrying no cost on DIL (saturated), and sitting at the ridge ceiling on Mixed/CIL-CORD CoLaR. One concrete prescription falls out:
+
+**CoLaR-RP (replace the plastic head with a per-task analytic ridge on recomputed features of all stored latents + the current full task):**
+- CIFAR: +9.5 pp available → 88 vs SLCA 87.5 (ties the ceiling)
+- ImageNet-R: +16 pp available → 72 vs SLCA 65 (+7 pp over SOTA)
+- CIL-CORD: +7.7 pp available → ridge+plain = 27, matches sliced-softmax
+- Mixed: ~0 pp available in the probe-equivalent accuracy; AA improvement would have to come from a different lever (label structure)
+- DIL: 0 pp available (saturated)
