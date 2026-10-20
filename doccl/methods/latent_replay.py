@@ -256,6 +256,21 @@ class LatentReplay(NaiveFineTune):
             self._apply_freeze_map()
         if self.docs_per_task > 0:
             self._capture_task(train_loader)
+        # Optional RCA dump at the final task — all CoLaR / CoLaSlot subclasses inherit this
+        # (ponytail: one place, applies to the whole family). CoLaRPP already overrides
+        # after_task with its own dump path; this is for the siblings that do not.
+        if (
+            task.is_last
+            and bool(self.config.get("dump_final", False))
+            and getattr(self, "out_dir", None)
+        ):
+            import pathlib as _p
+            out = _p.Path(self.out_dir)
+            out.mkdir(parents=True, exist_ok=True)
+            torch.save(self.model.state_dict(), out / "final_model.pt")
+            if getattr(self, "store", None):
+                torch.save(self.store, out / "final_store.pt")
+            log.info("latent_replay: dumped final_model.pt (+ store) to %s", out)
 
     def _make_optimizer(self) -> torch.optim.Optimizer:
         """AdamW over all trainable params; subclasses may split LR by parameter group."""

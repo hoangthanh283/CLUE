@@ -158,7 +158,7 @@ def probe_doc(run: Path, scenario: str, k: int):
     sd = torch.load(run / "final_model.pt", map_location="cpu")
     head_w = sd.get("model.classifier.weight"); head_w = sd.get("classifier.weight") if head_w is None else head_w
     n_cls = int(head_w.shape[0])
-    cur = LayoutLMv3Wrapper(num_labels=n_cls); cur.load_state_dict(sd); cur = cur.to(dev).eval()
+    cur = LayoutLMv3Wrapper(num_labels=n_cls); cur.load_state_dict(sd, strict=False); cur = cur.to(dev).eval()
 
     # DOC PATH NOTE: we do NOT reconstruct via CoLaRPP._stored_features because the
     # upper-layer rel_pos table conflicts with the pre-decoded hidden shape when
