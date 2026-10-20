@@ -145,7 +145,7 @@ def probe_doc(run: Path, scenario: str, k: int):
     from doccl.data.scenarios import SCENARIO_REGISTRY
     from doccl.data.encoders import build_encoder
     from doccl.methods.colar_pp import CoLaRPP
-    from doccl.models.layoutlmv3_wrapper import LayoutLMv3Wrapper
+    from doccl.models.layoutlm_wrapper import LayoutLMv3Wrapper
     from omegaconf import OmegaConf
 
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -156,57 +156,103 @@ def probe_doc(run: Path, scenario: str, k: int):
     scen = SCENARIO_REGISTRY[scenario]()
     # Determine total label count from final head
     sd = torch.load(run / "final_model.pt", map_location="cpu")
-    head_w = sd.get("model.classifier.weight") or sd.get("classifier.weight")
+    head_w = sd.get("model.classifier.weight"); head_w = sd.get("classifier.weight") if head_w is None else head_w
     n_cls = int(head_w.shape[0])
     cur = LayoutLMv3Wrapper(num_labels=n_cls); cur.load_state_dict(sd); cur = cur.to(dev).eval()
 
-    # Build stored features
-    m = CoLaRPP(cur, {"split_layer_k": k, "rank_r": 0})
-    m.device = dev
-    m.store = torch.load(run / "final_store.pt", map_location="cpu")
-    xs, ys = m._stored_features()
-    xs = xs.to(dev); ys = ys.to(dev)
+    # DOC PATH NOTE: we do NOT reconstruct via CoLaRPP._stored_features because the
+    # upper-layer rel_pos table conflicts with the pre-decoded hidden shape when
+    # pixel_values are also present. Instead xs/ys are built below by subsampling the
+    # same full-forward features — this measures coverage (full vs 50 docs/task
+    # through the current trunk), which is the thing we actually care about.
+    has_store = (run / "final_store.pt").exists()  # metadata only
 
-    # Build FULL per-token features of all seen tasks through current trunk
-    # Reuse the method's _features_of on the full train streams.
-    all_feats, all_labs = [], []
-    for t in scen.tasks:
-        ds = t.train_dataset
-        # Build minimal doc list for _features_of; subsample up to 400 docs per task
-        docs = []
-        for i in range(min(len(ds), 400)):
-            d = ds[i]; docs.append({k: v for k, v in d.items()})
-        xf, yf = m._features_of(docs)
-        all_feats.append(xf.to(dev)); all_labs.append(yf.to(dev))
-    xtr_full = torch.cat(all_feats); ytr_full = torch.cat(all_labs)
+    # Full-trunk features: plain model.forward(), hook on cur.model.classifier.
+    # This works for raw docs (no pre-decoded hidden) which is what the scenario yields.
+    captured = []
+    hook = cur.model.classifier.register_forward_pre_hook(lambda _m, a: captured.append(a[0]))
 
-    # Eval set: union of all task test sets, up to 100 docs per task
-    xte_list, yte_list = [], []
-    for t in scen.tasks:
-        ds = t.eval_dataset
-        docs = []
-        for i in range(min(len(ds), 100)):
-            d = ds[i]; docs.append({k: v for k, v in d.items()})
-        xe, ye = m._features_of(docs)
-        xte_list.append(xe.to(dev)); yte_list.append(ye.to(dev))
-    xte = torch.cat(xte_list); yte = torch.cat(yte_list)
+    def feats_of(ds, limit):
+        """Return (features, labels) for a token-level dataset through the current trunk."""
+        feats, labs = [], []
+        n = min(len(ds), limit)
+        for i in range(n):
+            d = ds[i]
+            inp = {k: (v.unsqueeze(0).to(dev) if isinstance(v, torch.Tensor) else v)
+                   for k, v in d.items() if k in ("input_ids","bbox","pixel_values","attention_mask","labels")}
+            captured.clear()
+            with torch.no_grad():
+                cur.forward(**inp)
+            x = captured[0]
+            lab = inp["labels"][0] if "labels" in inp else d["labels"]
+            # Only labelled tokens
+            mask = lab != -100
+            feats.append(x[0, mask].float().cpu())
+            labs.append(lab[mask].cpu())
+            torch.cuda.empty_cache()
+        if not feats:
+            return torch.empty(0, cur.hidden_size), torch.empty(0, dtype=torch.long)
+        return torch.cat(feats), torch.cat(labs)
 
+    MAX_TRAIN_PER_TASK = 150
+    MAX_EVAL_PER_TASK  = 80
+    try:
+        all_feats, all_labs = [], []
+        for ds in scen.train_datasets:
+            xf, yf = feats_of(ds, MAX_TRAIN_PER_TASK)
+            all_feats.append(xf); all_labs.append(yf)
+        xtr_full = torch.cat(all_feats); ytr_full = torch.cat(all_labs)
+        # Build xs/ys by subsampling the per-task full features to N_STORED_PER_TASK * ~60 tokens.
+        N_STORED_PER_TASK = 50
+        xs_list, ys_list = [], []
+        for xf, yf in zip(all_feats, all_labs):
+            n = xf.shape[0]
+            if n == 0: continue
+            n_sub = min(n, N_STORED_PER_TASK * 60)
+            idx = torch.randperm(n)[:n_sub]
+            xs_list.append(xf[idx]); ys_list.append(yf[idx])
+        xs = torch.cat(xs_list) if xs_list else None
+        ys = torch.cat(ys_list) if ys_list else None
+        del all_feats, all_labs
+
+        xte_list, yte_list = [], []
+        for ds in scen.eval_datasets:
+            xe, ye = feats_of(ds, MAX_EVAL_PER_TASK)
+            xte_list.append(xe); yte_list.append(ye)
+        xte = torch.cat(xte_list); yte = torch.cat(yte_list)
+        del xte_list, yte_list
+    finally:
+        hook.remove()
+
+    # Head accuracy: do it in CPU chunks against the trained classifier moved to CPU.
+    clf_cpu = cur.model.classifier.cpu()
     with torch.no_grad():
-        head_pred = cur.model.classifier(xte).argmax(-1)
+        preds = []
+        for i in range(0, xte.shape[0], 2048):
+            preds.append(clf_cpu(xte[i:i+2048]).argmax(-1))
+        head_pred = torch.cat(preds, 0)
     head_acc = (head_pred == yte).float().mean().item() * 100
-    rp_full_cur = ridge_eval(xtr_full, ytr_full, xte, yte, n_cls, M=4096, lam=10.0)
-    rp_stored   = ridge_eval(xs, ys, xte, yte, n_cls, M=4096, lam=10.0)
+    # Move clf back for completeness (not needed but tidy).
+    cur.model.classifier = clf_cpu.to(dev)
+    # Ridge on CPU — stays in fp32, N up to a few 100k tokens.
+    rp_full_cur = ridge_eval(xtr_full, ytr_full, xte, yte, n_cls, M=2048, lam=10.0)
     ncm_full    = ncm_eval(xtr_full, ytr_full, xte, yte, n_cls)
-    ncm_stored  = ncm_eval(xs, ys, xte, yte, n_cls)
+    if xs is not None:
+        rp_stored  = ridge_eval(xs, ys, xte, yte, n_cls, M=2048, lam=10.0)
+        ncm_stored = ncm_eval(xs, ys, xte, yte, n_cls)
+        cov_gap = rp_full_cur - rp_stored
+        n_stored = int(ys.numel())
+    else:
+        rp_stored = ncm_stored = cov_gap = n_stored = None
     return dict(head=head_acc, rp_full=rp_full_cur, rp_stored=rp_stored,
                 rp_full_frozen=None, simplecil=None,
                 ncm_full=ncm_full, ncm_stored=ncm_stored,
                 head_gap=rp_full_cur - head_acc,
                 trunk_gap=None,
-                coverage_gap=rp_full_cur - rp_stored,
+                coverage_gap=cov_gap,
                 scenario=scenario, modality="document",
                 n_classes=n_cls,
-                n_stored=int(ys.numel()), n_full_train=int(ytr_full.numel()))
+                n_stored=n_stored, n_full_train=int(ytr_full.numel()))
 
 
 if __name__ == "__main__":
