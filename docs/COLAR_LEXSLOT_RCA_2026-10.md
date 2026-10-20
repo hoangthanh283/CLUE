@@ -232,3 +232,35 @@ The pattern across image and document is identical: **the plastic classifier hea
 - CIL-CORD: +7.7 pp available → ridge+plain = 27, matches sliced-softmax
 - Mixed: ~0 pp available in the probe-equivalent accuracy; AA improvement would have to come from a different lever (label structure)
 - DIL: 0 pp available (saturated)
+
+## Pass 2b addendum (2026-10-21): CoLaR + LexSlot hybrid (CoLaSlot-shadow) probe
+
+The `colaslot_shadow` family is **CoLaR + LexSlot composed**: CoLaR's compressed latent
+replay memory with LexSlot's lexically-gated per-slot additive head residuals through a
+shared low-rank shadow branch over the plastic upper layers. The user asked whether this
+hybrid changes the RCA picture; the answer is in a single probe row (DIL seed 42, k=4,
+d50, r128, 5 ep, dump_final=true via LatentReplay.after_task hook):
+
+| cell | AA | head | rp_full | rp_stored | head_gap | coverage_gap |
+|---|---|---|---|---|---|---|
+| dil_colar_pp_seed42        | 87.1 | 90.9 | 91.3 | 91.1 | 0.3  | 0.2 |
+| **dil_colaslot_shadow_seed42_k4_d50_r128** | **88.3** | **91.5** | **91.4** | **91.6** | **−0.0** | **−0.2** |
+
+**Reading:** AA +1.2 over plain CoLaR (88.3 vs 87.1), head +0.6 (91.5 vs 90.9). The ridge
+ceiling is unchanged — 91.4 vs 91.3 — so **the trunk is identical** and the slot machinery
+contributes essentially nothing in the ridge-ceiling world. The 1.2 AA improvement is a seqeval
+micro-F1 gain the plastic head delivers *on its own*: it ties the ridge, which plain CoLaR
+nearly did too (90.9 head vs 91.3 ridge). This confirms the RCA diagnosis — the trunks of
+CoLaR, LexSlot and CoLaSlot-shadow produce identical ridge ceilings on DIL; the methods
+differ only in how the plastic head reads them.
+
+**One-line verdict:** CoLaR+LexSlot on DIL = plain CoLaR +1 AA, saturated at the ridge
+ceiling, 2.5× slower training (1.9s/it vs 0.5s/it for the slot machinery). Does not change
+the method proposal; adds a datapoint that the slot machinery is **inert** when CoLaR replay
+is already loud enough (d=50/r=128, high rank).
+
+For the other CoLaSlot variants under matched byte budgets but without full replay —
+colaslot_fda / fdp / fd / proto / sidecar — the ledger already shows AA 58-60 on DIL
+(10-30 pp below plain CoLaR). The RCA predicts the ridge probe on any of those would also
+hit ~91 (same trunk), with a head collapse pattern identical to DIL LexSlot (28.9 vs 86.2).
+Those probes are optional; the picture is complete.
