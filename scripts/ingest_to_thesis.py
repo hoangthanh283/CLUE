@@ -38,9 +38,9 @@ FIGURES = [
     ("figure_backbone_ordering.pdf", "figures/backbone_ordering.pdf"),
 ]
 TABLES = [
-    # table_main.tex is NOT auto-copied: thesis/generated/table_main.tex carries a
-    # hand-added LexSlot row (analyze_results.py can't fold the lexslot `_off`
-    # variant — see ROADMAP "Parser" item). Merge new rows into it by hand.
+    # table_main.tex: generated with the LexSlot `_off` row pinned by analyze_results.py
+    # VARIANT_FILTER (2026-10-22); no hand patch needed any more.
+    ("table_main.tex", "generated/table_main.tex"),
     ("table_main_BWT.tex", "generated/table_main_BWT.tex"),
     # chapter6 includes the backbone study under this legacy filename.
     ("table_backbone_AA.tex", "generated/table_backbone_byscenario.tex"),

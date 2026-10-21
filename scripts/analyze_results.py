@@ -114,9 +114,13 @@ VARIANT_FILTER = {
     "lexslot": "_off",  # the 200-exemplar slot-memory recipe (thesis row 87.3)
 }
 # Run aliases that ARE the canonical recipe of a proposed method under another name.
-METHOD_ALIASES = {
-    "docU_d50": ("colar", "_k4_d50_r128")
-}  # DIL uniform replay = plain CoLaR k4/d50/r128
+METHOD_ALIASES = {"colar_e10": ("colar", "_k4_d50_r128")}  # DIL CoLaR, 10-epoch headline
+# Headline protocol per proposed method (epochs from metrics.json method_hparams). The DIL
+# 5-epoch CoLaR cells (dil_colar_seed42_k4_d50_r128, dil_docU_d50_seed*) are the Amendment-9
+# control recipe (86.6 ± 0.3) and are excluded from the 10-epoch headline row (87.8 ± 0.5).
+RECIPE_EPOCHS = {"colar": 10, "colar_r_sliced": 10}
+# Proposed rows allowed in the frozen-scope (CVPR) core table: CoLaSlot is one 5-epoch seed.
+OURS_ORDER_CORE = ["colar", "colar_r_sliced", "lexslot"]
 
 SCENARIO_ORDER = [
     "cil_cord",
@@ -252,6 +256,7 @@ def load_local_runs(results_dir: Path) -> pd.DataFrame:
             {
                 "name": mp.parent.name,
                 "variant": variant,
+                "epochs": (d.get("method_hparams") or {}).get("epochs"),
                 "state": "finished",
                 "method": method,
                 "model_family": family,
@@ -387,8 +392,12 @@ def write_main_table(
     proposed: str = "colar",
     proposed_variant: str | None = "_k4_d50_r128",
     scenarios: list[str] | None = None,
+    ours_order: list[str] | None = None,
 ) -> None:
     df = _finished(df, metric)
+    if "epochs" in df.columns:
+        for m, ep in RECIPE_EPOCHS.items():
+            df = df[(df["method"] != m) | (df["epochs"] == ep)]
     # Only the un-ablated proposed run (target null or "all") belongs in the main table.
     df = df[(df["method"] != proposed) | _is_full_method(df["target"])]
     # Every "ours" row is pinned to one recipe (VARIANT_FILTER); --proposed_variant overrides
@@ -406,7 +415,7 @@ def write_main_table(
 
     scenarios = [s for s in SCENARIO_ORDER if s in mean.columns]
     methods = [m for m in METHOD_ORDER if m in mean.index]
-    ours = [m for m in OURS_ORDER if m in mean.index]
+    ours = [m for m in (ours_order or OURS_ORDER) if m in mean.index]
 
     # Best non-oracle per scenario (for bolding) + significance vs best baseline.
     best = {s: mean.loc[methods, s].max() if methods else np.nan for s in scenarios}
@@ -979,6 +988,7 @@ def main():
         proposed=args.proposed,
         proposed_variant=pv,
         scenarios=["cil_cord", "dil", "mixed"],
+        ours_order=OURS_ORDER_CORE,
     )
     # BWT companion to the main table, so every backward-transfer headline number
     # is traceable to a generated artifact rather than hand-kept in the thesis prose.
