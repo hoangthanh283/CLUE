@@ -48,12 +48,17 @@ PY
 }
 
 until grep -q 'PHASE1B COMPLETE' results/logs_vision/phase1_queue.log 2>/dev/null; do sleep 120; done
+# Relaunch support: wait for a still-running orphaned training child (WAIT_PID) to exit first.
+if [ -n "${WAIT_PID:-}" ]; then while kill -0 "$WAIT_PID" 2>/dev/null; do sleep 60; done; fi
 echo "=== TIER A $(date) ===" >>"$LOG"
 
 # ---- ungated cells (cheapest / most certain first) ----
 for sd in 42 7 123; do run_cell lca dil      "$sd"; done
 for sd in 42 7 123; do run_cell lca cil_cord "$sd"; done
-for sd in 42 7 123; do run_cell lca mixed    "$sd"; done
+# Mixed LCA: skipped on this box (SKIP_MIXED_LCA=1). lca.py keeps a full CPU backbone copy
+# per task; on the 6-session Mixed stream the host RSS reached 12.8 GB at session 6 and the
+# kernel OOM-killed seed 42 (2026-10-21 23:37). Re-queue after the disk-backed store fix.
+if [ "${SKIP_MIXED_LCA:-0}" != 1 ]; then for sd in 42 7 123; do run_cell lca mixed "$sd"; done; else echo "$(date +%H:%M) SKIP  mixed_lca x3 (SKIP_MIXED_LCA=1, host OOM)" >>"$LOG"; fi
 run_cell cl_lora cil_cord 123
 for sd in 42 7 123; do run_cell is3 dil "$sd"; done
 
