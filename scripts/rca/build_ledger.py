@@ -21,7 +21,8 @@ PAT = re.compile(r"(colar|lexslot|lexmem|docR|docU|docB|docD)", re.I)
 def classify(name: str) -> tuple[str, str, int|None, str, str]:
     """Return (family, scenario, seed, backbone, variant)."""
     s = int(m.group(1)) if (m := re.search(r"seed(\d+)", name)) else None
-    backbone = "vit" if "_vit" in name else "layoutlmv3"
+    # Backbone from the run-dir family suffix (train.py appends _<family> for non-LayoutLMv3).
+    backbone = next((f for f in ("vit", "bert", "lilt", "bros") if f"_{f}" in name), "layoutlmv3")
     if name.startswith("cil_cifar100_"):   scenario = "cil_cifar100"
     elif name.startswith("cil_imagenet_r_"): scenario = "cil_imagenet_r"
     elif name.startswith("cil_cord_"):     scenario = "cil_cord"

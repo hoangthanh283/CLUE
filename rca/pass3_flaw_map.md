@@ -6,6 +6,7 @@
 
 | family | scenario | seed | diag | final_old | plastic | recov | boundary | long-run | slope |
 |---|---|---|---|---|---|---|---|---|---|
+| colar | cil_cord | 42 | 40.0 | 21.4 | LOW | yes (4) | -3.3 | 26.2 | +0.82 |
 | colar_r_oracle | cil_cord | 123 | 30.3 | 36.9 | LOW | yes (4) | -15.5 | 0.8 | -12.98 |
 | colar_r_oracle | cil_cord | 42 | 35.8 | 32.7 | LOW | yes (4) | -7.9 | 11.3 | -7.93 |
 | colar_r_oracle | cil_cord | 7 | 43.2 | 28.0 | LOW | yes (2) | 10.1 | 25.9 | -4.48 |
@@ -22,17 +23,20 @@
 | colar | cil_cord | 42 | 34.4 | 26.3 | LOW | yes (3) | 1.2 | 15.9 | -4.64 |
 | colar | cil_cord | 7 | 48.9 | 20.1 | LOW | yes (1) | 27.6 | 37.3 | -1.35 |
 | lexslot | cil_cord | 123 | 91.3 | 0.0 | HIGH | no (0) | 90.5 | 90.5 | +18.89 |
+| lexslot | cil_cord | 42 | 93.8 | 0.0 | HIGH | no (0) | 93.2 | 93.2 | +19.18 |
 | lexslot | cil_cord | 42 | 91.8 | 0.0 | HIGH | no (0) | 90.9 | 90.9 | +19.09 |
 | lexslot | cil_cord | 7 | 91.2 | 0.0 | HIGH | no (0) | 90.7 | 90.7 | +18.60 |
 | colar | cil_imagenet_r | 123 | 88.3 | 51.8 | LOW | no (0) | 17.4 | 36.7 | +4.51 |
 | colar | cil_imagenet_r | 42 | 88.4 | 50.2 | LOW | no (0) | 17.9 | 38.4 | +4.46 |
 | colar | cil_imagenet_r | 7 | 88.6 | 53.3 | LOW | no (0) | 17.5 | 35.4 | +4.20 |
+| colar | cil_imagenet_r | 42 | 89.0 | 52.9 | LOW | no (0) | 17.2 | 36.1 | +4.34 |
 | colar_adaptive | dil | 123 | 87.8 | 64.8 | LOW | no (0) | 18.0 | 18.7 | +7.57 |
 | colar_adaptive | dil | 42 | 88.3 | 70.4 | LOW | no (0) | 16.7 | 13.9 | +7.52 |
 | colar_adaptive | dil | 7 | 88.2 | 58.6 | LOW | no (0) | 26.2 | 25.5 | +8.11 |
 | colar_e10 | dil | 123 | 89.6 | 82.7 | LOW | no (0) | 4.3 | 3.3 | +4.38 |
 | colar_e10 | dil | 42 | 88.7 | 82.7 | LOW | yes (1) | 3.6 | 1.7 | +4.03 |
 | colar_e10 | dil | 7 | 88.6 | 83.9 | LOW | no (0) | 1.1 | 0.5 | +5.06 |
+| colar | dil | 42 | 88.7 | 82.0 | LOW | no (0) | 3.3 | 2.5 | +5.24 |
 | colar | dil | 123 | 87.7 | 56.4 | LOW | no (0) | 30.6 | 27.1 | +13.57 |
 | colar | dil | 123 | 87.9 | 56.4 | LOW | no (0) | 28.6 | 27.4 | +11.15 |
 | colar | dil | 42 | 88.4 | 59.3 | LOW | no (0) | 28.7 | 24.8 | +13.51 |
@@ -56,6 +60,7 @@
 | docU | dil | 42 | 88.9 | 65.1 | LOW | no (0) | 26.8 | 19.5 | +11.93 |
 | lexslot | dil | 123 | 76.1 | 8.3 | LOW | no (0) | 61.7 | 57.8 | +42.18 |
 | lexslot | dil | 123 | 88.7 | 81.1 | LOW | no (0) | 3.0 | 3.6 | +5.61 |
+| lexslot | dil | 42 | 88.2 | 12.4 | LOW | no (0) | 78.9 | 71.5 | +39.36 |
 | lexslot | dil | 42 | 75.2 | 10.2 | LOW | no (0) | 61.2 | 55.1 | +40.18 |
 | lexslot | dil | 42 | 89.2 | 82.5 | LOW | no (0) | 1.0 | 3.1 | +5.79 |
 | lexslot | dil | 42 | 89.2 | 84.0 | LOW | no (0) | 0.4 | 1.1 | +5.03 |
@@ -63,6 +68,7 @@
 | lexslot | dil | 42 | 86.1 | 80.2 | LOW | no (0) | 1.8 | 2.0 | +3.36 |
 | lexslot | dil | 7 | 75.6 | 8.8 | LOW | no (0) | 62.5 | 56.7 | +41.63 |
 | lexslot | dil | 7 | 88.7 | 83.5 | LOW | yes (1) | 0.7 | 2.1 | +4.76 |
+| colar | mixed | 42 | 82.9 | 53.4 | LOW | no (0) | 48.9 | 28.9 | +0.04 |
 | colar_r_oracle | mixed | 123 | 75.6 | 57.9 | LOW | yes (1) | 23.1 | 15.2 | +2.37 |
 | colar_r_oracle | mixed | 42 | 76.1 | 58.3 | LOW | yes (1) | 21.5 | 15.1 | +2.39 |
 | colar_r_oracle | mixed | 7 | 81.3 | 61.8 | LOW | no (0) | 35.0 | 17.7 | +1.84 |
@@ -79,5 +85,6 @@
 | colar | mixed | 42 | 85.3 | 51.3 | LOW | no (0) | 44.4 | 33.3 | +2.69 |
 | colar | mixed | 7 | 79.4 | 53.9 | LOW | yes (1) | 33.1 | 23.8 | +1.78 |
 | lexslot | mixed | 123 | 71.6 | 18.9 | LOW | no (0) | 69.8 | 56.3 | +1.30 |
+| lexslot | mixed | 42 | 88.0 | 22.7 | LOW | no (0) | 87.9 | 65.8 | -1.05 |
 | lexslot | mixed | 42 | 70.7 | 21.9 | LOW | no (0) | 65.7 | 52.4 | +2.68 |
 | lexslot | mixed | 7 | 72.4 | 23.0 | LOW | no (0) | 66.8 | 52.8 | +2.85 |

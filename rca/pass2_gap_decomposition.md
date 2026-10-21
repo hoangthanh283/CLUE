@@ -4,6 +4,7 @@ For each cell: `plastic_gap = joint - AA` (what the method leaves on the table) 
 
 | family | scenario | backbone | seed | AA | joint | naive | plastic_gap | replay_gap | head_gap | trunk_gap | coverage_gap |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| colar | cil_cord | layoutlmv3 | 42 | 19.1 | 33.3 | 19.0 | +14.2 | +0.1 | TODO | TODO | TODO |
 | colar_r_oracle | cil_cord | layoutlmv3 | 123 | 29.6 | 33.3 | 19.0 | +3.7 | +10.6 | TODO | TODO | TODO |
 | colar_r_oracle | cil_cord | layoutlmv3 | 42 | 26.8 | 33.3 | 19.0 | +6.5 | +7.8 | TODO | TODO | TODO |
 | colar_r_oracle | cil_cord | layoutlmv3 | 7 | 22.5 | 33.3 | 19.0 | +10.8 | +3.5 | TODO | TODO | TODO |
@@ -19,18 +20,21 @@ For each cell: `plastic_gap = joint - AA` (what the method leaves on the table) 
 | colar | cil_cord | layoutlmv3 | 123 | 20.5 | 33.3 | 19.0 | +12.8 | +1.5 | TODO | TODO | TODO |
 | colar | cil_cord | layoutlmv3 | 42 | 21.7 | 33.3 | 19.0 | +11.6 | +2.7 | TODO | TODO | TODO |
 | colar | cil_cord | layoutlmv3 | 7 | 19.0 | 33.3 | 19.0 | +14.3 | -0.0 | TODO | TODO | TODO |
-| lexslot | cil_cord | layoutlmv3 | 123 | 18.9 | 33.3 | 19.0 | +14.4 | -0.1 | TODO | TODO | TODO |
-| lexslot | cil_cord | layoutlmv3 | 42 | 19.1 | 33.3 | 19.0 | +14.2 | +0.1 | TODO | TODO | TODO |
-| lexslot | cil_cord | layoutlmv3 | 7 | 18.6 | 33.3 | 19.0 | +14.7 | -0.4 | TODO | TODO | TODO |
+| lexslot | cil_cord | bert | 123 | 18.9 | ? | ? | +nan | +nan | TODO | TODO | TODO |
+| lexslot | cil_cord | layoutlmv3 | 42 | 19.2 | 33.3 | 19.0 | +14.1 | +0.2 | TODO | TODO | TODO |
+| lexslot | cil_cord | bert | 42 | 19.1 | ? | ? | +nan | +nan | TODO | TODO | TODO |
+| lexslot | cil_cord | bert | 7 | 18.6 | ? | ? | +nan | +nan | TODO | TODO | TODO |
 | colar | cil_imagenet_r | vit | 123 | 55.2 | 77.6 | 9.3 | +22.4 | +45.9 | TODO | TODO | TODO |
 | colar | cil_imagenet_r | vit | 42 | 53.8 | 77.6 | 9.3 | +23.8 | +44.5 | TODO | TODO | TODO |
 | colar | cil_imagenet_r | vit | 7 | 56.7 | 77.6 | 9.3 | +20.9 | +47.4 | TODO | TODO | TODO |
+| colar | cil_imagenet_r | vit | 42 | 56.4 | 77.6 | 9.3 | +21.2 | +47.1 | TODO | TODO | TODO |
 | colar_adaptive | dil | layoutlmv3 | 123 | 75.3 | 88.7 | 41.3 | +13.4 | +34.0 | TODO | TODO | TODO |
 | colar_adaptive | dil | layoutlmv3 | 42 | 79.0 | 88.7 | 41.3 | +9.7 | +37.7 | TODO | TODO | TODO |
 | colar_adaptive | dil | layoutlmv3 | 7 | 71.2 | 88.7 | 41.3 | +17.5 | +29.9 | TODO | TODO | TODO |
 | colar_e10 | dil | layoutlmv3 | 123 | 87.4 | 88.7 | 41.3 | +1.3 | +46.1 | TODO | TODO | TODO |
 | colar_e10 | dil | layoutlmv3 | 42 | 87.6 | 88.7 | 41.3 | +1.1 | +46.3 | TODO | TODO | TODO |
 | colar_e10 | dil | layoutlmv3 | 7 | 88.3 | 88.7 | 41.3 | +0.4 | +47.0 | TODO | TODO | TODO |
+| colar | dil | layoutlmv3 | 42 | 87.1 | 88.7 | 41.3 | +1.6 | +45.8 | TODO | TODO | TODO |
 | colar | dil | layoutlmv3 | 123 | 69.6 | 88.7 | 41.3 | +19.1 | +28.3 | TODO | TODO | TODO |
 | colar | dil | layoutlmv3 | 123 | 69.6 | 88.7 | 41.3 | +19.1 | +28.3 | TODO | TODO | TODO |
 | colar | dil | layoutlmv3 | 42 | 71.9 | 88.7 | 41.3 | +16.8 | +30.6 | TODO | TODO | TODO |
@@ -52,15 +56,17 @@ For each cell: `plastic_gap = joint - AA` (what the method leaves on the table) 
 | docU | dil | layoutlmv3 | 123 | 86.9 | 88.7 | 41.3 | +1.8 | +45.6 | TODO | TODO | TODO |
 | docU | dil | layoutlmv3 | 7 | 86.6 | 88.7 | 41.3 | +2.1 | +45.3 | TODO | TODO | TODO |
 | docU | dil | layoutlmv3 | 42 | 75.9 | 88.7 | 41.3 | +12.8 | +34.6 | TODO | TODO | TODO |
-| lexslot | dil | layoutlmv3 | 123 | 37.6 | 88.7 | 41.3 | +51.1 | -3.7 | TODO | TODO | TODO |
+| lexslot | dil | bert | 123 | 37.6 | ? | ? | +nan | +nan | TODO | TODO | TODO |
 | lexslot | dil | layoutlmv3 | 123 | 86.3 | 88.7 | 41.3 | +2.4 | +45.0 | TODO | TODO | TODO |
-| lexslot | dil | layoutlmv3 | 42 | 38.5 | 88.7 | 41.3 | +50.2 | -2.8 | TODO | TODO | TODO |
+| lexslot | dil | layoutlmv3 | 42 | 40.5 | 88.7 | 41.3 | +48.2 | -0.8 | TODO | TODO | TODO |
+| lexslot | dil | bert | 42 | 38.5 | ? | ? | +nan | +nan | TODO | TODO | TODO |
 | lexslot | dil | layoutlmv3 | 42 | 87.1 | 88.7 | 41.3 | +1.6 | +45.8 | TODO | TODO | TODO |
 | lexslot | dil | layoutlmv3 | 42 | 88.4 | 88.7 | 41.3 | +0.3 | +47.1 | TODO | TODO | TODO |
 | lexslot | dil | layoutlmv3 | 42 | 88.4 | 88.7 | 41.3 | +0.3 | +47.1 | TODO | TODO | TODO |
 | lexslot | dil | layoutlmv3 | 42 | 84.8 | 88.7 | 41.3 | +3.9 | +43.5 | TODO | TODO | TODO |
-| lexslot | dil | layoutlmv3 | 7 | 37.9 | 88.7 | 41.3 | +50.8 | -3.4 | TODO | TODO | TODO |
+| lexslot | dil | bert | 7 | 37.9 | ? | ? | +nan | +nan | TODO | TODO | TODO |
 | lexslot | dil | layoutlmv3 | 7 | 87.2 | 88.7 | 41.3 | +1.5 | +45.9 | TODO | TODO | TODO |
+| colar | mixed | layoutlmv3 | 42 | 58.8 | 67.5 | 33.9 | +8.7 | +24.9 | TODO | TODO | TODO |
 | colar_r_oracle | mixed | layoutlmv3 | 123 | 63.0 | 67.5 | 33.9 | +4.5 | +29.1 | TODO | TODO | TODO |
 | colar_r_oracle | mixed | layoutlmv3 | 42 | 63.5 | 67.5 | 33.9 | +4.0 | +29.6 | TODO | TODO | TODO |
 | colar_r_oracle | mixed | layoutlmv3 | 7 | 66.5 | 67.5 | 33.9 | +1.0 | +32.6 | TODO | TODO | TODO |
@@ -76,6 +82,7 @@ For each cell: `plastic_gap = joint - AA` (what the method leaves on the table) 
 | colar | mixed | layoutlmv3 | 123 | 59.2 | 67.5 | 33.9 | +8.3 | +25.3 | TODO | TODO | TODO |
 | colar | mixed | layoutlmv3 | 42 | 57.5 | 67.5 | 33.9 | +10.0 | +23.6 | TODO | TODO | TODO |
 | colar | mixed | layoutlmv3 | 7 | 59.6 | 67.5 | 33.9 | +7.9 | +25.7 | TODO | TODO | TODO |
-| lexslot | mixed | layoutlmv3 | 123 | 24.7 | 67.5 | 33.9 | +42.8 | -9.2 | TODO | TODO | TODO |
-| lexslot | mixed | layoutlmv3 | 42 | 27.0 | 67.5 | 33.9 | +40.5 | -6.9 | TODO | TODO | TODO |
-| lexslot | mixed | layoutlmv3 | 7 | 28.3 | 67.5 | 33.9 | +39.2 | -5.6 | TODO | TODO | TODO |
+| lexslot | mixed | bert | 123 | 24.7 | ? | ? | +nan | +nan | TODO | TODO | TODO |
+| lexslot | mixed | layoutlmv3 | 42 | 33.1 | 67.5 | 33.9 | +34.4 | -0.8 | TODO | TODO | TODO |
+| lexslot | mixed | bert | 42 | 27.0 | ? | ? | +nan | +nan | TODO | TODO | TODO |
+| lexslot | mixed | bert | 7 | 28.3 | ? | ? | +nan | +nan | TODO | TODO | TODO |
