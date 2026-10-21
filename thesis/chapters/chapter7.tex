@@ -102,8 +102,9 @@ element is the drift-immune \gls{ocr}-vocabulary signature that gates it. Lexica
 latent replay joins that gate to CoLaR's memory: for each incoming document it replays the stored
 latents chosen by lexical similarity rather than uniformly, with the memory and loss held fixed so
 that any change is the gate's alone. Routing towards the lexically nearest stored documents
-passes the pre-registered one-point rule, adding \est{$1.4$} AA at fifty documents per task and
-\est{$6.6$} at five, so the gate matters most exactly where memory is scarce.
+does not pass the pre-registered one-point rule once three seeds are in (best arm $+0.5$ AA,
+two of three seeds agreeing), so the gate is retired as a component and the memory is sampled
+uniformly; what moves the class-incremental scenarios is keeping the stored labels live.
 
 Taken together, the diagnosis decides \emph{where} a remedy attaches, the negative results decide
 \emph{what form} its memory must take, and the lexical gate decides \emph{what} it replays. The

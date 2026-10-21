@@ -573,96 +573,101 @@ $77.3 \pm 0.5$ (BERT) --- \emph{above} the pooled Joint oracle on LiLT ($83.8$) 
 \label{sec:results-main-table}
 
 Table~\ref{tab:main-comparison} and Figure~\ref{fig:aa-bars} report the average accuracy
-of each method on the three scenarios, all measured to convergence over three seeds. Six
-patterns hold. The first four characterise the core six methods; the fifth reports
-LexSlot, the origin of the proposed method's gate, the sixth the prompt/LoRA family.
-First, naive fine-tuning is far below the joint oracle in every scenario, with the gap
-largest on the domain-incremental scenario ($41.3$ vs $88.7$). Second, the
-\emph{replay} methods are the strongest non-oracle strategies by a wide margin and behave
-almost identically: on DIL ER ($87.9$), DER++ ($88.0$), and the 2025 sharpness-aware
-replay variant C-Flat++ ($88.4$, the best non-oracle result) all statistically match the
-joint upper bound ($88.7$), closing essentially the entire forgetting gap; on the Mixed
-scenario ER and DER++ reach $60.3$ and $60.8$, below the oracle ($67.5$) but far above the
-rest. C-Flat++ adds a sharpness-aware neighbourhood on top of ER and edges it out on DIL
-($88.4$ vs $87.9$), but the gain over plain replay is within noise: replay's dominance is
-the robust pattern, not the particular replay variant. Third, regularisation (EWC) is the most surprising result:
-trained to convergence its Fisher penalty over-constrains the growing head and it
-\emph{collapses} on fine-grained class-incremental learning (CIL-CORD AA falls to $0.5$,
-far below naive ($19.0$)), and it is unstable on Mixed ($22.0\pm7.6$); yet on the
-fixed-label DIL scenario the same penalty yields near-zero forgetting (BWT $-2.8$). EWC thus
-buys retention at the cost of plasticity, and on a growing output space that trade-off is
-catastrophic. Fourth, distillation (LwF) tracks the naive lower bound throughout: in this
-dense token-classification setting LwF gives essentially no benefit, because the old-class
-logits it distils collapse anyway as the classifier head grows. The hardest scenario for
-every method is CIL-CORD, where even the joint oracle reaches only $33.3$ AA: packing all
-$60$ fine-grained CORD classes into one growing head is an intrinsically difficult
+of the frozen reference set (\S\ref{sec:exp-baselines}) and of our rows on the five
+scenarios, measured to convergence over three seeds unless a cell says otherwise. Six
+patterns hold. First, naive fine-tuning is far below the joint oracle in every scenario,
+with the gap largest on the domain-incremental scenario ($41.3$ vs $88.7$). Second, the
+\emph{replay} methods are the strongest baselines by a wide margin and behave almost
+identically: on DIL ER ($87.9$) and DER++ ($88.0$) statistically match the joint upper
+bound ($88.7$), closing essentially the entire forgetting gap (the sharpness-aware replay
+variant C-Flat++, cited as ER's 2025 relative, reaches $88.4$, within noise of plain ER);
+on Mixed ER and DER++ reach $60.3$ and $60.8$, below the oracle ($67.5$) but far above the
+rest. Third, regularisation is the most surprising result: EWC, run in the backbone grid of
+\S\ref{sec:results-backbone} but dominated by LwF and therefore not a row here, over-constrains
+the growing head when trained to convergence and \emph{collapses} on fine-grained
+class-incremental learning (CIL-CORD AA $0.5$, far below naive $19.0$), while on the
+fixed-label DIL scenario the same penalty yields near-zero forgetting (BWT $-2.8$): retention
+bought with plasticity, catastrophic on a growing output space. Fourth, distillation (LwF)
+tracks the naive lower bound throughout: in this dense token-classification setting the
+old-class logits it distils collapse anyway as the classifier head grows. The hardest
+scenario for every method is CIL-CORD, where even the joint oracle reaches only $33.3$ AA:
+packing all fine-grained CORD classes into one growing head is an intrinsically difficult
 multi-class problem, independent of forgetting.
-Fifth, and most important for this thesis, \textbf{LexSlot}
-(the isolated slot memory, paired with a compact 200-exemplar replay buffer in its headline
-configuration, mean over three seeds on the domain-incremental
-scenario) \emph{approaches replay-level accuracy} (LexSlot $87.3$ vs ER $87.9$, DER++ $88.0$,
-within $\sim$1 point, and the oracle's $88.7$) while \emph{forgetting less than the plain
-replay methods} (LexSlot BWT $-2.3$ vs ER $-2.8$, DER++ $-3.4$; \S\ref{sec:results-lexslot}),
-and it does so with an order-of-magnitude smaller exemplar budget than the plain replay
-baselines: slot isolation carries most of the protection structurally, with the small buffer
-supplying the rest. The honest reading is that LexSlot's
-diagnosis-driven head/late targeting is competitive with, rather than exceeding, data replay
-on the domain shift, with the chief advantage being qualitative: replay-level retention at a
-parameter-efficient cost with a fraction of the exemplar budget. Across the broader columns of Table~\ref{tab:main-comparison}, the proposed lexically-routed
-latent replay leads every non-oracle method on both class-incremental scenarios
-(\est{$22.4$} on CIL-CORD, \est{$23.1$} on CIL-WildReceipt), on cross-lingual DIL (\est{$80.9$}),
-and on Mixed (\est{$63.4$}), and sits \est{$0.4$} below the oracle on DIL (\est{$88.3$}); CoLaR,
-its memory with uniform sampling, trails it in every column by \est{$0.5$}--\est{$1.5$} points.
-Sixth, the parameter-efficient prompt baselines, which \emph{freeze} the backbone and
-train only a prompt pool plus the head, \emph{nearly fail} on this dense per-token task:
-L2P, DualPrompt, and CODA-Prompt collapse to single-digit AA on class-incremental CORD
-($0$--$2$) and reach only $\sim$30 on DIL and $\sim$12 on Mixed, far below even the naive
-full-fine-tuning lower bound. The frozen backbone, sufficient for the \texttt{[CLS]}-level
-image-classification tasks these methods were designed for, cannot supply the per-token
-representations that document IE needs; the LoRA-adapted O-LoRA and CL-LoRA, which do
-update the backbone in a low-rank subspace, fare better on the fixed-label DIL scenario
-(O-LoRA $40.8$, CL-LoRA $41.1$, on a par with naive) but are unstable on the
-growing-head scenarios (O-LoRA collapses to $4.7\pm8.2$ on CIL-CORD and $13.4$ on Mixed,
-CL-LoRA to $8.9\pm7.7$ on CIL-CORD). This is direct evidence that prompt-pool transfer
-does not carry over to dense visually-rich document understanding, while low-rank
-adaptation recovers the naive lower bound only where the output space is fixed.
+
+Fifth, and most important for this thesis, the two proposed memories behave as the
+diagnosis predicts, and the lexical \emph{gate} does not. \textbf{LexSlot} (the isolated
+slot memory, paired with its compact 200-exemplar buffer, three seeds on DIL)
+\emph{approaches replay-level accuracy} ($87.3$ vs ER $87.9$, DER++ $88.0$, oracle $88.7$)
+while \emph{forgetting less than plain replay} (BWT $-2.3$ vs $-2.8$ and $-3.4$;
+\S\ref{sec:results-lexslot}), with an order-of-magnitude smaller exemplar budget.
+\textbf{CoLaR}, the compressed whole-document memory with uniform sampling ($k{=}4$, $50$
+documents per task, rank $128$, $60$\,MB), reaches $87.8\pm0.5$ on DIL---within one point of
+the oracle and of raw-exemplar replay at $2.7\times$ less storage---but only the naive level
+on CIL-CORD ($20.4\pm1.3$ vs $19.0$) and $58.8\pm0.9$ on Mixed, below ER. Routing CoLaR's
+replay sampler with the LexSlot lexical gate (near, far or task-level) was pre-registered and
+killed: the best routed arm gains $+0.5$ points over uniform sampling on average with the
+sign agreeing on two of three seeds (\S\ref{sec:results-abl-which}), so the gate adds nothing
+beyond the memory it routes. What moves the class-incremental scenarios is the
+\emph{label} side of the memory. A banked document carries ``O'' on every entity introduced
+after it was banked, and replaying it re-teaches the head to suppress those classes:
+refreshing the stored labels from a per-document ledger (the true-label ceiling) lifts
+CIL-CORD to $26.3\pm3.6$ and Mixed to $64.4\pm1.6$, above plain CoLaR on every seed;
+restricting the replay loss to the classes that existed at banking time (CoLaR-R, a sliced
+softmax that touches no label) gives $25.4\pm2.0$ on CIL-CORD, again above plain on all three
+seeds and the only deployable arm to clear its pre-registered bar, and $61.3\pm1.6$ on Mixed,
+where it ties plain CoLaR on one seed and so falls short of its bar. Teacher-free
+pseudo-labelling of the stale ``O'' tokens is a registered null ($20.0\pm3.4$ on CIL-CORD,
+sign flipping across seeds).
+
+Sixth, the parameter-efficient prompt baselines, which \emph{freeze} the backbone and train
+only a prompt pool plus the head, \emph{nearly fail} on this dense per-token task: CODA-Prompt
+does not converge on CIL-CORD (AA $0.0$ on all three seeds; a five-fold larger prompt pool
+still leaves one session unlearned, \S\ref{sec:results-nulls}) and reaches only $32.5$ on DIL
+and $8.1$ on Mixed, far below the naive lower bound; its ancestors L2P and DualPrompt behave
+the same and are cited rather than re-run. The frozen backbone, sufficient for the
+\texttt{[CLS]}-level image-classification tasks these methods were designed for, cannot supply
+the per-token representations that document IE needs. The LoRA-adapted CL-LoRA, which does
+update the backbone in a low-rank subspace, recovers the naive bound only where the output
+space is fixed (DIL $41.1$) and is unstable where it grows (CIL-CORD $13.4\pm0.7$ over two
+converged seeds, Mixed $31.4$). The two continual-NER comparators built for exactly the
+stale-``O'' failure mode do not survive five class-adding sessions on a single growing head:
+CPFD does not converge on CIL-CORD or Mixed and IS3 never re-predicts a previously learned
+class on CIL-CORD ($4.4\pm1.7$), though it recovers to $30.1\pm1.0$ on Mixed, whose last
+session adds no classes. Model merging with classifier realignment (LCA) converges but lands
+far below naive on CIL-CORD ($8.2\pm2.1$) and just above it on DIL ($43.9\pm2.0$).
 
 \begin{table}[!htbp]
   \centering
-  \caption[Main comparison: average accuracy across scenarios]{Average entity-F1
-  (AA) of each method on the five continual scenarios (mean\,$\pm$\,std over three seeds).
-  Best non-oracle result per column in bold. Replay matches the oracle on DIL and the
-  frozen-backbone prompt methods nearly fail on this dense token-level task. The proposed
-  lexically-routed latent replay is the strongest non-oracle method on four of the five
-  scenarios; CoLaR is its memory with uniform sampling, and LexSlot is listed with the
-  200-exemplar buffer its accuracy depends on (\S\ref{sec:results-abl-components}).}
+  \caption[Main comparison: average accuracy across scenarios]{Average entity-F1 (AA) of
+  the frozen reference set (two bounds, ten published baselines; \S\ref{sec:exp-baselines}) and
+  of our rows on the five continual scenarios (mean\,$\pm$\,std over three seeds unless
+  marked). Best baseline per column in bold. CoLaR, CoLaR-R and the baselines use ten epochs
+  per task with early stopping; LexSlot is listed with the 200-exemplar buffer its accuracy
+  depends on (\S\ref{sec:results-abl-components}); CoLaSlot is a single five-epoch seed.
+  null$^{*}$: did not converge (\S\ref{sec:results-nulls}). ``--'': cell not run or not
+  applicable (CPFD and IS3 on DIL and LCA on Mixed were in progress at the time of writing).}
   \label{tab:main-comparison}
-  % Auto-loaded from generated/table_main.tex (scripts/project_converged_metrics.py);
-  % the inline table below is a hand-kept mirror as a fallback. The 5-scenario generated
-  % table is wider than \textwidth, so wrap it in \resizebox to fit and stay centred.
   \IfFileExists{generated/table_main.tex}{\resizebox{\textwidth}{!}{\input{generated/table_main}}}{%
   \begin{tabular}{lccc}
     \toprule
     \textbf{Method} & \textbf{CIL-CORD} & \textbf{DIL} & \textbf{Mixed} \\
     \midrule
-    Naive (lower bound)   & $\mathbf{19.0 \pm 0.1}$ & $41.3 \pm 0.4$ & $33.9 \pm 0.7$ \\
-    EWC                   & $0.5 \pm 0.5$ & $41.2 \pm 0.9$ & $22.0 \pm 7.6$ \\
-    LwF                   & $18.8 \pm 0.1$ & $43.7 \pm 0.9$ & $35.2 \pm 1.0$ \\
-    ER                    & $16.0 \pm 1.1$ & $87.9 \pm 1.4$ & $60.3 \pm 5.3$ \\
-    ER + C-Flat++ (2025)  & $15.9 \pm 1.5$ & $\mathbf{88.4 \pm 0.1}$ & $62.2 \pm 0.7$ \\
-    DER++                 & $18.2 \pm 0.2$ & $88.0 \pm 0.9$ & $60.8 \pm 2.7$ \\
-    LexSlot ($+$ buffer)  & \est{$16.4 \pm 0.9$} & $87.3 \pm 1.0$ & \est{$59.2 \pm 2.1$} \\
-    CoLaR (memory only)   & \est{$21.2 \pm 0.8$} & $87.8 \pm 0.5$ & \est{$61.9 \pm 1.6$} \\
-    \textbf{Lexically-routed latent replay (ours)} & \est{$\mathbf{22.4 \pm 0.7}$} & \est{$88.3 \pm 0.5$} & \est{$\mathbf{63.4 \pm 1.2}$} \\
+    Naive (lower bound)   & $19.0 \pm 0.2$ & $41.3 \pm 1.5$ & $33.9 \pm 0.3$ \\
+    LwF                   & $18.8 \pm 0.2$ & $43.7 \pm 1.1$ & $35.2 \pm 1.2$ \\
+    ER                    & $16.0 \pm 1.4$ & $87.9 \pm 1.4$ & $60.3 \pm 5.3$ \\
+    DER++                 & $18.2 \pm 0.3$ & $\mathbf{88.0 \pm 0.9}$ & $\mathbf{60.8 \pm 2.7}$ \\
+    CODA-Prompt           & null$^{*}$ & $32.5 \pm 1.2$ & $8.1 \pm 1.5$ \\
+    CL-LoRA (2025)        & $13.4 \pm 0.7$ & $41.1 \pm 0.3$ & $31.4 \pm 0.6$ \\
+    CPFD (2023)           & null$^{*}$ & -- & null$^{*}$ \\
+    IS3 (2024)            & null$^{*}$ & -- & $30.1 \pm 1.2$ \\
+    LCA (2026)            & $8.2 \pm 2.6$ & $43.9 \pm 2.5$ & -- \\
     \midrule
-    L2P                   & $1.1 \pm 0.9$ & $30.4 \pm 0.3$ & $11.5 \pm 0.1$ \\
-    DualPrompt            & $1.8 \pm 1.4$ & $29.9 \pm 0.5$ & $11.7 \pm 0.1$ \\
-    CODA-Prompt           & $0.0 \pm 0.0$ & $32.5 \pm 1.2$ & $8.1 \pm 1.5$ \\
-    O-LoRA                & $4.7 \pm 8.2$ & $40.8 \pm 0.3$ & $13.4 \pm 0.7$ \\
-    CL-LoRA (2025)        & $8.9 \pm 7.7$ & $41.1 \pm 0.3$ & $31.4 \pm 0.6$ \\
+    \textbf{CoLaR (ours)}            & $20.4 \pm 1.3$ & $87.8 \pm 0.5$ & $58.8 \pm 1.1$ \\
+    \textbf{CoLaR-R, sliced (ours)}  & $25.4 \pm 2.4$ & -- & $61.3 \pm 1.9$ \\
+    \textbf{LexSlot (ours)}          & -- & $87.3 \pm 1.0$ & -- \\
     \midrule
-    Independent (per-dataset)\textsuperscript{\dag} & \textsc{n/a} & $88.2 \pm 1.0$ & \textsc{n/a} \\
-    Joint (upper bound)   & $33.3 \pm 0.3$ & $88.7 \pm 1.1$ & $67.5 \pm 0.7$ \\
+    Joint (upper bound)   & $33.3 \pm 0.3$ & $88.7 \pm 1.1$ & $67.5 \pm 0.8$ \\
+    Independent (per-dataset)\textsuperscript{\dag} & \textsc{n/a} & $88.8 \pm 0.6$ & \textsc{n/a} \\
     \bottomrule
   \end{tabular}}
 
@@ -670,13 +675,33 @@ adaptation recovers the naive lower bound only where the output space is fixed.
   {\footnotesize \textsuperscript{\dag}\emph{Independent} is the per-dataset upper bound: three
   models trained from scratch on FUNSD, SROIE, and CORD independently (no CL), three-seed macro.
   It is a stronger comparator than Joint for the deployment question ``why not just fine-tune
-  one model per domain?''\ --- the gap it leaves open to Joint ($+0.5$) is the entire
-  transfer headroom on DIL/LayoutLMv3, and CoLaR captures $\approx 85\%$ of it at $1\times$
-  model storage plus a $60$\,MB replay buffer. The row is undefined for CIL-CORD (one dataset
-  split by label) and Mixed (composed stream). Per-dataset numbers in
-  Table~\ref{tab:single-task-baselines}; secondary-backbone cells are running (see
-  Section~\ref{sec:concl-limitations}).}
+  one model per domain?'': Joint exceeds it by only $+0.5$ on DIL/LayoutLMv3, and CoLaR
+  ($87.8$) sits $1.0$ below Independent at $1\times$ model storage plus a $60$\,MB replay
+  buffer. The row is undefined for CIL-CORD (one dataset split by label) and Mixed (composed
+  stream). Per-dataset numbers in Table~\ref{tab:single-task-baselines}.}
 \end{table}
+
+\paragraph{Non-converged baselines.}
+\label{sec:results-nulls}
+Three cells of Table~\ref{tab:main-comparison} are reported as nulls rather than scores.
+CPFD and IS3 were ported onto the single growing token-classification head used by every
+other method (their reference implementations keep per-task classifiers). On CIL-CORD, CPFD
+learns the first session ($90$--$95$ F1) and then reads $0.00$ on every session from the first
+class-adding boundary; on Mixed it reads $6.0$, $0.0$ and $0.1$. Two single-knob ablations on
+seed 42 reproduce the collapse exactly---flooring its per-sample cross-entropy weight at
+$0.5$, and switching its distillation term off entirely---so neither the adaptive loss
+weight nor the attention and logit distillation is the cause; what remains is the
+pseudo-labelling and ``O''-token masking path, which removes the training signal on the new
+session's entities. IS3 learns each new session but never predicts a previously learned
+class again (every off-diagonal entry of its accuracy matrix is exactly $0.00$), giving
+$4.4\pm1.7$ on CIL-CORD; on Mixed, whose last session adds no classes, it recovers to
+$30.1\pm1.0$ and that cell is reported. CODA-Prompt reads $0.0$ on all three CIL-CORD seeds
+with its default pool of ten prompt components; enlarging the pool to fifty lets some
+sessions be learned (per-session accuracies $79.5/40.6/0.0/18.9/36.8$) but leaves one session
+unlearned and the final row at $[0,0,0,0,36.8]$, so the cell stays a null. These are
+properties of the methods' ``O''-tag and static-pool assumptions under five class-adding
+sessions, not of the sessions themselves, which naive training ($19.0$) and the joint bound
+($33.3$) both learn.
 
 \begin{figure}[!htbp]
   \centering
@@ -777,9 +802,9 @@ baselines.
     ER                  & $-68.3 \pm 3.2$ & $-2.8 \pm 1.7$ & $-23.5 \pm 5.6$ \\
     ER + C-Flat++ (2025) & $-73.2 \pm 4.1$ & $\mathbf{-1.8 \pm 0.3}$ & $-21.8 \pm 4.3$ \\
     DER++               & $-86.2 \pm 3.2$ & $-3.4 \pm 1.4$ & $-34.8 \pm 2.0$ \\
-    LexSlot ($+$ buffer) & \est{$-78.6 \pm 6.2$} & $-2.3 \pm 1.2$ & \est{$-24.9 \pm 7.8$} \\
-    CoLaR (memory only) & \est{$-58.4 \pm 3.1$} & \est{$-2.9 \pm 0.7$} & \est{$-20.6 \pm 3.3$} \\
-    \textbf{Lexically-routed latent replay (ours)} & \est{$-55.2 \pm 2.8$} & \est{$-2.1 \pm 0.6$} & \est{$-18.5 \pm 2.6$} \\
+    LexSlot ($+$ buffer) & -- & $-2.3 \pm 1.0$ & -- \\
+    CoLaR (memory only) & $-22.3 \pm 10.6$ & $-1.8 \pm 1.1$ & $-28.0 \pm 3.9$ \\
+    \textbf{CoLaR-R, sliced (ours)} & $-26.9 \pm 16.2$ & -- & $-28.4 \pm 3.3$ \\
     \midrule
     L2P                 & $-15.7$ & $-11.5$ & $-2.8$ \\
     DualPrompt          & $-15.2$ & $-11.1$ & $-2.6$ \\
@@ -897,8 +922,8 @@ same slots costs more in interference than it recovers in shared-rule refinement
 selects isolation.
 
 \emph{Depth (targeting vs.\ uniform).} Placing slots only at the diagnosed head/late site
-(\est{$86.8$} / \est{$-1.9$}) beats spreading them across every layer (\emph{uniform},
-\est{$84.4$} / \est{$-2.4$}) by \est{$2.4$} AA with less forgetting, reproducing, now with the slot mechanism, the same targeting
+($87.3$ / $-2.3$, three seeds) beats spreading them across every layer (\emph{uniform},
+$84.8$ / $-2.0$, one seed) by $2.5$ AA at similar forgetting, reproducing, now with the slot mechanism, the same targeting
 effect the depth-scaled consolidation probe shows (\S\ref{sec:results-key-ablation}). LexSlot's
 gain comes from \emph{where} the mechanism attaches: capacity placed where forgetting lives
 outperforms the same capacity spread uniformly. The effect is smaller than for the consolidation
@@ -913,7 +938,7 @@ the diagnosis-driven placement.
   lexical sharing (\emph{soft}) on both AA and backward transfer over three seeds, so the
   putative vocabulary-overlap transfer does not outweigh slot interference: isolation is the
   selected method. \emph{Depth}: slots concentrated on the diagnosed head/late site versus
-  spread uniformly across depth (targeting the site beats spreading by \est{$2.4$} AA), reproducing the
+  spread uniformly across depth (targeting the site beats spreading by $2.5$ AA; the head-only and uniform rows are single-seed), reproducing the
   depth-targeting probe's effect with the slot mechanism. All rows are mean\,$\pm$\,std over
   three seeds (42/123/7).}
   \label{tab:lexslot-ablation}
@@ -927,14 +952,14 @@ the diagnosis-driven placement.
       & soft (graded by $S$)              & $86.3 \pm 0.6$          & $-3.8 \pm 2.0$ \\
     \midrule
     \multirow{3}{*}{Depth}
-      & head/late (targeted)              & \est{$86.8 \pm 0.9$} & \est{$-1.9 \pm 0.7$} \\
-      & head-only                         & \est{$86.7 \pm 0.8$} & \est{$-3.0 \pm 0.9$} \\
-      & uniform (all depths)              & \est{$84.4 \pm 1.1$} & \est{$-2.4 \pm 0.8$} \\
+      & head/late (targeted)              & $87.3 \pm 0.8$ & $-2.3 \pm 1.0$ \\
+      & head-only                         & $87.1$ {\scriptsize (1 seed)} & $-3.1$ \\
+      & uniform (all depths)              & $84.8$ {\scriptsize (1 seed)} & $-2.0$ \\
     \bottomrule
   \end{tabular}}
 \end{table}
 
-As with the depth-targeting probe, a head-only restriction (\est{$86.7$}) already recovers
+As with the depth-targeting probe, a head-only restriction ($87.1$, one seed) already recovers
 essentially the full head/late result, suggesting the late-layer slots are largely redundant with the head slots; a simpler
 head-only variant is a natural future simplification. Class-incremental learning remains a
 hard case for the lexical gate (same-dataset sessions collapse the signature contrast). What the
@@ -1035,12 +1060,15 @@ at the diagnosed site is the component that makes the method work.
 \emph{Both together is the proposed method.} With the memory, its size, and the replay loss
 fixed, the gate decides only which stored documents are replayed, so the difference between the
 ``both'' rows and the memory-only row at the same $d$ is the gate's contribution alone. Under
-the pre-registered rule it counts as an effect only above one AA point. \emph{Near} routing
-clears it at both memory sizes and is the method's default: at $d{=}50$ it adds \est{$1.4$}
-points over uniform sampling (\est{$87.8$} vs $86.4$), within \est{$0.9$} of the joint oracle,
-and at $d{=}5$ it adds \est{$6.6$} (\est{$74.6$} vs \est{$68.0$}) while cutting forgetting from
-\est{$-22.4$} to \est{$-14.1$}. The gate therefore matters most when the memory is small, where
-uniform sampling spends most of its few replays on documents unrelated to the current task.
+the pre-registered rule it counts as an effect only above one AA point on seed 42, confirmed
+with the same sign on seeds 7 and 123. No routed arm clears it. At $d{=}50$ the seed-42 screen
+put \emph{far} routing at $88.2$ ($+1.8$ over uniform $86.4$), \emph{task} at $87.3$ ($+0.9$)
+and \emph{near} at $86.5$ ($+0.1$); on the confirmation seeds far routing averages
+$87.2\pm0.8$ against uniform $86.6\pm0.2$, a mean gain of $+0.5$ with the sign agreeing on
+two of three seeds ($+1.8/+0.4/-0.6$), and the arm is killed by the rule. At $d{=}5$ (seed 42)
+far routing gains $+1.9$ ($77.8$ vs $75.9$), task loses $2.5$ and near loses $11.9$. The
+gate therefore adds nothing beyond the memory it routes, and the method's default is uniform
+sampling; the seed-42 gain was seed noise, not a routing effect.
 
 \begin{table}[!htbp]
   \centering
@@ -1060,15 +1088,15 @@ uniform sampling spends most of its few replays on documents unrelated to the cu
     Gate alone (LexSlot, no memory)         & --         & \checkmark & --  & $42.2$         & $-67.2$ \\
     LexSlot $+$ buffer$^\dagger$            & exemplars  & \checkmark & --  & $87.3 \pm 1.0$ & $-2.3$ \\
     \midrule
-    Memory alone (CoLaR, uniform)           & \checkmark & --         & 50  & $86.4$         & $-3.4$ \\
-    Both, \emph{near}                       & \checkmark & \checkmark & 50  & \est{$87.8$}   & \est{$-2.6$} \\
-    Both, \emph{far}                        & \checkmark & \checkmark & 50  & \est{$85.9$}   & \est{$-3.9$} \\
-    Both, \emph{task}                       & \checkmark & \checkmark & 50  & \est{$86.6$}   & \est{$-3.1$} \\
+    Memory alone (CoLaR, uniform)           & \checkmark & --         & 50  & $86.6 \pm 0.2$ & $-2.8 \pm 0.5$ \\
+    Both, \emph{near}                       & \checkmark & \checkmark & 50  & $86.5$ {\scriptsize (1 seed)} & $-3.4$ \\
+    Both, \emph{far}                        & \checkmark & \checkmark & 50  & $87.2 \pm 0.8$ & $-1.5 \pm 1.0$ \\
+    Both, \emph{task}                       & \checkmark & \checkmark & 50  & $87.3$ {\scriptsize (1 seed)} & $-1.9$ \\
     \midrule
-    Memory alone (CoLaR, uniform)           & \checkmark & --         & 5   & \est{$68.0$}   & \est{$-22.4$} \\
-    Both, \emph{near}                       & \checkmark & \checkmark & 5   & \est{$74.6$}   & \est{$-14.1$} \\
-    Both, \emph{far}                        & \checkmark & \checkmark & 5   & \est{$66.2$}   & \est{$-24.5$} \\
-    Both, \emph{task}                       & \checkmark & \checkmark & 5   & \est{$69.4$}   & \est{$-19.8$} \\
+    Memory alone (CoLaR, uniform)           & \checkmark & --         & 5   & $75.9$ {\scriptsize (1 seed)} & $-19.5$ \\
+    Both, \emph{near}                       & \checkmark & \checkmark & 5   & $64.0$ {\scriptsize (1 seed)} & $-36.6$ \\
+    Both, \emph{far}                        & \checkmark & \checkmark & 5   & $77.8$ {\scriptsize (1 seed)} & $-16.5$ \\
+    Both, \emph{task}                       & \checkmark & \checkmark & 5   & $73.4$ {\scriptsize (1 seed)} & $-23.3$ \\
     \midrule
     Joint oracle (3 seeds)                  & all data   & --         & --  & $88.7$         & -- \\
     \bottomrule
@@ -1149,13 +1177,14 @@ The gate's own design choice is the routing mode, held at a fixed memory in the 
 Table~\ref{tab:abl-components}: \emph{near} replays the stored documents whose vocabulary is
 closest to the current batch (where interference is most likely), \emph{far} the least similar
 (where the current task gives no support), and \emph{task} the most similar past task as a
-whole. Uniform sampling is the zero point. The ordering is the same at both memory sizes,
-near $>$ task $>$ uniform $>$ far (\est{$87.8$}/\est{$86.6$}/$86.4$/\est{$85.9$} at $d{=}50$;
-\est{$74.6$}/\est{$69.4$}/\est{$68.0$}/\est{$66.2$} at $d{=}5$). Replaying the most similar
-documents is what helps: interference is concentrated between lexically close tasks (the two
-receipt datasets), and routing replay towards them repairs it where it happens, while
-\emph{far} routing spends the budget where the current task does little damage and falls below
-uniform.
+whole. Uniform sampling is the zero point. The measured ordering is far $\approx$ task $>$ uniform $>$ near at $d{=}50$
+($87.2$/$87.3$/$86.6$/$86.5$; far over three seeds, the others one) and far $>$ uniform $>$
+task $>$ near at $d{=}5$ ($77.8$/$75.9$/$73.4$/$64.0$, one seed). Replaying the most
+\emph{similar} documents, the mode the design argued for, is the worst at both sizes, and the
+only arm above uniform on the seed-42 screen, far routing, does not survive the confirmation
+seeds ($+0.5$ on average, two of three signs). Lexical similarity therefore selects documents
+that the current task already covers; the memory's value is coverage, which uniform sampling
+already provides, and the routing mode is retired.
 
 \section{Computational Efficiency}
 \label{sec:results-compute}
@@ -1178,7 +1207,7 @@ advantage is qualitative: replay-level retention on the domain shift (\S\ref{sec
 with a frozen backbone and a small fraction of the rehearsal data. The proposed method is cheaper
 than both: below layer $k$ the encoder is frozen after the first task, so it trains
 $56.7$\,M parameters, less than half of the full-fine-tuning methods, and its replay passes run
-only the upper layers on stored latents, keeping peak memory at \est{$2.5$}\,GB. ``Run'' denotes one full continual
+only the upper layers on stored latents, keeping peak memory at $2.4$\,GB. ``Run'' denotes one full continual
 scenario.
 
 \begin{table}[!htbp]
@@ -1227,8 +1256,8 @@ tags), the largest growing output space in the benchmark. Forgetting here is sev
 unlike DIL, \emph{replay does not rescue it}: naive reaches only $20.8$ AA with BWT
 $-84.5$, and the replay methods barely move the needle (ER $19.9$ / $-79.4$, DER++
 $20.2$ / $-84.0$), all far below the joint oracle ($33.9$). Among the baselines the best accuracy
-is just $\sim$$20.8$ (LwF and naive); the proposed method, replaying whole-document latents,
-lifts it only to \est{$23.1$}, still far below the oracle. The lesson is that class-incremental learning
+is just $\sim$$20.8$ (LwF and naive), and no replay variant we tested lifts it out of that
+band, far below the oracle. The lesson is that class-incremental learning
 \emph{at scale} is the hardest regime: when the head must keep growing to admit dozens of
 new classes, the head-growth bottleneck dominates, and a replay buffer over past inputs
 cannot compensate for an output space that keeps expanding. This mirrors, at larger
@@ -1383,8 +1412,10 @@ CoLaR's memory, size, and replay loss unchanged and replaces only the sampler: L
 five epochs; reference AA $86.4$ at $60.4$\,MB) at two memory sizes, $d{=}50$ and $d{=}5$
 documents per task, where routing should matter most when the store is small. The
 pre-registered decision rule is that routing counts as an effect only if it moves AA by more
-than one point over uniform sampling. \emph{Near} routing passes it at both sizes, adding
-\est{$1.4$} AA at $d{=}50$ and \est{$6.6$} at $d{=}5$ (Table~\ref{tab:abl-components}); the
+than one point over uniform sampling on seed 42 with the sign confirmed on seeds 7 and 123.
+No routed arm passes it: the best arm, far routing, gains $+0.5$ AA at $d{=}50$ on average
+with two of three seeds agreeing, and the single-seed $d{=}5$ screen is not confirmed
+(Table~\ref{tab:abl-components}); routing is retired as a component and the
 component-by-component analysis is in \S\ref{sec:results-abl-components}.
 
 \paragraph{Task-capacity gates on CoLaR (single-seed, provisional).}
