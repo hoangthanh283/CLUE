@@ -136,106 +136,6 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 \midrule
 \multirow{4}{*}{CIL-CORD}
  & LayoutLMv3 & $19.0{\pm}0.2$ & \textsc{n/a} & $33.3{\pm}0.3$ & $0.5{\pm}0.6$ & $18.8{\pm}0.2$ & $16.0{\pm}1.4$ & $18.2{\pm}0.3$ \\
-%% GATE-1 DRAFT (do not render until 3 seeds): CoLaR / CoLaR-R rows for CIL-CORD, LayoutLMv3,
-%% seed 42 only (n=1), k=4 d=50 r=128. Needs three extra columns (CoLaR & CoLaR-R\,or. & CoLaR-R\,ps.)
-%% or a dedicated small table in Sec. 7. Pre-reg bar 23.0 (naive+4) and >= CPFD/IS3; oracle > pseudo.
-%%  CoLaR            21.7  (BWT -15.9)  final row [6.2 54.5 30.4 14.1 3.2]
-%%  CoLaR-R oracle   26.8  (BWT -11.3)  final row [45.6 28.5 22.4 34.1 3.2]  refresh 101/760/1461/1402 tok
-%%  CoLaR-R pseudo   23.7  (BWT -12.6)  final row [1.8 22.1 46.5 45.1 3.2]   refresh 1/0/0/2 tok (= plain)
-%%  Caveat: plain vs pseudo differ by 2.1 pp with near-identical training -> seed-42 spread on CIL-CORD
-%%  is ~2 pp; the oracle +5.1 is n=1 and must clear seeds 7/123 before any sentence enters the body.
-%%  seed 7 (2026-10-15 17:28):
-%%  CoLaR            19.0  (BWT -37.3)  final row [10.8 30.5 29.7 9.4 14.6]  diag [95.4 81.4 25.5 27.3 14.6]
-%%    -> two-seed plain mean 20.3±1.9 = naive 19.0, below the 23.0 bar. Seed 7 learns sessions 3-5 far better
-%%       than seed 42 (diag 25.5/27.3/14.6 vs 5.9/4.5/3.2) but forgets far more (BWT -37 vs -16): same AA band,
-%%       opposite plasticity/stability mix, so CIL-CORD single-seed rows are not interpretable row-by-row.
-%%       The seed-42 "last session at 3.2 in all arms" is seed-specific (seed 7: 14.6) -- not a mechanism.
-%%  CoLaR-R oracle   22.5  (BWT -25.9)  final row [33.8 21.9 12.4 44.1 0.3]  diag [95.4 81.4 32.1 6.7 0.3]
-%%                   refresh 66/944/1366/1269 tok (seed 42: 101/760/1461/1402)
-%%    -> +3.5 over plain seed 7 (19.0); seed 42 was +5.1. Oracle > plain holds at n=2 (two-seed oracle 24.6±3.0 vs
-%%       plain 20.3±1.9; per-seed gain +5.1/+3.5). Seed 7 alone is BELOW the 23.0 bar; the two-seed mean clears it.
-%%       Same pattern as seed 42: the gain is retention of session 1 (33.8 vs 10.8) and session 4 (44.1 vs 9.4)
-%%       bought with plasticity on the last sessions (diag 6.7/0.3 vs plain 27.3/14.6) -- mid-stream the oracle was
-%%       behind plain on both old sessions (after task 2: [14.7 34.7 32.1] vs [36.6 58.4 25.5]), so only final AA is
-%%       interpretable. Last-session diagonal 0.3 is the lowest of any arm: the refreshed buffer's replay loss is
-%%       crowding out a 50-doc final session; worth a sentence in the limitations if it repeats at seed 123.
-%%  CoLaR-R pseudo   15.6  (BWT -43.3)  final row [4.8 8.0 8.9 51.7 4.4]  diag [95.4 81.4 39.2 30.5 4.4]
-%%                   refresh 4->2 / 0->0 / 2->0 / 4->2 (candidates->relabelled tok; seed 42: 1/0/0/2 tok)
-%%    -> -3.4 vs plain seed 7 (19.0); seed 42 was +2.0: the pseudo-vs-plain sign FLIPS across seeds (two-seed pseudo
-%%       19.7±5.8 vs plain 20.3±1.9). NOT bit-identical to plain: the 2 relabels at boundary 1 diverge the run from
-%%       task 2 on (after task 2: 34.9/51.5/39.2 vs plain 36.6/58.4/25.5), so a handful of relabels moves single-seed
-%%       rows by 5-15 pp -- the CIL-CORD "spread" is relabel sensitivity on a deterministic run, not seed noise.
-%%       Mechanism null holds (<= 4 candidates at every boundary). Oracle 22.5 > pseudo 15.6: gate order holds (n=2).
-%%       Pre-reg reading at n=2: pseudo mean <= plain + 1.0 and sign disagrees -> heading to KILL unless seed 123 is
-%%       anomalous; no action until n=3.
-%%  n=2 summary (CIL-CORD, 2026-10-16): plain 20.3±1.9, oracle 24.6±3.0 (+5.1/+3.5), pseudo 19.7±5.8 (+2.0/-3.4, sign flip);
-%%    oracle > pseudo on both seeds. Pre-reg reading: pseudo heading to KILL; oracle clears the 23.0 bar on the two-seed mean only.
-%%  plain n=3 (CIL-CORD, 2026-10-16 13:32): 21.7 / 19.0 / 20.5 -> 20.4±1.3 (BWT -15.9 / -37.3 / -13.8); gate still PENDING until oracle+pseudo seed 123 land.
-%%  oracle n=3 (CIL-CORD, 2026-10-16 15:37): 26.8 / 22.5 / 29.6 -> 26.3±3.6 (BWT -11.3 / -25.9 / -0.8); clears the 23.0 bar on the mean and
-%%    oracle > plain on all three seeds (+5.1 / +3.5 / +9.1); last-session diagonal 3.8 / 0.3 / 0.35 -> plasticity loss on every seed.
-%%  Comparators (2026-10-16 00:30): CPFD seed 7 = AA 0.0 (every F1 exactly 0 from task 1 on, incl. its own task 0;
-%%    teacher fix confirmed by the old-class counts, so a second problem -- suspect the classif_adaptive_factor CE
-%%    scaling on sparse sessions; NOT root-caused; quarantined). IS3 seed 7 killed: LayoutLMv3Wrapper.token_features
-%%    was @torch.no_grad() so the IS3 encoder never trained (T0 F1 69.7 vs 94 naive) -- fixed, re-queued (retry3).
-%%    No valid CPFD/IS3 cell exists; if CPFD stays unconverged, disclose it in the supplement as a port that did not
-%%    converge on sparse sessions and keep the ER / DER++ / best-tuned bars as the comparators.
-%%    CPU probe (tests/methods/test_cpfd_sparse_signal.py, 2026-10-16 01:33) rules out classif_adaptive_factor as the
-%%    CPFD collapse cause (confident teacher -> factor 1.0, new-entity CE = log 25); KD / attention-MSE remain suspects.
-%%    CPFD status (2026-10-16 09:51): two post-fix runs reproduce a scenario-independent non-convergence -- cil_cord s7
-%%    AA 0.0; mixed s7 AA 0.0/BWT -30.2 (sparse FUNSD sessions collapse at the first boundary, dense CORD still learns
-%%    55.7 at task 2, then everything 0 from task 3). classif_adaptive_factor ruled out; KD / attention-MSE suspected;
-%%    user decision pending. If dropped, supplement wording: "the CPFD port did not converge on sparse sessions (two
-%%    seeds, two scenarios)".
-%%    IS3 post-fix (2026-10-16 11:55, mixed_is3_seed7 DONE): AA 31.2 / BWT -31.3. Encoder trains (T0 85.9 vs 69.6 frozen)
-%%    but every old task reads exactly 0.00 after each class-adding boundary; final row [57.0 45.9 0.0 0.0 4.7 79.5]
-%%    (tasks 0/1 recover only at task 5, which adds no classes). Read-only diagnosis: non-first-task CE covers new-entity
-%%    tokens only (is3.py:135) and KD constrains logits[:n_old] only (is3.py:216), so new head rows get no negatives on
-%%    O / relabelled-old tokens and win the argmax everywhere -- a port-level flaw, not an encoder bug. Decision pending
-%%    with the user alongside CPFD (comparator row would be the IS3 port, not the published method).
-%%    Comparator decision needed (2026-10-16 11:55): both NER-CL ports fail for port-level reasons -- CPFD: non-convergence
-%%    on sparse sessions (2 seeds x 2 scenarios); IS3: new head rows unconstrained -> old classes never predicted. Options:
-%%    (a) drop both + supplement disclosure [recommended]; (b) fix the IS3 CE mask + rerun 3 seeds x 2 scenarios (~18 GPU-h).
-%%  CIL-CORD seed-7 cells still needed for Gate 1: is3 seed 7 (retry3), cpfd undecided --
-%%    the FIRST post-fix CPFD/IS3 runs: check the log says 'old classes' == pre-expansion head size and that the
-%%    task-2 diagonal is non-zero before trusting them. Then the same five cells at seed 123.
-%% Mixed, LayoutLMv3, seed 42 (n=1), same k/d/r. Bar 63.2; ER 60.3, DER++ 60.8, best 62.2, joint 67.5.
-%%  CoLaR            57.5  (BWT -33.3)  final row [64.3 53.6 64.9 11.2 62.4 88.6]
-%%    -> domain steps (FUNSD/SROIE) hold at 54-65; the one collapse (11.2) is mixed_cord_s0, the
-%%       class-incremental step inside CORD = the stale-O slot the refresh targets.
-%%  CoLaR-R oracle   63.5  (BWT -15.1)  final row [65.6 54.2 78.1 38.6 54.9 89.8]  refresh 3120/2640/0/316
-%%    -> +6.1 over plain, above ER 60.3 / DER++ 60.8 / best 62.2 and the 63.2 bar (by 0.3; n=1).
-%%       cord_s0 retention 11.2 -> 38.6 after the cord_s1 refresh (316 tok); funsd_s0 26.0 -> 30.2 and
-%%       funsd_s1 52.0 -> 69.9 already at the SROIE row from the 3120-token funsd_s1 refresh.
-%%       On Mixed the refresh acts only at within-dataset CIL steps (cord_s0 growth relabels 0: no
-%%       stale doc is CORD yet). Anomaly to check: oracle cord_s1 diagonal 12.8 (plain 71.1), recovers
-%%       to 54.9 after the FUNSD revisit -- early-stop / eval quirk or seed noise; do not cite before seeds 7/123.
-%%  CoLaR-R pseudo   59.5  (BWT -30.9)  final row [63.7 54.5 72.6 19.4 58.1 88.5]   refresh 0[0]/0[0]/0[0]/84[169] tok[cand]
-%%    - zero candidates at the first three boundaries (mechanism confirmed); 84 relabels only at cord_s1 -> funsd_revisit.
-%%    - the pseudo run is BIT-IDENTICAL to plain through task 4 (same "After task 4" row), so the +2.0 over plain 57.5
-%%      is entirely the last-boundary relabel effect and the runs are deterministic (the CIL-CORD 2-pp "spread" is the
-%%      effect of a few relabels, not non-determinism). Still below ER 60.3 and the 63.2 bar. Oracle 63.5 > pseudo: gate holds.
-%%  Oracle anomaly (open, n=1): cord_s1 diagonal 12.8 vs plain 71.1 — both runs early-stopped after 3 epochs on that
-%%    task (best = epoch 1), so it is a low best-epoch val-F1, not a later collapse; recovers to 54.9 after funsd_revisit.
-%%    Do not cite before seeds 7/123.
-%%  Mixed seed 7 (2026-10-16 02:55): CoLaR plain 59.6 (BWT -23.8) final row [63.1 54.9 75.1 25.9 50.4 88.0]; two-seed plain
-%%    58.5±1.5. Same shape as seed 42: cord_s0 is again the weakest slot (25.9 vs 11.2), funsd/sroie hold at 50-75.
-%%    funsd_s0 went 88.8 -> 0.0 -> 1.2 -> 29.4 -> 25.3 -> 63.1 (transient collapse, recovered by replay as in seed 42).
-%%  Oracle seed 7 (2026-10-16 05:23): CoLaR-R oracle 66.5 (BWT -17.7) final row [66.0 53.9 76.2 78.4 34.8 89.9]; refresh
-%%    3307/2932/0/316 tok (seed 42: 3120/2640/0/316 -- the cord_s1 refresh relabels the same 316 tokens on both seeds).
-%%    +6.9 over plain seed 7 (59.6); two-seed oracle 65.0±2.1 vs plain 58.5±1.5, both seeds above the 63.2 bar and ER 60.3.
-%%    cord_s0 retention 25.9 (plain) -> 78.4 after the cord_s1 refresh (seed 42: 11.2 -> 38.6): the stale-O slot is the lever.
-%%    cord_s1 anomaly does NOT reproduce as oracle-specific: oracle diag 39.4 vs plain 32.2 on this seed (seed 42: 12.8 vs
-%%    71.1), so the seed-42 gap is a seed-specific early-stop event; final cord_s1 34.8 (plain 50.4) is the one slot oracle loses.
-%%  Pseudo seed 7 (2026-10-16 07:47): CoLaR-R pseudo 59.6 (BWT -23.8) -- 0 candidates / 0 relabels at ALL four boundaries, so the
-%%    run is BIT-IDENTICAL to plain seed 7 (every "After task" row matches to the digit); pseudo gain 0.0 on this seed (seed 42:
-%%    +2.0 from 84 relabels at the last boundary only). Two-seed Mixed pseudo 59.5±0.1 vs plain 58.5±1.5 vs oracle 65.0±2.1.
-%%    Oracle > pseudo holds on both seeds. Pre-reg reading: pseudo mean <= plain + 1.0 -> heading to KILL on Mixed as on
-%%    CIL-CORD; the mechanism null (teacher confident on ~0 stale-O tokens) is the cause, not noise. No action until n=3.
-%%  CPFD / IS3 seed-42 Mixed cells INVALID (2026-10-15): both snapshotted the teacher after the loop had already grown
-%%    the head (n_old == n_total), so KD distilled the random-init new rows on every O token; CPFD 6.0 AA (diag 0.0 on
-%%    FUNSD sessions) discarded, IS3 killed (its first-task CE also skipped O tokens: T0 F1 48.7). Fixed (teacher
-%%    snapshot moved to after_task; IS3 first task full CE); reruns chained in scripts/run_r2_retry2.sh. Earlier CPFD/IS3
-%%    numbers in Table 1, if any, must be re-checked against this bug before submission.
  & LiLT       & $19.1{\pm}0.3$ & \textsc{n/a} & $32.4{\pm}0.4$ & \cellcolor{gray!25}-- & \cellcolor{gray!25}-- & $17.9{\pm}0.5$ & $18.0{\pm}1.0$ \\
  & BROS       & $19.2{\pm}0.1$ & \textsc{n/a} & $32.9{\pm}0.0$ & $17.3{\pm}0.8$ & $23.1{\pm}1.2$ & $18.3{\pm}1.5$ & $17.7{\pm}1.1$ \\
  & BERT       & $19.3{\pm}0.1$ & \textsc{n/a} & $32.4{\pm}0.2$ & $17.9{\pm}0.3$ & $24.3{\pm}0.3$ & $17.1{\pm}1.6$ & $19.2{\pm}1.9$ \\
@@ -327,6 +227,16 @@ Replay works because it re-exercises the head on inputs that keep their old join
 %%   Mixed (2026-10-17 05:40) KILL — pseudo 59.5±0.0 (59.5/59.6/59.5) vs bar 63.2, plain 58.8±1.1 (57.5/59.6/59.2), sign-agree=False
 %%   (seed 7 pseudo == plain); oracle 64.4±1.9 (63.5/66.5/63.0) vs joint 67.5. Pseudo relabel counts: s42/s7 0 tokens at every boundary,
 %%   s123 7/0/0/36 vs oracle 3231/2792/0/305. Both written as the ddagger ledger row; former §7 paragraph in git history (f35856b..). No further GPU on label refresh.
+
+\begin{table}[t]
+\centering
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{Fixed comparison set on LayoutLMv3} (AA, mean $\pm$ s.d. over seeds 42/7/123): the two bounds and the ten published baselines of the frozen reference set (document-side paired slots CPFD and IS3), then our rows. CoLaR, CoLaR-R and the baselines use 10 training epochs per task with early stopping; LexSlot is the 200-exemplar slot-memory recipe. $^{*}$did not converge (supplement, ``Null cells among the fixed baselines''). ``--'': cell not run (CPFD and IS3 on DIL, LCA on Mixed) or not applicable; CL-LoRA on CIL-CORD is two seeds pending a rerun.}
+\label{tab:main}
+\resizebox{\linewidth}{!}{\input{tab_main_core}}
+\end{table}
+
+\paragraph{Class-incremental documents: the memory must also hold live labels.} On CIL-CORD every replay method sits at the naive floor (\cref{tab:main}): CoLaR $20.4\pm1.3$, ER $16.0$, DER++ $18.2$ against naive $19.0$ and joint $33.3$. The mechanism is the one the anatomy predicts: a document banked at session $t$ carries ``O'' on every entity introduced after $t$, so replaying it re-teaches the head to suppress exactly the classes it should keep. Two interventions on the same CoLaR store test this, three seeds each, pre-registered. Refreshing the stored labels from a per-document ledger (the true-label ceiling) gives $26.3\pm3.6$, above plain CoLaR on every seed ($+5.1/+3.5/+9.1$); restricting the replay loss to the classes that existed when the document was banked (a sliced softmax, no labels touched) gives $25.4\pm2.0$, also above plain on every seed ($+6.0/+3.9/+5.1$) and the only deployable arm to clear its pre-registered bar. Teacher-free pseudo-labelling of the stale ``O'' tokens is a registered null ($20.0\pm3.4$; the sign flips across seeds because at most four tokens per boundary ever qualify). On Mixed the same ordering holds---CoLaR $58.8\pm0.9$, sliced $61.3\pm1.6$, ledger ceiling $64.4\pm1.6$, joint $67.5$---but the sliced arm ties plain CoLaR on one seed and so falls short of its three-seed bar there; we report it as a gain on CIL-CORD and a null on Mixed. The continual-NER comparators built for this failure mode (CPFD, IS3) do not converge on these sessions (\cref{tab:main}, supplement).
 
 \paragraph{Routing which stored document to replay (null).} The OCR vocabulary of a document is set by the input and does not drift with training, which suggests a drift-free sampler (\cref{fig:teaser}): a softmax over term-frequency signature scores $s_j=\sigma(x)^{\top}\sigma_j$ in three directions (\emph{near}, \emph{far}, \emph{task}), uniform as the zero-point. The seed-42 reading was promising (far $+1.8$ over uniform $86.4$ at $d{=}50$), so we pre-registered that single arm for confirmation. Across three seeds the gap collapses to $+1.8/+0.4/-0.6$, mean $+0.5$ pp with a sign flip, inside the uniform-sampling spread: lexical routing is a null, and the memory-only headline does not depend on it.
 
