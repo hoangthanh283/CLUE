@@ -210,7 +210,7 @@ export ABLATION_SCENARIOS="${ABLATION_SCENARIOS:-${SCENARIOS}}"
 export AMP="${AMP:-1}"   # bf16 on (RTX 4090); set AMP=0 for exact fp32
 
 # Count the planned jobs so you see the full scope before it starts.
-NJOBS=$(DRY_RUN=1 bash scripts/run_grid_multigpu.sh 2>/dev/null | grep -cE "  ->  " || echo "?")
+if [ -z "${GRID_SCRIPT:-}" ]; then NJOBS=$(DRY_RUN=1 bash scripts/run_grid_multigpu.sh 2>/dev/null | grep -cE "  ->  " || echo "?"); else NJOBS="n/a (${GRID_SCRIPT})"; fi
 
 echo
 info "Launching grid: ${NJOBS} runs (core + prompt/LoRA + DocCL + ablation + currency)"
@@ -218,4 +218,4 @@ info "  SCENARIOS='${SCENARIOS}'  (partition this box owns)"
 info "  GPUS='${GPUS}' JOBS_PER_GPU=${JOBS_PER_GPU} BATCH_SIZE=${BATCH_SIZE} bf16=$([ "${AMP}" = "1" ] && echo ON || echo OFF) W&B=${WANDB_MODE} sync=$([ -n "${R2_ACCESS_KEY_ID:-}" ] && echo ON || echo OFF)"
 echo "  ${c_dim}heartbeat + filtered training lines stream below; re-run this script to resume.${c_off}"
 echo
-exec bash scripts/run_grid_multigpu.sh
+exec bash "${GRID_SCRIPT:-scripts/run_grid_multigpu.sh}"  # setup_remote_vision.sh overrides
