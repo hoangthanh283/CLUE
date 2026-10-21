@@ -1,4 +1,4 @@
-# Full comparison — AA across methods × scenarios × seeds (2026-10-21)
+# Full comparison — AA across methods × scenarios × seeds (2026-10-21, doc rows refreshed 2026-10-22 after Tier A)
 
 Numbers are AA (average accuracy over all seen tasks). Where available, 3-seed means
 ± SD are given; otherwise seed-42 only. Pre-training backbone: ViT-B/16 on images,
@@ -40,10 +40,13 @@ on CIFAR and by 7.3 pp on ImageNet-R. CoLaR's current plastic head wastes 9.5 pp
 | LwF                | 2017 | — | 42.5 | 43.7 ± 1.1 | 19.0 | 18.8 | 35.1 | 35.2 |
 | ER                 | 2019 | 163 MB | 86.2 | 87.9 ± 1.4 | 16.9 | 16.0 | 64.3 | 60.3 |
 | DER++              | 2020 | 163 MB | 88.2 | 88.0 ± 0.9 | 17.9 | 18.2 | 60.9 | 60.8 |
-| CPFD               | 2023 | — | — | — | 2.7  | 1.4 (n=2) | 6.0  | 2.0 (n=2) |
-| IS3                | 2024 | — | — | — | 5.0  | 4.4 (n=2) | 28.8 | 30.1 (n=2) |
+| CODA-Prompt        | 2023 | — | 33.4 | 32.5 ± 1.2 | 0.0 | null (0.0 ×3; n50 pool 7.4) | 9.6 | 8.1 ± 1.5 |
+| CL-LoRA            | 2025 | — | 40.8 | 41.1 ± 0.3 | 13.8 | 15.2 ± 3.1 | 30.7 | 31.4 ± 0.6 |
+| CPFD               | 2023 | — | 0.0 | 6.1 ± 7.3 (0.0/4.2/14.2, collapse) | 2.7  | null (1.4, n=2) | 6.0  | null (2.0) |
+| IS3                | 2024 | — | 38.3 | n=1 (fixed-label port limitation) | 5.0  | null (4.4 ± 2.2) | 28.8 | 30.1 ± 1.2 |
+| LCA                | 2026 | — | 46.4 | 43.9 ± 2.5 | 8.9 | 8.2 ± 2.6 | running | running (tail queue 2026-10-22) |
 | LexSlot (buffer-free) | 2026 | 0 | 40.5 | 38.7 | 19.2 | n=1 | 33.1 | n=1 |
-| **CoLaR k4/d50/r128** | 2026 | 60 MB | **86.4** | **86.8 ± 0.6** | 21.7 | 20.4 ± 1.1 | 57.5 | 58.75 ± 0.9 |
+| **CoLaR k4/d50/r128** | 2026 | 60 MB | **86.4** | **86.8 ± 0.6** (5 ep); 87.8 ± 0.5 (10 ep, headline) | 21.7 | 20.4 ± 1.1 | 57.5 | 58.75 ± 0.9 |
 | CoLaR-R oracle (†) | 2026 | 60 MB | — | — | 26.8 | 26.3 ± 2.9 | 63.5 | 64.4 ± 1.6 |
 | CoLaR-R pseudo     | 2026 | 60 MB | — | — | 23.7 | 20.0 ± 3.4 | 59.5 | 59.5 ± 0.0 |
 | **CoLaR-R sliced** (R2b) | 2026 | 60 MB | — | — | **27.7** | **25.4 ± 2.0** | 62.0 | 61.3 ± 1.6 |
