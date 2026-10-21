@@ -89,11 +89,34 @@ METHOD_DISPLAY = {
     "ranpac": "RanPAC (2023)",
     "bert_textonly": "BERT (text-only)",
     "colar": "\\textbf{CoLaR (ours)}",
+    "colar_r_sliced": "\\textbf{CoLaR-R, sliced (ours)}",
+    "colaslot_shadow": "\\textbf{CoLaSlot (ours)}",
     "lexslot": "\\textbf{LexSlot (ours)}",
     "doccl": "DocCL (legacy)",
 }
 # Mean AA below this renders as a marked null in the main table (collapsed baseline).
 NULL_AA_THRESHOLD = 2.0
+# Settled nulls (Phase 1, 2026-10-21; supplement "Null cells among the fixed baselines"):
+# rendered as null$^{*}$ regardless of the numeric mean (CPFD/Mixed is 2.03 by seed luck).
+NULL_CELLS = {
+    ("cpfd", "cil_cord"),
+    ("cpfd", "mixed"),
+    ("is3", "cil_cord"),
+    ("coda_prompt", "cil_cord"),
+}
+# Proposed rows (ours), rendered after the baselines; each pinned to ONE recipe by run-dir
+# tail so that e.g. CoLaR d5/d10/d50 cells (all method="colar") are never averaged.
+OURS_ORDER = ["colar", "colar_r_sliced", "colaslot_shadow", "lexslot"]
+VARIANT_FILTER = {
+    "colar": "_k4_d50_r128",
+    "colar_r_sliced": "_k4_d50_r128",
+    "colaslot_shadow": "_k4_d50_r128",
+    "lexslot": "_off",  # the 200-exemplar slot-memory recipe (thesis row 87.3)
+}
+# Run aliases that ARE the canonical recipe of a proposed method under another name.
+METHOD_ALIASES = {
+    "docU_d50": ("colar", "_k4_d50_r128")
+}  # DIL uniform replay = plain CoLaR k4/d50/r128
 
 SCENARIO_ORDER = [
     "cil_cord",
@@ -223,6 +246,8 @@ def load_local_runs(results_dir: Path) -> pd.DataFrame:
         # a plain baseline). The proposed-method row is selected by this (plan rev. 8,
         # Phase 3): several CoLaR recipes share one method key and must not be averaged.
         variant = re.sub(r"^.*?_seed\d+", "", mp.parent.name)
+        if method in METHOD_ALIASES:
+            method, variant = METHOD_ALIASES[method]
         rows.append(
             {
                 "name": mp.parent.name,
@@ -361,18 +386,27 @@ def write_main_table(
     metric: str = "AA",
     proposed: str = "colar",
     proposed_variant: str | None = "_k4_d50_r128",
+    scenarios: list[str] | None = None,
 ) -> None:
     df = _finished(df, metric)
     # Only the un-ablated proposed run (target null or "all") belongs in the main table.
     df = df[(df["method"] != proposed) | _is_full_method(df["target"])]
-    # ... and only its canonical recipe (CoLaR d5/d10/d50 cells share method="colar").
-    if proposed_variant is not None and "variant" in df.columns:
-        df = df[(df["method"] != proposed) | (df["variant"] == proposed_variant)]
+    # Every "ours" row is pinned to one recipe (VARIANT_FILTER); --proposed_variant overrides
+    # the proposed method's entry.
+    if "variant" in df.columns:
+        vf = dict(VARIANT_FILTER)
+        if proposed_variant is not None:
+            vf[proposed] = proposed_variant
+        for m, tail in vf.items():
+            df = df[(df["method"] != m) | (df["variant"] == tail)]
+    if scenarios is not None:
+        df = df[df["scenario"].isin(scenarios)]
     mean = df.pivot_table(values=metric, index="method", columns="scenario", aggfunc="mean")
     std = df.pivot_table(values=metric, index="method", columns="scenario", aggfunc="std")
 
     scenarios = [s for s in SCENARIO_ORDER if s in mean.columns]
     methods = [m for m in METHOD_ORDER if m in mean.index]
+    ours = [m for m in OURS_ORDER if m in mean.index]
 
     # Best non-oracle per scenario (for bolding) + significance vs best baseline.
     best = {s: mean.loc[methods, s].max() if methods else np.nan for s in scenarios}
@@ -418,7 +452,9 @@ def write_main_table(
             # Collapsed cell (plan rev. 8, Phase 3): a baseline that did not converge on a
             # scenario is reported as a marked null, not as "0.00 +- 0.00". The caption
             # must carry: "$^{*}$ did not converge; see the supplement's null-cell note."
-            if mu < NULL_AA_THRESHOLD and m not in ("joint", "independent"):
+            if (m, s) in NULL_CELLS or (
+                mu < NULL_AA_THRESHOLD and m not in ("joint", "independent")
+            ):
                 cells.append("null$^{*}$")
                 continue
             # std pivot can lack a (method, scenario) cell that mean has (e.g. a
@@ -438,6 +474,8 @@ def write_main_table(
 
     for m in methods:
         lines.append(row(m))
+    if ours:
+        lines += ["\\midrule", *[row(m) for m in ours]]
     bounds = [m for m in ("joint", "independent") if m in mean.index]
     if bounds:
         lines += ["\\midrule", *[row(m) for m in bounds]]
@@ -932,6 +970,15 @@ def main():
         metric="AA",
         proposed=args.proposed,
         proposed_variant=pv,
+    )
+    # Frozen-scope document scenarios only (CVPR grid): DIL, CIL-CORD, Mixed.
+    write_main_table(
+        prim,
+        args.output_dir / "table_main_core.tex",
+        metric="AA",
+        proposed=args.proposed,
+        proposed_variant=pv,
+        scenarios=["cil_cord", "dil", "mixed"],
     )
     # BWT companion to the main table, so every backward-transfer headline number
     # is traceable to a generated artifact rather than hand-kept in the thesis prose.
