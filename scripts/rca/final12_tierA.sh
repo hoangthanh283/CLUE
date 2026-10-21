@@ -47,7 +47,7 @@ print("OK" if ok else "COLLAPSE", round(m["AA"], 2), [round(M[i][i], 1) for i in
 PY
 }
 
-until grep -q 'PHASE1 COMPLETE' results/logs_vision/phase1_queue.log 2>/dev/null; do sleep 120; done
+until grep -q 'PHASE1B COMPLETE' results/logs_vision/phase1_queue.log 2>/dev/null; do sleep 120; done
 echo "=== TIER A $(date) ===" >>"$LOG"
 
 # ---- ungated cells (cheapest / most certain first) ----
