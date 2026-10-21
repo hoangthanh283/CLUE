@@ -88,6 +88,7 @@ METHOD_DISPLAY = {
     "slca": "SLCA (2023)",
     "ranpac": "RanPAC (2023)",
     "bert_textonly": "BERT (text-only)",
+    "colar": "\\textbf{CoLaR (ours)}",
     "lexslot": "\\textbf{LexSlot (ours)}",
     "doccl": "DocCL (legacy)",
 }
@@ -218,9 +219,14 @@ def load_local_runs(results_dir: Path) -> pd.DataFrame:
             # table, not the main table) — renaming them all pooled 14 methods into
             # one bogus "bert_textonly" cell once the full BERT slice landed.
             method = "bert_textonly"
+        # Recipe tail of the run dir after "seed<N>" (e.g. "_k4_d50_r128", "_vit", "" for
+        # a plain baseline). The proposed-method row is selected by this (plan rev. 8,
+        # Phase 3): several CoLaR recipes share one method key and must not be averaged.
+        variant = re.sub(r"^.*?_seed\d+", "", mp.parent.name)
         rows.append(
             {
                 "name": mp.parent.name,
+                "variant": variant,
                 "state": "finished",
                 "method": method,
                 "model_family": family,
@@ -350,11 +356,18 @@ def aggregate(df: pd.DataFrame, metric: str = "AA") -> pd.DataFrame:
 
 
 def write_main_table(
-    df: pd.DataFrame, output: Path, metric: str = "AA", proposed: str = "doccl"
+    df: pd.DataFrame,
+    output: Path,
+    metric: str = "AA",
+    proposed: str = "colar",
+    proposed_variant: str | None = "_k4_d50_r128",
 ) -> None:
     df = _finished(df, metric)
     # Only the un-ablated proposed run (target null or "all") belongs in the main table.
     df = df[(df["method"] != proposed) | _is_full_method(df["target"])]
+    # ... and only its canonical recipe (CoLaR d5/d10/d50 cells share method="colar").
+    if proposed_variant is not None and "variant" in df.columns:
+        df = df[(df["method"] != proposed) | (df["variant"] == proposed_variant)]
     mean = df.pivot_table(values=metric, index="method", columns="scenario", aggfunc="mean")
     std = df.pivot_table(values=metric, index="method", columns="scenario", aggfunc="std")
 
@@ -854,7 +867,12 @@ def main():
     # LABEL is wired up and ready; pass --proposed lexslot once the parser learns
     # those suffixes. Until then the LexSlot row is hand-maintained in
     # thesis/generated/table_main.tex (see the NOTE there).
-    parser.add_argument("--proposed", default="doccl")
+    parser.add_argument("--proposed", default="colar")
+    parser.add_argument(
+        "--proposed_variant",
+        default="_k4_d50_r128",
+        help="run-dir tail selecting the proposed method's canonical recipe ('' = no filter)",
+    )
     parser.add_argument(
         "--ablation_scenario",
         default=None,
@@ -907,11 +925,22 @@ def main():
         write_pivot_csv(prim, args.output_dir / f"pivot_{metric}.csv", metric=metric)
         write_backbone_table(df, args.output_dir / f"table_backbone_{metric}.tex", metric=metric)
 
-    write_main_table(prim, args.output_dir / "table_main.tex", metric="AA", proposed=args.proposed)
+    pv = args.proposed_variant or None
+    write_main_table(
+        prim,
+        args.output_dir / "table_main.tex",
+        metric="AA",
+        proposed=args.proposed,
+        proposed_variant=pv,
+    )
     # BWT companion to the main table, so every backward-transfer headline number
     # is traceable to a generated artifact rather than hand-kept in the thesis prose.
     write_main_table(
-        prim, args.output_dir / "table_main_BWT.tex", metric="BWT", proposed=args.proposed
+        prim,
+        args.output_dir / "table_main_BWT.tex",
+        metric="BWT",
+        proposed=args.proposed,
+        proposed_variant=pv,
     )
     write_ablation_table(
         prim,
