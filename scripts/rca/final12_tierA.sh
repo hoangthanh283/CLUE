@@ -73,7 +73,15 @@ echo "$(date +%H:%M) GATE cpfd_ceMin05: $CPFD_GATE" >>"$LOG"
 echo "$(date +%H:%M) GATE coda_n50:    $CODA_GATE" >>"$LOG"
 
 CPFD_EXTRA=""; case "$CPFD_GATE" in OK*) CPFD_EXTRA="+method.adaptive_ce_min=0.5";; esac
-for sd in 42 7 123; do run_cell cpfd dil "$sd" $CPFD_EXTRA; done   # DIL runs regardless
+# CPFD DIL: plan rev. 8 collapse rule — seed 42 collapsed (AA 0.0, 2026-10-22 04:52); seed 7 is
+# the one permitted rerun; seed 123 runs only if seed 7 converges (AA > 2), else NULL.
+run_cell cpfd dil 42 $CPFD_EXTRA
+run_cell cpfd dil 7 $CPFD_EXTRA
+if [ -f results/dil_cpfd_seed7/metrics.json ] && python3 -c "import json,sys; sys.exit(0 if json.load(open('results/dil_cpfd_seed7/metrics.json'))['AA'] > 2 else 1)"; then
+  run_cell cpfd dil 123 $CPFD_EXTRA
+else
+  echo "$(date +%H:%M) NULL  cpfd dil (seeds 42+7 collapsed; s123 skipped per collapse rule)" >>"$LOG"
+fi
 case "$CPFD_GATE" in
   OK*) for sc in cil_cord mixed; do for sd in 42 7 123; do run_cell cpfd "$sc" "$sd" $CPFD_EXTRA; done; done;;
   *)   echo "$(date +%H:%M) NULL  cpfd cil_cord+mixed (disclosure; see plan rev. 8)" >>"$LOG";;
