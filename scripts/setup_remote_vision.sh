@@ -15,6 +15,12 @@
 #            the image cells (lca.py keeps a CPU backbone copy per task; the local 15 GB box
 #            OOM-killed mixed_lca at session 6/6). >= 4 CPU cores, >= 40 GB disk, >= 100 Mbps.
 #   RUN:     git clone <repo> && cd CLUE && git checkout doccl && bash scripts/setup_remote_vision.sh
+#   CONCURRENT WITH THE LOCAL GRID (scripts/rca/final12_tail.sh runs the same 18 cells on the
+#            local box, CIFAR first, seeds 42,7,123): launch the remote in the OPPOSITE order so
+#            the two sides rarely start the same cell —
+#              SCENARIOS="cil_imagenet_r cil_cifar100" SEEDS="123 7 42" bash scripts/setup_remote_vision.sh
+#            and rsync each finished cell (metrics.json + .done present) into the local results/
+#            as it completes; run_vision_grid.sh skips any cell whose metrics.json exists.
 #   SECRETS: W&B / R2 creds as instance ENV (-e ...), never a file in the repo. Both optional:
 #            no W&B key -> offline; no R2 -> no durable resume (fine for ~1 day of work).
 #   RESULTS: run_vision_grid.sh writes results/<cell>_vit/{metrics.json,matrix.npy,.done}.
