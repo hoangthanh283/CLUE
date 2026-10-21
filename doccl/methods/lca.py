@@ -28,6 +28,8 @@ Differences from the image-CIL original, all faithful in spirit:
 from __future__ import annotations
 
 import logging
+import pathlib
+import tempfile
 
 import torch
 import torch.nn.functional as F  # noqa: N812 — canonical torch alias (repo-wide)
@@ -88,6 +90,24 @@ class LCA(NaiveFineTune):
             if "classifier" not in n
         }
 
+    # AGENT FIX: disk-backed per-task backbone store (2026-10-22). One full fp32 CPU copy of
+    # the backbone per task (~0.5 GB on LayoutLMv3-base) lived in ``_task_backbones``; on the
+    # six-session Mixed stream the process reached 12.8 GB anonymous RSS and was OOM-killed at
+    # session 6 (kernel log 2026-10-21 23:37). Each snapshot is now written once to
+    # ``<out_dir>/lca_backbones/t<k>.pt`` and held memory-mapped: the values are the same fp32
+    # tensors (numerically identical merge), but the pages are reclaimable file cache instead of
+    # anonymous memory, so the OOM killer no longer counts them.
+    def _stash_backbone_state(self, tag: str) -> dict[str, torch.Tensor]:
+        state = self._backbone_state()
+        root = (
+            pathlib.Path(getattr(self, "out_dir", None) or tempfile.gettempdir()) / "lca_backbones"
+        )
+        root.mkdir(parents=True, exist_ok=True)
+        path = root / f"{tag}.pt"
+        torch.save(state, path)
+        del state
+        return torch.load(path, map_location="cpu", mmap=True, weights_only=True)
+
     @property
     def _head(self) -> torch.nn.Linear:
         return self.model.model.classifier
@@ -96,7 +116,7 @@ class LCA(NaiveFineTune):
         self._task_idx = task.task_id
         if self._base_backbone is None:
             # θ_base captured once (after the first task's head expansion the loop did).
-            self._base_backbone = self._backbone_state()
+            self._base_backbone = self._stash_backbone_state("base")
 
     def train_task(
         self, task: TaskInfo, train_loader: DataLoader, val_loader: DataLoader | None = None
@@ -150,7 +170,7 @@ class LCA(NaiveFineTune):
         self._compute_class_stats(train_loader)
         # (2) stash this task's backbone, then TIES-merge all task backbones onto base.
         if self.merge:
-            self._task_backbones.append(self._backbone_state())
+            self._task_backbones.append(self._stash_backbone_state(f"t{task.task_id}"))
             self._merge_backbones()
         # (3) align the classifier on sampled features (LCA skips task 0).
         if task.task_id > 0 and self._class_means:
