@@ -50,9 +50,9 @@ the short patience and the same rule applied to every method, and disclosed in
 and is a camera-ready refinement. Seventh, LexSlot's lexical gate is expected to be ineffective on class-incremental learning, where
 same-dataset sessions collapse the signature contrast the gate relies on, so its claims are
 deliberately confined to the domain-shift setting, which is why we frame it as promising rather
-than established. Ninth, lexically-routed latent replay is evaluated on the
-domain-incremental scenario and LayoutLMv3 at two memory sizes, so its transfer to other
-scenarios and backbones is untested. Finally, results rest on three
+than established. Ninth, lexical routing of the replay memory was evaluated on the
+domain-incremental scenario and LayoutLMv3 at two memory sizes and retired there, so no claim
+about it is made for other scenarios or backbones. Finally, results rest on three
 seeds; more seeds would tighten the confidence intervals around the smaller
 effects.
 
@@ -98,8 +98,8 @@ retaining any raw page.
 \paragraph{RQ2: which evidence to re-expose.} LexSlot, an isolated slot memory at the diagnosed
 site, approaches replay-level accuracy on domain-incremental learning (AA $87.3 \pm 1.0$, BWT
 $-2.3$ versus $-2.8$/$-3.4$ for plain replay) with a compact 200-exemplar buffer; its lasting
-element is the drift-immune \gls{ocr}-vocabulary signature that gates it. Lexically-routed
-latent replay joins that gate to CoLaR's memory: for each incoming document it replays the stored
+element is the drift-immune \gls{ocr}-vocabulary signature that gates it. Lexical routing
+of the replay memory joined that gate to CoLaR's memory: for each incoming document it replays the stored
 latents chosen by lexical similarity rather than uniformly, with the memory and loss held fixed so
 that any change is the gate's alone. Routing towards the lexically nearest stored documents
 does not pass the pre-registered one-point rule once three seeds are in (best arm $+0.5$ AA,
