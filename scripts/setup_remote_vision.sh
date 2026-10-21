@@ -11,6 +11,9 @@
 # ── vast.ai / any rented box ───────────────────────────────────────────────────────────
 #   IMAGE:   pytorch/pytorch:2.x-cuda12.x-cudnn9-runtime (match cuda12.x to the host driver)
 #   CARD:    anything with >= 8 GB (an RTX 4070 is plenty); the recipe peaks < 2 GB VRAM.
+#   HOST:    >= 32 GB RAM if the three Mixed LCA document cells are to be offloaded here after
+#            the image cells (lca.py keeps a CPU backbone copy per task; the local 15 GB box
+#            OOM-killed mixed_lca at session 6/6). >= 4 CPU cores, >= 40 GB disk, >= 100 Mbps.
 #   RUN:     git clone <repo> && cd CLUE && git checkout doccl && bash scripts/setup_remote_vision.sh
 #   SECRETS: W&B / R2 creds as instance ENV (-e ...), never a file in the repo. Both optional:
 #            no W&B key -> offline; no R2 -> no durable resume (fine for ~1 day of work).
