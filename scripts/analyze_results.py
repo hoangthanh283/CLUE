@@ -52,18 +52,21 @@ except ImportError:
 # L2P/DualPrompt are deliberately demoted to cite-only (the prompt family is
 # represented by CODA-Prompt); they stay in METHOD_DISPLAY so any legacy run still
 # renders, but are omitted from METHOD_ORDER so they are not reported as baselines.
+# FROZEN BASELINE SET (2026-10-21; memory `clue-fixed-12-baselines`): the document-side
+# rows of the twelve-row reference set, in table order. EWC, ER+C-Flat++, O-LoRA and the
+# legacy DocCL row are dominated/retired and stay in METHOD_DISPLAY only so old runs render.
+# SLCA / RanPAC are the image-side paired slots and live in the image table, not here.
 METHOD_ORDER = [
     "naive",
-    "ewc",
-    "er_cflat",  # 2025 currency: ER + C-Flat++ (flat-minima)
     "lwf",
     "er",
     "der_pp",
     "coda_prompt",
-    "o_lora",
-    "cl_lora",  # 2025 currency: CL-LoRA (dual-adapter, successor to O-LoRA)
+    "cl_lora",
+    "cpfd",  # paired slot (doc side of SLCA|CPFD)
+    "is3",  # paired slot (doc side of RanPAC|IS3)
+    "lca",
     "bert_textonly",  # external text-only comparator (naive on BERT backbone)
-    "doccl",
 ]  # 'joint' is rendered separately as the oracle row
 METHOD_DISPLAY = {
     "naive": "Naive (lower bound)",
@@ -79,10 +82,18 @@ METHOD_DISPLAY = {
     "coda_prompt": "CODA-Prompt",
     "o_lora": "O-LoRA",
     "cl_lora": "CL-LoRA (2025)",
+    "cpfd": "CPFD (2023)",
+    "is3": "IS3 (2024)",
+    "lca": "LCA (2026)",
+    "slca": "SLCA (2023)",
+    "ranpac": "RanPAC (2023)",
     "bert_textonly": "BERT (text-only)",
     "lexslot": "\\textbf{LexSlot (ours)}",
     "doccl": "DocCL (legacy)",
 }
+# Mean AA below this renders as a marked null in the main table (collapsed baseline).
+NULL_AA_THRESHOLD = 2.0
+
 SCENARIO_ORDER = [
     "cil_cord",
     "cil_wildreceipt",
@@ -391,6 +402,12 @@ def write_main_table(
                 cells.append("--")
                 continue
             mu = float(mean.loc[m, s])
+            # Collapsed cell (plan rev. 8, Phase 3): a baseline that did not converge on a
+            # scenario is reported as a marked null, not as "0.00 +- 0.00". The caption
+            # must carry: "$^{*}$ did not converge; see the supplement's null-cell note."
+            if mu < NULL_AA_THRESHOLD and m not in ("joint", "independent"):
+                cells.append("null$^{*}$")
+                continue
             # std pivot can lack a (method, scenario) cell that mean has (e.g. a
             # single-seed method like o_lora) — fall back to 0.0 instead of KeyError.
             try:
