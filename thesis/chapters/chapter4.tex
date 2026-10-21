@@ -312,7 +312,7 @@ and the proposed method alike, inherits the identical stopping rule for free, wh
 is what makes the comparison fair under the protocol of
 \S\ref{sec:exp-checkpointing}.
 
-\paragraph{The proposed method (lexically-routed latent replay).} The method is implemented
+\paragraph{The proposed method (CoLaR and its label-refreshed and routed variants).} The method is implemented
 in \texttt{doccl/methods/colar\_pp.py} on top of the latent-replay base class
 (\texttt{doccl/methods/latent\_replay.py}). The memory is CoLaR's: a forward hook captures
 each stored document's layer-$k$ activations, which are kept as truncated SVD factors and

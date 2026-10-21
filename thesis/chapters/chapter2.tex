@@ -660,7 +660,7 @@ benchmark for document \gls{ie} that compares image-\gls{cl} baselines and
 This thesis is a \emph{diagnostic-plus-remedy} study in the spirit
 of~\citet{ramasesh2021anatomy} and~\citet{zhai2023investigating}: it first
 characterises how forgetting distributes across the components of a tri-modal
-document encoder, then proposes one method, lexically-routed latent replay, whose
+document encoder, then proposes one method, compressed latent replay with live labels (CoLaR-R), whose
 memory attaches at the dominant-forgetting component. The measurement contribution stands on its own; it
 is informative even if forgetting turns out to be uniform, while the remedy is
 explicitly derived from, and validated against, the measurement. The four gaps
@@ -679,7 +679,7 @@ shift retained rather than engineered away
 (Chapter~\ref{ch:experimental-setup}).
 
 \paragraph{Gap 3 $\rightarrow$ Contributions 2--3 (why remedies fail, and
-lexically-routed latent replay).} The reliance on heuristic remedies
+compressed latent replay with live labels).} The reliance on heuristic remedies
 (\S\ref{sec:bg-gap-heuristic}) is answered by a remedy whose every part is derived from
 measurement: the diagnosis fixes \emph{where} it attaches (the head/late site), the tests
 of the failing remedies fix \emph{what} its memory must keep (whole documents, stored as

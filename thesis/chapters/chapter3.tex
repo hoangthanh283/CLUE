@@ -8,8 +8,8 @@ This chapter presents the methods that answer the two research questions of
 tri-modal document encoders (\S\ref{sec:method-diagnostic}). For RQ2 it derives, from that
 diagnosis, where a remedy may attach (\S\ref{sec:method-remedy}), designs LexSlot, a
 lexically-gated slot memory at the diagnosed site (\S\ref{sec:method-lexslot}), and joins
-LexSlot's gate to a compressed per-document latent memory in \emph{lexically-routed latent
-replay} (\S\ref{sec:method-routed}). The ordering is deliberate: the diagnosis comes first and
+LexSlot's gate to a compressed per-document latent memory as a replay router, a hypothesis
+the results retire (\S\ref{sec:method-routed}). The ordering is deliberate: the diagnosis comes first and
 constrains every remedy that follows.
 
 \section{Problem Formulation}
@@ -499,10 +499,12 @@ independently of the remedy's margin regardless.
 \section{Lexical-Slot Head-Memory Continual Learning (LexSlot)}
 \label{sec:method-lexslot}
 
-\paragraph{Role in the proposed method.} The thesis proposes one method, lexically-routed
-latent replay (\S\ref{sec:method-routed}), with three parts: \emph{where} it acts (the
-diagnosed head/late site), \emph{what} it stores (compressed per-document latents, CoLaR),
-and \emph{which} stored documents it replays (a lexical gate). This section develops the
+\paragraph{Role in the proposed method.} The thesis proposes one method, compressed latent
+replay with live labels (CoLaR-R), with three parts: \emph{where} it acts (the diagnosed
+head/late site), \emph{what} it stores (compressed per-document latents, CoLaR), and
+\emph{which} labels the replay loss may touch (those that existed when a document was
+banked). A fourth candidate, \emph{which} stored documents to replay (a lexical gate,
+\S\ref{sec:method-routed}), is tested and retired. This section develops the
 gate. It does so inside LexSlot, a slot memory at the diagnosed site that was designed and
 evaluated first; LexSlot's results (Chapter~\ref{ch:results}) are the evidence that the
 lexical signature is a usable, drift-immune routing signal at the head. Its slot memory is
@@ -735,14 +737,15 @@ rehearsal buffer, so the method's standing cost is just the small slot parameter
 ($\sim$1--2\% over the frozen lower encoder, plus the trainable late blocks and head). Slot
 counts, ranks, and the per-task budget are listed in Appendix~\ref{app:hyperparameters}.
 
-\section{Lexically-Routed Latent Replay}
+\section{Lexical Routing of the Replay Memory: Hypothesis and Test}
 \label{sec:method-routed}
 
 The diagnosis says \emph{where} old-task evidence must be re-supplied (the head and late
 layers); the negative results of Chapter~\ref{ch:results} say \emph{what form} it must
-take (whole documents, whose feature, position, and label stay bound together). Lexically-routed
-latent replay adds the remaining decision: \emph{which} stored documents to replay for the
-document currently being learned. It has two parts.
+take (whole documents, whose feature, position, and label stay bound together). Lexical
+routing was the remaining candidate decision: \emph{which} stored documents to replay for the
+document currently being learned. The results chapter retires it
+(\S\ref{sec:results-abl-which}); it is kept here as the tested hypothesis. It has two parts.
 
 \paragraph{The memory: compressed per-document latents (CoLaR).} The encoder is split at
 layer $k$; layers below $k$ are frozen after the first task. For each of up to $d$ documents per
@@ -782,7 +785,8 @@ forgetting matrix) that together localise forgetting by depth, stream, and head.
 From that measurement we derive where a remedy may attach, and two remedies that attach
 there: \textbf{LexSlot}, an isolated slot memory at the diagnosed site, gated by a
 drift-immune lexical signature and paired with a compact 200-exemplar replay buffer in its
-headline configuration; and \textbf{lexically-routed latent replay}, which keeps LexSlot's
-signature as the gate and replaces its memory with compressed per-document latents (CoLaR) at
-layer $k$, so the gate decides which stored documents are replayed. The next chapter describes how this methodology is realised in
+headline configuration; and \textbf{lexical routing of the replay memory}, which keeps
+LexSlot's signature as a gate over compressed per-document latents (CoLaR) at layer $k$, so
+the gate decides which stored documents are replayed---a component the results retire in
+favour of keeping the stored labels live (CoLaR-R). The next chapter describes how this methodology is realised in
 software.

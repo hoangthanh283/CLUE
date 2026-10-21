@@ -1072,8 +1072,8 @@ sampling; the seed-42 gain was seed noise, not a routing effect.
 
 \begin{table}[!htbp]
   \centering
-  \caption[Component ablation of the proposed method]{Component ablation of
-  lexically-routed latent replay on DIL (LayoutLMv3, seed 42, $k{=}4$, $r{=}128$, five epochs
+  \caption[Component ablation of the routing hypothesis]{Component ablation of
+  the lexical routing hypothesis on DIL (LayoutLMv3, seed 42, $k{=}4$, $r{=}128$, five epochs
   per task). \emph{Memory} = CoLaR per-document latents; \emph{gate} = the lexical
   OCR-vocabulary signature. The gate alone (LexSlot without a memory) stays at the naive level;
   the memory alone carries the protection; the ``both'' rows isolate the gate's contribution on a
@@ -1300,7 +1300,7 @@ input-representation drift \emph{per se}.
   \label{fig:newscenarios-aa}
 \end{figure}
 
-\section{Why Other Remedies Fail, and Lexically-Routed Latent Replay}
+\section{Why Other Remedies Fail, and What the Memory Must Hold}
 \label{sec:results-falsification-ext}
 
 The experiments in this section post-date the main grid and sharpen its central negative
@@ -1403,8 +1403,8 @@ weaker reader or stiffened.
   \label{fig:colar-pareto}
 \end{figure}
 
-\paragraph{Lexically-routed latent replay.}
-CoLaR samples its store uniformly. Lexically-routed replay (\S\ref{sec:method-routed}) keeps
+\paragraph{Lexical routing of the replay memory (retired).}
+CoLaR samples its store uniformly. Lexical routing (\S\ref{sec:method-routed}) keeps
 CoLaR's memory, size, and replay loss unchanged and replaces only the sampler: LexSlot's
 \gls{ocr}-vocabulary signature selects the stored documents nearest to the current batch
 (\emph{near}), farthest from it (\emph{far}), or from the most similar past task

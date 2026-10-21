@@ -161,9 +161,11 @@ SROIE, extended with WildReceipt and XFUND) under one configuration system
   \item an \textbf{explanation of why buffer-free remedies fail} with one identified cause, the
         readout-marginal snap on a drifting representation, and the law that replay must
         preserve \emph{whole-document consistency};
-  \item \textbf{lexically-routed latent replay}, a remedy derived from both: a compressed,
-        per-document latent memory (CoLaR) at the diagnosed site, with LexSlot's lexical
-        signature as the gate that selects what is replayed;
+  \item \textbf{compressed latent replay with live labels (CoLaR-R)}, a remedy derived from
+        both: a compressed, per-document latent memory (CoLaR) at the diagnosed site whose
+        stored labels are kept live across class-incremental boundaries; LexSlot's lexical
+        signature as a gate over what is replayed is tested and reported as a pre-registered
+        negative;
   \item the \textbf{FCS-CL benchmark} and reproducible diagnostic tooling.
 \end{enumerate}
 
@@ -206,7 +208,7 @@ a fixed layer: replaying real whole documents retains AA $87.3$, while a rank-16
 ($41.9$), per-class Gaussians ($39.4$), and even real $k$-means centroids ($36.7$) collapse.
 The binding of feature, position, and label within one document is the necessary ingredient.
 
-\noindent\textbf{Lexically-routed latent replay (RQ2).} Individual documents, unlike the pooled
+\noindent\textbf{Compressed latent replay with live labels (RQ2).} Individual documents, unlike the pooled
 feature space, \emph{are} low-rank. CoLaR stores each replayed document as rank-$r$ SVD factors
 of its layer-$k$ activations, which keeps whole-document binding and reaches AA $87.6$ with a
 $60$\,MB memory, $2.7\times$ smaller than raw replay and within $1.4$ points of the joint
@@ -237,8 +239,9 @@ backbones relevant to this work; it closes by identifying the research gaps the
 thesis addresses.
 \textbf{Chapter~\ref{ch:methodology}} presents the methodological
 contributions: the per-component forgetting diagnostic (RQ1), the remedy design space it
-opens, LexSlot's lexically-gated slot memory, and the lexically-routed latent replay that
-joins that gate to a compressed per-document memory (RQ2).
+opens, LexSlot's lexically-gated slot memory, the compressed per-document memory (CoLaR) with
+its label-side extension (CoLaR-R), and the lexical gate as a replay router, a hypothesis the
+results retire (RQ2).
 \textbf{Chapter~\ref{ch:implementation}} describes the framework, the
 document-\gls{ie} pipeline, and the system architecture, including the
 instrumentation hooks and experiment tracking.
@@ -247,7 +250,7 @@ task construction, the model and training configuration, the baselines, and the
 evaluation methodology.
 \textbf{Chapter~\ref{ch:results}} answers RQ1 with the diagnosis and its stability across
 seeds, task orders, and backbones, then answers RQ2: the benchmark ordering, the root cause of
-the buffer-free failures, the whole-document consistency law, CoLaR, and lexically-routed
-replay, with ablations, a computational-cost analysis, and threats to validity.
+the buffer-free failures, the whole-document consistency law, CoLaR, its label-refresh and
+routing arms, with ablations, a computational-cost analysis, and threats to validity.
 \textbf{Chapter~\ref{ch:conclusions}} states limitations, conclusions, and future
 work.

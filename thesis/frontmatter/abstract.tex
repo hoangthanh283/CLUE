@@ -24,7 +24,7 @@ learns them in sequence with a bounded memory and no access to past raw document
 end as a single model that extracts entities from every task seen so far. We first locate
 where in the encoder forgetting concentrates, then use that answer to decide what a
 memory-bounded remedy must retain and which of its stored evidence it should re-expose,
-arriving at a single method, \textbf{lexically-routed latent replay}, in which each of these
+arriving at a single method, \textbf{compressed latent replay with live labels (CoLaR-R)}, in which each of these
 choices follows from a measurement.
 
 The diagnosis masks the input modalities of a single LayoutLMv3, holding the architecture
