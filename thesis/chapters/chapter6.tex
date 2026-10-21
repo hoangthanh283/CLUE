@@ -631,7 +631,7 @@ update the backbone in a low-rank subspace, recovers the naive bound only where 
 space is fixed (DIL $41.1$) and is unstable where it grows (CIL-CORD $15.2\pm3.1$, with
 the three seeds spanning $12.9$--$18.8$; Mixed $31.4$). The two continual-NER comparators built for exactly the
 stale-``O'' failure mode do not survive five class-adding sessions on a single growing head:
-CPFD does not converge on CIL-CORD or Mixed and IS3 never re-predicts a previously learned
+CPFD does not converge on CIL-CORD or Mixed and collapses to $6.2\pm7.2$ on DIL, and IS3 never re-predicts a previously learned
 class on CIL-CORD ($4.4\pm1.7$), though it recovers to $30.1\pm1.0$ on Mixed, whose last
 session adds no classes. Model merging with classifier realignment (LCA) converges but lands
 far below naive on CIL-CORD ($8.2\pm2.1$) and just above it on DIL ($43.9\pm2.0$).
@@ -645,7 +645,8 @@ far below naive on CIL-CORD ($8.2\pm2.1$) and just above it on DIL ($43.9\pm2.0$
   per task with early stopping; LexSlot is listed with the 200-exemplar buffer its accuracy
   depends on (\S\ref{sec:results-abl-components}); CoLaSlot is a single five-epoch seed.
   null$^{*}$: did not converge (\S\ref{sec:results-nulls}). ``--'': cell not run or not
-  applicable (CPFD and IS3 on DIL and LCA on Mixed were in progress at the time of writing).}
+  applicable (LCA on Mixed was in progress at the time of writing); IS3 on DIL is a single seed
+  (\S\ref{sec:results-nulls}).}
   \label{tab:main-comparison}
   \IfFileExists{generated/table_main.tex}{\resizebox{\textwidth}{!}{\input{generated/table_main}}}{%
   \begin{tabular}{lccc}
@@ -658,7 +659,7 @@ far below naive on CIL-CORD ($8.2\pm2.1$) and just above it on DIL ($43.9\pm2.0$
     DER++                 & $18.2 \pm 0.3$ & $\mathbf{88.0 \pm 0.9}$ & $\mathbf{60.8 \pm 2.7}$ \\
     CODA-Prompt           & null$^{*}$ & $32.5 \pm 1.2$ & $8.1 \pm 1.5$ \\
     CL-LoRA (2025)        & $15.2 \pm 3.1$ & $41.1 \pm 0.3$ & $31.4 \pm 0.6$ \\
-    CPFD (2023)           & null$^{*}$ & -- & null$^{*}$ \\
+    CPFD (2023)           & null$^{*}$ & $6.2 \pm 7.2$ & null$^{*}$ \\
     IS3 (2024)            & null$^{*}$ & $38.3$ (1 seed) & $30.1 \pm 1.2$ \\
     LCA (2026)            & $8.2 \pm 2.6$ & $43.9 \pm 2.5$ & -- \\
     \midrule
@@ -683,11 +684,14 @@ far below naive on CIL-CORD ($8.2\pm2.1$) and just above it on DIL ($43.9\pm2.0$
 
 \paragraph{Non-converged baselines.}
 \label{sec:results-nulls}
-Three cells of Table~\ref{tab:main-comparison} are reported as nulls rather than scores.
+Four cells of Table~\ref{tab:main-comparison} are reported as nulls rather than scores.
 CPFD and IS3 were ported onto the single growing token-classification head used by every
 other method (their reference implementations keep per-task classifiers). On CIL-CORD, CPFD
 learns the first session ($90$--$95$ F1) and then reads $0.00$ on every session from the first
-class-adding boundary; on Mixed it reads $6.0$, $0.0$ and $0.1$. Two single-knob ablations on
+class-adding boundary; on Mixed it reads $6.0$, $0.0$ and $0.1$; and on DIL, where no class is
+ever added, the first domain falls to $8.0/4.0/0.9$ F1 at the first boundary and the final
+row is zero on every domain for seeds 42 and 7 (AA $0.0/4.2/14.2$, reported as $6.2\pm7.2$
+since one seed does learn the last domain), so the collapse is not a property of head growth. Two single-knob ablations on
 seed 42 reproduce the collapse exactly---flooring its per-sample cross-entropy weight at
 $0.5$, and switching its distillation term off entirely---so neither the adaptive loss
 weight nor the attention and logit distillation is the cause; what remains is the
