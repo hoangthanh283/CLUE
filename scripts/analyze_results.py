@@ -101,6 +101,7 @@ NULL_AA_THRESHOLD = 2.0
 NULL_CELLS = {
     ("cpfd", "cil_cord"),
     ("cpfd", "mixed"),
+    # NOT ("cpfd","dil"): 0.0/4.2/14.2 -> reported as 6.2±7.2 with the collapse disclosed in prose.
     ("is3", "cil_cord"),
     ("coda_prompt", "cil_cord"),
 }
