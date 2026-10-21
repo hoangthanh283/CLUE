@@ -19,11 +19,14 @@ LOGDIR=results/logs_vision; mkdir -p "$LOGDIR"; LOG="$LOGDIR/queue.log"
 
 echo "=== VISION GRID — $(date) ===" >>"$LOG"
 for sc in $SCENARIOS; do for me in $METHODS; do for sd in $SEEDS; do
-  # Non-published batch size -> give the run its own alias so train.py writes it to a
-  # separate dir (<sc>_<me>_bs<N>_seed<sd>_vit) and BS=16 cells never overwrite or
-  # masquerade as the BS=128 (published-recipe) cells. See plan rev. 8, Tier B.
+  # House recipe for every image cell in the paper tables = batch 16, fp32, gradient
+  # checkpointing (all SLCA/RanPAC/ER/DER++/naive/joint cells on disk were produced that
+  # way; the 128 default below was never used for a reported cell). Any OTHER batch size
+  # gets its own run_alias so it lands in <sc>_<me>_bs<N>_seed<sd>_vit and can never
+  # overwrite or masquerade as a house-recipe cell. See plan rev. 9, Tier B.
+  REF_BATCH="${REF_BATCH:-16}"
   alias=""; mk="$me"
-  if [ "$BATCH_SIZE" != 128 ]; then
+  if [ "$BATCH_SIZE" != "$REF_BATCH" ]; then
     mk="${me}_bs${BATCH_SIZE}"
     if grep -q "^run_alias:" "configs/method/${me}.yaml"; then alias="method.run_alias=${mk}"; else alias="+method.run_alias=${mk}"; fi
   fi
