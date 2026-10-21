@@ -628,8 +628,8 @@ the same and are cited rather than re-run. The frozen backbone, sufficient for t
 \texttt{[CLS]}-level image-classification tasks these methods were designed for, cannot supply
 the per-token representations that document IE needs. The LoRA-adapted CL-LoRA, which does
 update the backbone in a low-rank subspace, recovers the naive bound only where the output
-space is fixed (DIL $41.1$) and is unstable where it grows (CIL-CORD $13.4\pm0.7$ over two
-converged seeds, Mixed $31.4$). The two continual-NER comparators built for exactly the
+space is fixed (DIL $41.1$) and is unstable where it grows (CIL-CORD $15.2\pm3.1$, with
+the three seeds spanning $12.9$--$18.8$; Mixed $31.4$). The two continual-NER comparators built for exactly the
 stale-``O'' failure mode do not survive five class-adding sessions on a single growing head:
 CPFD does not converge on CIL-CORD or Mixed and IS3 never re-predicts a previously learned
 class on CIL-CORD ($4.4\pm1.7$), though it recovers to $30.1\pm1.0$ on Mixed, whose last
@@ -657,9 +657,9 @@ far below naive on CIL-CORD ($8.2\pm2.1$) and just above it on DIL ($43.9\pm2.0$
     ER                    & $16.0 \pm 1.4$ & $87.9 \pm 1.4$ & $60.3 \pm 5.3$ \\
     DER++                 & $18.2 \pm 0.3$ & $\mathbf{88.0 \pm 0.9}$ & $\mathbf{60.8 \pm 2.7}$ \\
     CODA-Prompt           & null$^{*}$ & $32.5 \pm 1.2$ & $8.1 \pm 1.5$ \\
-    CL-LoRA (2025)        & $13.4 \pm 0.7$ & $41.1 \pm 0.3$ & $31.4 \pm 0.6$ \\
+    CL-LoRA (2025)        & $15.2 \pm 3.1$ & $41.1 \pm 0.3$ & $31.4 \pm 0.6$ \\
     CPFD (2023)           & null$^{*}$ & -- & null$^{*}$ \\
-    IS3 (2024)            & null$^{*}$ & -- & $30.1 \pm 1.2$ \\
+    IS3 (2024)            & null$^{*}$ & $38.3$ (1 seed) & $30.1 \pm 1.2$ \\
     LCA (2026)            & $8.2 \pm 2.6$ & $43.9 \pm 2.5$ & -- \\
     \midrule
     \textbf{CoLaR (ours)}            & $20.4 \pm 1.3$ & $87.8 \pm 0.5$ & $58.8 \pm 1.1$ \\
@@ -695,7 +695,13 @@ pseudo-labelling and ``O''-token masking path, which removes the training signal
 session's entities. IS3 learns each new session but never predicts a previously learned
 class again (every off-diagonal entry of its accuracy matrix is exactly $0.00$), giving
 $4.4\pm1.7$ on CIL-CORD; on Mixed, whose last session adds no classes, it recovers to
-$30.1\pm1.0$ and that cell is reported. CODA-Prompt reads $0.0$ on all three CIL-CORD seeds
+$30.1\pm1.0$ and that cell is reported. On DIL, whose nine-tag head never grows, IS3's
+old/new split is degenerate (every entity row is ``old'' at every boundary and its
+``O''-token distillation spans the whole output), and the method reduces to sequential
+fine-tuning under a full-output distillation term: seed 42 learns the first domain ($88.2$)
+and drops both earlier domains below $8$ F1 at the next boundary, AA $38.3$ against naive
+$41.3$. We report that single seed and do not spend further compute on a structural
+limitation of the port. CODA-Prompt reads $0.0$ on all three CIL-CORD seeds
 with its default pool of ten prompt components; enlarging the pool to fifty lets some
 sessions be learned (per-session accuracies $79.5/40.6/0.0/18.9/36.8$) but leaves one session
 unlearned and the final row at $[0,0,0,0,36.8]$, so the cell stays a null. These are
