@@ -18,8 +18,10 @@
 #            Pull them back from the local box when done:
 #              rsync -avz -e "ssh -p <port>" --include='*/' --include='cil_*_vit/**' --exclude='*' \
 #                    <user>@<host>:~/CLUE/results/ ./results/
-#   TIME:    18 cells; ~6 h each on the local RTX 2060 (≈4.5 days), ~1.5-2 h each on a 4070
-#            (≈1-1.5 days). Do NOT change batch size / precision: that breaks comparability.
+#   TIME:    measured on the local RTX 2060: full-fine-tune image cells take 2.1-3.1 h (CIFAR-100)
+#            and 1.5-2.2 h (ImageNet-R) -> the 18 cells ≈ 35-40 GPU-h on the 2060, ≈ 10-15 h on a
+#            3090/4070-class card. SEED_MAJOR=1 (default) runs all 6 cells at seed 42 first, then
+#            7, then 123. Do NOT change batch size / precision: that breaks comparability.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -52,4 +54,16 @@ export EPOCHS_CAP="${EPOCHS_CAP:-100}"
 export WANDB_MODE="${WANDB_MODE:-offline}"
 echo ">> cells: ${SCENARIOS} x ${METHODS} x seeds ${SEEDS} @ bs${BATCH_SIZE} grad_ckpt=${GRAD_CKPT}"
 
+# Seed-major order: run the whole method x dataset block at seed 42 first, then 7, then 123,
+# so a budget cut-off still leaves every method/dataset with at least one complete seed
+# (and the grid's metrics.json skip makes each pass resume-safe).
+if [ "${SEED_MAJOR:-1}" = 1 ]; then
+  ALL_SEEDS="$SEEDS"
+  for sd in $ALL_SEEDS; do
+    echo ">> pass: seed $sd"
+    SEEDS="$sd" GRID_SCRIPT="$GRID_SCRIPT" bash scripts/setup_remote.sh || exit $?
+    # setup_remote.sh exec's the grid; it returns here only after that pass finishes.
+  done
+  exit 0
+fi
 exec bash scripts/setup_remote.sh
