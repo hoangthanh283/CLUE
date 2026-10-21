@@ -413,55 +413,68 @@ the practical split is constrained, so we prefer explicit disclosure here.
 \section{Baselines and Continual-Learning Strategies}
 \label{sec:exp-baselines}
 
-We compare against a deliberately representative baseline suite spanning the major
-families, plus the proposed lexically-routed latent replay and its two components, all under the shared interface of
-\S\ref{sec:impl-cl-core} (Table~\ref{tab:baselines}). Each family is covered by its
-strongest classical member and, where applicable, a current (2025) member, so the
-comparison is both fair and up to date rather than exhaustive: in the prompt family
-we report CODA-Prompt~\citep{smith2023coda} as the strongest member and cite its
-predecessors L2P~\citep{wang2022l2p} and DualPrompt~\citep{wang2022dualprompt} as
-methodological ancestors rather than re-running a dominated method; the regularisation
-and LoRA families add the recent C-Flat++~\citep{bian2024cflat} and
-CL-LoRA~\citep{he2025cllora} as their 2025 members. A genuine external text-only
+%% FROZEN BASELINE SET (decided 2026-10-21; do not add, swap or re-litigate):
+%%   bounds: naive, joint
+%%   ER, DER++, LwF, CODA-Prompt, CL-LoRA, LCA
+%%   paired slots: SLCA|CPFD (head-side), RanPAC|IS3 (frozen-PTM / CL-NER)
+%%   image side (CIFAR-100, ImageNet-R) uses SLCA+RanPAC; document side (DIL, CIL-CORD, Mixed)
+%%   uses CPFD+IS3. Everything else (EWC, L2P, DualPrompt, O-LoRA, C-Flat++, SimpleCIL,
+%%   MagMax, ...) is dominated by a listed member and is NOT re-run.
+Every comparison in this thesis uses one frozen reference set of twelve rows: two bounds
+and ten published baselines, one per family and era, all under the shared interface of
+\S\ref{sec:impl-cl-core} (Table~\ref{tab:baselines}). The ten are ER~\citep{rolnick2019er}
+and DER++~\citep{buzzega2020der} for replay, LwF~\citep{li2017lwf} for distillation,
+CODA-Prompt~\citep{smith2023coda} for prompts, CL-LoRA~\citep{he2025cllora} for
+parameter-efficient adaptation, LCA~\citep{lca2026} for model merging, and two
+\emph{modality-paired} slots that hold the strongest head-side and representation-side
+method of each modality: SLCA~\citep{zhang2023slca} and RanPAC~\citep{mcdonnell2023ranpac}
+on image class-incremental learning, CPFD~\citep{zhang2023cpfd} and IS3~\citep{chen2024is3}
+on document continual learning. The set is deliberately small so that the same twelve rows
+appear in every table; dominated relatives are cited as ancestors rather than re-run
+(L2P~\citep{wang2022l2p} and DualPrompt~\citep{wang2022dualprompt} under CODA-Prompt,
+O-LoRA~\citep{wang2023olora} under CL-LoRA, EWC~\citep{kirkpatrick2017ewc} and
+C-Flat++~\citep{bian2024cflat} under LwF and ER). A genuine external text-only
 comparator (BERT-base, no layout or vision) is included so the ``text is load-bearing''
 finding rests on a real unimodal encoder rather than a masked multimodal one. Methods
 are reproduced and validated against their published behaviour before being extended
-(for example, \gls{er} is made to work before DER++). The proposed method and its components (CoLaR's memory with uniform sampling, and
-LexSlot, where the lexical gate is first evaluated) are added once the diagnosis fixes
-their target (\S\S\ref{sec:method-lexslot}--\ref{sec:method-routed}). Default
-settings (\gls{ewc} $\lambda{=}1000$ with the Fisher estimated over 200 samples, DER++
-$\alpha{=}\beta{=}0.5$, O-LoRA rank 8 on the query/key/value projections with
-orthogonality weight $0.5$, C-Flat++ neighbourhood $\rho{=}0.05$ on top of ER, CL-LoRA
-rank 8 with shared-adapter distillation) are tabulated in
+(for example, \gls{er} is made to work before DER++). The proposed rows---CoLaR,
+LexSlot, CoLaR-R and CoLaSlot---are added once the diagnosis fixes their target
+(\S\S\ref{sec:method-lexslot}--\ref{sec:method-routed}). Default settings (LwF
+$T{=}2$, DER++ $\alpha{=}\beta{=}0.5$, CL-LoRA rank 8 with shared-adapter distillation,
+replay buffer of 200 documents or 2{,}000 images) are tabulated in
 Appendix~\ref{app:hyperparameters}.
 
 \begin{table}[!htbp]
   \centering
-  \caption[Baseline suite]{The reported baseline suite (plus the post-pilot proposed method and its components) evaluated on the primary backbone, with the main hyperparameter swept for
-  each. Each family is represented by its strongest classical member and a 2025 member
-  where applicable. Naive and Joint are the lower and oracle-upper bounds; BERT is an
-  external text-only comparator. L2P and DualPrompt are cited as prompt-family
-  ancestors (\S\ref{sec:exp-baselines}) but not reported, being dominated by
-  CODA-Prompt.}
+  \caption[Baseline suite]{The frozen twelve-row reference set used in every comparison
+  table, plus the proposed rows, with the main hyperparameter swept for each. Naive and
+  Joint are the lower and oracle-upper bounds; the ten baselines cover one method per
+  family and era. Two slots are modality-paired: the image side (CIFAR-100, ImageNet-R)
+  reports SLCA and RanPAC, the document side (DIL, CIL-CORD, Mixed) reports CPFD and IS3.
+  BERT is an external text-only comparator. Dominated relatives (EWC, L2P, DualPrompt,
+  O-LoRA, C-Flat++) are cited as ancestors in \S\ref{sec:exp-baselines} but not reported.}
   \label{tab:baselines}
   \begin{tabularx}{\textwidth}{l l L}
     \toprule
-    \textbf{Family} & \textbf{Method} & \textbf{Reference / swept hyperparameter} \\
+    \textbf{Family} & \textbf{Method (year)} & \textbf{Reference / swept hyperparameter} \\
     \midrule
     Bounds         & Naive (sequential FT) & lower bound \\
                    & Joint (multi-task)    & oracle upper bound \\
-    Regularisation & EWC  & \citet{kirkpatrick2017ewc}; $\lambda\in\{10^2,10^3,10^4\}$ \\
-                   & C-Flat++ (2025) & \citet{bian2024cflat}; $\rho{=}0.05$ on ER \\
-    Distillation   & LwF  & \citet{li2017lwf}; $\alpha\in\{0.5,1,2\}$, $T{=}2$ \\
-    Replay         & ER   & \citet{rolnick2019er}; buffer $\in\{200,500\}$ \\
-                   & DER++& \citet{buzzega2020der}; logit weight $\in\{0.1,0.5,1\}$ \\
-    Prompt-based   & CODA-Prompt & \citet{smith2023coda} \\
-    LoRA-based     & O-LoRA & \citet{wang2023olora}; rank $\in\{4,8,16\}$ \\
-                   & CL-LoRA (2025) & \citet{he2025cllora}; rank 8, shared-adapter KD \\
+    Replay         & ER (2019)   & \citet{rolnick2019er}; buffer 200 docs / 2{,}000 images \\
+                   & DER++ (2020)& \citet{buzzega2020der}; $\alpha{=}\beta{=}0.5$ \\
+    Distillation   & LwF (2017)  & \citet{li2017lwf}; $T{=}2$ \\
+    Prompt-based   & CODA-Prompt (2023) & \citet{smith2023coda} \\
+    LoRA-based     & CL-LoRA (2025) & \citet{he2025cllora}; rank 8, shared-adapter KD \\
+    Head-side (paired) & SLCA (2023) / CPFD (2023) & \citet{zhang2023slca} on images / \citet{zhang2023cpfd} on documents \\
+    Frozen-PTM / CL-NER (paired) & RanPAC (2023) / IS3 (2024) & \citet{mcdonnell2023ranpac} on images / \citet{chen2024is3} on documents \\
+    Model merging  & LCA (2026)  & \citet{lca2026} \\
     Text-only      & BERT (external) & unimodal text comparator (no layout/vision) \\
-    Proposed       & Lexically-routed latent replay & CoLaR memory $+$ LexSlot gate; route $\in\{\text{near},\text{far},\text{task}\}$ \\
-    Components     & CoLaR (uniform sampling) & memory only; rank $r$, docs per task $d$ \\
-                   & LexSlot & gate's origin; slot memory at the head/late site \\
+    Proposed       & CoLaR & per-document SVD latent replay; rank $r$, docs per task $d$ \\
+                   & LexSlot & lexical slot memory at the head/late site \\
+                   & CoLaR-R (sliced) & CoLaR with sliced-softmax replay CE \\
+                   & CoLaSlot & CoLaR memory $+$ LexSlot slots \\
+    %% Removed 2026-10-21: "Lexically-routed latent replay (route in {near,far,task})" --
+    %% routing was killed by the Amendment-10 three-seed confirmation (docs/IMAGE_SCOPE_PREREG.md).
     \bottomrule
   \end{tabularx}
 \end{table}
