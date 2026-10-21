@@ -60,7 +60,11 @@ for sd in 42 7 123; do run_cell lca cil_cord "$sd"; done
 # kernel OOM-killed seed 42 (2026-10-21 23:37). Re-queue after the disk-backed store fix.
 if [ "${SKIP_MIXED_LCA:-0}" != 1 ]; then for sd in 42 7 123; do run_cell lca mixed "$sd"; done; else echo "$(date +%H:%M) SKIP  mixed_lca x3 (SKIP_MIXED_LCA=1, host OOM)" >>"$LOG"; fi
 run_cell cl_lora cil_cord 123
-for sd in 42 7 123; do run_cell is3 dil "$sd"; done
+# IS3 on DIL: fixed 9-tag head => n_old == n_total at every boundary (all entity rows "old",
+# no "new" rows; O-token KD over the whole output). Seed 42 (2026-10-22 02:44) dropped both
+# tasks below 8 F1 at the first boundary. With SKIP_IS3_DIL=1 only seed 42 is kept (single-seed,
+# disclosed); seeds 7/123 stay queueable later.
+if [ "${SKIP_IS3_DIL:-0}" != 1 ]; then for sd in 42 7 123; do run_cell is3 dil "$sd"; done; else run_cell is3 dil 42; echo "$(date +%H:%M) SKIP  is3 dil s7/s123 (SKIP_IS3_DIL=1, fixed-label port limitation)" >>"$LOG"; fi
 
 # ---- Phase-1 gated cells (decision table, plan rev. 8) ----
 CPFD_GATE=$(gate_ok "results/phase1/cil_cord_cpfd*seed42*/metrics.json")
