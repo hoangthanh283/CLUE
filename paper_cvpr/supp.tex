@@ -80,6 +80,26 @@ ER + C-Flat++ & $88.4\pm0.1$ & $-1.8\pm0.6$ & $78.3\pm0.4$ & $-2.2\pm0.1$ \\
 \end{tabular}
 \end{table}
 
+\paragraph{Image CIL: forgetting and the dominated rows.} \cref{tab:image_supp} extends Table~4 of the main paper with BWT and with every image run outside the frozen reference set that we keep as evidence, all under the same recipe (ViT-B/16, ten sessions, batch 16, early stopping, seeds 42/7/123; cells not yet on disk are marked pending, never imputed). Two readings matter. Replay at $200$ exemplars is far below the $2{,}000$-exemplar rows ($42.3/21.6$ vs.\ $76.2/54.8$ for ER), so the buffer size in Table~4 is the one at which replay is competitive, not a favourable choice for our rows. SLCA's whole margin comes from its classifier alignment: without it the same recipe falls to $38.0/25.8$, below $200$-exemplar replay on CIFAR-100, which is the image-side instance of the head-locus finding. Per-class Gaussian latent replay, the image port of the document-side Gaussian store, sits at the naive floor ($10.7$).
+
+\begin{table}[t]
+\centering\small
+\caption{Image class-incremental learning, AA and BWT, mean$\pm$std over seeds 42/7/123 (ViT-B/16, ten sessions). Frozen reference set first, our rows, the joint bound, then the dominated rows kept as evidence. SimpleCIL is a single seed.}
+\label{tab:image_supp}
+\setlength{\tabcolsep}{2pt}\scriptsize
+\resizebox{\linewidth}{!}{\input{tab_image_supp}}
+\end{table}
+
+\paragraph{Ridge decomposition of the plastic-head gap.} \cref{tab:probe} reports the Pass~2b probe on the trained trunk of our replay rows (seed 42). After the last session the trunk is frozen and a closed-form ridge readout (random projection to $10{,}000$ ReLU features, $\lambda{=}10$, the RanPAC recipe) is fitted under three data conditions: on the stored bank only (deployable), on all training data of all sessions (an oracle ceiling on what the features support), and on all data through the frozen pre-trained trunk (image only). Three differences follow: the \emph{head gap} (full ridge minus the trained head) is the total headroom of the readout; the \emph{coverage gap} (full minus stored) is the part that needs features of inputs the bank does not hold; the \emph{trunk gap} (adapted minus frozen) is what replay-driven adaptation bought. On images the head gap is $9.5/16.1$ points and is mostly coverage ($7.5/14.3$), so a better analytic head on the stored latents does not close the gap to SLCA; the adapted trunk is nevertheless $2.9/15.0$ points better than the frozen one under the same readout, so adaptation is not the problem. On documents the head gap of CoLaR is within one point on DIL and Mixed and $7.7$ points on CIL-CORD with zero coverage gap, i.e.\ the compressed store already covers its documents and the residual is the plastic head itself. The probe reads every past training image once at the end and is therefore a diagnostic, not a continual method.
+
+\begin{table}[t]
+\centering\small
+\caption{Pass~2b ridge decomposition, seed 42, AA. \emph{Head}: the trained plastic head. \emph{Ridge, stored/full/frozen}: closed-form readout on the stored latents, on all seen training data, and on all data through the frozen pre-trained trunk. Gaps as defined in the text; a dash means the condition does not apply (documents have no frozen-trunk reference).}
+\label{tab:probe}
+\setlength{\tabcolsep}{2pt}\scriptsize
+\resizebox{\linewidth}{!}{\input{tab_probe_decomp}}
+\end{table}
+
 \paragraph{Per-backbone forgetting.} The full BWT and AF tables for every backbone$\times$scenario$\times$method cell of the generality grid are generated from the released run directories (\texttt{results/table\_backbone\_\{BWT,AF\}.tex}) and will ship with the code; Table~1 of the main paper already carries the AA view.
 
 \paragraph{Budget-adaptive allocation is a frontier, not a gain.} Allocating a fixed compressed-replay budget unevenly across tasks (documents $[18,5,2]$, ranks $[64,128,64]$ vs.\ a uniform $10$ documents at rank $64$; 5 epochs, $k{=}4$) gave $+4.0$ AA on seed 42 while passing a pre-registered per-domain guard. On seeds 7 and 123 the same comparison gave $-8.0$ and $+5.7$: $+0.6\pm7.5$ over three seeds, a null. The seed-42 result was a point on a Pareto frontier (old-domain retention traded against the final domain at $\approx9{:}1$), not a shift of the frontier, and we report it as such.
