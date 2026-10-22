@@ -14,6 +14,13 @@ LOG=results/logs_vision/colar_backbones.log
 exec 9>/tmp/claude-1000/colar_backbones.lock
 flock -n 9 || { echo "colar_backbones already running" >&2; exit 1; }
 mkdir -p results/logs_vision
+# 2026-10-22 22:51: tried beside the image grid — CoLaR/BROS alone took 4.8 GB VRAM (total 5.6 GB,
+# over the 5 GB cap) and was killed. A 6 GB card holds one of these at a time, so wait for the
+# image grid to finish (scripts/rca/final12_tail.sh writes "IMAGE GRID end"), unless WAIT=0.
+if [ "${WAIT:-1}" = 1 ]; then
+  echo "$(date +%H:%M) waiting for IMAGE GRID end in results/logs_vision/final12_tail.log" >>"$LOG"
+  until grep -q 'IMAGE GRID end' results/logs_vision/final12_tail.log 2>/dev/null; do sleep 300; done
+fi
 echo "=== COLAR BACKBONES $(date) ===" >>"$LOG"
 COLAR_AX="method.split_layer_k=4 method.docs_per_task=50 method.rank_r=128 method.replay_batch_size=4"
 COMMON="training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline"
