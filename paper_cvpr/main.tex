@@ -26,8 +26,10 @@
 \newcommand{\todo}[1]{\textcolor{blue}{[TODO: #1]}}
 
 \definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
-%% pagebackref dropped (2026-10-22): it costs one extra pdflatex pass (4 -> 3), which matters
-%% under Overleaf's 10 s free-plan compile limit; back-reference page numbers are cosmetic.
+%% pagebackref (recommended by cvpr.sty for the review copy) costs one extra pdflatex pass
+%% (4 instead of 3). It is enabled only where refs.bib exists (local builds, which produce the
+%% submission PDF) and skipped on Overleaf (free plan, 10 s compile limit) — 2026-10-22.
+\IfFileExists{refs.bib}{\PassOptionsToPackage{pagebackref}{hyperref}}{}
 \usepackage[breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
 
 %%%%%%%%% PAPER ID
