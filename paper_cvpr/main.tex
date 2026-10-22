@@ -29,7 +29,9 @@
 %% pagebackref (recommended by cvpr.sty for the review copy) costs one extra pdflatex pass
 %% (4 instead of 3). It is enabled only where refs.bib exists (local builds, which produce the
 %% submission PDF) and skipped on Overleaf (free plan, 10 s compile limit) — 2026-10-22.
-\IfFileExists{refs.bib}{\PassOptionsToPackage{pagebackref}{hyperref}}{}
+% Overleaf free plan: 10 s compile limit (since 2025-09-08). pagebackref needs extra passes,
+% so it is enabled only when the bibliography is being regenerated (no precompiled .bbl).
+\IfFileExists{refs_precompiled.bbl}{}{\PassOptionsToPackage{pagebackref}{hyperref}}
 \usepackage[breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
 
 %%%%%%%%% PAPER ID
@@ -254,14 +256,17 @@ Replay works because it re-exercises the head on inputs that keep their old join
 
 {
     \small
-    %% Overleaf (free plan, 10 s compile limit): the project holds refs_precompiled.bbl and no
-    %% refs.bib, so the bibliography is read directly and NO BibTeX pass runs (both commands sit
-    %% inside the conditional: a bare \bibliographystyle makes latexmk run BibTeX, which would
-    %% overwrite the jobname .bbl with an empty one). Locally refs.bib exists and the normal
-    %% BibTeX path is used. After any citation change: build locally, then
+    %% Overleaf free plan = 10 s compile limit (since 2025-09-08). The bibliography is read from
+    %% refs_precompiled.bbl whenever that file exists, so NO BibTeX pass runs on Overleaf even
+    %% if refs.bib was uploaded too (BibTeX + its reruns alone exceed the limit). Both commands
+    %% sit inside the conditional: a bare \bibliographystyle makes latexmk run BibTeX, which
+    %% would overwrite the jobname .bbl with an empty one.
+    %% Rule (2026-10-22): the precompiled .bbl wins whenever it exists, so Overleaf runs
+    %% pdflatex only (2 passes) even if refs.bib was uploaded too. To regenerate the
+    %% bibliography locally: mv refs_precompiled.bbl aside, latexmk -pdf main.tex, then
     %%   cp main.bbl refs_precompiled.bbl   and re-upload main.tex + refs_precompiled.bbl.
-    \IfFileExists{refs.bib}{\bibliographystyle{ieeenat_fullname}\bibliography{refs}}%
-      {\input{refs_precompiled.bbl}}
+    \IfFileExists{refs_precompiled.bbl}{\input{refs_precompiled.bbl}}%
+      {\bibliographystyle{ieeenat_fullname}\bibliography{refs}}
 }
 
 \end{document}
