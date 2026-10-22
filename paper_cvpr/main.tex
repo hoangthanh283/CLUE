@@ -26,7 +26,9 @@
 \newcommand{\todo}[1]{\textcolor{blue}{[TODO: #1]}}
 
 \definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
-\usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
+%% pagebackref dropped (2026-10-22): it costs one extra pdflatex pass (4 -> 3), which matters
+%% under Overleaf's 10 s free-plan compile limit; back-reference page numbers are cosmetic.
+\usepackage[breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
 
 %%%%%%%%% PAPER ID
 \def\paperID{*****}
@@ -250,8 +252,14 @@ Replay works because it re-exercises the head on inputs that keep their old join
 
 {
     \small
-    \bibliographystyle{ieeenat_fullname}
-    \bibliography{refs}
+    %% Overleaf (free plan, 10 s compile limit): the project holds refs_precompiled.bbl and no
+    %% refs.bib, so the bibliography is read directly and NO BibTeX pass runs (both commands sit
+    %% inside the conditional: a bare \bibliographystyle makes latexmk run BibTeX, which would
+    %% overwrite the jobname .bbl with an empty one). Locally refs.bib exists and the normal
+    %% BibTeX path is used. After any citation change: build locally, then
+    %%   cp main.bbl refs_precompiled.bbl   and re-upload main.tex + refs_precompiled.bbl.
+    \IfFileExists{refs.bib}{\bibliographystyle{ieeenat_fullname}\bibliography{refs}}%
+      {\input{refs_precompiled.bbl}}
 }
 
 \end{document}
