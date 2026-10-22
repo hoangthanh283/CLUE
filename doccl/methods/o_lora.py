@@ -42,13 +42,20 @@ class OLoRA(NaiveFineTune):
             ["query", "key", "value"],  # matches layoutlmv3 attention naming
         )
 
+        # AGENT FIX (2026-10-22): PEFT's TOKEN_CLS forward hard-codes ``input_ids=`` into the
+        # base-model call, which ViTForImageClassification rejects. On image backbones use
+        # the generic PeftModel (kwargs pass straight through) and register the classifier
+        # as a saved/trainable module explicitly (TOKEN_CLS did that implicitly), so the
+        # ModulesToSaveWrapper re-sync in ``before_task`` keeps working unchanged.
+        is_image = getattr(self.model, "task_type", "token") == "image"
         peft_config = LoraConfig(
             r=self.rank,
             lora_alpha=self.alpha,
             lora_dropout=self.dropout,
             target_modules=target_modules,
             bias="none",
-            task_type="TOKEN_CLS",
+            task_type=None if is_image else "TOKEN_CLS",
+            modules_to_save=["classifier"] if is_image else None,
         )
         # Wrap the inner HF model
         self.model.model = get_peft_model(self.model.model, peft_config)
