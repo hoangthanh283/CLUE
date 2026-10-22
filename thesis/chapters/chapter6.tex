@@ -634,7 +634,8 @@ stale-``O'' failure mode do not survive five class-adding sessions on a single g
 CPFD does not converge on CIL-CORD or Mixed and collapses to $6.2\pm7.2$ on DIL, and IS3 never re-predicts a previously learned
 class on CIL-CORD ($4.4\pm1.7$), though it recovers to $30.1\pm1.0$ on Mixed, whose last
 session adds no classes. Model merging with classifier realignment (LCA) converges but lands
-far below naive on CIL-CORD ($8.2\pm2.1$) and just above it on DIL ($43.9\pm2.0$).
+far below naive on CIL-CORD ($8.2\pm2.6$) and Mixed ($19.0\pm3.7$) and just above it on DIL
+($43.9\pm2.5$): old sessions read $0$--$5$ after every merge, the pattern of merging without replay.
 
 \begin{table}[!htbp]
   \centering
@@ -645,8 +646,7 @@ far below naive on CIL-CORD ($8.2\pm2.1$) and just above it on DIL ($43.9\pm2.0$
   per task with early stopping; LexSlot is listed with the 200-exemplar buffer its accuracy
   depends on (\S\ref{sec:results-abl-components}); CoLaSlot is a single five-epoch seed.
   null$^{*}$: did not converge (\S\ref{sec:results-nulls}). ``--'': cell not run or not
-  applicable (LCA on Mixed was in progress at the time of writing); IS3 on DIL is a single seed
-  (\S\ref{sec:results-nulls}).}
+  applicable; IS3 on DIL is a single seed (\S\ref{sec:results-nulls}).}
   \label{tab:main-comparison}
   \IfFileExists{generated/table_main.tex}{\resizebox{\textwidth}{!}{\input{generated/table_main}}}{%
   \begin{tabular}{lccc}
@@ -661,7 +661,7 @@ far below naive on CIL-CORD ($8.2\pm2.1$) and just above it on DIL ($43.9\pm2.0$
     CL-LoRA (2025)        & $15.2 \pm 3.1$ & $41.1 \pm 0.3$ & $31.4 \pm 0.6$ \\
     CPFD (2023)           & null$^{*}$ & $6.2 \pm 7.2$ & null$^{*}$ \\
     IS3 (2024)            & null$^{*}$ & $38.3$ (1 seed) & $30.1 \pm 1.2$ \\
-    LCA (2026)            & $8.2 \pm 2.6$ & $43.9 \pm 2.5$ & -- \\
+    LCA (2026)            & $8.2 \pm 2.6$ & $43.9 \pm 2.5$ & $19.0 \pm 3.7$ \\
     \midrule
     \textbf{CoLaR (ours)}            & $20.4 \pm 1.3$ & $87.8 \pm 0.5$ & $58.8 \pm 1.1$ \\
     \textbf{CoLaR-R, sliced (ours)}  & $25.4 \pm 2.4$ & -- & $61.3 \pm 1.9$ \\
