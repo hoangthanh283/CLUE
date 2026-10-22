@@ -29,9 +29,10 @@
 %% pagebackref (recommended by cvpr.sty for the review copy) costs one extra pdflatex pass
 %% (4 instead of 3). It is enabled only where refs.bib exists (local builds, which produce the
 %% submission PDF) and skipped on Overleaf (free plan, 10 s compile limit) — 2026-10-22.
-% Overleaf free plan: 10 s compile limit (since 2025-09-08). pagebackref needs extra passes,
-% so it is enabled only when the bibliography is being regenerated (no precompiled .bbl).
-\IfFileExists{refs_precompiled.bbl}{}{\PassOptionsToPackage{pagebackref}{hyperref}}
+%% It needs no BibTeX: the bibliography itself always comes from refs_precompiled.bbl when
+%% that file exists (see the switch before \end{document}). Do NOT upload refs.bib to
+%% Overleaf: it would only add this extra pass.
+\IfFileExists{refs.bib}{\PassOptionsToPackage{pagebackref}{hyperref}}{}
 \usepackage[breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
 
 %%%%%%%%% PAPER ID
