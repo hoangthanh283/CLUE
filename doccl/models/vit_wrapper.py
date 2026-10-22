@@ -44,5 +44,22 @@ class ViTWrapper(TokenClassificationWrapper):
         """CLS feature feeding the head, kept 3-D (B, 1, D) for the token-style consumers."""
         return self._inner(pixel_values=batch["pixel_values"]).last_hidden_state[:, :1]
 
-    def forward_with_prompts(self, *args: Any, **kwargs: Any) -> torch.Tensor:  # noqa: ARG002
-        raise NotImplementedError("prompt methods are not wired for ViTWrapper")
+    def forward_with_prompts(  # type: ignore[override]
+        self,
+        prompt_embeds: torch.Tensor,
+        pixel_values: torch.Tensor,
+        **kwargs: Any,  # noqa: ARG002 — input_ids/bbox/attention_mask are None for images
+    ) -> torch.Tensor:
+        """AGENT FIX (2026-10-22): prefix-prompt forward for the prompt family on ViT.
+
+        Prompt tokens are inserted between CLS and the patch embeddings (after the
+        position embeddings are added, as in L2P/CODA-Prompt on ViT), the frozen encoder
+        runs over the extended sequence, and the CLS logits are returned in the token
+        layout the prompt methods expect: (B, 1, n_labels).
+        """
+        inner = self._inner
+        emb = inner.embeddings(pixel_values)  # (B, 1 + N, D), positions already added
+        h = torch.cat([emb[:, :1], prompt_embeds.to(emb.dtype), emb[:, 1:]], dim=1)
+        seq = inner.layernorm(inner.encoder(h)[0])
+        logits = self.model.classifier(seq[:, 0])
+        return logits.unsqueeze(1)

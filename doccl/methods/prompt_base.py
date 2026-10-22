@@ -27,7 +27,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from doccl.eval.metrics import compute_token_f1
+from doccl.eval.metrics import compute_eval_metrics
 from doccl.methods.naive import NaiveFineTune
 from doccl.types import EvalMetrics, TaskInfo, TrainMetrics
 
@@ -112,6 +112,27 @@ class PromptBasedMethod(NaiveFineTune):
         """q(x) = CLS embedding from the frozen backbone (backbone-agnostic)."""
         return self.model.encode_query(batch)  # (B, D)
 
+    def _prompt_logits(self, batch: dict, prompt_embeds: torch.Tensor) -> torch.Tensor:
+        """Backbone-agnostic prompt forward. Document wrappers need ``input_ids``/``bbox``
+        (``pixel_values`` optional: LiLT/BROS/BERT emit none); the image wrapper needs only
+        ``pixel_values`` and ignores the rest (AGENT FIX 2026-10-22: ViT support)."""
+        return self.model.forward_with_prompts(
+            input_ids=batch.get("input_ids"),
+            bbox=batch.get("bbox"),
+            pixel_values=batch.get("pixel_values"),
+            prompt_embeds=prompt_embeds,
+            attention_mask=batch.get("attention_mask"),
+        )
+
+    @staticmethod
+    def _aligned_labels(batch: dict, logits: torch.Tensor) -> torch.Tensor:
+        """Labels cut to the (prompt-truncated) logit length; image labels are (B,) and
+        become (B, 1) to match the (B, 1, C) CLS logits."""
+        labels = batch["labels"]
+        if labels.dim() == 1:
+            labels = labels.unsqueeze(1)
+        return labels[:, : logits.shape[1]]
+
     @torch.no_grad()
     def _prompt_val_f1(self, val_loader: DataLoader) -> float:
         """Entity-F1 on a held-out loader using the PROMPT forward path.
@@ -132,22 +153,15 @@ class PromptBasedMethod(NaiveFineTune):
             batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
             query = self._query(batch)
             prompt_embeds, _ = self._select_prompts(query, batch)
-            logits = self.model.forward_with_prompts(
-                input_ids=batch["input_ids"],
-                bbox=batch["bbox"],
-                # ``.get`` (not hard-index): secondary backbones (LiLT/BROS/BERT) emit
-                # no ``pixel_values`` — matching the train/eval forward paths below so
-                # the val-F1 early-stop path runs on every backbone, not just LayoutLMv3.
-                pixel_values=batch.get("pixel_values"),
-                prompt_embeds=prompt_embeds,
-                attention_mask=batch.get("attention_mask"),
-            )
+            logits = self._prompt_logits(batch, prompt_embeds)
             preds = logits.argmax(dim=-1)
-            labels = batch["labels"][:, : logits.shape[1]]
+            labels = self._aligned_labels(batch, logits)
             mask = labels != -100
             all_preds.extend(preds[mask].cpu().tolist())
             all_labels.extend(labels[mask].cpu().tolist())
-        f1 = compute_token_f1(all_preds, all_labels, id_to_label)["f1"]
+        f1 = compute_eval_metrics(
+            all_preds, all_labels, id_to_label, getattr(self.model, "task_type", "token")
+        )["f1"]
         if was_training:
             self.model.train()
         return f1
@@ -182,14 +196,8 @@ class PromptBasedMethod(NaiveFineTune):
                 optimizer.zero_grad()
                 query = self._query(batch)
                 prompt_embeds, aux = self._select_prompts(query, batch)
-                logits = self.model.forward_with_prompts(
-                    input_ids=batch["input_ids"],
-                    bbox=batch["bbox"],
-                    pixel_values=batch.get("pixel_values"),
-                    prompt_embeds=prompt_embeds,
-                    attention_mask=batch.get("attention_mask"),
-                )
-                labels = batch["labels"][:, : logits.shape[1]]
+                logits = self._prompt_logits(batch, prompt_embeds)
+                labels = self._aligned_labels(batch, logits)
                 ce = F.cross_entropy(
                     logits.reshape(-1, logits.shape[-1]),
                     labels.reshape(-1),
@@ -238,19 +246,15 @@ class PromptBasedMethod(NaiveFineTune):
                     batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
                     query = self._query(batch)
                     prompt_embeds, _ = self._select_prompts(query, batch)
-                    logits = self.model.forward_with_prompts(
-                        input_ids=batch["input_ids"],
-                        bbox=batch["bbox"],
-                        pixel_values=batch.get("pixel_values"),
-                        prompt_embeds=prompt_embeds,
-                        attention_mask=batch.get("attention_mask"),
-                    )
+                    logits = self._prompt_logits(batch, prompt_embeds)
                     preds = logits.argmax(dim=-1)
-                    labels = batch["labels"][:, : logits.shape[1]]
+                    labels = self._aligned_labels(batch, logits)
                     mask = labels != -100
                     all_preds.extend(preds[mask].cpu().tolist())
                     all_labels.extend(labels[mask].cpu().tolist())
-                metrics = compute_token_f1(all_preds, all_labels, id_to_label)
+                metrics = compute_eval_metrics(
+                    all_preds, all_labels, id_to_label, getattr(self.model, "task_type", "token")
+                )
                 results[tid] = EvalMetrics(
                     task_id=tid,
                     f1=metrics["f1"],
