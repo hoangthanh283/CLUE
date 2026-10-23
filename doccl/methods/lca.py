@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import pathlib
+import shutil
 import tempfile
 
 import torch
@@ -97,11 +98,21 @@ class LCA(NaiveFineTune):
     # ``<out_dir>/lca_backbones/t<k>.pt`` and held memory-mapped: the values are the same fp32
     # tensors (numerically identical merge), but the pages are reclaimable file cache instead of
     # anonymous memory, so the OOM killer no longer counts them.
-    def _stash_backbone_state(self, tag: str) -> dict[str, torch.Tensor]:
-        state = self._backbone_state()
-        root = (
+    def _stash_root(self) -> pathlib.Path:
+        return (
             pathlib.Path(getattr(self, "out_dir", None) or tempfile.gettempdir()) / "lca_backbones"
         )
+
+    def _drop_stash(self) -> None:
+        """AGENT FIX (2026-10-24): delete the on-disk stash once the last merge is done. Each
+        image run left ~3.3 GB of per-task backbones behind (8 finished runs = 29 GB) and filled
+        the data drive, killing three running cells. The mmap'd tensors stay valid on Linux
+        until unmapped, and nothing after the final ``after_task`` reads them."""
+        shutil.rmtree(self._stash_root(), ignore_errors=True)
+
+    def _stash_backbone_state(self, tag: str) -> dict[str, torch.Tensor]:
+        state = self._backbone_state()
+        root = self._stash_root()
         root.mkdir(parents=True, exist_ok=True)
         path = root / f"{tag}.pt"
         torch.save(state, path)
@@ -172,6 +183,8 @@ class LCA(NaiveFineTune):
         if self.merge:
             self._task_backbones.append(self._stash_backbone_state(f"t{task.task_id}"))
             self._merge_backbones()
+            if task.is_last:
+                self._drop_stash()
         # (3) align the classifier on sampled features (LCA skips task 0).
         if task.task_id > 0 and self._class_means:
             self._align()
