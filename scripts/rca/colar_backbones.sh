@@ -31,6 +31,12 @@ for sc in ${SCENARIOS:-dil cil_cord mixed}; do
     for sd in ${SEEDS:-42 7 123}; do
       name="${sc}_colar_e10_seed${sd}_${fam}"
       if ls results/${name}*/metrics.json >/dev/null 2>&1; then echo "$(date +%H:%M) SKIP $name" >>"$LOG"; continue; fi
+      # 2026-10-24 05:03: /mnt/DataDrive filled (LCA stashes) and killed three image cells. Do not start a
+      # run with < 10 GB free; wait and re-check. (colar_e10 runs write no model dumps — the 7.8 GB of
+      # final_model.pt/final_store.pt on disk are the Pass 2b probe runs.)
+      while [ "$(df --output=avail -BG /mnt/DataDrive | tail -1 | tr -dc 0-9)" -lt 10 ]; do
+        echo "$(date +%H:%M) DISK LOW ($(df -h /mnt/DataDrive | awk 'NR==2{print $4}') free) — waiting before $name" >>"$LOG"; sleep 600
+      done
       echo "$(date +%H:%M) START $name" >>"$LOG"
       uv run python scripts/train.py method=colar +method.run_alias=colar_e10 scenario="$sc" model="${fam}_base" \
         seed="$sd" method.epochs=10 $COMMON $COLAR_AX >"results/logs_vision/$name.log" 2>&1
