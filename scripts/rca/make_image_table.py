@@ -39,7 +39,7 @@ ROWS = [
     ),
     (
         "\\textbf{CoLaR $r{=}128$, 500/class (ours)}",
-        {"cil_cifar100": None, "cil_imagenet_r": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128"},
+        {"cil_cifar100": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128", "cil_imagenet_r": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128"},
         "ours",
     ),
     ("Joint (upper bound)", "{sc}_joint_seed{sd}_vit", "oracle"),
