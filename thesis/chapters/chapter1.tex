@@ -208,19 +208,21 @@ a fixed layer: replaying real whole documents retains AA $87.3$, while a rank-16
 ($41.9$), per-class Gaussians ($39.4$), and even real $k$-means centroids ($36.7$) collapse.
 The binding of feature, position, and label within one document is the necessary ingredient.
 
-\noindent\textbf{Compressed latent replay with live labels (RQ2).} Individual documents, unlike the pooled
+\noindent\textbf{Compressed latent replay and its boundaries (RQ2).} Individual documents, unlike the pooled
 feature space, \emph{are} low-rank. CoLaR stores each replayed document as rank-$r$ SVD factors
 of its layer-$k$ activations, which keeps whole-document binding and reaches AA $87.6$ with a
 $60$\,MB memory, $2.7\times$ smaller than raw replay and within $1.4$ points of the joint
 oracle, with no raw document retained. LexSlot, an isolated slot memory at the head and late
-layers gated by a drift-immune \gls{ocr}-vocabulary signature, reaches AA $87.3 \pm 1.0$ with
-backward transfer $-2.3 \pm 1.2$ with a compact 200-exemplar buffer, forgetting less than plain
-replay ($-2.8$/$-3.4$). The thesis joins the two: LexSlot's signature becomes the \emph{gate}
-and CoLaR the \emph{memory}, so that for each incoming document the replay draws the stored
-latents whose vocabulary is nearest (or farthest, or from the nearest task), rather than
-sampling the store uniformly. The diagnosis decides \emph{where} the memory attaches; the
-lexical signature, immune to the representation drift that defeats every buffer-free method,
-decides \emph{what} is replayed.
+layers with a compact 200-exemplar buffer, reaches AA $87.3 \pm 1.0$ with
+backward transfer $-2.3 \pm 1.2$, forgetting less than plain
+replay ($-2.8$/$-3.4$). Where the label space grows (class-incremental CORD),
+banked labels go stale and every replay method sits at the naive floor; a sliced replay loss
+over the classes alive at banking time recovers $+5$ AA on three seeds. A drift-immune
+\gls{ocr}-vocabulary signature was hypothesised as a replay router but is reported as a
+three-seed null ($+0.5$ AA with a sign flip); the memory-only headline does not depend on
+routing. On image class-incremental learning the same latent bank is beaten by a Gaussian-head
+method whose document analogue is null in every form, isolating whole-document binding as the
+ingredient that separates the two domains.
 
 \noindent\textbf{The FCS-CL benchmark and reproducible tooling.} We provide a unified \gls{cl}
 benchmark over five document datasets (FUNSD, CORD, SROIE, WildReceipt, XFUND) with
