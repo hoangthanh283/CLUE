@@ -48,49 +48,18 @@ directly instantiates the backbone selection criteria laid out in
   \end{tabularx}
 \end{table}
 
-\subsection{Software Stack: Selection Criteria and Justification}
+\subsection{Software Stack}
 \label{sec:impl-stack}
 
-\paragraph{Selection criteria.} Five requirements drove the choice of software
-stack. \textbf{(i) Reference implementations:} the diagnosis must run on the
-canonical LayoutLMv3 weights and preprocessing, not a re-implementation whose
-deviations could masquerade as forgetting signal. \textbf{(ii) Composable
-configuration at grid scale:} the full grid of methods $\times$ scenarios
-$\times$ seeds must be launchable from a single entry point with no per-run code
-edits. \textbf{(iii) BIO-correct evaluation:} the metric must be entity-level,
-span-aware F1 rather than token accuracy. \textbf{(iv) Queryable experiment
-tracking:} the complete grid must be reconstructable from logged runs alone.
-\textbf{(v) Determinism support:} the CKA and Fisher patterns reported in
-Chapter~\ref{ch:results} must reflect signal, not run-to-run noise, so the
-framework must expose deterministic execution modes.
-
-\paragraph{Justification.} PyTorch ($\ge$2.3) satisfies (i) and (v): it is the
-framework in which the canonical LayoutLMv3 is released, it provides the
-forward-hook API on which the CKA activation probes are built, and it exposes
-the cuDNN determinism flags required for reproducible kernels. TensorFlow and
-JAX were rejected because neither has a maintained LayoutLMv3 reference
-implementation. HuggingFace Transformers ($\ge$4.41) supplies the canonical
-LayoutLMv3 model together with its \texttt{LayoutLMv3Processor}, and Datasets
-($\ge$4.0) loads the benchmark corpora from the HuggingFace Hub, jointly
-covering (i); re-implementing the backbone or hand-rolling loaders would
-forfeit the canonical-weights guarantee. PEFT ($\ge$0.11) provides audited LoRA
-injection for the LoRA-family baselines, avoiding hand-rolled adapter code.
-For (ii), Hydra ($\ge$1.3.2) with OmegaConf composes declarative configuration
-groups (method, scenario, model, training) into a fully specified run;
-\texttt{argparse} plus hand-rolled YAML was rejected because it cannot express
-the sweep grid declaratively. For (iv), Weights \& Biases ($\ge$0.17) records
-every run with structured, queryable tags; TensorBoard was rejected because it
-offers no structured cross-run querying. Finally, for (iii), \texttt{seqeval}
-($\ge$1.2.2) computes entity-level BIO-aware F1; plain token accuracy was
-rejected because it is inflated by the dominant O class and would mask
-entity-level forgetting. Experiments are launched through a single entry point
-and configured by composition, e.g.
-\begin{quote}\small
-\texttt{python scripts/train.py method=ewc scenario=cil\_cord seed=42
-method.lambda\_=1000}
-\end{quote}
-so that every run is fully specified by its config and reproducible.
-Table~\ref{tab:software-stack} summarises the stack.
+The stack was chosen to satisfy five requirements: (i) canonical reference
+weights and preprocessing for LayoutLMv3, (ii) composable configuration for
+grid-scale sweeps, (iii) entity-level BIO-aware F1 evaluation, (iv) queryable
+experiment tracking, and (v) deterministic execution for reproducible CKA and
+Fisher patterns. Table~\ref{tab:software-stack} summarises the components and
+the alternatives each was chosen over. All experiments are launched through a
+single Hydra entry point, e.g.\
+\texttt{python scripts/train.py method=ewc scenario=cil\_cord seed=42}, so every
+run is fully specified by its config.
 
 \begin{table}[!htbp]
   \centering

@@ -812,9 +812,13 @@ tags in class-incremental CORD, a shifted domain in DIL), forward transfer is
 \emph{strongly negative} and depends on the scenario, not the method. Where it is measured
 (the naive runs, seeded with the single-task baselines), it is
 $\approx-92$ on CIL-CORD (the head cannot predict unseen classes), $\approx-75$ to $-84$ on
-DIL, and $\approx-80$ to $-88$ on Mixed. This negative forward transfer is itself a finding:
-in continual document IE there is little to gain ahead of seeing a task's data, which is precisely why
-the \emph{backward} methods (replay, head-targeted slot memory) dominate. These FWT
+DIL, and $\approx-80$ to $-88$ on Mixed. This is largely a property of the metric
+under BIO labelling: a zero-shot model cannot predict BIO tags it has never seen, so the
+zero-shot term $R[i{-}1,i]$ is near zero by construction whenever a new session introduces new
+entity types, making FWT tautologically negative regardless of method quality. The practical
+consequence is that in continual document IE there is little to gain ahead of seeing a task's
+data, which is precisely why the \emph{backward} methods (replay, head-targeted slot memory)
+dominate. These FWT
 values are measured from the grid's recorded zero-shot entries against the single-task
 baselines.
 
