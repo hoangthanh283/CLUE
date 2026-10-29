@@ -1070,16 +1070,48 @@ empirical ordering is not an artefact of one backbone, or of multimodality itsel
   \end{tabular}}
 \end{table}
 
-\paragraph{CoLaR beyond LayoutLMv3.} The compressed memory was rerun on the two vision-free
-backbones under the same DIL recipe (split layer $k{=}4$, $50$ documents per task, rank $128$,
-three seeds). It does not reproduce the LayoutLMv3 result there: BERT reaches $71.8\pm4.4$
-against $77.1$ for ER on BERT, and LiLT $76.8\pm1.3$ against $85.7\pm0.5$ for ER on LiLT, while on
-LayoutLMv3 CoLaR and ER are level ($87.8$ vs.\ $87.9$). Every seed learns each domain as well as
-ER does; the shortfall is retention of the replayed SROIE documents. The split layer and rank
-were selected on LayoutLMv3 and carried over unchanged, so the result bounds the claim rather
-than refutes the mechanism: per-document compression is lossless where its hyper-parameters were
-chosen, and its transfer to other encoders is untested beyond this fixed setting. BROS cells and
-the class-incremental scenarios on the secondary backbones are still running.
+\paragraph{CoLaR beyond LayoutLMv3.} The compressed memory was rerun on all three secondary
+backbones under the same recipe (split layer $k{=}4$, $50$ documents per task, rank $128$,
+three seeds each; BROS required batch size $1$ with mixed precision on the 6\,GB GPU).
+Table~\ref{tab:colar-crossbackbone} summarises.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[CoLaR cross-backbone]{CoLaR average accuracy (AA) across backbones and scenarios
+  (mean\,$\pm$\,std over three seeds unless noted). ER is the raw-exemplar replay reference
+  on the same backbone. LiLT CIL-CORD is $n{=}1$ (seed 42). $^\dagger$LiLT Mixed exceeded
+  6\,GB VRAM even at batch~1 with mixed precision (283M parameters).}
+  \label{tab:colar-crossbackbone}
+  \begin{tabular}{l ccc ccc}
+    \toprule
+    & \multicolumn{3}{c}{\textbf{CoLaR}} & \multicolumn{3}{c}{\textbf{ER (reference)}} \\
+    \cmidrule(lr){2-4} \cmidrule(lr){5-7}
+    \textbf{Backbone} & \textbf{DIL} & \textbf{CIL} & \textbf{Mixed}
+                       & \textbf{DIL} & \textbf{CIL} & \textbf{Mixed} \\
+    \midrule
+    LayoutLMv3 & $87.8{\pm}0.5$ & $20.4{\pm}1.1$ & $58.8{\pm}0.9$
+               & $87.9{\pm}1.2$ & $16.0{\pm}1.1$ & $60.3{\pm}4.3$ \\
+    BROS       & $87.2{\pm}0.5$ & $20.3{\pm}1.5$ & $60.6{\pm}0.1$
+               & $87.8{\pm}0.3$ & $18.3{\pm}1.2$ & $61.1{\pm}1.2$ \\
+    LiLT       & $76.8{\pm}1.1$ & $19.1$\,(1 seed) & --\,\textsuperscript{$\dagger$}
+               & $85.7{\pm}0.4$ & $17.9{\pm}0.4$ & $57.0{\pm}1.2$ \\
+    BERT       & $71.8{\pm}3.6$ & $17.1{\pm}0.1$ & $43.8{\pm}0.7$
+               & $77.1{\pm}0.8$ & $17.1{\pm}1.3$ & $50.2{\pm}0.5$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+On the layout-aware BROS encoder, CoLaR matches ER to within one point on every scenario
+($87.2$ vs.\ $87.8$ on DIL, $20.3$ vs.\ $18.3$ on CIL-CORD, $60.6$ vs.\ $61.1$ on Mixed),
+reproducing the LayoutLMv3 pattern: per-document SVD compression is lossless where the
+backbone's representation preserves layout structure. On the text-heavy secondaries the gap
+widens: BERT CoLaR trails ER by $5$--$6$ points on DIL and Mixed, LiLT by $9$ on DIL. The
+split layer and rank were selected on LayoutLMv3 and carried over unchanged, so the shortfall
+bounds the claim rather than refutes the mechanism: per-backbone tuning was not attempted, and
+LiLT's separate layout stream is not stored in the latent bank, so replay there is
+approximate. LiLT's 283M parameters exceeded the 6\,GB GPU on CIL-CORD (5 task expansions)
+and Mixed (4 tasks) even at batch~1 with mixed precision; only DIL (3 tasks) and one CIL-CORD
+seed completed.
 
 \section{Ablation Studies}
 \label{sec:results-ablation}
