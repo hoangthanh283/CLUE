@@ -23,7 +23,7 @@ from torch.utils.data import ConcatDataset, DataLoader, random_split
 
 import wandb
 from doccl.data.encoders import build_encoder
-from doccl.data.scenarios import ScenarioType, get_scenario
+from doccl.data.scenarios import get_scenario
 from doccl.eval.metrics import CLMetricsTracker, compute_per_class_f1
 from doccl.methods.aglr_replay import AGLRReplay
 from doccl.methods.cl_lora import CLLoRA
@@ -363,10 +363,14 @@ def cil_allowed(cfg, scenario, model, task) -> set[int] | None:
     """Allowed head ids for scoring ``task`` under ``training.cil_restrict_eval``."""
     if not cfg.training.get("cil_restrict_eval", False):
         return None
-    is_image = getattr(model, "task_type", "token") == "image"
-    if scenario.scenario_type != ScenarioType.CIL or is_image:
+    if getattr(model, "task_type", "token") == "image":
         return None
-    return {model.label_to_id[lb] for lb in task.label_set if lb in model.label_to_id}
+    allowed = {model.label_to_id[lb] for lb in task.label_set if lb in model.label_to_id}
+    # Only sessions whose gold is masked to a SUBSET of the head need it (CIL sessions,
+    # the CIL halves of Mixed); DIL tasks carry the full label set -> no-op.
+    if len(allowed) >= len(model.label_to_id):
+        return None
+    return allowed
 
 
 def split_val(dataset, cfg, seed: int):
