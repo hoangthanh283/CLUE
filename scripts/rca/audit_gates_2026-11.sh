@@ -16,6 +16,15 @@ run() { local name=$1; shift
   if ls $OUT/${name}*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  $name" >>$LOG; else echo "$(date '+%m-%d %H:%M') FAIL  $name rc=$?" >>$LOG; fi
 }
 echo "=== AUDIT GATES START $(date) ===" >>$LOG
+# G0 (2026-11-02, highest priority): CoLaR-R double-sliced on CIL-CORD under the corrected scorer
+P=results/gates/cil_protocol_2026-11
+PDOC="scenario=cil_cord model=layoutlmv3_base seed=42 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true"
+PAX="method.split_layer_k=4 method.docs_per_task=50 method.rank_r=128 method.replay_batch_size=4"
+if ! ls $P/cil_cord_colar_r_sliced2_seed42*/metrics.json >/dev/null 2>&1; then
+  echo "$(date '+%m-%d %H:%M') START cil_cord_colar_r_sliced2_seed42" >>$P/queue.log
+  uv run python scripts/train.py method=colar_r_sliced2 method.epochs=10 $PAX $PDOC >"$P/cil_cord_colar_r_sliced2_seed42.log" 2>&1
+  if ls $P/cil_cord_colar_r_sliced2_seed42*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  cil_cord_colar_r_sliced2_seed42" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  cil_cord_colar_r_sliced2_seed42" >>$P/queue.log; fi
+fi
 # G1
 run cil_cifar100_coda_masked_seed42_vit uv run python scripts/train.py method=coda_prompt +method.run_alias=coda_masked \
   +method.mask_old_logits=true method.epochs=100 scenario=cil_cifar100 seed=42 $VIS

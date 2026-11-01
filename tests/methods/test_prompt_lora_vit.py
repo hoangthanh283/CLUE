@@ -90,3 +90,21 @@ def test_mask_old_logits_hides_previous_classes_in_training_ce(tmp_path):
     assert method.state.custom["n_old"] == N
     masked = method._mask_old(torch.zeros(2, 1, N + 2))
     assert torch.isinf(masked[..., :N]).all() and masked[..., N:].isfinite().all()
+
+
+def test_current_sliced_masks_old_classes_only_on_o_tokens():
+    """AGENT IMPL 2026-11-02: latent_replay._current_ce mirror slice."""
+    from types import SimpleNamespace
+
+    from doccl.methods.latent_replay import LatentReplay
+
+    m = SimpleNamespace(config={"current_sliced": True}, state=SimpleNamespace(custom={"n_old": 3}))
+    logits = torch.zeros(1, 2, 5)
+    logits[0, 0, 1] = 10.0  # O-token strongly predicts OLD class 1 -> must not be punished
+    logits[0, 1, 1] = 10.0  # entity token (label 4) predicting class 1 -> full softmax, punished
+    labels = torch.tensor([[0, 4]])
+    out = SimpleNamespace(logits=logits, loss=torch.tensor(99.0))
+    loss = LatentReplay._current_ce(m, out, {"labels": labels})
+    full = torch.nn.functional.cross_entropy(logits.reshape(-1, 5), labels.reshape(-1))
+    assert loss < full  # the O-token's old-class mass was removed from its CE
+    assert loss > 4.0  # the entity token is still punished (≈10 nats / 2 tokens)
