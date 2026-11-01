@@ -198,6 +198,7 @@ class PromptBasedMethod(NaiveFineTune):
                 prompt_embeds, aux = self._select_prompts(query, batch)
                 logits = self._prompt_logits(batch, prompt_embeds)
                 labels = self._aligned_labels(batch, logits)
+                logits = self._mask_old(logits)
                 ce = F.cross_entropy(
                     logits.reshape(-1, logits.shape[-1]),
                     labels.reshape(-1),
@@ -229,9 +230,24 @@ class PromptBasedMethod(NaiveFineTune):
                     break
 
         stopper.restore_best(self.model)
+        self.state.custom["n_old"] = int(self.model.model.config.num_labels)
         return TrainMetrics(
             task_id=task.task_id, loss=total_loss / max(n_steps, 1), n_steps=n_steps
         )
+
+    def _mask_old(self, logits: torch.Tensor) -> torch.Tensor:
+        """AGENT FIX (2026-11-01): ``mask_old_logits`` (default off = legacy) masks the
+        classes seen before this task out of the training CE, as the official L2P /
+        DualPrompt / CODA-Prompt code does; without it the shared growing head drives old
+        logits to zero at every session. Eval is never masked (task-agnostic CIL)."""
+        if not self.config.get("mask_old_logits", False):
+            return logits
+        n_old = self.state.custom.get("n_old", 0)
+        if n_old <= 0:
+            return logits
+        logits = logits.clone()
+        logits[..., :n_old] = float("-inf")
+        return logits
 
     def evaluate(self, eval_loaders: dict[int, DataLoader]) -> dict[int, EvalMetrics]:
         self.model.eval()

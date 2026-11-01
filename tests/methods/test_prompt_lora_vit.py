@@ -75,3 +75,18 @@ def test_cl_lora_trains_and_evaluates_on_vit(tmp_path):
     # the classifier must stay trainable under the generic PeftModel wrapping
     assert any(p.requires_grad for p in model.model.classifier.parameters())
     _run(method)
+
+
+def test_mask_old_logits_hides_previous_classes_in_training_ce(tmp_path):
+    """AGENT FIX 2026-11-01: with ``mask_old_logits`` the second task's CE never touches
+    the first task's logit rows (official prompt/CL-LoRA CIL protocol)."""
+    model = _tiny_vit(tmp_path)
+    method = CODAPrompt(
+        model, {"epochs": 1, "n_components": 3, "prompt_length": 2, "mask_old_logits": True}
+    )
+    method.device = torch.device("cpu")
+    assert method._mask_old(torch.zeros(2, 1, N)).isfinite().all()  # task 0: nothing masked
+    method.train_task(_task(), _loader(), val_loader=None)
+    assert method.state.custom["n_old"] == N
+    masked = method._mask_old(torch.zeros(2, 1, N + 2))
+    assert torch.isinf(masked[..., :N]).all() and masked[..., N:].isfinite().all()
