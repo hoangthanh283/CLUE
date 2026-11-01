@@ -40,6 +40,7 @@ import logging
 import random
 
 import torch
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -137,7 +138,7 @@ class LatentReplay(NaiveFineTune):
                 optimizer.zero_grad()
                 with self._amp_autocast():
                     cur_out = self.model(**batch)
-                    ce_loss = cur_out.loss
+                    ce_loss = self._current_ce(cur_out, batch)
                     replay_loss = torch.zeros((), device=self.device)
 
                     self._cur_batch = batch  # routed variants read the current documents
@@ -158,10 +159,33 @@ class LatentReplay(NaiveFineTune):
                 break
 
         stopper.restore_best(self.model)
+        self.state.custom["n_old"] = len(getattr(self.model, "label_to_id", {}))
         return TrainMetrics(
             task_id=task.task_id,
             loss=total_loss / max(n_steps, 1),
             n_steps=n_steps,
+        )
+
+    def _current_ce(self, cur_out, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        """AGENT IMPL (2026-11-02): ``current_sliced`` — the mirror of the sliced replay
+        loss. CIL-masked current-session data labels every OLD-session entity O, so the
+        plain CE teaches "old-class token = O" while replay teaches the opposite on the
+        same surface forms (CoLaR-R sliced val-F1 oscillated 82→27, 45→5→51→5 on CIL-CORD).
+        For current tokens labelled O the CE is taken over {O} ∪ new classes only, so an
+        old-class prediction there is neither rewarded nor punished. Entity tokens keep the
+        full softmax. Off by default = legacy loss."""
+        if not self.config.get("current_sliced", False):
+            return cur_out.loss
+        n_old = int(self.state.custom.get("n_old", 0))
+        logits, labels = cur_out.logits, batch["labels"]
+        if n_old <= 0 or logits.shape[-1] <= n_old:
+            return cur_out.loss
+        is_o = (labels == 0).unsqueeze(-1)
+        old_cls = torch.arange(logits.shape[-1], device=logits.device) < n_old
+        old_cls[0] = False  # O itself stays in the softmax
+        masked = logits.masked_fill(is_o & old_cls, float("-inf"))
+        return F.cross_entropy(
+            masked.reshape(-1, masked.shape[-1]), labels.reshape(-1), ignore_index=-100
         )
 
     def _post_optimizer_step(self) -> None:
@@ -265,6 +289,7 @@ class LatentReplay(NaiveFineTune):
             and getattr(self, "out_dir", None)
         ):
             import pathlib as _p
+
             out = _p.Path(self.out_dir)
             out.mkdir(parents=True, exist_ok=True)
             torch.save(self.model.state_dict(), out / "final_model.pt")
