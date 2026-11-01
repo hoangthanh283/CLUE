@@ -79,3 +79,15 @@ Known gaps: (i) five image cells pending (F9b); (ii) the body is **12 pages** ag
 8-page limit — the ledger says which rows carry claim weight (F1, F2, F3, F5, F6b, F10b, F9) and
 which can move to the supplement wholesale (F6c/F6d/F7a/F7b, the HGT/CUBER and Ledger ledger rows,
 the routing paragraph); (iii) Finding 2 freeze arms and the F6 ladder remain seed-42.
+
+## I. Audit 2026-11-01 (plan pure-zooming-jellyfish) — pending gates
+
+| # | Claim under test | Gate run (`results/gates/audit_2026-11/`) | Status |
+|---|---|---|---|
+| F12 | Test-as-val early stopping (`train.py` legacy) inflates headline cells by ≤ 1 AA | `dil_colar_e10_val_seed42`, `dil_er_val_seed42`, `cil_cifar100_colar500r128_val_seed42_vit` (`+training.val_frac=0.1`) | PEND |
+| F13 | CODA-Prompt / CL-LoRA image collapse is the unmasked shared-head protocol, not the methods | `cil_cifar100_coda_masked_seed42_vit`, `cil_cifar100_cl_lora_masked_seed42_vit` (`+method.mask_old_logits=true`) | PEND |
+| F14 | Image "inversion" is coverage (50/class bank vs 500/class Gaussians), not bank-vs-summary | `cil_cifar100_aglr_fit500_seed42_vit` (`+method.fit_docs_per_task=500`) | PEND |
+
+Adjudication: F13 ≥ 70 AA → the Table 4 CODA/CL-LoRA rows must be re-run masked (3 seeds) or
+moved to supp as a protocol note. F14 within 3 AA of CoLaR 79.5 → contribution 6 reworded to a
+coverage statement. F12 delta > 1 AA → disclose the delta per cell in Limitations.

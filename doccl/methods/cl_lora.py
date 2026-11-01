@@ -102,6 +102,18 @@ class CLLoRA(OLoRA):
 
                 outputs = self.model(**batch)
                 ce_loss = outputs.loss
+                n_old = self.state.custom.get("n_old", 0)
+                if self.config.get("mask_old_logits", False) and n_old > 0:
+                    # AGENT FIX (2026-11-01): mask previously-seen classes out of the
+                    # training CE (official CL-LoRA / prompt-family protocol); KD below
+                    # still sees the unmasked old slice, which is what retains them.
+                    masked = outputs.logits.clone()
+                    masked[..., :n_old] = float("-inf")
+                    ce_loss = F.cross_entropy(
+                        masked.reshape(-1, masked.shape[-1]),
+                        batch["labels"].reshape(-1),
+                        ignore_index=-100,
+                    )
                 # Task-specific subspace: O-LoRA orthogonality penalty.
                 ortho_loss = self.lambda_ortho * self._ortho_loss()
 
@@ -135,6 +147,7 @@ class CLLoRA(OLoRA):
                 break
 
         stopper.restore_best(self.model)
+        self.state.custom["n_old"] = int(self.model.model.config.num_labels)
         return TrainMetrics(
             task_id=task.task_id,
             loss=total_loss / max(n_steps, 1),

@@ -30,7 +30,7 @@ from __future__ import annotations
 import logging
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 from doccl.methods.latent_replay import LatentReplay
 from doccl.types import TaskInfo
@@ -217,6 +217,19 @@ class AGLRReplay(LatentReplay):
     def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         if task.task_id == 0:
             self._apply_freeze_map()
+        # AGENT FIX (2026-11-01): ``fit_docs_per_task`` caps the documents/images the
+        # Gaussians are fit on (0 = all), the coverage control that matches the summary's
+        # data budget to a latent bank's (e.g. 500 images/task on CIFAR = 50/class).
+        n_fit = int(self.config.get("fit_docs_per_task", 0) or 0)
+        if n_fit > 0 and len(train_loader.dataset) > n_fit:
+            gen = torch.Generator().manual_seed(int(self.config.get("seed", 0)) + task.task_id)
+            idx = torch.randperm(len(train_loader.dataset), generator=gen)[:n_fit].tolist()
+            train_loader = DataLoader(
+                Subset(train_loader.dataset, idx),
+                batch_size=train_loader.batch_size,
+                shuffle=False,
+                num_workers=0,
+            )
         self._fit_gaussians(task, train_loader)
 
     def memory_bytes(self) -> int:

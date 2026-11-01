@@ -19,7 +19,7 @@ import hydra
 import numpy as np
 import torch
 from omegaconf import DictConfig, OmegaConf
-from torch.utils.data import ConcatDataset, DataLoader
+from torch.utils.data import ConcatDataset, DataLoader, random_split
 
 import wandb
 from doccl.data.encoders import build_encoder
@@ -320,6 +320,19 @@ METHOD_REGISTRY = {
     "doccl_b": DocCL_B,
     "doccl_c": DocCL_C,
 }
+
+
+def split_val(dataset, cfg, seed: int):
+    """AGENT FIX (2026-11-01): carve a held-out val split off the TRAIN set for early
+    stopping. ``training.val_frac`` (default 0 = legacy behaviour: the test loader is the
+    early-stop signal, disclosed in the paper). Returns (train_ds, val_ds | None)."""
+    frac = float(cfg.training.get("val_frac", 0.0) or 0.0)
+    if frac <= 0:
+        return dataset, None
+    n_val = max(1, int(round(len(dataset) * frac)))
+    gen = torch.Generator().manual_seed(seed)
+    tr, va = random_split(dataset, [len(dataset) - n_val, n_val], generator=gen)
+    return tr, va
 
 
 def set_seed(seed: int) -> None:
@@ -815,6 +828,9 @@ def main(cfg: DictConfig) -> None:
         # single biggest time sink in the grid. With it, Joint early-stops on
         # plateaued pooled val-F1 exactly like every other method.
         joint_val = ConcatDataset(list(scenario.eval_datasets))
+        joint_train, joint_val_split = split_val(joint_train, cfg, cfg.seed)
+        if joint_val_split is not None:
+            joint_val = joint_val_split
         joint_val_loader = DataLoader(
             joint_val,
             batch_size=cfg.training.batch_size,
@@ -875,8 +891,9 @@ def main(cfg: DictConfig) -> None:
             model.expand_classifier(new_labels)
             model = model.to(device)
 
+        train_ds, val_ds = split_val(scenario.train_datasets[task_idx], cfg, cfg.seed + task_idx)
         train_loader = DataLoader(
-            scenario.train_datasets[task_idx],
+            train_ds,
             batch_size=cfg.training.batch_size,
             shuffle=True,
             num_workers=cfg.training.num_workers,
@@ -921,7 +938,16 @@ def main(cfg: DictConfig) -> None:
         t0 = time.perf_counter()
         # Pass the current task's eval loader as the validation signal for val-F1
         # early stopping (train until current-task F1 plateaus, then restore best).
-        train_metrics = method.train_task(task, train_loader, val_loader=eval_loader)
+        val_loader = eval_loader
+        if val_ds is not None:
+            val_loader = DataLoader(
+                val_ds,
+                batch_size=cfg.training.batch_size,
+                shuffle=False,
+                num_workers=cfg.training.num_workers,
+                pin_memory=True,
+            )
+        train_metrics = method.train_task(task, train_loader, val_loader=val_loader)
         task_times.append(time.perf_counter() - t0)
         method.after_task(task, train_loader)
 
