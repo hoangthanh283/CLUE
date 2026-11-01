@@ -344,7 +344,13 @@ def restrict_preds(model, allowed_ids):
         if k.numel() < out.shape[-1]:  # head grew after the mask was built
             pad = torch.zeros(out.shape[-1] - k.numel(), dtype=torch.bool, device=k.device)
             k = torch.cat([k, pad])
-        return out.masked_fill(~k[: out.shape[-1]], -1e4)
+        k = k[: out.shape[-1]]
+        # Out-of-session argmax -> O (never re-argmax among the allowed classes: that
+        # would turn a correct cross-session prediction into an in-session false positive).
+        bad = ~k[out.argmax(-1)]
+        out = out.masked_fill(~k, -1e4)
+        out[..., 0] = torch.where(bad, torch.full_like(out[..., 0], 1e4), out[..., 0])
+        return out
 
     h = head.register_forward_hook(hook)
     try:
