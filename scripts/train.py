@@ -12,7 +12,7 @@ import json
 import logging
 import random
 import time
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
 import hydra
@@ -23,7 +23,7 @@ from torch.utils.data import ConcatDataset, DataLoader, random_split
 
 import wandb
 from doccl.data.encoders import build_encoder
-from doccl.data.scenarios import get_scenario
+from doccl.data.scenarios import ScenarioType, get_scenario
 from doccl.eval.metrics import CLMetricsTracker, compute_per_class_f1
 from doccl.methods.aglr_replay import AGLRReplay
 from doccl.methods.cl_lora import CLLoRA
@@ -320,6 +320,47 @@ METHOD_REGISTRY = {
     "doccl_b": DocCL_B,
     "doccl_c": DocCL_C,
 }
+
+
+@contextmanager
+def restrict_preds(model, allowed_ids):
+    """AGENT FIX (2026-11-01): token-CIL evaluation protocol. A CIL session's test gold
+    masks every OTHER session's entity to O, so a model that correctly predicts those
+    entities is charged a false positive per span (the Joint oracle scores 70/32/25/26/14
+    on CIL-CORD for that reason). Standard CL-NER practice scores session j on its own
+    entity types only: here predictions outside ``allowed_ids`` are pushed to O by a
+    forward hook on the classifier (eval mode only). ``allowed_ids=None`` = legacy."""
+    if allowed_ids is None:
+        yield
+        return
+    head = model.model.classifier
+    keep = torch.zeros(model.model.config.num_labels, dtype=torch.bool)
+    keep[sorted(allowed_ids)] = True
+
+    def hook(mod, _inp, out):
+        if mod.training:
+            return out
+        k = keep.to(out.device)
+        if k.numel() < out.shape[-1]:  # head grew after the mask was built
+            pad = torch.zeros(out.shape[-1] - k.numel(), dtype=torch.bool, device=k.device)
+            k = torch.cat([k, pad])
+        return out.masked_fill(~k[: out.shape[-1]], -1e4)
+
+    h = head.register_forward_hook(hook)
+    try:
+        yield
+    finally:
+        h.remove()
+
+
+def cil_allowed(cfg, scenario, model, task) -> set[int] | None:
+    """Allowed head ids for scoring ``task`` under ``training.cil_restrict_eval``."""
+    if not cfg.training.get("cil_restrict_eval", False):
+        return None
+    is_image = getattr(model, "task_type", "token") == "image"
+    if scenario.scenario_type != ScenarioType.CIL or is_image:
+        return None
+    return {model.label_to_id[lb] for lb in task.label_set if lb in model.label_to_id}
 
 
 def split_val(dataset, cfg, seed: int):
@@ -853,7 +894,10 @@ def main(cfg: DictConfig) -> None:
                 num_workers=cfg.training.num_workers,
                 pin_memory=True,
             )
-        results = method.evaluate(eval_loaders_seen)
+        results = {}
+        for tid, loader in eval_loaders_seen.items():
+            with restrict_preds(model, cil_allowed(cfg, scenario, model, scenario.tasks[tid])):
+                results.update(method.evaluate({tid: loader}))
         # Fill last row of matrix (since Joint = oracle = T-1 step)
         for tid in range(len(scenario.tasks)):
             tracker.matrix[len(scenario.tasks) - 1, tid] = results[tid].f1
@@ -912,7 +956,8 @@ def main(cfg: DictConfig) -> None:
         # is a genuine zero-shot reading carried over from the previous task. We do this
         # before before_task/train_task so no current-task gradient has touched the model.
         if task_idx > 0:
-            zs = method.evaluate({task_idx: eval_loader})
+            with restrict_preds(model, cil_allowed(cfg, scenario, model, task)):
+                zs = method.evaluate({task_idx: eval_loader})
             tracker.matrix[task_idx - 1, task_idx] = zs[task_idx].f1
             log.info("Zero-shot on task %d (for FWT): F1=%.2f", task_idx, zs[task_idx].f1)
 
@@ -947,7 +992,8 @@ def main(cfg: DictConfig) -> None:
                 num_workers=cfg.training.num_workers,
                 pin_memory=True,
             )
-        train_metrics = method.train_task(task, train_loader, val_loader=val_loader)
+        with restrict_preds(model, cil_allowed(cfg, scenario, model, task)):
+            train_metrics = method.train_task(task, train_loader, val_loader=val_loader)
         task_times.append(time.perf_counter() - t0)
         method.after_task(task, train_loader)
 
@@ -965,7 +1011,10 @@ def main(cfg: DictConfig) -> None:
                 log.warning("boundary diagnostics skipped: %s", e)
 
         # Evaluate on all seen tasks
-        results = method.evaluate(eval_loaders_seen)
+        results = {}
+        for tid, loader in eval_loaders_seen.items():
+            with restrict_preds(model, cil_allowed(cfg, scenario, model, scenario.tasks[tid])):
+                results.update(method.evaluate({tid: loader}))
         tracker.update(task_idx, {tid: {"f1": r.f1} for tid, r in results.items()})
 
         wandb.log(
