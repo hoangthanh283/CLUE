@@ -28,6 +28,13 @@ sbr_run() { local name=$1; shift
 sbr_run cil_cord_colar_sbr_seed42          method.docs_per_task=50
 sbr_run cil_cord_colar_sbr_noreplay_seed42 method.docs_per_task=0 +method.run_alias=colar_sbr_noreplay
 sbr_run cil_cord_colar_sbr_frozen_seed42   method.docs_per_task=0 method.split_layer_k=11 +method.run_alias=colar_sbr_frozen  # layers <11 frozen (ICE-like)
+# M2 (2026-11-03): Mixed SBR with a patient stopper + lower entity threshold (SROIE block under-trained:
+# val 57->50->53, recall 45-49, stopped at ep3)
+if ! ls $P/mixed_colar_sbr_p4t3_seed42*/metrics.json >/dev/null 2>&1; then
+  echo "$(date '+%m-%d %H:%M') START mixed_colar_sbr_p4t3_seed42 (M2)" >>$P/queue.log
+  uv run python scripts/train.py method=colar_sbr +method.run_alias=colar_sbr_p4t3 method.sbr_threshold=0.3 +method.early_stop_patience=4 method.epochs=10 method.split_layer_k=4 method.docs_per_task=50 method.rank_r=128 method.replay_batch_size=4 scenario=mixed model=layoutlmv3_base seed=42 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true >"$P/mixed_colar_sbr_p4t3_seed42.log" 2>&1
+  if ls $P/mixed_colar_sbr_p4t3_seed42*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  mixed_colar_sbr_p4t3_seed42" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  mixed_colar_sbr_p4t3_seed42" >>$P/queue.log; fi
+fi
 # E3 (2026-11-02): ER-ACE-asymmetric CoLaR-R (current_sliced: all) on CIL-CORD seed 42 + seed 123
 P=results/gates/cil_protocol_2026-11
 for SD in 42 123; do
