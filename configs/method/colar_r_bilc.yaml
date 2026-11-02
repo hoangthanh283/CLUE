@@ -1,0 +1,20 @@
+name: colar_r
+run_alias: colar_r_bilc
+# BiLC — Bidirectional Label Completion over the whole-document latent bank (2026-11-02):
+#   forward : pseudo refresh writes new-session labels into banked docs (sliced_pseudo)
+#   backward: a frozen task-start snapshot labels old-class entities hidden under the
+#             current session's O (confidence gate current_pseudo_tau)
+#   residual: double-sliced CE on whatever stays O on either side.
+refresh: sliced_pseudo
+current_sliced: true
+current_pseudo_tau: 0.9
+refresh_entropy_floor: 0.001
+refresh_quantile: 0.5
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64

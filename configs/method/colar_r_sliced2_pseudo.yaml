@@ -1,0 +1,19 @@
+name: colar_r
+run_alias: colar_r_sliced2_pseudo
+# Forward label completion (2026-11-02): double-sliced CoLaR-R + teacher-free pseudo refresh
+# of the bank after each task (the model that just learned session t writes its confident
+# session-t predictions into the stale-O tokens of banked documents). Under the legacy
+# conflict this refresh found 0 candidates; with the double slice the new session is learned
+# at the joint level, so the refresh has something to write.
+refresh: sliced_pseudo
+current_sliced: true
+refresh_entropy_floor: 0.001
+refresh_quantile: 0.5
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64

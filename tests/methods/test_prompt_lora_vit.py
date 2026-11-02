@@ -98,7 +98,12 @@ def test_current_sliced_masks_old_classes_only_on_o_tokens():
 
     from doccl.methods.latent_replay import LatentReplay
 
-    m = SimpleNamespace(config={"current_sliced": True}, state=SimpleNamespace(custom={"n_old": 3}))
+    m = SimpleNamespace(
+        config={"current_sliced": True},
+        state=SimpleNamespace(custom={"n_old": 3}),
+        _teacher=None,
+        _complete_current_labels=lambda b: b["labels"],
+    )
     logits = torch.zeros(1, 2, 5)
     logits[0, 0, 1] = 10.0  # O-token strongly predicts OLD class 1 -> must not be punished
     logits[0, 1, 1] = 10.0  # entity token (label 4) predicting class 1 -> full softmax, punished
@@ -108,3 +113,24 @@ def test_current_sliced_masks_old_classes_only_on_o_tokens():
     full = torch.nn.functional.cross_entropy(logits.reshape(-1, 5), labels.reshape(-1))
     assert loss < full  # the O-token's old-class mass was removed from its CE
     assert loss > 4.0  # the entity token is still punished (≈10 nats / 2 tokens)
+
+
+def test_backward_completion_relabels_confident_old_class_o_tokens():
+    """AGENT IMPL 2026-11-02: latent_replay._complete_current_labels (CPFD-style gate)."""
+    from types import SimpleNamespace
+
+    from doccl.methods.latent_replay import LatentReplay
+
+    logits = torch.zeros(1, 3, 5)
+    logits[0, 0, 2] = 6.0  # O token, teacher confident on old class 2 -> relabelled
+    logits[0, 1, 2] = 0.1  # O token, low confidence -> stays O
+    logits[0, 2, 2] = 6.0  # entity token (label 4) -> untouched
+    teacher = lambda **kw: SimpleNamespace(logits=logits)  # noqa: E731
+    m = SimpleNamespace(
+        config={"current_pseudo_tau": 0.9},
+        state=SimpleNamespace(custom={"n_old": 3}),
+        _teacher=teacher,
+        _amp_autocast=lambda: __import__("contextlib").nullcontext(),
+    )
+    out = LatentReplay._complete_current_labels(m, {"labels": torch.tensor([[0, 0, 4]])})
+    assert out.tolist() == [[2, 0, 4]]
