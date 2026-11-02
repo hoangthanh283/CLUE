@@ -36,6 +36,7 @@ from doccl.methods.colar_knn import CoLaRKNN
 from doccl.methods.colar_meta import CoLaRMeta
 from doccl.methods.colar_pp import CoLaRPP
 from doccl.methods.colar_r import CoLaRRefresh
+from doccl.methods.colar_sbr import CoLaRSBR
 from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.colaslot import CoLaSlot
 from doccl.methods.colaslot_fd import CoLaSlotFD
@@ -259,6 +260,7 @@ METHOD_REGISTRY = {
     # (whole-doc binding preserved; per-doc matrices ARE low-rank though the pooled space isn't).
     "colar": CoLaR,
     "colar_r": CoLaRRefresh,
+    "colar_sbr": CoLaRSBR,
     # CoLaR++: + head alignment on real stored latents, slow trunk, WA, balanced replay,
     # int8 / token-pooled storage (image CIL; docs/IMAGE_SCOPE_PREREG.md Amendment 5).
     "colar_pp": CoLaRPP,
@@ -332,6 +334,15 @@ def restrict_preds(model, allowed_ids):
     forward hook on the classifier (eval mode only). ``allowed_ids=None`` = legacy."""
     if allowed_ids is None:
         yield
+        return
+    if getattr(model, "restrict_in_method", False):
+        # Methods with a non-argmax readout (colar_sbr) apply the restriction themselves,
+        # AFTER the full-model decision, from ``model._allowed``.
+        model._allowed = set(allowed_ids)
+        try:
+            yield
+        finally:
+            model._allowed = None
         return
     head = model.model.classifier
     keep = torch.zeros(model.model.config.num_labels, dtype=torch.bool)

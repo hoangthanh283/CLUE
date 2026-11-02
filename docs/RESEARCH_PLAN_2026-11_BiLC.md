@@ -56,3 +56,14 @@ Decision rule: E2 ≥ 70 on seed 42 → run 3 seeds + Mixed, make BiLC the metho
 
 - 3-seed rescore of the 12 reference rows on CIL-CORD + Mixed (`scripts/rescore_cil_2026-11.sh`, rented GPU). CPFD / IS3 were "nulls" under the broken scorer; under the corrected one they are the natural baselines and may be strong.
 - Paper reframe: CIL-CORD is no longer a floor regime; the label-growth section becomes the method section.
+
+## 6. Verdict (2026-11-02 22:00) and successor
+
+E1 forward completion 48.0, E2 BiLC 44.1 — both below the double-sliced 62.9. Forward refresh fires
+on ~100 tokens (the sliced replay CE keeps O dominant on stale tokens); backward completion floods
+the current batch with old-class labels and the few new-session tokens lose. The oracle with true
+labels (61.2) shows the cap is structural: with ONE shared O every session's loss moves every
+session's boundary. Successor: **CoLaR-SBR** (session-blocked readout, `doccl/methods/colar_sbr.py`,
+config `colar_sbr`): one `[O_b, tags_b]` block per session, trained only by its own session's data
+and its own banked docs; task-agnostic inference by entity mass. Prior art: ICE (ACL Findings 2023),
+SpanKL (AAAI 2023). Gate S1 = CIL-CORD seed 42 + no-replay + frozen-trunk controls.
