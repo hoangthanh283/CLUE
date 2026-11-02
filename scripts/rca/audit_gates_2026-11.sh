@@ -16,6 +16,13 @@ run() { local name=$1; shift
   if ls $OUT/${name}*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  $name" >>$LOG; else echo "$(date '+%m-%d %H:%M') FAIL  $name rc=$?" >>$LOG; fi
 }
 echo "=== AUDIT GATES START $(date) ===" >>$LOG
+# G0b: Mixed joint under the corrected scorer (the follow-up batch's entry passes CoLaR keys and fails)
+P=results/gates/cil_protocol_2026-11
+if ! ls $P/mixed_joint_seed42/metrics.json >/dev/null 2>&1; then
+  echo "$(date '+%m-%d %H:%M') START mixed_joint_seed42 (G0b)" >>$P/queue.log
+  uv run python scripts/train.py method=joint method.epochs=100 scenario=mixed model=layoutlmv3_base seed=42 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true >"$P/mixed_joint_seed42.log" 2>&1
+  if ls $P/mixed_joint_seed42/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  mixed_joint_seed42" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  mixed_joint_seed42" >>$P/queue.log; fi
+fi
 # G0 (2026-11-02, highest priority): CoLaR-R double-sliced on CIL-CORD under the corrected scorer
 P=results/gates/cil_protocol_2026-11
 PDOC="scenario=cil_cord model=layoutlmv3_base seed=42 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true"
