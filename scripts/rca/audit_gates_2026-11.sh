@@ -16,6 +16,18 @@ run() { local name=$1; shift
   if ls $OUT/${name}*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  $name" >>$LOG; else echo "$(date '+%m-%d %H:%M') FAIL  $name rc=$?" >>$LOG; fi
 }
 echo "=== AUDIT GATES START $(date) ===" >>$LOG
+# S1 (2026-11-02, TOP PRIORITY): CoLaR-SBR session-blocked readout, CIL-CORD seed 42 + controls
+P=results/gates/cil_protocol_2026-11
+SBR_COMMON="scenario=cil_cord model=layoutlmv3_base seed=42 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true method.epochs=10 method.split_layer_k=4 method.rank_r=128 method.replay_batch_size=4"
+sbr_run() { local name=$1; shift
+  if ls $P/${name}*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') SKIP $name" >>$P/queue.log; return; fi
+  echo "$(date '+%m-%d %H:%M') START $name (S1)" >>$P/queue.log
+  uv run python scripts/train.py method=colar_sbr "$@" $SBR_COMMON >"$P/$name.log" 2>&1
+  if ls $P/${name}*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  $name" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  $name" >>$P/queue.log; fi
+}
+sbr_run cil_cord_colar_sbr_seed42          method.docs_per_task=50
+sbr_run cil_cord_colar_sbr_noreplay_seed42 method.docs_per_task=0 +method.run_alias=colar_sbr_noreplay
+sbr_run cil_cord_colar_sbr_frozen_seed42   method.docs_per_task=0 method.split_layer_k=11 +method.run_alias=colar_sbr_frozen  # layers <11 frozen (ICE-like)
 # E3 (2026-11-02): ER-ACE-asymmetric CoLaR-R (current_sliced: all) on CIL-CORD seed 42 + seed 123
 P=results/gates/cil_protocol_2026-11
 for SD in 42 123; do

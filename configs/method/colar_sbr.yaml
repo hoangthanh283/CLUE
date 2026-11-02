@@ -1,0 +1,13 @@
+name: colar_sbr
+# CoLaR-SBR (2026-11-02): CoLaR latent replay + Session-Blocked Readout — one [O_b, tags_b]
+# block per session with its own background logit, so every session's partial annotation is
+# complete within its block and no stale O exists on either side. See doccl/methods/colar_sbr.py.
+sbr_threshold: 0.5
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64
