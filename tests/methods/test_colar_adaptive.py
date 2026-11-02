@@ -41,9 +41,9 @@ def test_schedules_apply_per_task_and_fall_back_beyond_length():
 
 
 def test_zero_docs_skips_banking_in_parent():
-    # The docs_per_task > 0 guard in LatentReplay.after_task is what makes a
+    # The docs_per_task > 0 guard in LatentReplay._after_task_impl is what makes a
     # 0-entry in docs_schedule an actual no-bank instruction.
     import inspect
 
-    src = inspect.getsource(LatentReplay.after_task)
+    src = inspect.getsource(LatentReplay._after_task_impl)
     assert "docs_per_task > 0" in src

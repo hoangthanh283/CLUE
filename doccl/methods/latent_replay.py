@@ -36,6 +36,7 @@ drive the correct rel_pos/rel_2d_pos biases and masking for the replayed documen
 from __future__ import annotations
 
 import contextlib
+import copy
 import logging
 import random
 
@@ -166,6 +167,37 @@ class LatentReplay(NaiveFineTune):
             n_steps=n_steps,
         )
 
+    # ---------------------------------------------------------------- backward completion
+    def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
+        super().before_task(task, train_loader)
+        self._teacher = None
+        tau = float(self.config.get("current_pseudo_tau", 0.0) or 0.0)
+        if tau > 0 and int(self.state.custom.get("n_old", 0)) > 0:
+            # AGENT IMPL (2026-11-02): frozen snapshot at task start labels the OLD classes
+            # hidden under the current session's O (backward label completion, CPFD-style
+            # confidence gate). Freed in after_task.
+            self._teacher = copy.deepcopy(self.model).eval()
+            for p in self._teacher.parameters():
+                p.requires_grad = False
+
+    def _complete_current_labels(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        """O-labelled current tokens whose snapshot predicts an old entity class with
+        confidence >= tau take that class. Returns the completed label tensor."""
+        labels = batch["labels"]
+        if getattr(self, "_teacher", None) is None:
+            return labels
+        n_old = int(self.state.custom.get("n_old", 0))
+        tau = float(self.config.get("current_pseudo_tau", 0.0))
+        with torch.no_grad(), self._amp_autocast():
+            t_logits = self._teacher(**{k: v for k, v in batch.items() if k != "labels"}).logits
+        p_old = torch.softmax(t_logits[..., :n_old].float(), dim=-1)
+        conf, cls = p_old.max(-1)
+        take = (labels == 0) & (cls != 0) & (conf >= tau)
+        out = labels.clone()
+        out[take] = cls[take]
+        self._n_completed = int(getattr(self, "_n_completed", 0)) + int(take.sum())
+        return out
+
     def _current_ce(self, cur_out, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         """AGENT IMPL (2026-11-02): ``current_sliced`` — the mirror of the sliced replay
         loss. CIL-masked current-session data labels every OLD-session entity O, so the
@@ -174,10 +206,14 @@ class LatentReplay(NaiveFineTune):
         For current tokens labelled O the CE is taken over {O} ∪ new classes only, so an
         old-class prediction there is neither rewarded nor punished. Entity tokens keep the
         full softmax. Off by default = legacy loss."""
-        if not self.config.get("current_sliced", False):
+        if not self.config.get("current_sliced", False) and getattr(self, "_teacher", None) is None:
             return cur_out.loss
         n_old = int(self.state.custom.get("n_old", 0))
-        logits, labels = cur_out.logits, batch["labels"]
+        logits, labels = cur_out.logits, self._complete_current_labels(batch)
+        if not self.config.get("current_sliced", False):
+            return F.cross_entropy(
+                logits.reshape(-1, logits.shape[-1]), labels.reshape(-1), ignore_index=-100
+            )
         if n_old <= 0 or logits.shape[-1] <= n_old:
             return cur_out.loss
         is_o = (labels == 0).unsqueeze(-1)
@@ -271,6 +307,19 @@ class LatentReplay(NaiveFineTune):
 
     # ------------------------------------------------------------- after task
     def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
+        if getattr(self, "_teacher", None) is not None:
+            log.info(
+                "latent_replay: backward completion relabelled %d current O tokens on task %d",
+                int(getattr(self, "_n_completed", 0)),
+                task.task_id,
+            )
+            self._teacher = None
+            self._n_completed = 0
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        self._after_task_impl(task, train_loader)
+
+    def _after_task_impl(self, task: TaskInfo, train_loader: DataLoader) -> None:
         """Freeze below the split after task 0, then bank this task's activations.
 
         Order matters: task-0 activations are captured AFTER the freeze point, i.e.
