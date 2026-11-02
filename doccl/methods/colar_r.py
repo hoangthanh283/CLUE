@@ -136,7 +136,10 @@ class CoLaRRefresh(CoLaR):
 
     def _replay_forward(self, replay: dict[str, torch.Tensor]):
         out = super()._replay_forward(replay)
-        if self.refresh in ("sliced", "sliced_pseudo"):
+        # AGENT FIX (2026-11-02): `replay_sliced: true` applies the sliced replay CE in ANY
+        # refresh mode (oracle/pseudo docs are still stale between refreshes; without it the
+        # oracle ceiling collapsed its new session to 1-12 val-F1 on CIL-CORD).
+        if self.refresh in ("sliced", "sliced_pseudo") or self.config.get("replay_sliced", False):
             out.loss = sliced_replay_loss(
                 out.logits,
                 replay["labels"].to(self.device),
