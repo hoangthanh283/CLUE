@@ -27,6 +27,7 @@ jobs() { for sc in $SCENARIOS; do for sd in $SEEDS; do
   echo "${sc}_lca_seed${sd}|method=lca"
   echo "${sc}_colar_seed${sd}_k4_d50_r128|method=colar method.epochs=10 $AX"
   echo "${sc}_colar_r_sliced_seed${sd}_k4_d50_r128|method=colar_r_sliced method.epochs=10 $AX"
+  echo "${sc}_colar_r_sliced2_seed${sd}_k4_d50_r128|method=colar_r_sliced2 method.epochs=10 $AX"
   echo "${sc}_lexslot_seed${sd}_off|method=lexslot method.slot_sharing=off method.epochs=100"
   echo "${sc}_joint_seed${sd}|method=joint method.epochs=100"
 done; done; }
