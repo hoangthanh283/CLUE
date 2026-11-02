@@ -16,6 +16,15 @@ run() { local name=$1; shift
   if ls $OUT/${name}*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  $name" >>$LOG; else echo "$(date '+%m-%d %H:%M') FAIL  $name rc=$?" >>$LOG; fi
 }
 echo "=== AUDIT GATES START $(date) ===" >>$LOG
+# E3 (2026-11-02): ER-ACE-asymmetric CoLaR-R (current_sliced: all) on CIL-CORD seed 42 + seed 123
+P=results/gates/cil_protocol_2026-11
+for SD in 42 123; do
+if ! ls $P/cil_cord_colar_r_sliced3_seed${SD}*/metrics.json >/dev/null 2>&1; then
+  echo "$(date '+%m-%d %H:%M') START cil_cord_colar_r_sliced3_seed${SD} (E3)" >>$P/queue.log
+  uv run python scripts/train.py method=colar_r_sliced3 method.epochs=10 method.split_layer_k=4 method.docs_per_task=50 method.rank_r=128 method.replay_batch_size=4 scenario=cil_cord model=layoutlmv3_base seed=$SD training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true >"$P/cil_cord_colar_r_sliced3_seed${SD}.log" 2>&1
+  if ls $P/cil_cord_colar_r_sliced3_seed${SD}*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  cil_cord_colar_r_sliced3_seed${SD}" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  cil_cord_colar_r_sliced3_seed${SD}" >>$P/queue.log; fi
+fi
+done
 # G0b: Mixed joint under the corrected scorer (the follow-up batch's entry passes CoLaR keys and fails)
 P=results/gates/cil_protocol_2026-11
 if ! ls $P/mixed_joint_seed42/metrics.json >/dev/null 2>&1; then

@@ -134,3 +134,25 @@ def test_backward_completion_relabels_confident_old_class_o_tokens():
     )
     out = LatentReplay._complete_current_labels(m, {"labels": torch.tensor([[0, 0, 4]])})
     assert out.tolist() == [[2, 0, 4]]
+
+
+def test_current_sliced_all_masks_old_classes_on_entity_tokens_too():
+    """AGENT IMPL 2026-11-02: ER-ACE asymmetry (`current_sliced: all`)."""
+    from types import SimpleNamespace
+
+    from doccl.methods.latent_replay import LatentReplay
+
+    logits = torch.zeros(1, 1, 5)
+    logits[0, 0, 1] = 10.0  # entity token (label 4) predicting OLD class 1
+    labels = torch.tensor([[4]])
+    out = SimpleNamespace(logits=logits, loss=torch.tensor(99.0))
+    mk = lambda mode: SimpleNamespace(  # noqa: E731
+        config={"current_sliced": mode},
+        state=SimpleNamespace(custom={"n_old": 3}),
+        _teacher=None,
+        _complete_current_labels=lambda b: b["labels"],
+    )
+    partial = LatentReplay._current_ce(mk(True), out, {"labels": labels})
+    full_asym = LatentReplay._current_ce(mk("all"), out, {"labels": labels})
+    assert partial > 9.0  # old class 1 still in the softmax -> punished
+    assert full_asym < 2.0  # old class masked -> only {O, 3, 4} compete
