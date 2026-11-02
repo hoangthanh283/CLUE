@@ -91,3 +91,20 @@ the routing paragraph); (iii) Finding 2 freeze arms and the F6 ladder remain see
 Adjudication: F13 ≥ 70 AA → the Table 4 CODA/CL-LoRA rows must be re-run masked (3 seeds) or
 moved to supp as a protocol note. F14 within 3 AA of CoLaR 79.5 → contribution 6 reworded to a
 coverage statement. F12 delta > 1 AA → disclose the delta per cell in Limitations.
+
+## J. Corrected token-CIL protocol (2026-11-01 → 03; `+training.cil_restrict_eval=true`, seed 42, CIL-CORD, `results/gates/cil_protocol_2026-11/`)
+
+| # | Row | Legacy AA | Corrected AA | Status |
+|---|---|---|---|---|
+| F15 | Joint | 33.3 | 93.1 | 1S (3S via rescore queue) |
+| F15 | Naive | 19.0 | 18.9 | 1S |
+| F15 | ER | 16.0 | 26.9 | 1S |
+| F15 | CoLaR | 20.4 | 34.1 | 1S |
+| F15 | CoLaR-R sliced | 25.4 | 39.4 | 1S |
+| F15 | CoLaR-R oracle | 26.3 | 61.2 | 1S |
+| F16 | CoLaR-R double-sliced | — | 60.5 ± 10.1 | 3S (62.9/69.2/49.4); Mixed s42 73.6 (joint 86.5) |
+| F16 | forward completion / BiLC | — | 48.0 / 44.1 | 1S, nulls |
+| **F17** | **CoLaR-SBR (session-blocked readout)** | — | **87.6** (BWT −7.5) | 1S; seeds 7/123 + Mixed running |
+
+Mechanism: the shared-softmax O is the bug (every session's loss moves every boundary); per-session
+[O_b, tags_b] blocks make each session's partial annotation complete within its block.
