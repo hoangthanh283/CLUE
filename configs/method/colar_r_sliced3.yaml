@@ -1,0 +1,16 @@
+name: colar_r
+run_alias: colar_r_sliced3
+# ER-ACE-asymmetric CoLaR-R (2026-11-02): sliced replay CE (capture-time classes) + EVERY
+# current-session token trains over {O} ∪ new classes only. Old classes are updated by replay
+# alone, so current entity tokens can no longer push old classes down on shared surface
+# forms (the late-session val oscillation 93→54→80 of the double-sliced run).
+refresh: sliced
+current_sliced: all
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64

@@ -216,10 +216,15 @@ class LatentReplay(NaiveFineTune):
             )
         if n_old <= 0 or logits.shape[-1] <= n_old:
             return cur_out.loss
-        is_o = (labels == 0).unsqueeze(-1)
         old_cls = torch.arange(logits.shape[-1], device=logits.device) < n_old
         old_cls[0] = False  # O itself stays in the softmax
-        masked = logits.masked_fill(is_o & old_cls, float("-inf"))
+        if str(self.config.get("current_sliced")) == "all":
+            # ER-ACE asymmetry: EVERY incoming token trains over {O} ∪ new classes; old
+            # classes are moved by replay only (new classes adapt to the old geometry).
+            where = torch.ones_like(labels, dtype=torch.bool).unsqueeze(-1)
+        else:
+            where = (labels == 0).unsqueeze(-1)
+        masked = logits.masked_fill(where & old_cls, float("-inf"))
         return F.cross_entropy(
             masked.reshape(-1, masked.shape[-1]), labels.reshape(-1), ignore_index=-100
         )
