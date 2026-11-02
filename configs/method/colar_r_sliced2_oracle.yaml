@@ -5,6 +5,7 @@ run_alias: colar_r_sliced2_oracle
 # Separates "remove the stale gradients" (sliced2) from "add the missing positives" (oracle).
 refresh: oracle
 current_sliced: true
+replay_sliced: true
 lr: 5.0e-5
 weight_decay: 0.01
 epochs: 10
