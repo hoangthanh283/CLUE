@@ -23,6 +23,12 @@ if ! ls $P/mixed_joint_seed42/metrics.json >/dev/null 2>&1; then
   uv run python scripts/train.py method=joint method.epochs=100 scenario=mixed model=layoutlmv3_base seed=42 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true >"$P/mixed_joint_seed42.log" 2>&1
   if ls $P/mixed_joint_seed42/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  mixed_joint_seed42" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  mixed_joint_seed42" >>$P/queue.log; fi
 fi
+# G0c: stabiliser probe — double-sliced seed 123 at replay:current 1:1 (replay_batch 2) 
+if ! ls $P/cil_cord_colar_r_sliced2_rb2_seed123*/metrics.json >/dev/null 2>&1; then
+  echo "$(date '+%m-%d %H:%M') START cil_cord_colar_r_sliced2_rb2_seed123 (G0c)" >>$P/queue.log
+  uv run python scripts/train.py method=colar_r_sliced2 method.run_alias=colar_r_sliced2_rb2 method.epochs=10 method.split_layer_k=4 method.docs_per_task=50 method.rank_r=128 method.replay_batch_size=2 scenario=cil_cord model=layoutlmv3_base seed=123 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true >"$P/cil_cord_colar_r_sliced2_rb2_seed123.log" 2>&1
+  if ls $P/cil_cord_colar_r_sliced2_rb2_seed123*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  cil_cord_colar_r_sliced2_rb2_seed123" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  cil_cord_colar_r_sliced2_rb2_seed123" >>$P/queue.log; fi
+fi
 # G0 (2026-11-02, highest priority): CoLaR-R double-sliced on CIL-CORD under the corrected scorer
 P=results/gates/cil_protocol_2026-11
 PDOC="scenario=cil_cord model=layoutlmv3_base seed=42 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true"
