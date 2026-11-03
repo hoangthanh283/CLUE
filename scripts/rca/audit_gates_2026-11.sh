@@ -22,12 +22,11 @@ SBR_COMMON="scenario=cil_cord model=layoutlmv3_base seed=42 training.batch_size=
 sbr_run() { local name=$1; shift
   if ls $P/${name}*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') SKIP $name" >>$P/queue.log; return; fi
   echo "$(date '+%m-%d %H:%M') START $name (S1)" >>$P/queue.log
-  uv run python scripts/train.py method=colar_sbr "$@" $SBR_COMMON >"$P/$name.log" 2>&1
+  uv run python scripts/train.py method=colar_sbr $SBR_COMMON "$@" >"$P/$name.log" 2>&1
   if ls $P/${name}*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  $name" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  $name" >>$P/queue.log; fi
 }
 sbr_run cil_cord_colar_sbr_seed42          method.docs_per_task=50
 sbr_run cil_cord_colar_sbr_noreplay_seed42 method.docs_per_task=0 +method.run_alias=colar_sbr_noreplay
-sbr_run cil_cord_colar_sbr_frozen_seed42   method.docs_per_task=0 method.split_layer_k=11 +method.run_alias=colar_sbr_frozen  # layers <11 frozen (ICE-like)
 # V2 (2026-11-03): SBR v2 supervision rule (cross-schema negatives, no block for re-annotating
 # sessions) validated on DIL and Mixed seed 42 before the rescore. CIL-CORD is unchanged by construction.
 for SC in dil mixed; do
@@ -38,6 +37,7 @@ for SC in dil mixed; do
     if ls $P/${NAME}*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  $NAME" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  $NAME" >>$P/queue.log; fi
   fi
 done
+sbr_run cil_cord_colar_sbr_frozen_seed42   method.docs_per_task=0 method.split_layer_k=11 +method.run_alias=colar_sbr_frozen  # layers <11 frozen (ICE-like)
 # R (2026-11-03): LOCAL 3-seed rescore of the reference rows on CIL-CORD + Mixed (no rented GPU).
 # Seed-outer order so every row reaches seed 42 first; AMP fp16 (Turing, 3.3x); one lane.
 OUT=results/rescore ROWS=main MODELS=layoutlmv3_base GPUS=0 LANES=1 BATCH_SIZE=2 GRAD_CKPT=true AMP=true NUM_WORKERS=0 bash scripts/rescore_cil_2026-11.sh
