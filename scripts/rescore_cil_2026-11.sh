@@ -25,7 +25,7 @@ AX="method.split_layer_k=4 method.docs_per_task=50 method.rank_r=128 method.repl
 row_args() {  # row -> method args
   case $1 in
     naive) echo "method=naive method.epochs=100" ;;
-    joint) echo "method=joint method.epochs=100" ;;
+    joint) echo "method=joint method.epochs=100 +training.val_frac=0.1" ;;  # pooled CIL-masked eval is a broken early-stop signal (flat 36 on CIL-CORD); hold out 10% of the full-label pool
     ewc) echo "method=ewc method.epochs=100" ;;
     lwf) echo "method=lwf method.epochs=100" ;;
     er) echo "method=er method.epochs=100" ;;

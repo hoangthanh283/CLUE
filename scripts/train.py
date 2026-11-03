@@ -876,6 +876,10 @@ def main(cfg: DictConfig) -> None:
         # per-task datasets for scenarios whose tasks are disjoint documents (e.g. DIL).
         joint_sources = scenario.joint_train_datasets or scenario.train_datasets
         joint_train = ConcatDataset(joint_sources)
+        # AGENT FIX (2026-11-03): split BEFORE building the train loader (val docs leaked into
+        # training). Under CIL the pooled eval set is a broken stop signal (session-masked labels,
+        # flat ~36 on CIL-CORD), so CIL joint runs set training.val_frac > 0.
+        joint_train, joint_val_split = split_val(joint_train, cfg, cfg.seed)
         joint_loader = DataLoader(
             joint_train,
             batch_size=cfg.training.batch_size,
@@ -890,7 +894,6 @@ def main(cfg: DictConfig) -> None:
         # single biggest time sink in the grid. With it, Joint early-stops on
         # plateaued pooled val-F1 exactly like every other method.
         joint_val = ConcatDataset(list(scenario.eval_datasets))
-        joint_train, joint_val_split = split_val(joint_train, cfg, cfg.seed)
         if joint_val_split is not None:
             joint_val = joint_val_split
         joint_val_loader = DataLoader(
