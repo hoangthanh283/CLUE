@@ -11,13 +11,13 @@ import numpy as np
 
 root = Path(sys.argv[1] if len(sys.argv) > 1 else "results/gates/cil_protocol_2026-11")
 rows = defaultdict(list)
-for d in sorted(root.iterdir()):
-    m = d / "metrics.json"
-    if not m.exists():
-        continue
+for m in sorted(root.rglob("metrics.json")):
+    d = m.parent
+    rel = d.relative_to(root).parts
+    name = rel[0] if len(rel) > 1 else d.name  # rescore layout: <job>/<run>/
     j = json.loads(m.read_text())
     mat = np.load(d / "matrix.npy")
-    key = re.sub(r"_seed\d+", "", d.name)
+    key = re.sub(r"_seed\d+", "", name)
     rows[key].append((j["AA"], j.get("BWT", float("nan")), np.round(mat[-1], 1).tolist()))
 for key, vals in sorted(rows.items()):
     aa = np.array([v[0] for v in vals])

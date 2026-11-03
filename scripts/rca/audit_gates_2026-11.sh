@@ -37,7 +37,7 @@ if ! ls $P/mixed_colar_sbr_p4t3_seed42*/metrics.json >/dev/null 2>&1; then
 fi
 # R (2026-11-03): LOCAL 3-seed rescore of the reference rows on CIL-CORD + Mixed (no rented GPU).
 # Seed-outer order so every row reaches seed 42 first; AMP fp16 (Turing, 3.3x); one lane.
-OUT=results/rescore GPUS=0 LANES=1 BATCH_SIZE=2 GRAD_CKPT=true AMP=true NUM_WORKERS=0 bash scripts/rescore_cil_2026-11.sh
+OUT=results/rescore ROWS=main MODELS=layoutlmv3_base GPUS=0 LANES=1 BATCH_SIZE=2 GRAD_CKPT=true AMP=true NUM_WORKERS=0 bash scripts/rescore_cil_2026-11.sh
 # E3 / G0b / G0c / G0d are superseded by CoLaR-SBR (2026-11-03); RUN_SUPERSEDED=1 to run them.
 if [ "${RUN_SUPERSEDED:-0}" = 1 ]; then
 # E3 (2026-11-02): ER-ACE-asymmetric CoLaR-R (current_sliced: all) on CIL-CORD seed 42 + seed 123
@@ -95,4 +95,8 @@ run dil_er_val_seed42 uv run python scripts/train.py method=er +method.run_alias
   seed=42 method.epochs=100 training.batch_size=2 +training.val_frac=0.1 $DOC
 run cil_cifar100_colar500r128_val_seed42_vit uv run python scripts/train.py scenario=cil_cifar100 seed=42 method=colar_vit \
   method.rank_r=128 +method.run_alias=colar500r128_val method.epochs=100 method.split_layer_k=4 training.amp=true +training.val_frac=0.1 $VIS
+# RB (2026-11-03): LOCAL backbone-grid rescore (tab:grid six classical rows + CoLaR + SBR) on BERT/BROS/LiLT,
+# CIL-CORD + Mixed, seed-outer. BROS/LiLT start at batch 1; anything that OOMs there lands in
+# results/rescore/needs_rent.txt for the rented GPU.
+OUT=results/rescore ROWS=grid MODELS="bert_base bros_base lilt_base" GPUS=0 LANES=1 BATCH_SIZE=2 GRAD_CKPT=true AMP=true NUM_WORKERS=0 bash scripts/rescore_cil_2026-11.sh
 echo "=== AUDIT GATES COMPLETE $(date) ===" >>$LOG
