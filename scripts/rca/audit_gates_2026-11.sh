@@ -28,13 +28,16 @@ sbr_run() { local name=$1; shift
 sbr_run cil_cord_colar_sbr_seed42          method.docs_per_task=50
 sbr_run cil_cord_colar_sbr_noreplay_seed42 method.docs_per_task=0 +method.run_alias=colar_sbr_noreplay
 sbr_run cil_cord_colar_sbr_frozen_seed42   method.docs_per_task=0 method.split_layer_k=11 +method.run_alias=colar_sbr_frozen  # layers <11 frozen (ICE-like)
-# M2 (2026-11-03): Mixed SBR with a patient stopper + lower entity threshold (SROIE block under-trained:
-# val 57->50->53, recall 45-49, stopped at ep3)
-if ! ls $P/mixed_colar_sbr_p4t3_seed42*/metrics.json >/dev/null 2>&1; then
-  echo "$(date '+%m-%d %H:%M') START mixed_colar_sbr_p4t3_seed42 (M2)" >>$P/queue.log
-  uv run python scripts/train.py method=colar_sbr +method.run_alias=colar_sbr_p4t3 method.sbr_threshold=0.3 +method.early_stop_patience=4 method.epochs=10 method.split_layer_k=4 method.docs_per_task=50 method.rank_r=128 method.replay_batch_size=4 scenario=mixed model=layoutlmv3_base seed=42 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true >"$P/mixed_colar_sbr_p4t3_seed42.log" 2>&1
-  if ls $P/mixed_colar_sbr_p4t3_seed42*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  mixed_colar_sbr_p4t3_seed42" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  mixed_colar_sbr_p4t3_seed42" >>$P/queue.log; fi
-fi
+# V2 (2026-11-03): SBR v2 supervision rule (cross-schema negatives, no block for re-annotating
+# sessions) validated on DIL and Mixed seed 42 before the rescore. CIL-CORD is unchanged by construction.
+for SC in dil mixed; do
+  NAME=${SC}_colar_sbr2_seed42
+  if ! ls $P/${NAME}*/metrics.json >/dev/null 2>&1; then
+    echo "$(date '+%m-%d %H:%M') START $NAME (V2)" >>$P/queue.log
+    uv run python scripts/train.py method=colar_sbr +method.run_alias=colar_sbr2 method.epochs=10 method.split_layer_k=4 method.docs_per_task=50 method.rank_r=128 method.replay_batch_size=4 scenario=$SC model=layoutlmv3_base seed=42 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true >"$P/$NAME.log" 2>&1
+    if ls $P/${NAME}*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  $NAME" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  $NAME" >>$P/queue.log; fi
+  fi
+done
 # R (2026-11-03): LOCAL 3-seed rescore of the reference rows on CIL-CORD + Mixed (no rented GPU).
 # Seed-outer order so every row reaches seed 42 first; AMP fp16 (Turing, 3.3x); one lane.
 OUT=results/rescore ROWS=main MODELS=layoutlmv3_base GPUS=0 LANES=1 BATCH_SIZE=2 GRAD_CKPT=true AMP=true NUM_WORKERS=0 bash scripts/rescore_cil_2026-11.sh

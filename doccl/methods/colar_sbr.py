@@ -36,21 +36,52 @@ from doccl.types import EvalMetrics, TaskInfo
 
 log = logging.getLogger(__name__)
 
-__all__ = ["CoLaRSBR", "block_targets", "aggregate_blocks"]
+__all__ = ["CoLaRSBR", "block_targets", "aggregate_blocks", "supervision_plan", "task_domain"]
 
 
 def block_targets(labels: torch.Tensor, idx: torch.Tensor, n_head: int) -> torch.Tensor:
-    """Global head labels -> block-local targets: O -> 0, in-block tag -> 1 + position,
-    anything else (other blocks' tags, -100) -> -100."""
+    """Global head labels -> block-local targets for a document whose session annotates every
+    tag of the block: O -> 0, in-block tag -> 1 + position, any other annotated tag -> 0 (a known
+    entity of another class is a true negative for this block), -100 stays -100."""
     pos = torch.full((n_head,), -1, dtype=torch.long, device=labels.device)
     pos[idx] = torch.arange(len(idx), device=labels.device)
     tgt = torch.full_like(labels, -100)
-    tgt[labels == 0] = 0
-    valid = labels > 0
+    valid = labels >= 0
+    tgt[valid] = 0
     local = pos[labels.clamp(min=0)]
     inblk = valid & (local >= 0)
     tgt[inblk] = local[inblk] + 1
     return tgt
+
+
+_DOMAINS = ("wildreceipt", "funsd", "sroie", "cord", "xfund")
+
+
+def task_domain(task: TaskInfo) -> str:
+    """Annotation-schema family of a task (dataset name); '' when unknown."""
+    native = (task.metadata or {}).get("native_dataset")
+    if native:
+        return str(native)
+    name = task.task_name.lower()
+    return next((d for d in _DOMAINS if d in name), "")
+
+
+def supervision_plan(
+    session_tags: set[int], session_domain: str, blocks: list[set[int]], block_domains: list[str]
+) -> list[tuple[int, str]]:
+    """Which blocks a document of this session trains, and how.
+
+    ``full``: every tag of the block is annotated in this session -> complete supervision.
+    ``neg``: the block belongs to a different dataset schema -> none of its entities can occur,
+    every token is a true negative. Otherwise (same schema, block not annotated) the O labels are
+    stale for that block, so it is not trained on this document."""
+    plan = []
+    for b, (tags, dom) in enumerate(zip(blocks, block_domains, strict=True)):
+        if tags <= session_tags:
+            plan.append((b, "full"))
+        elif dom and session_domain and dom != session_domain:
+            plan.append((b, "neg"))
+    return plan
 
 
 def aggregate_blocks(
@@ -95,8 +126,11 @@ class CoLaRSBR(CoLaR):
         self.model.sbr_o = nn.ModuleList().to(self.device)
         self.model.restrict_in_method = True  # train.py sets model._allowed instead of a hook
         self.model._allowed = None
+        self.neg_weight = float(config.get("sbr_neg_weight", 1.0))
         self.blocks: list[torch.Tensor] = []
-        self._cur_block = -1
+        self.block_domains: list[str] = []
+        self.sessions: list[tuple[set[int], str]] = []  # (annotated head ids, schema domain)
+        self._cur_session = -1
         self._feat: torch.Tensor | None = None
         self._hook = None
 
@@ -120,45 +154,76 @@ class CoLaRSBR(CoLaR):
         self._hook_classifier()
         l2i = self.model.label_to_id
         idx = [l2i[lb] for lb in task.label_set if lb in l2i and lb != "O"]
-        self.blocks.append(torch.tensor(idx, dtype=torch.long, device=self.device))
-        hidden = getattr(self.model, "hidden_size", None) or self.model.model.config.hidden_size
-        self.model.sbr_o.append(nn.Linear(hidden, 1).to(self.device))
-        self._cur_block = len(self.blocks) - 1
-        log.info("colar_sbr: block %d = %d tags (+ its own O)", self._cur_block, len(idx))
+        domain = task_domain(task)
+        covered = set().union(*[set(b.tolist()) for b in self.blocks]) if self.blocks else set()
+        new = [i for i in idx if i not in covered]
+        if new:  # a session that only re-annotates known tags (DIL, a revisit) adds no block
+            self.blocks.append(torch.tensor(new, dtype=torch.long, device=self.device))
+            self.block_domains.append(domain)
+            hidden = getattr(self.model, "hidden_size", None) or self.model.model.config.hidden_size
+            self.model.sbr_o.append(nn.Linear(hidden, 1).to(self.device))
+        self.sessions.append((set(idx), domain))
+        self._cur_session = len(self.sessions) - 1
+        plan = self._plan(self._cur_session)
+        log.info(
+            "colar_sbr: session %d (%s, %d tags) -> %d blocks; trains %s",
+            self._cur_session,
+            domain or "?",
+            len(idx),
+            len(self.blocks),
+            plan,
+        )
 
     def _capture_task(self, train_loader: DataLoader) -> None:
         n_before = len(self.store)
         super()._capture_task(train_loader)
         for d in self.store[n_before:]:
-            d["block"] = torch.tensor(self._cur_block)
+            d["session"] = torch.tensor(self._cur_session)
 
     def _stack_replay(self, docs):
         replay = super()._stack_replay(docs)
-        replay["block"] = torch.stack([d["block"] for d in docs])
+        replay["session"] = torch.stack([d["session"] for d in docs])
         return replay
+
+    def _plan(self, session: int) -> list[tuple[int, str]]:
+        tags, dom = self.sessions[session]
+        return supervision_plan(
+            tags, dom, [set(b.tolist()) for b in self.blocks], self.block_domains
+        )
 
     def _block_logits(self, logits: torch.Tensor, feat: torch.Tensor, b: int) -> torch.Tensor:
         o = self.model.sbr_o[b](feat.to(self.model.sbr_o[b].weight.dtype))
         return torch.cat([o.to(logits.dtype), logits[..., self.blocks[b]]], dim=-1)
 
-    def _block_ce(self, logits, feat, labels, b: int) -> torch.Tensor:
+    def _block_ce(self, logits, feat, labels, b: int, mode: str = "full") -> torch.Tensor:
         bl = self._block_logits(logits, feat, b)
-        tgt = block_targets(labels, self.blocks[b], logits.shape[-1])
+        if mode == "neg":
+            tgt = torch.where(labels >= 0, torch.zeros_like(labels), labels)
+        else:
+            tgt = block_targets(labels, self.blocks[b], logits.shape[-1])
         return F.cross_entropy(
             bl.reshape(-1, bl.shape[-1]).float(), tgt.reshape(-1), ignore_index=-100
         )
 
+    def _session_loss(self, logits, feat, labels, session: int) -> torch.Tensor:
+        terms = [
+            self._block_ce(logits, feat, labels, b, mode)
+            * (self.neg_weight if mode == "neg" else 1.0)
+            for b, mode in self._plan(session)
+        ]
+        return torch.stack(terms).sum() if terms else logits.sum() * 0.0
+
     # ------------------------------------------------------------------ losses
     def _current_ce(self, cur_out, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-        return self._block_ce(cur_out.logits, self._feat, batch["labels"], self._cur_block)
+        return self._session_loss(cur_out.logits, self._feat, batch["labels"], self._cur_session)
 
     def _replay_forward(self, replay: dict[str, torch.Tensor]):
         out = super()._replay_forward(replay)
         logits, feat = out.logits, self._feat
         labels = replay["labels"].to(self.device)
         losses = [
-            self._block_ce(logits[i : i + 1], feat[i : i + 1], labels[i : i + 1], int(b))
-            for i, b in enumerate(replay["block"].tolist())
+            self._session_loss(logits[i : i + 1], feat[i : i + 1], labels[i : i + 1], int(sess))
+            for i, sess in enumerate(replay["session"].tolist())
         ]
         out.loss = torch.stack(losses).mean()
         return out
