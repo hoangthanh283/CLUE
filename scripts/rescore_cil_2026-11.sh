@@ -42,7 +42,7 @@ row_args() {  # row -> method args
   esac
 }
 case $ROWS in
-  main) ROW_LIST="naive lwf er der_pp coda_prompt cl_lora cpfd is3 lca colar colar_r_sliced colar_sbr lexslot_off joint" ;;
+  main) ROW_LIST="joint naive lwf er der_pp coda_prompt cl_lora cpfd is3 lca colar colar_r_sliced colar_sbr lexslot_off" ;;  # joint first: the ceiling gates every claim
   grid) ROW_LIST="naive joint ewc lwf er der_pp colar colar_sbr" ;;
   *) ROW_LIST="$ROWS" ;;
 esac
