@@ -104,7 +104,7 @@ coverage statement. F12 delta > 1 AA → disclose the delta per cell in Limitati
 | F15 | CoLaR-R oracle | 26.3 | 61.2 | 1S |
 | F16 | CoLaR-R double-sliced | — | 60.5 ± 10.1 | 3S (62.9/69.2/49.4); Mixed s42 73.6 (joint 86.5) |
 | F16 | forward completion / BiLC | — | 48.0 / 44.1 | 1S, nulls |
-| **F17** | **CoLaR-SBR (session-blocked readout)** | — | **88.0 ± 2.0** (87.6 / 86.2 / 90.2) | **3S**; Mixed s42 = 85.0 (joint 86.5); controls running |
+| **F17** | **CoLaR-SBR (session-blocked readout)** | — | **88.0 ± 2.0** (87.6 / 86.2 / 90.2) | **3S**; Mixed s42 = 85.0 (joint 86.5); no-replay control 20.4 (final 0.5/0.0/1.2/4.6/95.4 — blocks without the bank collapse like naive: replay is the retention mechanism, blocks the plasticity one); frozen control running |
 
 Mechanism: the shared-softmax O is the bug (every session's loss moves every boundary); per-session
 [O_b, tags_b] blocks make each session's partial annotation complete within its block.
