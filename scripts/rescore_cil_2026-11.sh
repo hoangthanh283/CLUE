@@ -10,12 +10,12 @@ set -u
 cd "$(dirname "$0")/.."
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 GPUS="${GPUS:-0}"; LANES="${LANES:-1}"; BATCH_SIZE="${BATCH_SIZE:-16}"; GRAD_CKPT="${GRAD_CKPT:-false}"
-AMP="${AMP:-true}"; SEEDS="${SEEDS:-42 7 123}"; SCENARIOS="${SCENARIOS:-cil_cord mixed}"
-OUT=results/rescore; LOG=$OUT/queue.log; mkdir -p $OUT
-COMMON="model=layoutlmv3_base training.batch_size=$BATCH_SIZE training.gradient_checkpointing=$GRAD_CKPT training.amp=$AMP training.num_workers=2 wandb.mode=offline output_dir=$OUT +training.cil_restrict_eval=true"
+AMP="${AMP:-true}"; NUM_WORKERS="${NUM_WORKERS:-2}"; SEEDS="${SEEDS:-42 7 123}"; SCENARIOS="${SCENARIOS:-cil_cord mixed}"
+OUT="${OUT:-results/rescore}"; LOG=$OUT/queue.log; mkdir -p $OUT
+COMMON="model=layoutlmv3_base training.batch_size=$BATCH_SIZE training.gradient_checkpointing=$GRAD_CKPT training.amp=$AMP training.num_workers=$NUM_WORKERS wandb.mode=offline output_dir=$OUT +training.cil_restrict_eval=true"
 AX="method.split_layer_k=4 method.docs_per_task=50 method.rank_r=128 method.replay_batch_size=4"
 # name | method args  (one row per reference-table row; legacy run-dir naming preserved)
-jobs() { for sc in $SCENARIOS; do for sd in $SEEDS; do
+jobs() { for sd in $SEEDS; do for sc in $SCENARIOS; do
   echo "${sc}_naive_seed${sd}|method=naive method.epochs=100"
   echo "${sc}_lwf_seed${sd}|method=lwf method.epochs=100"
   echo "${sc}_er_seed${sd}|method=er method.epochs=100"
@@ -27,8 +27,7 @@ jobs() { for sc in $SCENARIOS; do for sd in $SEEDS; do
   echo "${sc}_lca_seed${sd}|method=lca"
   echo "${sc}_colar_seed${sd}_k4_d50_r128|method=colar method.epochs=10 $AX"
   echo "${sc}_colar_r_sliced_seed${sd}_k4_d50_r128|method=colar_r_sliced method.epochs=10 $AX"
-  echo "${sc}_colar_r_sliced2_seed${sd}_k4_d50_r128|method=colar_r_sliced2 method.epochs=10 $AX"
-  echo "${sc}_colar_sbr_seed${sd}_k4_d50_r128|method=colar_sbr method.epochs=10 $AX"
+  echo "${sc}_colar_sbr_seed${sd}|method=colar_sbr method.epochs=10 $AX"
   echo "${sc}_lexslot_seed${sd}_off|method=lexslot method.slot_sharing=off method.epochs=100"
   echo "${sc}_joint_seed${sd}|method=joint method.epochs=100"
 done; done; }
