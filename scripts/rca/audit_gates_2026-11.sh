@@ -35,6 +35,11 @@ if ! ls $P/mixed_colar_sbr_p4t3_seed42*/metrics.json >/dev/null 2>&1; then
   uv run python scripts/train.py method=colar_sbr +method.run_alias=colar_sbr_p4t3 method.sbr_threshold=0.3 +method.early_stop_patience=4 method.epochs=10 method.split_layer_k=4 method.docs_per_task=50 method.rank_r=128 method.replay_batch_size=4 scenario=mixed model=layoutlmv3_base seed=42 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true >"$P/mixed_colar_sbr_p4t3_seed42.log" 2>&1
   if ls $P/mixed_colar_sbr_p4t3_seed42*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  mixed_colar_sbr_p4t3_seed42" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  mixed_colar_sbr_p4t3_seed42" >>$P/queue.log; fi
 fi
+# R (2026-11-03): LOCAL 3-seed rescore of the reference rows on CIL-CORD + Mixed (no rented GPU).
+# Seed-outer order so every row reaches seed 42 first; AMP fp16 (Turing, 3.3x); one lane.
+OUT=results/rescore GPUS=0 LANES=1 BATCH_SIZE=2 GRAD_CKPT=true AMP=true NUM_WORKERS=0 bash scripts/rescore_cil_2026-11.sh
+# E3 / G0b / G0c / G0d are superseded by CoLaR-SBR (2026-11-03); RUN_SUPERSEDED=1 to run them.
+if [ "${RUN_SUPERSEDED:-0}" = 1 ]; then
 # E3 (2026-11-02): ER-ACE-asymmetric CoLaR-R (current_sliced: all) on CIL-CORD seed 42 + seed 123
 P=results/gates/cil_protocol_2026-11
 for SD in 42 123; do
@@ -62,6 +67,7 @@ if ! ls $P/cil_cord_colar_r_sliced2_oracle_seed42*/metrics.json >/dev/null 2>&1;
   echo "$(date '+%m-%d %H:%M') START cil_cord_colar_r_sliced2_oracle_seed42 (G0d)" >>$P/queue.log
   uv run python scripts/train.py method=colar_r_sliced2_oracle method.epochs=10 method.split_layer_k=4 method.docs_per_task=50 method.rank_r=128 method.replay_batch_size=4 scenario=cil_cord model=layoutlmv3_base seed=42 training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 wandb.mode=offline output_dir=$P +training.cil_restrict_eval=true >"$P/cil_cord_colar_r_sliced2_oracle_seed42.log" 2>&1
   if ls $P/cil_cord_colar_r_sliced2_oracle_seed42*/metrics.json >/dev/null 2>&1; then echo "$(date '+%m-%d %H:%M') DONE  cil_cord_colar_r_sliced2_oracle_seed42" >>$P/queue.log; else echo "$(date '+%m-%d %H:%M') FAIL  cil_cord_colar_r_sliced2_oracle_seed42" >>$P/queue.log; fi
+fi
 fi
 # G0 (2026-11-02, highest priority): CoLaR-R double-sliced on CIL-CORD under the corrected scorer
 P=results/gates/cil_protocol_2026-11
