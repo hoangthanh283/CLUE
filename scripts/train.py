@@ -1079,6 +1079,8 @@ def main(cfg: DictConfig) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     np.save(out_dir / "matrix.npy", tracker.matrix)
     log.info("Saved matrix to %s", out_dir)
+    if getattr(method, "eval_dump", None):  # colar_sbr: final-model block scores per task
+        torch.save(method.eval_dump, out_dir / "eval_dump.pt")
     save_run_metrics(out_dir, cfg, tracker, method, task_times, scenario_key)
 
     # Per-class F1 on the final model — DIL-degeneracy evidence (review M5).

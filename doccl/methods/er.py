@@ -5,6 +5,7 @@ Reference: Rolnick et al., "Experience Replay for Continual Learning", NeurIPS 2
 At each training step, mix a batch from the current task with a batch sampled
 from the replay buffer (containing examples from past tasks).
 """
+
 from __future__ import annotations
 
 import torch
@@ -39,6 +40,7 @@ class ER(NaiveFineTune):
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
         stopper = self.make_early_stopper(val_loader)
+        self._amp_setup()  # opt-in mixed precision; inert unless cfg.training.amp
 
         total_loss = 0.0
         n_steps = 0
@@ -49,21 +51,20 @@ class ER(NaiveFineTune):
 
                 optimizer.zero_grad()
                 # Forward on current task batch
-                cur_out = self.model(**batch)
-                ce_loss = cur_out.loss
-                replay_loss = torch.zeros((), device=self.device)
+                with self._amp_autocast():
+                    cur_out = self.model(**batch)
+                    ce_loss = cur_out.loss
+                    replay_loss = torch.zeros((), device=self.device)
 
-                # Forward on replay batch (if buffer non-empty)
-                replay_batch = self.state.buffer.sample(self.replay_batch_size)
-                if replay_batch is not None:
-                    replay_batch = {k: v.to(self.device) for k, v in replay_batch.items()}
-                    replay_out = self.model(**replay_batch)
-                    replay_loss = replay_out.loss
+                    # Forward on replay batch (if buffer non-empty)
+                    replay_batch = self.state.buffer.sample(self.replay_batch_size)
+                    if replay_batch is not None:
+                        replay_batch = {k: v.to(self.device) for k, v in replay_batch.items()}
+                        replay_out = self.model(**replay_batch)
+                        replay_loss = replay_out.loss
 
-                loss = ce_loss + replay_loss
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.trainable_parameters(), max_grad_norm)
-                optimizer.step()
+                    loss = ce_loss + replay_loss
+                self._amp_backward_step(loss, optimizer, self.trainable_parameters(), max_grad_norm)
 
                 total_loss += float(loss.item())
                 n_steps += 1

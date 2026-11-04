@@ -84,6 +84,18 @@ def supervision_plan(
     return plan
 
 
+def block_scores(
+    block_logits: list[torch.Tensor], block_idx: list[torch.Tensor]
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Per-block entity mass ``1 - p(O_b)`` and best in-block head id, each (B, L, n_blocks)."""
+    es, tags = [], []
+    for bl, idx in zip(block_logits, block_idx, strict=True):
+        p = bl.float().softmax(-1)
+        es.append(1.0 - p[..., 0])
+        tags.append(idx.to(p.device)[p[..., 1:].argmax(-1)])
+    return torch.stack(es, -1), torch.stack(tags, -1)
+
+
 def aggregate_blocks(
     block_logits: list[torch.Tensor],
     block_idx: list[torch.Tensor],
@@ -96,16 +108,9 @@ def aggregate_blocks(
     The block with the largest entity mass ``1 - p(O_b)`` claims the token when that mass
     exceeds ``threshold``; otherwise O. ``allowed`` (the corrected-scorer restriction) maps
     any out-of-session prediction to O *after* the full-model decision."""
-    ref = block_logits[0]
-    best_e = torch.zeros(ref.shape[:2], device=ref.device)
-    best_tag = torch.zeros(ref.shape[:2], dtype=torch.long, device=ref.device)
-    for bl, idx in zip(block_logits, block_idx, strict=True):
-        p = bl.float().softmax(-1)
-        e = 1.0 - p[..., 0]
-        tag = idx[p[..., 1:].argmax(-1)]
-        take = e > best_e
-        best_e = torch.where(take, e, best_e)
-        best_tag = torch.where(take, tag, best_tag)
+    e, tags = block_scores(block_logits, block_idx)
+    best_e, best_b = e.max(-1)  # ties -> lowest block, as the old strict-> loop did
+    best_tag = tags.gather(-1, best_b.unsqueeze(-1)).squeeze(-1)
     preds = torch.where(best_e > threshold, best_tag, torch.zeros_like(best_tag))
     if allowed is not None:
         keep = torch.zeros(n_head, dtype=torch.bool, device=preds.device)
@@ -126,6 +131,8 @@ class CoLaRSBR(CoLaR):
         self.model.sbr_o = nn.ModuleList().to(self.device)
         self.model.restrict_in_method = True  # train.py sets model._allowed instead of a hook
         self.model._allowed = None
+        self._dump: dict | None = None  # filled only inside evaluate()
+        self.eval_dump: dict[int, dict] = {}  # latest per-task block scores; saved by train.py
         self.neg_weight = float(config.get("sbr_neg_weight", 1.0))
         self.blocks: list[torch.Tensor] = []
         self.block_domains: list[str] = []
@@ -237,6 +244,12 @@ class CoLaRSBR(CoLaR):
         if not self.blocks:  # zero-shot reading before the first block exists
             return torch.zeros(logits.shape[:2], dtype=torch.long, device=logits.device)
         bls = [self._block_logits(logits, feat, b) for b in range(len(self.blocks))]
+        if self._dump is not None:
+            e, tags = block_scores(bls, self.blocks)
+            mask = batch["labels"] != -100
+            self._dump["e"].append(e[mask].half().cpu())
+            self._dump["tag"].append(tags[mask].short().cpu())
+            self._dump["gold"].append(batch["labels"][mask].short().cpu())
         return aggregate_blocks(
             bls,
             self.blocks,
@@ -278,7 +291,18 @@ class CoLaRSBR(CoLaR):
     def evaluate(self, eval_loaders: dict[int, DataLoader]) -> dict[int, EvalMetrics]:
         results: dict[int, EvalMetrics] = {}
         for tid, loader in eval_loaders.items():
-            m = self._score_loader(loader)
+            self._dump = {"e": [], "tag": [], "gold": []}
+            try:
+                m = self._score_loader(loader)
+                allowed = getattr(self.model, "_allowed", None)
+                self.eval_dump[tid] = {k: torch.cat(v) for k, v in self._dump.items() if v} | {
+                    "allowed": sorted(allowed) if allowed is not None else None,
+                    "n_head": len(getattr(self.model, "label_to_id", {})),
+                    "threshold": self.threshold,
+                    "id_to_label": dict(getattr(self.model, "id_to_label", None) or {}),
+                }
+            finally:
+                self._dump = None
             results[tid] = EvalMetrics(
                 task_id=tid,
                 f1=m["f1"],

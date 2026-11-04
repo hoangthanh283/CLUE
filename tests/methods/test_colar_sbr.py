@@ -57,3 +57,25 @@ def test_supervision_plan_cil_dil_and_mixed():
     ]
     # unknown domain -> never assume cross-schema negatives
     assert supervision_plan({4, 5}, "", blocks, doms) == [(2, "full")]
+
+
+def test_offline_calibration_default_rule_matches_aggregate_blocks():
+    """scripts/rca/sbr_calibrate.py (zero bias, tau 0.5) must reproduce the deployed rule."""
+    import importlib.util
+
+    import numpy as np
+
+    from doccl.methods.colar_sbr import block_scores
+
+    spec = importlib.util.spec_from_file_location("cal", "scripts/rca/sbr_calibrate.py")
+    cal = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cal)
+    g = torch.Generator().manual_seed(0)
+    idx = [torch.tensor([1, 2]), torch.tensor([3, 4, 5])]
+    bls = [torch.randn(2, 7, 1 + len(i), generator=g) * 3 for i in idx]
+    for allowed in (None, {0, 3, 4, 5}):
+        ref = aggregate_blocks(bls, idx, 0.5, allowed, 6)
+        e, tags = block_scores(bls, idx)
+        d = {"e": e.reshape(-1, 2), "tag": tags.reshape(-1, 2), "allowed": allowed, "n_head": 6}
+        d["allowed"] = sorted(allowed) if allowed is not None else None
+        assert torch.equal(cal.predict(d, np.zeros(2), 0.5), ref.reshape(-1))
