@@ -75,6 +75,7 @@ class LwF(NaiveFineTune):
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
         stopper = self.make_early_stopper(val_loader)
+        self._amp_setup()  # opt-in mixed precision; inert unless cfg.training.amp
 
         total_loss = 0.0
         n_steps = 0
@@ -84,20 +85,21 @@ class LwF(NaiveFineTune):
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
                 optimizer.zero_grad()
 
-                outputs = self.model(**batch)
-                ce_loss = outputs.loss
-                kd_loss = torch.zeros((), device=self.device)
+                with self._amp_autocast():
+                    outputs = self.model(**batch)
+                    ce_loss = outputs.loss
+                    kd_loss = torch.zeros((), device=self.device)
 
-                if teacher is not None:
-                    with torch.no_grad():
-                        teacher_out = teacher(**{k: v for k, v in batch.items() if k != "labels"})
-                    mask = batch["labels"] != -100
-                    kd_loss = self._kd_loss(outputs.logits, teacher_out.logits, mask)
+                    if teacher is not None:
+                        with torch.no_grad():
+                            teacher_out = teacher(
+                                **{k: v for k, v in batch.items() if k != "labels"}
+                            )
+                        mask = batch["labels"] != -100
+                        kd_loss = self._kd_loss(outputs.logits, teacher_out.logits, mask)
 
-                loss = ce_loss + self.alpha * kd_loss
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.trainable_parameters(), max_grad_norm)
-                optimizer.step()
+                    loss = ce_loss + self.alpha * kd_loss
+                self._amp_backward_step(loss, optimizer, self.trainable_parameters(), max_grad_norm)
 
                 total_loss += float(loss.item())
                 n_steps += 1

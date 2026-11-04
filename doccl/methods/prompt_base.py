@@ -183,6 +183,7 @@ class PromptBasedMethod(NaiveFineTune):
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
         # Early stopping on the prompt-aware val-F1 (disabled if no val_loader).
         stopper = self.make_early_stopper(val_loader)
+        self._amp_setup()  # opt-in mixed precision; inert unless cfg.training.amp
 
         total_loss = 0.0
         n_steps = 0
@@ -194,20 +195,19 @@ class PromptBasedMethod(NaiveFineTune):
             for batch in pbar:
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
                 optimizer.zero_grad()
-                query = self._query(batch)
-                prompt_embeds, aux = self._select_prompts(query, batch)
-                logits = self._prompt_logits(batch, prompt_embeds)
-                labels = self._aligned_labels(batch, logits)
-                logits = self._mask_old(logits)
-                ce = F.cross_entropy(
-                    logits.reshape(-1, logits.shape[-1]),
-                    labels.reshape(-1),
-                    ignore_index=-100,
-                )
-                loss = ce + aux
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.trainable_parameters(), max_grad_norm)
-                optimizer.step()
+                with self._amp_autocast():
+                    query = self._query(batch)
+                    prompt_embeds, aux = self._select_prompts(query, batch)
+                    logits = self._prompt_logits(batch, prompt_embeds)
+                    labels = self._aligned_labels(batch, logits)
+                    logits = self._mask_old(logits)
+                    ce = F.cross_entropy(
+                        logits.reshape(-1, logits.shape[-1]),
+                        labels.reshape(-1),
+                        ignore_index=-100,
+                    )
+                    loss = ce + aux
+                self._amp_backward_step(loss, optimizer, self.trainable_parameters(), max_grad_norm)
                 total_loss += float(loss.item())
                 n_steps += 1
                 pbar.set_postfix({"ce": f"{ce.item():.3f}", "aux": f"{float(aux):.4f}"})

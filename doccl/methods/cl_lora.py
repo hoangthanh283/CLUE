@@ -89,6 +89,7 @@ class CLLoRA(OLoRA):
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
         stopper = self.make_early_stopper(val_loader)
+        self._amp_setup()  # opt-in mixed precision; inert unless cfg.training.amp
 
         total_loss = 0.0
         n_steps = 0
@@ -100,39 +101,43 @@ class CLLoRA(OLoRA):
                 batch = {k: v.to(self.device) for k, v in batch.items() if torch.is_tensor(v)}
                 optimizer.zero_grad()
 
-                outputs = self.model(**batch)
-                ce_loss = outputs.loss
-                n_old = self.state.custom.get("n_old", 0)
-                if self.config.get("mask_old_logits", False) and n_old > 0:
-                    # AGENT FIX (2026-11-01): mask previously-seen classes out of the
-                    # training CE (official CL-LoRA / prompt-family protocol); KD below
-                    # still sees the unmasked old slice, which is what retains them.
-                    masked = outputs.logits.clone()
-                    masked[..., :n_old] = float("-inf")
-                    ce_loss = F.cross_entropy(
-                        masked.reshape(-1, masked.shape[-1]),
-                        batch["labels"].reshape(-1),
-                        ignore_index=-100,
-                    )
-                # Task-specific subspace: O-LoRA orthogonality penalty.
-                ortho_loss = self.lambda_ortho * self._ortho_loss()
+                with self._amp_autocast():
+                    outputs = self.model(**batch)
+                    ce_loss = outputs.loss
+                    n_old = self.state.custom.get("n_old", 0)
+                    if self.config.get("mask_old_logits", False) and n_old > 0:
+                        # AGENT FIX (2026-11-01): mask previously-seen classes out of the
+                        # training CE (official CL-LoRA / prompt-family protocol); KD below
+                        # still sees the unmasked old slice, which is what retains them.
+                        masked = outputs.logits.clone()
+                        masked[..., :n_old] = float("-inf")
+                        ce_loss = F.cross_entropy(
+                            masked.reshape(-1, masked.shape[-1]),
+                            batch["labels"].reshape(-1),
+                            ignore_index=-100,
+                        )
+                    # Task-specific subspace: O-LoRA orthogonality penalty.
+                    ortho_loss = self.lambda_ortho * self._ortho_loss()
 
-                # Task-shared knowledge: KD toward the frozen previous-task teacher,
-                # gradient-reassigned by shared_grad_scale.
-                kd_loss = torch.zeros((), device=self.device)
-                if teacher is not None and self.kd_alpha > 0:
-                    with torch.no_grad():
-                        teacher_out = teacher(**{k: v for k, v in batch.items() if k != "labels"})
-                    mask = batch["labels"] != -100
-                    kd_loss = self._kd_loss(outputs.logits, teacher_out.logits, mask)
-                    kd_loss = self.shared_grad_scale * self.kd_alpha * kd_loss
+                    # Task-shared knowledge: KD toward the frozen previous-task teacher,
+                    # gradient-reassigned by shared_grad_scale.
+                    kd_loss = torch.zeros((), device=self.device)
+                    if teacher is not None and self.kd_alpha > 0:
+                        with torch.no_grad():
+                            teacher_out = teacher(
+                                **{k: v for k, v in batch.items() if k != "labels"}
+                            )
+                        mask = batch["labels"] != -100
+                        kd_loss = self._kd_loss(outputs.logits, teacher_out.logits, mask)
+                        kd_loss = self.shared_grad_scale * self.kd_alpha * kd_loss
 
-                loss = ce_loss + ortho_loss + kd_loss
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(
-                    [p for p in self.model.parameters() if p.requires_grad], max_grad_norm
+                    loss = ce_loss + ortho_loss + kd_loss
+                self._amp_backward_step(
+                    loss,
+                    optimizer,
+                    [p for p in self.model.parameters() if p.requires_grad],
+                    max_grad_norm,
                 )
-                optimizer.step()
 
                 total_loss += float(loss.item())
                 n_steps += 1

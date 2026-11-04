@@ -217,6 +217,7 @@ class CPFD(NaiveFineTune):
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
         stopper = self.make_early_stopper(val_loader)
+        self._amp_setup()  # opt-in mixed precision; inert unless cfg.training.amp
         is_first_task = task.task_id == 0
 
         total_loss = 0.0
@@ -231,56 +232,60 @@ class CPFD(NaiveFineTune):
                 if labels_2d is None:
                     continue
 
-                s_logits, s_attns = self._forward_with_attentions(self.model, batch)
-                # (B, L, C_total)
+                with self._amp_autocast():
+                    s_logits, s_attns = self._forward_with_attentions(self.model, batch)
+                    # (B, L, C_total)
 
-                ce_factor = torch.ones(s_logits.size(0), 1, device=self.device)
-                kd_loss = torch.tensor(0.0, device=self.device)
-                attn_loss = torch.tensor(0.0, device=self.device)
+                    ce_factor = torch.ones(s_logits.size(0), 1, device=self.device)
+                    kd_loss = torch.tensor(0.0, device=self.device)
+                    attn_loss = torch.tensor(0.0, device=self.device)
 
-                if not is_first_task:
-                    with torch.no_grad():
-                        t_logits, t_attns = self._forward_with_attentions(self._teacher, batch)
+                    if not is_first_task:
+                        with torch.no_grad():
+                            t_logits, t_attns = self._forward_with_attentions(self._teacher, batch)
 
-                    labels_2d, ce_factor = self._apply_pseudo_labels(labels_2d, t_logits)
+                        labels_2d, ce_factor = self._apply_pseudo_labels(labels_2d, t_logits)
 
-                    flat_logits = s_logits.view(-1, s_logits.size(-1))
-                    flat_t_logits = t_logits.view(-1, t_logits.size(-1))
-                    orig_bg = batch["labels"].view(-1) == _BG_LABEL  # use original O-mask
-                    if orig_bg.any():
-                        n_old = self._n_old
-                        s_log = F.log_softmax(
-                            flat_logits[orig_bg, :n_old] / self.ref_temperature, dim=-1
-                        )
-                        t_soft = F.softmax(flat_t_logits[orig_bg] / self.ref_temperature, dim=-1)
-                        kd_loss = F.kl_div(s_log, t_soft, reduction="batchmean")
+                        flat_logits = s_logits.view(-1, s_logits.size(-1))
+                        flat_t_logits = t_logits.view(-1, t_logits.size(-1))
+                        orig_bg = batch["labels"].view(-1) == _BG_LABEL  # use original O-mask
+                        if orig_bg.any():
+                            n_old = self._n_old
+                            s_log = F.log_softmax(
+                                flat_logits[orig_bg, :n_old] / self.ref_temperature, dim=-1
+                            )
+                            t_soft = F.softmax(
+                                flat_t_logits[orig_bg] / self.ref_temperature, dim=-1
+                            )
+                            kd_loss = F.kl_div(s_log, t_soft, reduction="batchmean")
 
-                    attn_loss = self._attn_mse(s_attns, t_attns)
+                        attn_loss = self._attn_mse(s_attns, t_attns)
 
-                # ce_loss_per_token: (B, L) — permute because F.cross_entropy expects (B,C,L)
-                ce_per_tok = F.cross_entropy(
-                    s_logits.permute(0, 2, 1), labels_2d, ignore_index=-100, reduction="none"
-                )  # (B, L)
-                valid = labels_2d != -100
-                if valid.any():
-                    if self.adaptive_ce and not is_first_task:
-                        ce_loss = (ce_factor * ce_per_tok)[valid].mean()
+                    # ce_loss_per_token: (B, L) — permute because F.cross_entropy expects (B,C,L)
+                    ce_per_tok = F.cross_entropy(
+                        s_logits.permute(0, 2, 1), labels_2d, ignore_index=-100, reduction="none"
+                    )  # (B, L)
+                    valid = labels_2d != -100
+                    if valid.any():
+                        if self.adaptive_ce and not is_first_task:
+                            ce_loss = (ce_factor * ce_per_tok)[valid].mean()
+                        else:
+                            ce_loss = ce_per_tok[valid].mean()
                     else:
-                        ce_loss = ce_per_tok[valid].mean()
-                else:
-                    ce_loss = s_logits.sum() * 0.0
+                        ce_loss = s_logits.sum() * 0.0
 
-                n_total = s_logits.size(-1)
-                coef = self._adaptive_coef(self._n_old, n_total) if not is_first_task else 1.0
-                distill_loss = coef * self.distill_weight * (kd_loss + attn_loss)
-                loss = ce_loss + distill_loss
+                    n_total = s_logits.size(-1)
+                    coef = self._adaptive_coef(self._n_old, n_total) if not is_first_task else 1.0
+                    distill_loss = coef * self.distill_weight * (kd_loss + attn_loss)
+                    loss = ce_loss + distill_loss
 
                 optimizer.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(
-                    [p for p in self.model.parameters() if p.requires_grad], max_grad_norm
+                self._amp_backward_step(
+                    loss,
+                    optimizer,
+                    [p for p in self.model.parameters() if p.requires_grad],
+                    max_grad_norm,
                 )
-                optimizer.step()
 
                 total_loss += float(loss.item())
                 n_steps += 1

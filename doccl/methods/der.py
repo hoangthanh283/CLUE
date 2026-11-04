@@ -47,6 +47,7 @@ class DERpp(NaiveFineTune):
         epochs = self.config.get("epochs", 10)
         max_grad_norm = self.config.get("max_grad_norm", 1.0)
         stopper = self.make_early_stopper(val_loader)
+        self._amp_setup()  # opt-in mixed precision; inert unless cfg.training.amp
 
         total_loss = 0.0
         n_steps = 0
@@ -59,67 +60,68 @@ class DERpp(NaiveFineTune):
 
                 optimizer.zero_grad()
                 # Current task forward — capture logits for buffer insertion
-                cur_out = self.model(**batch)
-                ce_loss = cur_out.loss
-                cur_logits = cur_out.logits
+                with self._amp_autocast():
+                    cur_out = self.model(**batch)
+                    ce_loss = cur_out.loss
+                    cur_logits = cur_out.logits
 
-                mse_loss = torch.zeros((), device=self.device)
-                replay_ce_loss = torch.zeros((), device=self.device)
+                    mse_loss = torch.zeros((), device=self.device)
+                    replay_ce_loss = torch.zeros((), device=self.device)
 
-                # Replay (if buffer non-empty) — sample TWO batches per DER++ paper
-                replay1 = self.state.buffer.sample(self.replay_batch_size)
-                replay2 = self.state.buffer.sample(self.replay_batch_size)
+                    # Replay (if buffer non-empty) — sample TWO batches per DER++ paper
+                    replay1 = self.state.buffer.sample(self.replay_batch_size)
+                    replay2 = self.state.buffer.sample(self.replay_batch_size)
 
-                if replay1 is not None:
-                    replay1 = {k: v.to(self.device) for k, v in replay1.items()}
-                    cached_logits = replay1.pop("_logits")
-                    # Per-example original logit width (head grows across CIL tasks, so
-                    # cached_logits is zero-padded to the batch max). DER++ must distil
-                    # ONLY over each example's real classes — never against the padding
-                    # zeros, which would wrongly push new-class logits to zero on replay.
-                    widths = replay1.pop("_logit_width", None)
-                    # Forward over inputs only: drop labels and any "_"-prefixed buffer keys.
-                    fwd_in = {
-                        k: v for k, v in replay1.items() if k != "labels" and not k.startswith("_")
-                    }
-                    r_out = self.model(**fwd_in)
-                    n_shared = min(r_out.logits.shape[-1], cached_logits.shape[-1])
-                    student = r_out.logits[..., :n_shared]
-                    teacher = cached_logits[..., :n_shared]
-                    if widths is None:
-                        # No per-example widths (uniform head) — plain MSE over n_shared.
-                        mse_loss = F.mse_loss(student, teacher)
-                    else:
-                        # Build a (B, 1, n_shared) class mask: True for columns < width.
-                        cols = torch.arange(n_shared, device=student.device)
-                        col_mask = cols.unsqueeze(0) < widths.unsqueeze(1)  # (B, n_shared)
-                        if student.dim() == 3:  # token logits (B, L, C): broadcast over L
-                            col_mask = col_mask.unsqueeze(1)
-                        col_mask = col_mask.to(student.dtype)
-                        sq = (student - teacher) ** 2 * col_mask
-                        denom = col_mask.expand_as(sq).sum().clamp(min=1)
-                        mse_loss = sq.sum() / denom
+                    if replay1 is not None:
+                        replay1 = {k: v.to(self.device) for k, v in replay1.items()}
+                        cached_logits = replay1.pop("_logits")
+                        # Per-example original logit width (head grows across CIL tasks, so
+                        # cached_logits is zero-padded to the batch max). DER++ must distil
+                        # ONLY over each example's real classes — never against the padding
+                        # zeros, which would wrongly push new-class logits to zero on replay.
+                        widths = replay1.pop("_logit_width", None)
+                        # Forward over inputs only: drop labels and any "_"-prefixed buffer keys.
+                        fwd_in = {
+                            k: v
+                            for k, v in replay1.items()
+                            if k != "labels" and not k.startswith("_")
+                        }
+                        r_out = self.model(**fwd_in)
+                        n_shared = min(r_out.logits.shape[-1], cached_logits.shape[-1])
+                        student = r_out.logits[..., :n_shared]
+                        teacher = cached_logits[..., :n_shared]
+                        if widths is None:
+                            # No per-example widths (uniform head) — plain MSE over n_shared.
+                            mse_loss = F.mse_loss(student, teacher)
+                        else:
+                            # Build a (B, 1, n_shared) class mask: True for columns < width.
+                            cols = torch.arange(n_shared, device=student.device)
+                            col_mask = cols.unsqueeze(0) < widths.unsqueeze(1)  # (B, n_shared)
+                            if student.dim() == 3:  # token logits (B, L, C): broadcast over L
+                                col_mask = col_mask.unsqueeze(1)
+                            col_mask = col_mask.to(student.dtype)
+                            sq = (student - teacher) ** 2 * col_mask
+                            denom = col_mask.expand_as(sq).sum().clamp(min=1)
+                            mse_loss = sq.sum() / denom
 
-                if replay2 is not None:
-                    replay2 = {k: v.to(self.device) for k, v in replay2.items()}
-                    # Strip ALL buffer-internal bookkeeping keys (_logits, _logit_width,
-                    # any future "_"-prefixed field): the wrapper.forward signature is
-                    # fixed (no **kwargs), so leaving _logit_width in here raised
-                    # ``TypeError: forward() got an unexpected keyword argument
-                    # '_logit_width'`` at the first replay step — a hard crash.
-                    replay2 = {k: v for k, v in replay2.items() if not k.startswith("_")}
-                    r_out2 = self.model(**replay2)
-                    replay_ce_loss = r_out2.loss
+                    if replay2 is not None:
+                        replay2 = {k: v.to(self.device) for k, v in replay2.items()}
+                        # Strip ALL buffer-internal bookkeeping keys (_logits, _logit_width,
+                        # any future "_"-prefixed field): the wrapper.forward signature is
+                        # fixed (no **kwargs), so leaving _logit_width in here raised
+                        # ``TypeError: forward() got an unexpected keyword argument
+                        # '_logit_width'`` at the first replay step — a hard crash.
+                        replay2 = {k: v for k, v in replay2.items() if not k.startswith("_")}
+                        r_out2 = self.model(**replay2)
+                        replay_ce_loss = r_out2.loss
 
-                loss = ce_loss + self.alpha * mse_loss + self.beta * replay_ce_loss
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.trainable_parameters(), max_grad_norm)
-                optimizer.step()
+                    loss = ce_loss + self.alpha * mse_loss + self.beta * replay_ce_loss
+                self._amp_backward_step(loss, optimizer, self.trainable_parameters(), max_grad_norm)
 
                 # Add current batch to buffer with its logits
                 self.state.buffer.add_batch(
                     {k: v for k, v in batch.items() if torch.is_tensor(v)},
-                    logits=cur_logits,
+                    logits=cur_logits.float(),  # fp32 in the buffer under AMP
                 )
 
                 total_loss += float(loss.item())
