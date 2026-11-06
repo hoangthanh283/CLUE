@@ -37,6 +37,7 @@ from doccl.methods.colar_meta import CoLaRMeta
 from doccl.methods.colar_pp import CoLaRPP
 from doccl.methods.colar_r import CoLaRRefresh
 from doccl.methods.colar_sbr import CoLaRSBR
+from doccl.methods.colar_sbr_recall import CoLaRSBRRecall
 from doccl.methods.colar_wsvd import CoLaRWSVD
 from doccl.methods.colaslot import CoLaSlot
 from doccl.methods.colaslot_fd import CoLaSlotFD
@@ -261,6 +262,7 @@ METHOD_REGISTRY = {
     "colar": CoLaR,
     "colar_r": CoLaRRefresh,
     "colar_sbr": CoLaRSBR,
+    "colar_sbr_recall": CoLaRSBRRecall,
     # CoLaR++: + head alignment on real stored latents, slow trunk, WA, balanced replay,
     # int8 / token-pooled storage (image CIL; docs/IMAGE_SCOPE_PREREG.md Amendment 5).
     "colar_pp": CoLaRPP,
