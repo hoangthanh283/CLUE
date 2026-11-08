@@ -617,7 +617,10 @@ softmax that touches no label) gives $25.4\pm2.0$ on CIL-CORD, again above plain
 seeds and the only deployable arm to clear its pre-registered bar, and $61.3\pm1.6$ on Mixed,
 where it ties plain CoLaR on one seed and so falls short of its bar. Teacher-free
 pseudo-labelling of the stale ``O'' tokens is a registered null ($20.0\pm3.4$ on CIL-CORD,
-sign flipping across seeds).
+sign flipping across seeds). These class-incremental numbers are under the legacy scoring in
+which each session's gold hides the other sessions' entities; \S\ref{sec:results-sbr} re-scores
+the same runs per session, where the oracle reads $91.7$ and the session-blocked readout
+CoLaR-SBR reaches it.
 
 Sixth, the parameter-efficient prompt baselines, which \emph{freeze} the backbone and train
 only a prompt pool plus the head, \emph{nearly fail} on this dense per-token task: CODA-Prompt
@@ -1530,6 +1533,86 @@ full-budget or additional-seed run is warranted.
   \label{tab:capacity-gates}
   \IfFileExists{generated/table_capacity_gates.tex}{%
     \input{generated/table_capacity_gates}}{}
+\end{table}
+
+\subsection{Label Growth Is a Readout Problem: CoLaR-SBR}
+\label{sec:results-sbr}
+
+\paragraph{The floor is partly a scoring artefact.} In CIL-CORD and the class-incremental
+halves of the mixed stream, session $j$'s test gold masks every other session's entity to
+``O''. A model that correctly labels an entity of another session on the same receipt is
+therefore charged a false positive per span. The joint oracle, trained on every label, scores
+$70/32/25/26/14$ across the five sessions (AA $33.4$, seed 42), and the naive learner's
+diagonal of $\approx94$ reads well only because it has forgotten everything else. Restricting
+each session's predictions to its own label set when computing $R[t,j]$ (the scoring the
+literature's per-task matrices assume; a no-op on DIL) lifts the oracle to $91.7\pm1.7$ and
+leaves naive at $19.0$ (Table~\ref{tab:sbr-restricted}). The rest of the floor is real: under
+this scoring replay rises only to $20$--$25$, CoLaR to $30.4$, the sliced loss to $42.0$ and
+the true-label refresh to $61.2$ (seed 42). Even with perfect stored labels the memory recovers
+a third of the gap, because current documents still label old entities as background and
+replayed documents label new ones as background, and both move the one shared background logit
+on the same surface forms.
+
+\paragraph{Un-sharing the background.} CoLaR-SBR (\S\ref{sec:method-sbr}) gives each
+tag-introducing session its own readout block and background logit, trained only where the
+document's annotation is complete, and routes per token by $1-p_b(\mathrm{O}_b)$. On CIL-CORD it
+reaches $88.0\pm1.9$ (seeds 42/7/123: $87.6/86.3/90.1$; final row on seed 42
+$91.9/89.1/90.4/89.6/96.0$) against the oracle's $91.7$ and the best baseline's $24.5$ (ER). On
+the mixed stream it reaches $89.7$ (seed 42) against the oracle's $87.7\pm1.1$ and ER's $74.5$,
+its weakest cell being SROIE ($77.2$). On DIL, where it collapses to CoLaR with one block, it
+reads $86.2\pm1.3$. Two ablations locate the effect: the same blocks without the latent bank
+fall to $20.4$, so complete labels do not stop representation drift, and the same blocks on a
+frozen trunk fall to $14.8$, so sessions after the first never learn; readout and memory are
+each necessary and neither sufficient. The first version of the rule, which trained a block only
+on its own session's documents, scored $66.5$ on DIL because the FUNSD block, never shown a
+receipt, claimed receipt tokens; the all-background clause for other schemas restores
+$86.2$. Calibrating the readout further is closed: tuning $\tau$ and a per-block bias on the test
+set itself moves AA by at most $+0.6$ on CIL-CORD and $+1.1$ on DIL, so the residual loss is
+retention, not readout. Storage is $96$\,MB on CIL-CORD ($50$ documents per session at rank
+$128$) plus one background logit per block.
+
+\paragraph{SBR-Recall.} Storing a rank-$64$ LoRA delta of the upper trunk per session and reading
+each block under its own delta (\S\ref{sec:method-sbr}) reaches $92.7$ AA on CIL-CORD (seed 42;
+final row $95.4/93.2/92.2/89.3/93.3$, BWT $+0.6$) with every column of the retention matrix flat
+to within a point, and without a latent bank ($54$\,MB of half-precision deltas in total,
+$7.1$\,M trainable parameters). The same design at rank $8$ on the attention projections alone
+scores $80.5$: retention is exact but the second and third sessions plateau near $65$ F1, so the
+isolation is sound and the delta's capacity is what CORD's look-alike price classes demand.
+This is a single seed; seeds 7 and 123 and the mixed stream are running, and the row is marked
+accordingly.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Session-restricted scoring: CIL-CORD and Mixed]{Average entity-F1 under
+  session-restricted scoring on LayoutLMv3 (mean\,$\pm$\,std; superscript = number of seeds
+  when fewer than three; baseline rows are seeds 42/7 with the third in progress, CoLaR-SBR
+  on CIL-CORD is seeds 42/7/123). Same runs as Table~\ref{tab:main-comparison}, re-scored with
+  each session's predictions restricted to its label set. Baseline rows use bf16 autocast,
+  SBR rows fp32. $^{a}$one LwF seed collapsed to all-``O'' and is being re-run.}
+  \label{tab:sbr-restricted}
+  \begin{tabular}{lcc}
+  \toprule
+  \textbf{Method} & \textbf{CIL-CORD} & \textbf{Mixed} \\
+  \midrule
+  Naive (lower bound) & $19.0{\pm}0.1$ & $44.0{\pm}0.5$ \\
+  LwF & $18.5{\pm}0.0$ & $23.9{\pm}33.8^{\,a}$ \\
+  ER & $24.5{\pm}3.4$ & $74.5{\pm}1.6$ \\
+  DER++ & $20.0{\pm}1.8$ & $74.5{\pm}0.8$ \\
+  CODA-Prompt & $14.9{\pm}1.4$ & $11.3{\pm}1.1$ \\
+  CL-LoRA & $18.6{\pm}0.1$ & $44.8{\pm}1.3$ \\
+  CPFD & $1.4{\pm}1.9$ & $7.7{\pm}10.5$ \\
+  IS3 & $6.6{\pm}1.5$ & $20.3{\pm}28.7$ \\
+  LCA & $10.3{\pm}4.8$ & $38.0^{\,1}$ \\
+  \midrule
+  CoLaR & $30.4{\pm}2.2$ & $75.6^{\,1}$ \\
+  CoLaR-R, sliced & $42.0{\pm}3.1$ & $80.2^{\,1}$ \\
+  LexSlot & $19.0{\pm}0.0$ & $50.8^{\,1}$ \\
+  \textbf{CoLaR-SBR} & $88.0{\pm}1.9$ & $\mathbf{89.7}^{\,1}$ \\
+  \textbf{SBR-Recall} & $\mathbf{92.7}^{\,1}$ & pending \\
+  \midrule
+  Joint (upper bound) & $91.7{\pm}1.7$ & $87.7{\pm}1.1$ \\
+  \bottomrule
+  \end{tabular}
 \end{table}
 
 \section{Discussion}

@@ -50,13 +50,20 @@ so storing each past document as its own low-rank factors at an intermediate lay
 preserves that binding and reaches $87.6$ with a $60$\,MB memory, $2.7\times$ smaller than raw
 replay and without keeping any raw page.
 
-The proposed method builds on this memory and changes only how it is read. Rather than
-sampling stored documents uniformly, it routes replay by an OCR-vocabulary signature that
-depends on the input alone and therefore cannot drift, the same signal that gates LexSlot's
-slot memory at the diagnosed site, so that each incoming batch is rehearsed against the stored
-documents most relevant to it. Together with the diagnostic protocol, the benchmark, and the
-tooling released with the thesis, the method offers a measurement-driven route to continual
-learning for multimodal document encoders.\footnote{Source code:
+Where the label space grows, the memory is not the bottleneck. Scoring each
+class-incremental session on its own label set, as the per-task matrix of the literature
+assumes, lifts the oracle from $33$ to $92$ AA while every replay method stays near $20$--$30$:
+current documents label old entities as background and replayed documents label new ones as
+background, and both move the one shared background logit on the same surface forms. The
+proposed method, \textbf{CoLaR-SBR}, un-shares it: each session owns a readout block with its
+own background logit, trained only where its annotation is complete, and tokens are routed per
+block by their non-background mass with no task identifier. On the same bank it reaches
+$88.0\pm1.9$ AA on class-incremental CORD and $89.7$ on the mixed stream, at the joint oracle;
+storing a per-session low-rank delta of the upper trunk beside the bank and reading each block
+under its own delta (SBR-Recall) reaches $92.7$ with exact retention on a single seed. Together
+with the diagnostic protocol, the benchmark, and the tooling released with the thesis, the
+method offers a measurement-driven route to continual learning for multimodal document
+encoders.\footnote{Source code:
 \url{https://github.com/hoangthanh283/doccl} (\texttt{doccl} branch); experiments tracked on
 Weights \& Biases at \url{https://wandb.ai/thanh-workspace/doccl-aaai2027}.}
 

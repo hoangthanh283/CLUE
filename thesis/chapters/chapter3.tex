@@ -774,6 +774,62 @@ sampling of the store ($p_j = 1/|M|$) is the CoLaR baseline that every routing m
 against. Routing changes only which latents are replayed: the memory, its size, and the replay
 loss are identical, so any difference is attributable to the gate alone.
 
+\section{Session-Blocked Readout for Label Growth (CoLaR-SBR)}
+\label{sec:method-sbr}
+
+The memory of \S\ref{sec:method-routed} fixes \emph{what} is retained. Under class-incremental
+label growth the results chapter finds that the remaining loss is not in the memory but in the
+readout (\S\ref{sec:results-sbr}): a document from session $t$ labels every entity introduced
+after $t$ as background, a current document labels every earlier entity as background, and
+both are scored by one shared softmax whose single background logit is therefore pushed in
+opposite directions on the same surface forms. Keeping the stored labels live (CoLaR-R)
+removes one side of the contradiction and recovers a third of the gap to the oracle; the other
+side is irreducible as long as the background is shared.
+
+\paragraph{Blocks.} CoLaR-SBR un-shares the background. Each session $b$ that introduces tags
+owns a readout block $[\mathrm{O}_b, \text{tags}_b]$ with its own background logit and a
+block-local softmax. A token labelled ``O'' in session-$t$ data is \emph{truly} $\mathrm{O}_t$,
+so within its own block every session's annotation is complete and correct. A session that
+introduces no tag (every domain-incremental step, the FUNSD revisit of the mixed stream) creates
+no block, so on DIL the method reduces to CoLaR with a single block.
+
+\paragraph{Supervision rule.} For a document of session $S$ (dataset schema $d$) and a block
+$b$ with tag set $\mathcal{T}_b$ and schema $d_b$:
+\begin{itemize}
+  \item if $\mathcal{T}_b \subseteq \mathcal{T}_S$, the document trains $b$ \emph{fully}
+        (every tag of $b$ is annotated; an annotated tag of another class is a true negative);
+  \item else if $d_b \neq d$, the document trains $b$ as \emph{all-background} (no entity of
+        another schema can occur on it);
+  \item otherwise the document does not train $b$: its ``O'' labels are stale for that block.
+\end{itemize}
+Banked documents replayed from the CoLaR memory follow the same rule with their own session.
+The trunk is shared, trained by every block, and kept stable by whole-document latent replay
+exactly as in CoLaR; the second clause supplies the cross-schema negatives without which a
+block trained only on receipts claims form tokens (the failure of the first version on DIL,
+\S\ref{sec:results-sbr}).
+
+\paragraph{Task-agnostic inference.} For each block $e_b = 1 - p_b(\mathrm{O}_b)$ is the mass the
+block assigns to its own entities. The block with the largest $e_b$ claims the token with its
+best in-block tag if $e_b > \tau$ ($\tau{=}0.5$), otherwise the token is background. No task
+identifier is used at training or test time. The closest prior designs are ICE
+\citep{liu2023ice}, which trains individual per-session classifiers on a frozen language model,
+and SpanKL \citep{zheng2023spankl}, which uses per-type sigmoid span heads without replay; SBR
+is the blocked readout on a \emph{trained} trunk with whole-document replay, in a setting where
+every session's documents are the full population so each block sees true negatives.
+
+\paragraph{SBR-Recall: recalling the session's trunk state.} The bank is write-only at test
+time: the model never reads memory while labelling a new document. SBR-Recall stores, next to
+each session's latents, a low-rank LoRA delta \citep{hu2022lora} $\Delta_b$ of the upper trunk
+(layers $\ge k$; rank $64$ on the attention projections and feed-forward layers) and evaluates
+block $b$ \emph{under} $\Delta_b$, so $e_b$ is computed by the network state that learned those
+tags. The base trunk is frozen after the first session and all later plasticity lives in the
+deltas, so earlier sessions are forgetting-free by construction and a stored delta can never go
+stale. Inference costs one forward of the upper layers per distinct delta; routing is unchanged.
+This is parameter isolation in the HAT/Expert-Gate sense, made task-agnostic on documents by the
+per-session background class that every document supervises completely; it differs from
+CL-LoRA \citep{he2025cllora}, which trains per-task adapters but reads them through one shared
+softmax and inherits exactly the contradiction above.
+
 \section{Summary}
 \label{sec:method-summary}
 
@@ -787,6 +843,8 @@ there: \textbf{LexSlot}, an isolated slot memory at the diagnosed site, gated by
 drift-immune lexical signature and paired with a compact 200-exemplar replay buffer in its
 headline configuration; and \textbf{lexical routing of the replay memory}, which keeps
 LexSlot's signature as a gate over compressed per-document latents (CoLaR) at layer $k$, so
-the gate decides which stored documents are replayed---a component the results retire in
-favour of keeping the stored labels live (CoLaR-R). The next chapter describes how this methodology is realised in
+the gate decides which stored documents are replayed---a component the results retire; and
+\textbf{CoLaR-SBR} (\S\ref{sec:method-sbr}), which reads the same memory through one readout
+block per session so that label growth never contradicts a shared background logit, with
+SBR-Recall adding a stored per-session trunk delta under which each block is read. The next chapter describes how this methodology is realised in
 software.

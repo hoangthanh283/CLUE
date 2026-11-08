@@ -161,11 +161,13 @@ SROIE, extended with WildReceipt and XFUND) under one configuration system
   \item an \textbf{explanation of why buffer-free remedies fail} with one identified cause, the
         readout-marginal snap on a drifting representation, and the law that replay must
         preserve \emph{whole-document consistency};
-  \item \textbf{compressed latent replay with live labels (CoLaR-R)}, a remedy derived from
-        both: a compressed, per-document latent memory (CoLaR) at the diagnosed site whose
-        stored labels are kept live across class-incremental boundaries; LexSlot's lexical
-        signature as a gate over what is replayed is tested and reported as a pre-registered
-        negative;
+  \item \textbf{compressed latent replay with a session-blocked readout (CoLaR-SBR)}, a
+        remedy derived from both: a compressed, per-document latent memory (CoLaR) at the
+        diagnosed site, read through one readout block per session so that no shared
+        background logit receives contradictory supervision under label growth, and its
+        extension SBR-Recall, which recalls each session's trunk state through a stored
+        low-rank delta; LexSlot's lexical signature as a gate over what is replayed is tested
+        and reported as a pre-registered negative;
   \item the \textbf{FCS-CL benchmark} and reproducible diagnostic tooling.
 \end{enumerate}
 
@@ -216,8 +218,15 @@ oracle, with no raw document retained. LexSlot, an isolated slot memory at the h
 layers with a compact 200-exemplar buffer, reaches AA $87.3 \pm 1.0$ with
 backward transfer $-2.3 \pm 1.2$, forgetting less than plain
 replay ($-2.8$/$-3.4$). Where the label space grows (class-incremental CORD),
-banked labels go stale and every replay method sits at the naive floor; a sliced replay loss
-over the classes alive at banking time recovers $+5$ AA on three seeds. A drift-immune
+the apparent naive floor is largely a scoring artefact: once each session is scored on its own
+label set the oracle reads $92$ AA, yet every shared-softmax method, replay included, stays
+near $20$--$30$, and keeping the stored labels live recovers only a third of the gap. The
+contradiction lives in the single background logit, so CoLaR-SBR gives each session its own
+readout block and background, trained only where its annotation is complete and routed per
+token with no task identifier; it reaches $88.0\pm1.9$ AA on CIL-CORD and $89.7$ on Mixed, at
+the joint oracle ($91.7$, $87.7$), where the best baseline reaches $24.5$ and $74.5$. SBR-Recall
+additionally stores a per-session low-rank delta of the upper trunk and reads each block under
+its own delta, reaching $92.7$ with every retention column flat (single seed). A drift-immune
 \gls{ocr}-vocabulary signature was hypothesised as a replay router but is reported as a
 three-seed null ($+0.5$ AA with a sign flip); the memory-only headline does not depend on
 routing. On image class-incremental learning the same latent bank is beaten by a Gaussian-head
