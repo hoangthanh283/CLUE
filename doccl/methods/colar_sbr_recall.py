@@ -19,6 +19,7 @@ per-adapter ModulesToSaveWrapper, which breaks SBR's single shared head and feat
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 
 import torch
 from torch import nn
@@ -132,28 +133,57 @@ class CoLaRSBRRecall(CoLaRSBR):
             self.block_delta.append(self._cur_delta)
         self._set_delta(self._cur_delta)
 
-    # ------------------------------------------------------------------ replay
+    # ------------------------------------------------------------------ losses
+    def _loss_under_deltas(self, forward, labels, session: int, cur=None):
+        """Sum of the block losses of ``session``'s plan, every block computed under the delta it
+        is read under at inference (AGENT FIX 2026-11-09: cross-schema all-background terms were
+        computed under the *current* delta and destroyed the FUNSD/SROIE blocks on Mixed, 62.1).
+        ``forward()`` re-runs the model under whatever delta is active; ``cur`` = (logits, feat)
+        already computed under ``self._cur_delta``. Other deltas are frozen, so the extra forwards
+        only record the head in autograd."""
+        groups: dict[int | None, list[tuple[int, str]]] = {}
+        for b, mode in self._plan(session):
+            groups.setdefault(self.block_delta[b], []).append((b, mode))
+        total = None
+        for d, items in groups.items():
+            if d == self._cur_delta and cur is not None:
+                logits, feat = cur
+            else:
+                self._set_delta(d)
+                out = forward()
+                logits, feat = out.logits, self._feat
+            for b, mode in items:
+                t = self._block_ce(logits, feat, labels, b, mode)
+                t = t * (self.neg_weight if mode == "neg" else 1.0)
+                total = t if total is None else total + t
+        self._set_delta(self._cur_delta)
+        if total is None:
+            total = torch.zeros((), device=labels.device, requires_grad=True)
+        return total
+
+    def _current_ce(self, cur_out, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        inputs = {k: v for k, v in batch.items() if k != "labels"}
+        cur = (cur_out.logits, self._feat)
+        return self._loss_under_deltas(
+            lambda: self.model(**inputs), batch["labels"], self._cur_session, cur
+        )
+
     def _replay_forward(self, replay: dict[str, torch.Tensor]):
-        """Each banked doc is replayed under the delta of the session that banked it."""
+        """Banked docs grouped by session; each block they supervise is forwarded under its own
+        delta through CoLaR's injection forward (SBR's shared-forward loss is bypassed)."""
         sessions = replay["session"].tolist()
-        deltas = [self._session_delta(s) for s in sessions]
-        outs, losses = None, []
-        for d in dict.fromkeys(deltas):
-            rows = [i for i, x in enumerate(deltas) if x == d]
+        labels = replay["labels"].to(self.device)
+        inject = super(CoLaRSBR, self)._replay_forward  # CoLaR: inject latents at layer k
+        total, n = None, len(sessions)
+        for s in dict.fromkeys(sessions):
+            rows = [i for i, x in enumerate(sessions) if x == s]
             sub = {
-                k: (v[rows] if torch.is_tensor(v) and v.shape[:1] == (len(deltas),) else v)
+                k: (v[rows] if torch.is_tensor(v) and v.shape[:1] == (n,) else v)
                 for k, v in replay.items()
             }
-            self._set_delta(d)
-            outs = super()._replay_forward(sub)
-            losses.append(outs.loss * len(rows))
-        self._set_delta(self._cur_delta)
-        outs.loss = torch.stack(losses).sum() / len(deltas)
-        return outs
-
-    def _session_delta(self, session: int) -> int | None:
-        full = [b for b, mode in self._plan(session) if mode == "full"]
-        return self.block_delta[full[0]] if full else None
+            t = self._loss_under_deltas(lambda sub=sub: inject(sub), labels[rows], s) * len(rows)
+            total = t if total is None else total + t
+        return SimpleNamespace(loss=total / n)
 
     # ------------------------------------------------------------------ inference
     @torch.no_grad()

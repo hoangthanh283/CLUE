@@ -1572,14 +1572,18 @@ retention, not readout. Storage is $96$\,MB on CIL-CORD ($50$ documents per sess
 $128$) plus one background logit per block.
 
 \paragraph{SBR-Recall.} Storing a rank-$64$ LoRA delta of the upper trunk per session and reading
-each block under its own delta (\S\ref{sec:method-sbr}) reaches $92.7$ AA on CIL-CORD (seed 42;
-final row $95.4/93.2/92.2/89.3/93.3$, BWT $+0.6$) with every column of the retention matrix flat
-to within a point, and without a latent bank ($54$\,MB of half-precision deltas in total,
+each block under its own delta (\S\ref{sec:method-sbr}) reaches $92.8\pm0.5$ AA on CIL-CORD
+(seeds 42/7/123: $92.7/93.4/92.4$, BWT $+0.6/+0.4/-0.1$; final row on seed 42
+$95.4/93.2/92.2/89.3/93.3$), above the oracle on every seed, with every column of the retention
+matrix flat to within a point, and without a latent bank ($54$\,MB of half-precision deltas in total,
 $7.1$\,M trainable parameters). The same design at rank $8$ on the attention projections alone
 scores $80.5$: retention is exact but the second and third sessions plateau near $65$ F1, so the
 isolation is sound and the delta's capacity is what CORD's look-alike price classes demand.
-This is a single seed; seeds 7 and 123 and the mixed stream are running, and the row is marked
-accordingly.
+On the mixed stream the same configuration scores $62.1$ (seed 42): the FUNSD and SROIE blocks
+are destroyed during the CORD sessions because the cross-schema all-background supervision of
+another session's block is computed under the current session's delta while that block is read
+under its own; training every block under the delta it is read under is the pending fix, and
+the row is reported as it stands.
 
 \begin{table}[!htbp]
   \centering
@@ -1588,7 +1592,8 @@ accordingly.
   when fewer than three; baseline rows are seeds 42/7 with the third in progress, CoLaR-SBR
   on CIL-CORD is seeds 42/7/123). Same runs as Table~\ref{tab:main-comparison}, re-scored with
   each session's predictions restricted to its label set. Baseline rows use bf16 autocast,
-  SBR rows fp32. $^{a}$one LwF seed collapsed to all-``O'' and is being re-run.}
+  SBR rows fp32. $^{a}$one LwF seed collapsed to all-``O'' and is being re-run. $^{b}$cross-schema
+  negatives computed under the wrong delta; see text.}
   \label{tab:sbr-restricted}
   \begin{tabular}{lcc}
   \toprule
@@ -1608,7 +1613,7 @@ accordingly.
   CoLaR-R, sliced & $42.0{\pm}3.1$ & $80.2^{\,1}$ \\
   LexSlot & $19.0{\pm}0.0$ & $50.8^{\,1}$ \\
   \textbf{CoLaR-SBR} & $88.0{\pm}1.9$ & $\mathbf{89.7}^{\,1}$ \\
-  \textbf{SBR-Recall} & $\mathbf{92.7}^{\,1}$ & pending \\
+  \textbf{SBR-Recall} & $\mathbf{92.8{\pm}0.5}$ & $62.1^{\,1,b}$ \\
   \midrule
   Joint (upper bound) & $91.7{\pm}1.7$ & $87.7{\pm}1.1$ \\
   \bottomrule
