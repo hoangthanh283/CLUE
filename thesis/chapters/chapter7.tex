@@ -104,7 +104,7 @@ latents chosen by lexical similarity rather than uniformly, with the memory and 
 that any change is the gate's alone. Routing towards the lexically nearest stored documents
 does not pass the pre-registered one-point rule once three seeds are in (best arm $+0.5$ AA,
 two of three seeds agreeing), so the gate is retired as a component and the memory is sampled
-uniformly. What moves the class-incremental scenarios is the readout: once each session is scored on its own label set the oracle reads $92$ while every shared-softmax method stays near $20$--$30$, and giving each session its own readout block and background logit (CoLaR-SBR) reaches $88.0\pm1.9$ on CIL-CORD and $89.7$ on Mixed, at the oracle; reading each block under a stored per-session trunk delta (SBR-Recall) reaches $92.7$ with exact retention on one seed.
+uniformly. What moves the class-incremental scenarios is the readout: once each session is scored on its own label set the oracle reads $92$ while every shared-softmax method stays near $20$--$30$, and giving each session its own readout block and background logit (CoLaR-SBR) reaches $88.0\pm1.9$ on CIL-CORD and $89.7$ on Mixed, at the oracle; reading each block under a stored per-session trunk delta (SBR-Recall) reaches $92.8\pm0.5$ over three seeds with exact retention.
 
 Taken together, the diagnosis decides \emph{where} a remedy attaches, the negative results decide
 \emph{what form} its memory must take, and the lexical gate decides \emph{what} it replays. The

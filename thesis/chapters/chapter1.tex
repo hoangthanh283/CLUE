@@ -226,7 +226,7 @@ readout block and background, trained only where its annotation is complete and 
 token with no task identifier; it reaches $88.0\pm1.9$ AA on CIL-CORD and $89.7$ on Mixed, at
 the joint oracle ($91.7$, $87.7$), where the best baseline reaches $24.5$ and $74.5$. SBR-Recall
 additionally stores a per-session low-rank delta of the upper trunk and reads each block under
-its own delta, reaching $92.7$ with every retention column flat (single seed). A drift-immune
+its own delta, reaching $92.8\pm0.5$ over three seeds with every retention column flat. A drift-immune
 \gls{ocr}-vocabulary signature was hypothesised as a replay router but is reported as a
 three-seed null ($+0.5$ AA with a sign flip); the memory-only headline does not depend on
 routing. On image class-incremental learning the same latent bank is beaten by a Gaussian-head
