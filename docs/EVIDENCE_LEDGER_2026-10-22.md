@@ -105,7 +105,7 @@ coverage statement. F12 delta > 1 AA → disclose the delta per cell in Limitati
 | F16 | CoLaR-R double-sliced | — | 60.5 ± 10.1 | 3S (62.9/69.2/49.4); Mixed s42 73.6 (joint 86.5) |
 | F16 | forward completion / BiLC | — | 48.0 / 44.1 | 1S, nulls |
 | **F17** | **CoLaR-SBR (session-blocked readout)** | — | **88.0 ± 2.0** (87.6 / 86.2 / 90.2) | **3S**; Mixed s42 = 85.0 (joint 86.5); no-replay control 20.4 (final 0.5/0.0/1.2/4.6/95.4 — blocks without the bank collapse like naive: replay is the retention mechanism, blocks the plasticity one); V2 rule: DIL 86.2 ± 1.3 (3S; v1 66.5; CoLaR 87.8); frozen-trunk control (k=11, ICE-like) 14.8 — sessions 2–4 never learn on a frozen trunk |
-| F17b | SBR-Recall (per-session LoRA deltas, frozen base, blocks read under their own delta) | — | 80.5 (d50) / 82.5 (d0) s42 | 1S, below SBR; retention exact (columns flat), session-1 cell 90.5 vs SBR 74.9, but LoRA r=8 Q/K/V lacks plasticity on look-alike price sessions (diag s2/s3 65/68 vs ~90/83); bank inert once base frozen. Negative at r=8; capacity ablation open. |
+| F17b | SBR-Recall (per-session LoRA deltas, frozen base, blocks read under their own delta) | — | r=8 Q/K/V: 80.5 (d50) / 82.5 (d0); **r=64 Q/K/V+FFN, d0: 92.7 (s42, BWT +0.6)** | r=8 negative (s2/s3 diag 65/68 = capacity). r=64 CIL-CORD s42: final row [95.4 93.2 92.2 89.3 93.3], every column flat (retention exact), AA 92.7 > SBR 85.2 (s42 AMP) and > joint 91.7±1.7; session-1 cell 93.2 vs SBR 65.5. 7.1 M trainable, 56 MB. Single seed; seeds 7/123 + Mixed s42 queued. |
 
 Mechanism: the shared-softmax O is the bug (every session's loss moves every boundary); per-session
 [O_b, tags_b] blocks make each session's partial annotation complete within its block.
