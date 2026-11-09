@@ -1579,11 +1579,14 @@ matrix flat to within a point, and without a latent bank ($54$\,MB of half-preci
 $7.1$\,M trainable parameters). The same design at rank $8$ on the attention projections alone
 scores $80.5$: retention is exact but the second and third sessions plateau near $65$ F1, so the
 isolation is sound and the delta's capacity is what CORD's look-alike price classes demand.
-On the mixed stream the same configuration scores $62.1$ (seed 42): the FUNSD and SROIE blocks
-are destroyed during the CORD sessions because the cross-schema all-background supervision of
-another session's block is computed under the current session's delta while that block is read
-under its own; training every block under the delta it is read under is the pending fix, and
-the row is reported as it stands.
+On the mixed stream the picture inverts. Without a bank the same design scores $44.7$ (seed 42):
+across schemas every current document adds an all-background term for the other sessions'
+blocks, and with no positive term to balance it those blocks learn to abstain until their own
+domain is revisited (the FUNSD and SROIE blocks fall to $0$ and return only at the FUNSD
+revisit). Restoring the $50$-document bank supplies that counterweight and gives $85.9$
+(BWT $-3.8$), still below CoLaR-SBR's $89.7$. The frozen base therefore removes the need for
+replay only when the stream is a single schema; where sessions span schemas the bank, not the
+delta, carries retention, and the shared-trunk SBR row stands as the mixed-stream result.
 
 \begin{table}[!htbp]
   \centering
@@ -1592,8 +1595,8 @@ the row is reported as it stands.
   when fewer than three; baseline rows are seeds 42/7 with the third in progress, CoLaR-SBR
   on CIL-CORD is seeds 42/7/123). Same runs as Table~\ref{tab:main-comparison}, re-scored with
   each session's predictions restricted to its label set. Baseline rows use bf16 autocast,
-  SBR rows fp32. $^{a}$one LwF seed collapsed to all-``O'' and is being re-run. $^{b}$cross-schema
-  negatives computed under the wrong delta; see text.}
+  SBR rows fp32. $^{a}$one LwF seed collapsed to all-``O'' and is being re-run. $^{b}$with the
+  50-document bank; without it $44.7$, see text.}
   \label{tab:sbr-restricted}
   \begin{tabular}{lcc}
   \toprule
@@ -1613,7 +1616,7 @@ the row is reported as it stands.
   CoLaR-R, sliced & $42.0{\pm}3.1$ & $80.2^{\,1}$ \\
   LexSlot & $19.0{\pm}0.0$ & $50.8^{\,1}$ \\
   \textbf{CoLaR-SBR} & $88.0{\pm}1.9$ & $\mathbf{89.7}^{\,1}$ \\
-  \textbf{SBR-Recall} & $\mathbf{92.8{\pm}0.5}$ & $62.1^{\,1,b}$ \\
+  \textbf{SBR-Recall} & $\mathbf{92.8{\pm}0.5}$ & $85.9^{\,1,b}$ \\
   \midrule
   Joint (upper bound) & $91.7{\pm}1.7$ & $87.7{\pm}1.1$ \\
   \bottomrule
