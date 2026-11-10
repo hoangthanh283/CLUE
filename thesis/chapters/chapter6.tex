@@ -1570,6 +1570,11 @@ $86.2$. Calibrating the readout further is closed: tuning $\tau$ and a per-block
 set itself moves AA by at most $+0.6$ on CIL-CORD and $+1.1$ on DIL, so the residual loss is
 retention, not readout. Storage is $96$\,MB on CIL-CORD ($50$ documents per session at rank
 $128$) plus one background logit per block.
+Stacking LexSlot's lexically routed head slots (\S\ref{sec:method-lexslot}) on top of the
+blocks, the combination one might expect to compound, moves the three-seed mean by $+1.7$ on
+CIL-CORD ($89.7\pm0.5$), $-0.1$ on Mixed ($89.6\pm1.0$) and $+0.8$ on DIL ($87.0\pm0.3$
+against $86.2\pm1.3$); the robust effect is a smaller seed variance rather than a higher mean,
+consistent with the two mechanisms partitioning the same readout.
 
 \paragraph{SBR-Recall.} Storing a rank-$64$ LoRA delta of the upper trunk per session and reading
 each block under its own delta (\S\ref{sec:method-sbr}) reaches $92.8\pm0.5$ AA on CIL-CORD
@@ -1616,6 +1621,7 @@ delta, carries retention, and the shared-trunk SBR row stands as the mixed-strea
   CoLaR-R, sliced & $42.0{\pm}3.1$ & $80.2^{\,1}$ \\
   LexSlot & $19.0{\pm}0.0$ & $50.8^{\,1}$ \\
   \textbf{CoLaR-SBR} & $88.0{\pm}1.9$ & $\mathbf{89.7}^{\,1}$ \\
+  \quad + LexSlot head slots & $89.7{\pm}0.5$ & $89.6{\pm}1.0$ \\
   \textbf{SBR-Recall} & $\mathbf{92.8{\pm}0.5}$ & $85.9^{\,1,b}$ \\
   \midrule
   Joint (upper bound) & $91.7{\pm}1.7$ & $87.7{\pm}1.1$ \\
