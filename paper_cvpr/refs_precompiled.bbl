@@ -51,13 +51,6 @@ Mehrdad Farajtabar, Navid Azizan, Alex Mott, and Ang Li.
 \newblock In \emph{Proceedings of the 23rd International Conference on
   Artificial Intelligence and Statistics (AISTATS)}, 2020.
 
-\bibitem[Ge et~al.(2025)]{ge2025dmole}
-Ge et~al.
-\newblock {D-MoLE}: Dynamic layer-wise mixture-of-lora-experts for continual
-  multimodal instruction tuning.
-\newblock In \emph{Proceedings of the International Conference on Machine
-  Learning (ICML)}, 2025.
-
 \bibitem[Goswami et~al.(2023)Goswami, Liu, Twardowski, and van~de
   Weijer]{goswami2023fecam}
 Dipam Goswami, Yuyang Liu, Bart{\l}omiej Twardowski, and Joost van~de Weijer.
@@ -112,6 +105,12 @@ Yupan Huang, Tengchao Lv, Lei Cui, Yutong Lu, and Furu Wei.
 \newblock In \emph{Proceedings of the 30th ACM International Conference on
   Multimedia (MM)}, 2022.
 
+\bibitem[Kim et~al.(2022)Kim, Xiao, Konishi, Ke, and Liu]{kim2022theoretical}
+Gyuhak Kim, Changnan Xiao, Tatsuya Konishi, Zixuan Ke, and Bing Liu.
+\newblock A theoretical study on solving continual learning.
+\newblock In \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, 2022.
+
 \bibitem[Kirkpatrick et~al.(2017)Kirkpatrick, Pascanu, Rabinowitz, Veness,
   Desjardins, Rusu, Milan, Quan, Ramalho, Grabska-Barwinska,
   et~al.]{kirkpatrick2017ewc}
@@ -136,15 +135,6 @@ Kumar et~al.
 \newblock In \emph{International Workshop on Document Analysis Systems (DAS)},
   2024.
 
-\bibitem[Le et~al.(2025)Le, Luu, The, Le, Nguyen, Nguyen, Van, and
-  Nguyen]{le2025wavecre}
-Minh Le, Tien~Ngoc Luu, An~Nguyen The, Thanh-Thien Le, Trang Nguyen, Tung~Thanh
-  Nguyen, Linh~Ngo Van, and Thien~Huu Nguyen.
-\newblock Adaptive prompting for continual relation extraction: A within-task
-  variance perspective.
-\newblock In \emph{Proceedings of the AAAI Conference on Artificial
-  Intelligence}, 2025.
-
 \bibitem[Li et~al.(2025)Li, Shen, Chen, Chen, Ju, Duan, Mao, Zhou, Zhang, Fu,
   et~al.]{gdibench}
 Siqi Li, Yufan Shen, Xiangnan Chen, Jiayi Chen, Hengwei Ju, Haodong Duan, Song
@@ -157,6 +147,13 @@ Siqi Li, Yufan Shen, Xiangnan Chen, Jiayi Chen, Hengwei Ju, Haodong Duan, Song
 Zhizhong Li and Derek Hoiem.
 \newblock Learning without forgetting.
 \newblock In \emph{European Conference on Computer Vision (ECCV)}, 2016.
+
+\bibitem[Liang and Li(2024)]{liang2024inflora}
+Yan-Shuo Liang and Wu-Jun Li.
+\newblock {InfLoRA}: Interference-free low-rank adaptation for continual
+  learning.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, 2024.
 
 \bibitem[Liu and Huang(2023)]{liu2023ice}
 Minqian Liu and Lifu Huang.
@@ -358,13 +355,6 @@ Gengwei Zhang, Liyuan Wang, Guoliang Kang, Ling Chen, and Yunchao Wei.
   on a pre-trained model.
 \newblock In \emph{ICCV}, 2023{\natexlab{b}}.
 
-\bibitem[Zhang et~al.(2025)]{zhang2025clcrossvqa}
-Yao Zhang et~al.
-\newblock {CL-CrossVQA}: A continual learning benchmark for cross-domain visual
-  question answering.
-\newblock In \emph{Proceedings of the IEEE/CVF Winter Conference on
-  Applications of Computer Vision (WACV)}, 2025.
-
 \bibitem[Zhao et~al.(2022)Zhao, Xu, Yang, and Gao]{zhao2022crl}
 Kang Zhao, Hua Xu, Jiangong Yang, and Kai Gao.
 \newblock Consistent representation learning for continual relation extraction.
@@ -384,6 +374,13 @@ Junhao Zheng et~al.
   named entity recognition.
 \newblock In \emph{Proceedings of the AAAI Conference on Artificial
   Intelligence}, 2023.
+
+\bibitem[Zhou et~al.(2024)Zhou, Sun, Ye, and Zhan]{zhou2024ease}
+Da-Wei Zhou, Hai-Long Sun, Han-Jia Ye, and De-Chuan Zhan.
+\newblock Expandable subspace ensemble for pre-trained model-based
+  class-incremental learning.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, pages 23554--23564, 2024.
 
 \bibitem[Zhu et~al.(2021)Zhu, Zhang, Wang, Yin, and Liu]{zhu2021pass}
 Fei Zhu, Xu-Yao Zhang, Chuang Wang, Fei Yin, and Cheng-Lin Liu.

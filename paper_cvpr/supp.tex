@@ -58,7 +58,7 @@
 
 \section{Additional results}
 \label{app:extra}
-\paragraph{Prompt-, LoRA- and flatness-based baselines.} \cref{tab:prompt_lora} reports the frozen-backbone prompt family (L2P, DualPrompt, CODA-Prompt), the orthogonal/continual LoRA family and ER with C-Flat++ sharpness-aware optimisation on DIL, three seeds, LayoutLMv3 and BERT. The prompt family forgets little but never acquires the task (AA $\approx30$--$35$, below the naive floor of $41.3$): a frozen document encoder with a drifting shared head cannot be routed back into place. LoRA adapters acquire but forget as much as naive training does, because the adapter does not protect the head. Only the replay-based variant reaches the replay ceiling, and its sharpness term adds nothing over plain ER ($88.4$ vs.\ $87.9$ on LayoutLMv3), consistent with Sec.~5 of the main paper: the remedy ordering is set by whether the head is re-grounded, not by the optimiser.
+\paragraph{Prompt-, LoRA- and flatness-based baselines.} \cref{tab:prompt_lora} reports the frozen-backbone prompt family (L2P, DualPrompt, CODA-Prompt), the orthogonal/continual LoRA family and ER with C-Flat++ sharpness-aware optimisation on DIL, three seeds, LayoutLMv3 and BERT. The prompt family forgets little but never acquires the task (AA $\approx30$--$35$, below the naive floor of $41.3$): a frozen document encoder with a drifting shared head cannot be routed back into place. LoRA adapters acquire but forget as much as naive training does, because the adapter does not protect the head. Only the replay-based variant reaches the replay ceiling, and its sharpness term adds nothing over plain ER ($88.4$ vs.\ $87.9$ on LayoutLMv3), consistent with Sec.~4.1 of the main paper: the remedy ordering is set by whether the head is re-grounded, not by the optimiser.
 
 \begin{table}[t]
 \centering\small
@@ -80,7 +80,7 @@ ER + C-Flat++ & $88.4\pm0.1$ & $-1.8\pm0.6$ & $78.3\pm0.4$ & $-2.2\pm0.1$ \\
 \end{tabular}
 \end{table}
 
-\paragraph{Image CIL: forgetting and the dominated rows.} \cref{tab:image_supp} extends Table~4 of the main paper with BWT and with every image run outside the frozen reference set that we keep as evidence, all under the same recipe (ViT-B/16, ten sessions, batch 16, early stopping, seeds 42/7/123; cells not yet on disk are marked pending, never imputed). Two readings matter. Replay at $200$ exemplars is far below the $2{,}000$-exemplar rows ($42.3/21.6$ vs.\ $76.2/54.8$ for ER), so the buffer size in Table~4 is the one at which replay is competitive, not a favourable choice for our rows. SLCA's whole margin comes from its classifier alignment: without it the same recipe falls to $38.0/25.8$, below $200$-exemplar replay on CIFAR-100, which is the image-side instance of the head-locus finding. Per-class Gaussian latent replay, the image port of the document-side Gaussian store, sits at the naive floor ($10.7$).
+\paragraph{Image CIL: forgetting and the dominated rows.} \cref{tab:image_supp} extends the image-side comparison referenced in Sec.~5.1 of the main paper with BWT and with every image run outside the frozen reference set that we keep as evidence, all under the same recipe (ViT-B/16, ten sessions, batch 16, early stopping, seeds 42/7/123; cells not yet on disk are marked pending, never imputed). Two readings matter. Replay at $200$ exemplars is far below the $2{,}000$-exemplar rows ($42.3/21.6$ vs.\ $76.2/54.8$ for ER), so the buffer size in Table~4 is the one at which replay is competitive, not a favourable choice for our rows. SLCA's whole margin comes from its classifier alignment: without it the same recipe falls to $38.0/25.8$, below $200$-exemplar replay on CIFAR-100, which is the image-side instance of the head-locus finding. Per-class Gaussian latent replay, the image port of the document-side Gaussian store, sits at the naive floor ($10.7$).
 
 \begin{table}[t]
 \centering\small
@@ -164,9 +164,80 @@ Label refresh (latent memory) & CoLaR-R pseudo (CIL-CORD / Mixed, 3 seeds each)$
 \caption{\textbf{What the memory must hold} (DIL, LayoutLMv3, layer $k{=}8$). Whole documents retain; summaries of the same store fall to the naive level (41.3), and the identical features on decoupled layout carriers lose 27 points against matched whole documents.}
 \label{fig:ladder}\end{figure}
 
-\paragraph{Routing which stored document to replay (null).} The OCR vocabulary of a document is set by the input and does not drift with training, which suggests a drift-free sampler (main-paper Fig.~1): a softmax over term-frequency signature scores $s_j=\sigma(x)^{\top}\sigma_j$ in three directions (\emph{near}, \emph{far}, \emph{task}), uniform as the zero-point. The seed-42 reading was promising (far $+1.8$ over uniform $86.4$ at $d{=}50$), so we pre-registered that single arm for confirmation. Across three seeds the gap collapses to $+1.8/+0.4/-0.6$, mean $+0.5$ pp with a sign flip, inside the uniform-sampling spread: lexical routing is a null, and the memory-only headline does not depend on it.
+\paragraph{Routing which stored document to replay (null).} The OCR vocabulary of a document is set by the input and does not drift with training, which suggests a drift-free sampler: a softmax over term-frequency signature scores $s_j=\sigma(x)^{\top}\sigma_j$ in three directions (\emph{near}, \emph{far}, \emph{task}), uniform as the zero-point. The seed-42 reading was promising (far $+1.8$ over uniform $86.4$ at $d{=}50$), so we pre-registered that single arm for confirmation. Across three seeds the gap collapses to $+1.8/+0.4/-0.6$, mean $+0.5$ pp with a sign flip, inside the uniform-sampling spread: lexical routing is a null, and the memory-only headline does not depend on it.
 
 \paragraph{A bounded positive on the storage side.} Replaying pseudo-labelled \emph{public} documents through the same mechanism (zero private bytes) recovers dense-label tasks (FUNSD $76.1$) but not one the proxy pool does not cover (SROIE $\sim7$), topping out at $58.9$: coverage-limited transfer. Budget-adaptive allocation across tasks moves along a Pareto frontier, not beyond it (supplementary Sec.~B).
+
+
+\section{Drift analysis details and legacy-scored tables}
+\label{sec:supp-drift}
+\paragraph{Displacement by depth, with and without the head.} For a checkpoint pair $(\theta^{(t-1)},\theta^{(t)})$ and a parameter group $g$ we compute the old-task-Fisher-weighted displacement $D_g=\sum_{\phi\in g}F^{(t-1)}_\phi(\theta^{(t)}_\phi-\theta^{(t-1)}_\phi)^2$. \cref{tab:depthprofile} reports it at the first task boundary, mean over three seeds. The classifier's $D_g$ is two to four orders of magnitude above the largest encoder bucket on every condition. This ratio is inflated by construction: the empirical Fisher of a token classifier is largest at the head whatever the task ($0.22$ against $0.005$ for the next group on LayoutLMv3), so the weighting itself favours the head. The informative part is the encoder-only share: with the head excluded, weighted displacement sits in the early and middle layers on every document encoder and is smallest in the late layers. Representational drift measured by CKA, in contrast, grows with depth because it accumulates. The two instruments therefore agree on the classifier and disagree on the late encoder layers, and the main text claims only what both support.
+
+\begin{table}[h]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\caption{Fisher-weighted displacement at the first task boundary (three seeds). ``Head ratio'': classifier $D_g$ over the largest encoder bucket. ``Encoder share'': each bucket's fraction of the encoder total with the head excluded. Generated by \texttt{scripts/rca/pilot\_depth\_profile.py}.}
+\label{tab:depthprofile}
+\begin{tabular}{lrcccc}
+\toprule
+ & & \multicolumn{4}{c}{Encoder share} \\
+Condition & Head ratio & input & early & mid & late \\
+\midrule
+LayoutLMv3, full & $273\times$ & $0.03$ & $0.70$ & $0.24$ & $0.03$ \\
+LayoutLMv3, text+layout & $361\times$ & $0.05$ & $0.65$ & $0.27$ & $0.02$ \\
+LayoutLMv3, text only & $9505\times$ & $0.03$ & $0.33$ & $0.50$ & $0.13$ \\
+LayoutLMv3, no text & $247\times$ & $0.06$ & $0.80$ & $0.13$ & $0.01$ \\
+LiLT & $111\times$ & $0.05$ & $0.88$ & $0.06$ & $0.00$ \\
+BROS & $738\times$ & $0.21$ & $0.37$ & $0.37$ & $0.05$ \\
+BERT & $1608\times$ & $0.18$ & $0.32$ & $0.36$ & $0.14$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{What the significance tests do and do not show.} Two tests accompanied an earlier version of this analysis and we report them with their limits. (i) A Mann--Whitney test of the classifier against each other parameter group (six samples per group, Bonferroni $\alpha'=0.0042$) rejects equality against three of twelve groups ($p=0.0022$) and not against the rest; it was run on per-group Fisher \emph{importance}, which is head-dominant by construction, and we do not use it as evidence of where forgetting occurs. (ii) A permutation test on the normalised $D_g$ depth profile does not reject a shared profile between LayoutLMv3 and LiLT or BROS ($p=0.38$, $0.51$); since every normalised profile is nearly one-hot at the head, this test cannot reject and is not evidence of architecture-generality. The claim that drift is shared across backbones rests on the descriptive agreement of the CKA profiles and of \cref{tab:depthprofile}, and on the remedy ordering of \cref{tab:grid}.
+
+\paragraph{Consolidation probe.} A depth-targeted consolidation method (output distillation with a per-bucket penalty) scores $42.6$ AA on DIL when the penalty is spread uniformly over all depth buckets, $84.7$ when concentrated on the head and late layers, $86.1$ head-only and $86.2$ late-only (three seeds). All four arms include a $200$-document head-replay buffer, and plain ER with the same buffer scores $87.9$. The probe therefore shows that a uniform penalty prevents the new tasks from being learned; it does not show that a targeted penalty recovers old tasks without replay, and we do not cite it for that.
+
+\paragraph{Legacy-scored tables.} \cref{tab:grid,tab:legacy} are the tables of the earlier grid. Their CIL-CORD and Mixed columns use legacy scoring, under which joint training reads $33$ on CIL-CORD; they are kept for the cross-backbone comparison (the EWC sign flip of Sec.~4.1 is read from the Mixed rows of \cref{tab:grid}) and for completeness. ``Independent'' is the mean of one model trained per task from the pre-trained checkpoint.
+
+\begin{table*}[t]
+\centering\small
+\caption{Generality grid (legacy scoring on CIL-CORD and Mixed, evaluation-split early stopping): average accuracy (mean $\pm$ s.d., three seeds) of the six classical strategies on four backbones and three scenarios. \emph{Indep.} is the per-dataset upper bound (one model trained independently on each dataset, three-seed macro over FUNSD/SROIE/CORD). \emph{Joint} is the pooled-data oracle (one model, all three datasets). Independent is only meaningful on DIL, where the task stream is three distinct datasets; CIL-CORD is one dataset split by label and Mixed is a composed stream, so Indep.\ is undefined there and marked \textsc{n/a}. Grey cells did not fit the available GPU memory (see text). Replay reaches the joint bound on DIL on every backbone; regularisation and distillation stay near the naive floor; on CIL-CORD every method, replay included, sits near the floor.}
+\label{tab:grid}
+\setlength{\tabcolsep}{4pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llccccccc}
+\toprule
+Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
+\midrule
+\multirow{4}{*}{DIL}
+ & LayoutLMv3 & $41.3{\pm}1.5$ & $88.8{\pm}0.6$ & $88.7{\pm}1.1$ & $41.2{\pm}1.1$ & $43.7{\pm}1.1$ & $87.9{\pm}1.4$ & $88.0{\pm}0.9$ \\
+ & LiLT       & $40.1{\pm}0.5$ & $85.3{\pm}0.8$ & $83.8{\pm}1.2$ & $48.4{\pm}5.9$ & \cellcolor{gray!25}-- & $85.7{\pm}0.5$ & $84.4{\pm}0.3$ \\
+ & BROS       & $40.3{\pm}1.8$ & $88.8{\pm}0.1$ & $87.5{\pm}1.3$ & $45.0{\pm}4.9$ & $35.2{\pm}3.1$ & $87.8{\pm}0.4$ & $87.6{\pm}1.1$ \\
+ & BERT       & $39.4{\pm}0.3$ & $77.3{\pm}0.5$ & $77.2{\pm}0.4$ & $46.6{\pm}3.0$ & $40.5{\pm}0.1$ & $77.1{\pm}1.0$ & $77.4{\pm}0.6$ \\
+\midrule
+\multirow{4}{*}{CIL-CORD}
+ & LayoutLMv3 & $19.0{\pm}0.2$ & \textsc{n/a} & $33.3{\pm}0.3$ & $0.5{\pm}0.6$ & $18.8{\pm}0.2$ & $16.0{\pm}1.4$ & $18.2{\pm}0.3$ \\
+ & LiLT       & $19.1{\pm}0.3$ & \textsc{n/a} & $32.4{\pm}0.4$ & \cellcolor{gray!25}-- & \cellcolor{gray!25}-- & $17.9{\pm}0.5$ & $18.0{\pm}1.0$ \\
+ & BROS       & $19.2{\pm}0.1$ & \textsc{n/a} & $32.9{\pm}0.0$ & $17.3{\pm}0.8$ & $23.1{\pm}1.2$ & $18.3{\pm}1.5$ & $17.7{\pm}1.1$ \\
+ & BERT       & $19.3{\pm}0.1$ & \textsc{n/a} & $32.4{\pm}0.2$ & $17.9{\pm}0.3$ & $24.3{\pm}0.3$ & $17.1{\pm}1.6$ & $19.2{\pm}1.9$ \\
+\midrule
+\multirow{4}{*}{Mixed}
+ & LayoutLMv3 & $33.9{\pm}0.3$ & \textsc{n/a} & $67.5{\pm}0.8$ & $22.0{\pm}9.4$ & $35.2{\pm}1.2$ & $60.3{\pm}5.3$ & $60.8{\pm}2.7$ \\
+ & LiLT       & $30.7{\pm}0.7$ & \textsc{n/a} & $61.8{\pm}0.6$ & $28.1{\pm}3.0$ & \cellcolor{gray!25}-- & $57.0{\pm}1.4$ & $55.1{\pm}2.9$ \\
+ & BROS       & $33.9{\pm}0.4$ & \textsc{n/a} & $65.3{\pm}2.1$ & $37.4{\pm}3.3$ & $34.4{\pm}0.5$ & $61.1{\pm}1.4$ & $63.0{\pm}0.4$ \\
+ & BERT       & $23.4{\pm}0.3$ & \textsc{n/a} & $55.0{\pm}0.6$ & $28.6{\pm}0.9$ & $29.4{\pm}4.2$ & $50.2{\pm}0.6$ & $50.7{\pm}1.3$ \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\begin{table}[t]
+\centering
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{Fixed comparison set on LayoutLMv3 under legacy scoring} (AA, mean $\pm$ s.d. over seeds 42/7/123): the two bounds and the ten published baselines (document-side paired slots CPFD and IS3), then our rows; the image-side table is in the supplement. CoLaR, CoLaR-R and the baselines use 10 training epochs per task with early stopping; LexSlot is the 200-exemplar slot-memory recipe. $^{*}$did not converge on these sessions, which naive ($19.0$) and joint ($33.3$) do learn (supplement, ``Null cells among the fixed baselines''). ``--'': not applicable; IS3 on DIL is a single seed (fixed-label port limitation, supplement).}
+\label{tab:legacy}
+\resizebox{\linewidth}{!}{\input{tab_main_core}}
+\end{table}
 
 
 \end{document}
