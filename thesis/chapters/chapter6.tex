@@ -1579,7 +1579,7 @@ consistent with the two mechanisms partitioning the same readout.
 \paragraph{SBR-Recall.} Storing a rank-$64$ LoRA delta of the upper trunk per session and reading
 each block under its own delta (\S\ref{sec:method-sbr}) reaches $92.8\pm0.5$ AA on CIL-CORD
 (seeds 42/7/123: $92.7/93.4/92.4$, BWT $+0.6/+0.4/-0.1$; final row on seed 42
-$95.4/93.2/92.2/89.3/93.3$), above the oracle on every seed, with every column of the retention
+$95.4/93.2/92.2/89.3/93.3$), at the oracle ($91.9\pm1.3$; above it on one seed, within $0.2$ on the other two), with every column of the retention
 matrix flat to within a point, and without a latent bank ($54$\,MB of half-precision deltas in total,
 $7.1$\,M trainable parameters). The same design at rank $8$ on the attention projections alone
 scores $80.5$: retention is exact but the second and third sessions plateau near $65$ F1, so the
@@ -1599,8 +1599,8 @@ delta, carries retention, and the shared-trunk SBR row stands as the mixed-strea
   session-restricted scoring on LayoutLMv3 (mean\,$\pm$\,std; superscript = number of seeds
   when fewer than three; naive, LwF, ER and joint on CIL-CORD and the SBR rows are three
   seeds, the remaining baseline rows are seeds 42/7 with the third in progress). Same runs as Table~\ref{tab:main-comparison}, re-scored with
-  each session's predictions restricted to its label set. Baseline rows use bf16 autocast,
-  SBR rows fp32. $^{a}$one LwF seed per scenario collapsed to all-``O'' and is being re-run. $^{b}$with the
+  each session's predictions restricted to its label set. Baseline rows and SBR's Mixed cell use fp16 mixed precision;
+  the other SBR rows are fp32. $^{a}$one LwF seed per scenario collapsed to all-``O'' and is being re-run. $^{b}$with the
   50-document bank; without it $44.7$, see text.}
   \label{tab:sbr-restricted}
   \begin{tabular}{lcc}
