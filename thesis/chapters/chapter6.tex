@@ -619,7 +619,7 @@ where it ties plain CoLaR on one seed and so falls short of its bar. Teacher-fre
 pseudo-labelling of the stale ``O'' tokens is a registered null ($20.0\pm3.4$ on CIL-CORD,
 sign flipping across seeds). These class-incremental numbers are under the legacy scoring in
 which each session's gold hides the other sessions' entities; \S\ref{sec:results-sbr} re-scores
-the same runs per session, where the oracle reads $91.7$ and the session-blocked readout
+the same runs per session, where the oracle reads $91.9$ and the session-blocked readout
 CoLaR-SBR reaches it.
 
 Sixth, the parameter-efficient prompt baselines, which \emph{freeze} the backbone and train
@@ -1545,7 +1545,7 @@ therefore charged a false positive per span. The joint oracle, trained on every 
 $70/32/25/26/14$ across the five sessions (AA $33.4$, seed 42), and the naive learner's
 diagonal of $\approx94$ reads well only because it has forgotten everything else. Restricting
 each session's predictions to its own label set when computing $R[t,j]$ (the scoring the
-literature's per-task matrices assume; a no-op on DIL) lifts the oracle to $91.7\pm1.7$ and
+literature's per-task matrices assume; a no-op on DIL) lifts the oracle to $91.9\pm1.3$ and
 leaves naive at $19.0$ (Table~\ref{tab:sbr-restricted}). The rest of the floor is real: under
 this scoring replay rises only to $20$--$25$, CoLaR to $30.4$, the sliced loss to $42.0$ and
 the true-label refresh to $61.2$ (seed 42). Even with perfect stored labels the memory recovers
@@ -1557,7 +1557,7 @@ on the same surface forms.
 tag-introducing session its own readout block and background logit, trained only where the
 document's annotation is complete, and routes per token by $1-p_b(\mathrm{O}_b)$. On CIL-CORD it
 reaches $88.0\pm1.9$ (seeds 42/7/123: $87.6/86.3/90.1$; final row on seed 42
-$91.9/89.1/90.4/89.6/96.0$) against the oracle's $91.7$ and the best baseline's $24.5$ (ER). On
+$91.9/89.1/90.4/89.6/96.0$) against the oracle's $91.9$ and the best baseline's $24.3$ (ER). On
 the mixed stream it reaches $89.7$ (seed 42) against the oracle's $87.7\pm1.1$ and ER's $74.5$,
 its weakest cell being SROIE ($77.2$). On DIL, where it collapses to CoLaR with one block, it
 reads $86.2\pm1.3$. Two ablations locate the effect: the same blocks without the latent bank
@@ -1597,19 +1597,19 @@ delta, carries retention, and the shared-trunk SBR row stands as the mixed-strea
   \centering
   \caption[Session-restricted scoring: CIL-CORD and Mixed]{Average entity-F1 under
   session-restricted scoring on LayoutLMv3 (mean\,$\pm$\,std; superscript = number of seeds
-  when fewer than three; baseline rows are seeds 42/7 with the third in progress, CoLaR-SBR
-  on CIL-CORD is seeds 42/7/123). Same runs as Table~\ref{tab:main-comparison}, re-scored with
+  when fewer than three; naive, LwF, ER and joint on CIL-CORD and the SBR rows are three
+  seeds, the remaining baseline rows are seeds 42/7 with the third in progress). Same runs as Table~\ref{tab:main-comparison}, re-scored with
   each session's predictions restricted to its label set. Baseline rows use bf16 autocast,
-  SBR rows fp32. $^{a}$one LwF seed collapsed to all-``O'' and is being re-run. $^{b}$with the
+  SBR rows fp32. $^{a}$one LwF seed per scenario collapsed to all-``O'' and is being re-run. $^{b}$with the
   50-document bank; without it $44.7$, see text.}
   \label{tab:sbr-restricted}
   \begin{tabular}{lcc}
   \toprule
   \textbf{Method} & \textbf{CIL-CORD} & \textbf{Mixed} \\
   \midrule
-  Naive (lower bound) & $19.0{\pm}0.1$ & $44.0{\pm}0.5$ \\
-  LwF & $18.5{\pm}0.0$ & $23.9{\pm}33.8^{\,a}$ \\
-  ER & $24.5{\pm}3.4$ & $74.5{\pm}1.6$ \\
+  Naive (lower bound) & $18.9{\pm}0.3$ & $44.0{\pm}0.5$ \\
+  LwF & $12.3{\pm}10.7^{\,a}$ & $23.9{\pm}33.8^{\,a}$ \\
+  ER & $24.3{\pm}2.4$ & $74.5{\pm}1.6$ \\
   DER++ & $20.0{\pm}1.8$ & $74.5{\pm}0.8$ \\
   CODA-Prompt & $14.9{\pm}1.4$ & $11.3{\pm}1.1$ \\
   CL-LoRA & $18.6{\pm}0.1$ & $44.8{\pm}1.3$ \\
@@ -1619,12 +1619,12 @@ delta, carries retention, and the shared-trunk SBR row stands as the mixed-strea
   \midrule
   CoLaR & $30.4{\pm}2.2$ & $75.6^{\,1}$ \\
   CoLaR-R, sliced & $42.0{\pm}3.1$ & $80.2^{\,1}$ \\
-  LexSlot & $19.0{\pm}0.0$ & $50.8^{\,1}$ \\
-  \textbf{CoLaR-SBR} & $88.0{\pm}1.9$ & $\mathbf{89.7}^{\,1}$ \\
+  LexSlot & $19.0{\pm}0.0$ & $46.9{\pm}5.6$ \\
+  \textbf{CoLaR-SBR} & $88.0{\pm}1.9$ & $\mathbf{89.7{\pm}0.1}^{\,2}$ \\
   \quad + LexSlot head slots & $89.7{\pm}0.5$ & $89.6{\pm}1.0$ \\
   \textbf{SBR-Recall} & $\mathbf{92.8{\pm}0.5}$ & $85.9^{\,1,b}$ \\
   \midrule
-  Joint (upper bound) & $91.7{\pm}1.7$ & $87.7{\pm}1.1$ \\
+  Joint (upper bound) & $91.9{\pm}1.3$ & $87.7{\pm}1.1$ \\
   \bottomrule
   \end{tabular}
 \end{table}
