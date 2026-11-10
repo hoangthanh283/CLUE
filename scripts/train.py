@@ -388,6 +388,34 @@ def cil_allowed(cfg, scenario, model, task) -> set[int] | None:
     return allowed
 
 
+def add_full_label_f1(out_dir: Path, cfg, scenario, method) -> float | None:
+    """AGENT IMPL (2026-11-11): score the FINAL model on the unmasked, full-label test set
+    (``scenario.full_eval_dataset``) with no session restriction and append ``full_label_f1``
+    to metrics.json. Opt-in via ``training.full_label_eval``; never fails a run."""
+    full_ds = getattr(scenario, "full_eval_dataset", None)
+    if not cfg.training.get("full_label_eval", False) or full_ds is None:
+        return None
+    try:
+        loader = DataLoader(
+            full_ds,
+            batch_size=cfg.training.batch_size,
+            shuffle=False,
+            num_workers=cfg.training.num_workers,
+            pin_memory=True,
+        )
+        tid = len(scenario.tasks) - 1
+        f1 = float(method.evaluate({tid: loader})[tid].f1)
+        path = out_dir / "metrics.json"
+        metrics = json.loads(path.read_text())
+        metrics["full_label_f1"] = f1
+        path.write_text(json.dumps(metrics, indent=2))
+        log.info("Full-label final F1 (unmasked test set): %.2f", f1)
+        return f1
+    except Exception as e:  # a diagnostic must never cost a finished run
+        log.warning("full-label eval skipped: %s", e)
+        return None
+
+
 def split_val(dataset, cfg, seed: int):
     """AGENT FIX (2026-11-01): carve a held-out val split off the TRAIN set for early
     stopping. ``training.val_frac`` (default 0 = legacy behaviour: the test loader is the
@@ -947,6 +975,7 @@ def main(cfg: DictConfig) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         np.save(out_dir / "matrix.npy", tracker.matrix)
         save_run_metrics(out_dir, cfg, tracker, method, [joint_time], scenario_key)
+        add_full_label_f1(out_dir, cfg, scenario, method)
 
         wandb.finish()
         return
@@ -1086,6 +1115,7 @@ def main(cfg: DictConfig) -> None:
     if getattr(method, "eval_dump", None):  # colar_sbr: final-model block scores per task
         torch.save(method.eval_dump, out_dir / "eval_dump.pt")
     save_run_metrics(out_dir, cfg, tracker, method, task_times, scenario_key)
+    add_full_label_f1(out_dir, cfg, scenario, method)
 
     # Per-class F1 on the final model — DIL-degeneracy evidence (review M5).
     # Standard-forward methods only (prompt/LoRA methods have a custom forward).

@@ -1,0 +1,5 @@
+name: cil_cord_o2
+# Session-order check for SBR-Recall (base frozen after session 0): reversed curriculum.
+kwargs:
+  num_sessions: 5
+  order: [4, 3, 2, 1, 0]
