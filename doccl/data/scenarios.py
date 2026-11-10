@@ -77,6 +77,10 @@ class CLScenario:
     # the Joint path falls back to ``train_datasets`` (correct for scenarios whose tasks are
     # disjoint documents, e.g. DIL).
     joint_train_datasets: list[Dataset] | None = None
+    # Unmasked test set in the FINAL head-index space: every test document once with ALL its
+    # labels. Scored on the final model with no session restriction (training.full_label_eval),
+    # this is the number comparable with the non-continual literature. None = not available.
+    full_eval_dataset: Dataset | None = None
 
 
 def build_cil_funsd() -> CLScenario:
@@ -209,6 +213,8 @@ def build_cil_cord(num_sessions: int = 5, order: list[int] | None = None) -> CLS
     full_head = snapshots[-1]
     full_train = CORDDataset(split="train", granularity="fine")
     joint_train = [CIL_LabelRemapper(full_train, full_train.id_to_label, full_head)]
+    full_test = CORDDataset(split="test", granularity="fine")
+    full_eval = CIL_LabelRemapper(full_test, full_test.id_to_label, full_head)
 
     # Super-class metadata only applies to the canonical, in-order 5-session layout.
     super_meta = (
@@ -234,6 +240,7 @@ def build_cil_cord(num_sessions: int = 5, order: list[int] | None = None) -> CLS
         train_dss,
         eval_dss,
         joint_train_datasets=joint_train,
+        full_eval_dataset=full_eval,
     )
 
 
@@ -705,6 +712,9 @@ SCENARIO_REGISTRY = {
     "single_wildreceipt": lambda: build_single("wildreceipt"),
     "cil_funsd": build_cil_funsd,
     "cil_cord": build_cil_cord,
+    # Session-order permutations of the canonical 5-session stream (order from kwargs).
+    "cil_cord_o2": build_cil_cord,
+    "cil_cord_o3": build_cil_cord,
     "cil_wildreceipt": build_cil_wildreceipt,
     # Long-horizon variants (Study 2): distinct registry names so run dirs/W&B names
     # don't collide with the base scenarios. kwargs (num_sessions/order) overridable.

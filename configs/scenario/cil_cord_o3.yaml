@@ -1,0 +1,5 @@
+name: cil_cord_o3
+# Session-order check for SBR-Recall: shuffled curriculum.
+kwargs:
+  num_sessions: 5
+  order: [2, 0, 4, 1, 3]
