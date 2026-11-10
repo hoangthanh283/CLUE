@@ -111,4 +111,62 @@ ER + C-Flat++ & $88.4\pm0.1$ & $-1.8\pm0.6$ & $78.3\pm0.4$ & $-2.2\pm0.1$ \\
 %% results/{cil_cord,mixed}_{cpfd,is3,coda_prompt}_seed*/metrics.json. DIL cells for CPFD/IS3 are added in Phase 3.
 \paragraph{Null cells among the fixed baselines (CPFD, IS3, CODA-Prompt).} Three of the twelve reference rows do not converge on the document scenarios, and we report those cells as nulls rather than as scores. CPFD and IS3 were ported onto the single growing token-classification head used by every other method here (the reference implementations keep per-task classifiers). On CIL-CORD, CPFD learns the first session ($90$--$95$ F1) and then reads $0.00$ on every session from the first class-adding boundary (AA $2.7$ and $0.0$ on seeds 42 and 123); on Mixed it reads $6.0$, $0.0$ and $0.1$; and on DIL, where no class is ever added, the first domain falls to $8.0/4.0/0.9$ F1 at the first boundary and the final row is zero on every domain for seeds 42 and 7 (AA $0.0/4.2/14.2$, reported as $6.2\pm7.2$ since one seed does learn the last domain), so the collapse is not a property of head growth. Two single-knob ablations on seed 42 reproduce the collapse exactly: flooring the per-sample CE weight at $0.5$ (session-1 F1 $0.00$) and switching the distillation term off entirely (session-1 F1 $2.1$), so neither the adaptive CE factor nor the attention/logit distillation is the cause; what remains is the pseudo-labelling and O-token masking path, which removes the training signal on the new session's entities. IS3 learns each new session (diagonal $93/29/32/66/10$ on seed 123) but never predicts a previously learned class again (every off-diagonal entry is exactly $0.00$), giving AA $4.4\pm1.7$ on CIL-CORD; on Mixed, whose last session adds no classes, it recovers to $30.1\pm1.0$ and that cell is reported. On DIL the nine-tag head never grows, so IS3's old/new split is degenerate (every entity row is ``old'' at every boundary and the O-token distillation spans the whole output) and the method reduces to sequential fine-tuning under a full-output distillation term; seed 42 learns the first domain ($88.2$) and drops both earlier domains below $8$ F1 at the next boundary (AA $38.3$ vs.\ naive $41.3$). We report that single seed rather than spend further compute on a structural limitation of the port. CODA-Prompt reads AA $0.0$ on all three CIL-CORD seeds with its default pool of $10$ components; enlarging the pool to $50$ ($10$ per session) lets some sessions be learned (diagonal $79.5/40.6/0.0/18.9/36.8$) but the final row is $[0,0,0,0,36.8]$, AA $7.4$, with one session never learned, so the cell stays a null. These are properties of the methods' O-tag and static-pool assumptions under five class-adding sessions, not of the sessions themselves: the same sessions are learned by naive training (AA $19.0$) and by the joint upper bound ($33.3$).
 
+\section{Figures and tables moved from the main paper}
+\input{fig/colar}
+\label{sec:supp-moved}
+The displacement profile, the remedy-benefit chart, the image-side comparison table, the falsification ledger, the buffer-content ladder and the two registered side results referenced from the main text.
+
+\begin{figure*}[t]\centering
+\includegraphics[width=0.92\linewidth]{figures/pilot_displacement_bars.pdf}
+\caption{Where forgetting lives. Old-task-Fisher-weighted displacement $D_g$ by depth bucket (log scale, first boundary), for the four LayoutLMv3 modality-mask conditions, text-only BERT, LiLT and BROS; mean over three seeds, $\pm$1 s.d. The classifier head's weighted displacement is one to four orders of magnitude above any encoder layer's on every backbone.}
+\label{fig:displacement}\end{figure*}
+
+\begin{figure*}[t]\centering
+\includegraphics[width=0.95\linewidth]{figures/remedy_benefit.pdf}
+\caption{Remedy benefit is backbone-dependent; the phenomenon is not. Change in AA over naive for each classical remedy, per backbone and scenario (mean of three seeds). Replay's benefit is large and consistent; EWC and LwF change sign across backbones (missing bars: cells not run).}
+\label{fig:signflip}\end{figure*}
+
+\begin{table}[t]
+\centering
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{Fixed comparison set on image CIL} (ViT-B/16, ten sessions, AA, mean $\pm$ s.d., seeds 42/7/123): same bounds and baselines as the fixed comparison table of the main paper, with image-side paired slots SLCA and RanPAC. ER/DER++/SLCA keep $2{,}000$ exemplars; the latent bank and CoLaR keep $500$/class. Ridge is a diagnostic readout refit, not a method.}
+\label{tab:image}
+\resizebox{\linewidth}{!}{\input{tab_image_core}}
+\end{table}
+
+\begin{table*}[t]
+\centering\small
+\caption{Falsification ledger, DIL/LayoutLMv3 (naive floor $41.3$, replay $\approx88$). Each family is the strongest instance we could build of its mechanism; the failure reason is from a per-boundary root-cause analysis, not inferred from the score. $^\dagger$run at a frozen-backbone, short-schedule (3--5 epoch) operating point whose own naive floor is given in the cell. $^\ddagger$CIL-CORD and Mixed, LayoutLMv3, three seeds each; oracle = true-label refresh ceiling.}
+\label{tab:ledger}
+\setlength{\tabcolsep}{4pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llcl}
+\toprule
+Family & Instance & Best AA & Why it fails \\
+\midrule
+Weight merging & TIES/Fisher head merge$^\dagger$ & $21.6$ (no-merge $21.9$) & merge of head vectors cancels; near no-op \\
+Merge + realignment & LCA (ported) & $43.9{\pm}2.5$ & backbone merge halves BWT; Gaussian realignment kills acquisition \\
+Subspace transfer & HGT / CUBER (ported)$^\dagger$ & $39.8$ (own naive $38.7$); HGT $\le25.3$ & protected subspace grows; head unconstrained; $\alpha$ is a pure stability--plasticity dial \\
+%% PROVENANCE (2026-10-16 21:18): results/hgt_ablation/<variant>/dil_*_seed42/metrics.json, DIL/LayoutLMv3 seed 42, 5-epoch frozen-backbone
+%%   operating point (2026-06-26): naive 38.65/-75.2, ER 86.21/-3.3 (buffer reference), CUBER 39.80/-73.04, HGT alpha=0/0.5/1 = 24.80/25.29/24.90
+%%   (BWT -7.9/-21.1/-23.2). Cell verified against disk; the former \vnum{--} placeholder and the app:extra \todo are both gone (no \todo call remains).
+Parametric slots & LexSlot (no buffer) & $42.2$ & isolated head slots cannot re-ground shared head \\
+Input-anchored memory & Ledger$^\dagger$ & FUNSD $21$ / SROIE $23$ & own-vs-cumulative gap is training-free \\
+Feature-Gaussian replay & LexMem v3b (positive control) & $66.0$ & partial: recovers dense-label tasks only \\
+ & LexMem v5 (+relational) & $63.2$; mid-task $13.0$ & marginal summary breaks doc consistency \\
+Label refresh (latent memory) & CoLaR-R pseudo (CIL-CORD / Mixed, 3 seeds each)$^\ddagger$ & $20.0$ / $59.5$ (plain $20.4$ / $58.8$; oracle $26.3$ / $64.4$) & teacher confident on $\approx0$ stale-O tokens; pseudo refresh is a no-op on both scenarios (oracle refresh $+5.9$ / $+5.6$ shows the slot is reachable only with true labels) \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{figures/falsification_ladder.pdf}
+\caption{\textbf{What the memory must hold} (DIL, LayoutLMv3, layer $k{=}8$). Whole documents retain; summaries of the same store fall to the naive level (41.3), and the identical features on decoupled layout carriers lose 27 points against matched whole documents.}
+\label{fig:ladder}\end{figure}
+
+\paragraph{Routing which stored document to replay (null).} The OCR vocabulary of a document is set by the input and does not drift with training, which suggests a drift-free sampler (main-paper Fig.~1): a softmax over term-frequency signature scores $s_j=\sigma(x)^{\top}\sigma_j$ in three directions (\emph{near}, \emph{far}, \emph{task}), uniform as the zero-point. The seed-42 reading was promising (far $+1.8$ over uniform $86.4$ at $d{=}50$), so we pre-registered that single arm for confirmation. Across three seeds the gap collapses to $+1.8/+0.4/-0.6$, mean $+0.5$ pp with a sign flip, inside the uniform-sampling spread: lexical routing is a null, and the memory-only headline does not depend on it.
+
+\paragraph{A bounded positive on the storage side.} Replaying pseudo-labelled \emph{public} documents through the same mechanism (zero private bytes) recovers dense-label tasks (FUNSD $76.1$) but not one the proxy pool does not cover (SROIE $\sim7$), topping out at $58.9$: coverage-limited transfer. Budget-adaptive allocation across tasks moves along a Pareto frontier, not beyond it (supplementary Sec.~B).
+
+
 \end{document}
