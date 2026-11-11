@@ -1,0 +1,13 @@
+name: colar_mib
+# CoLaR-MiB (2026-11-11, D14b): CoLaR memory + shared softmax + MiB-style unbiased CE in both
+# directions (current O = O or earlier-session class; replayed O = O or class introduced after
+# storage). No MiB distillation, no MiB classifier init. See doccl/methods/colar_mib.py.
+# CoLaR defaults; the clean recipe is k=4 / d=50 / r=128 via CLI override.
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64
