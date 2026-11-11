@@ -1369,3 +1369,160 @@ session (own-session tags only; logs print 12 tags per CIL-CORD session).
   second echo (R4-M3), and the abstract's "when label growth itself supplies the routing key" has
   R4-M2's scope gap.
 - CR2: † headline cells, pending data.
+
+## R5 (2026-11-11): confirmation of P7 and the first clean cell
+
+Snapshot: `HEAD = 4c43de9` (commits 17f3720, b8617f1, 4c43de9 on top of c53cf54). `main.pdf` and
+`supp.pdf` were built at 09:55, after `main.tex` (09:55) and `supp.tex` (09:42). The generated
+files are from 09:55, after the clean s123 `metrics.json` (09:53). Tracked paper files are clean
+against HEAD.
+
+Scope: `git diff c53cf54..4c43de9 -- paper_cvpr/ scripts/rca/` and the rebuilt PDFs. My own
+scripts recomputed every changed number from `metrics.json`, `matrix.npy` and the logs. No model,
+dataset, torch or pytest was touched.
+
+### Verdict: **PASS for draft upload**
+
+Every R4 MEDIUM item is fixed, and so is every LOW item the Paper agent claimed. The switch to the
+clean protocol moved exactly the cells it should and nothing else. Every sentence comparing
+CoLaR-SBR with another cell is true of the current values. There is no CRITICAL, HIGH or MEDIUM
+finding. Five LOW items remain; one is a stale sentence in App. G caused by the switch (R5-L1).
+
+### Status of the R4 items
+
+| Item | Status | Current text / evidence |
+|---|---|---|
+| **M1**, Fig. 4 caption | CONFIRMED FIXED | "With a shared softmax the curves fall steeply and irregularly, some sessions partly recovering later, and later sessions are learned poorly even on their own diagonal; with the blocked readout most sessions hold and the remaining losses are uneven across sessions; under SBR-Recall every curve is flat to within about a point." Mean matrices: CoLaR column 3 is 37.1 → 66.3; clean SBR losses 3.1/9.0/1.6/3.1; the largest Recall per-seed deviation is 1.34 (s7, session 3). |
+| **M1**, body "Retention per session" | CONFIRMED FIXED | "... most keep nearly all of their F1, but the losses are uneven, with one early session losing the most". Clean mean: session 2 loses 9.0, the others ≤ 3.1. It is a statement about the figure (the mean), not per seed: on s123 session 2 loses 16.0 and session 3 loses 9.6. |
+| **M1**, App. D.1 (`supp_vals.tex`) | CONFIRMED FIXED | "the first two sessions lose \colarDropOne\ [47] and \colarDropTwo\ [28] points ... only to [19] to [37] F1 on their own diagonal ... rises by up to [29] ... loses [2] to [9] points on the mean, session [2] the most ... within [0.5] points of its diagonal". The text says these are computed from the mean matrices shown. Recomputed below. |
+| **M2** | CONFIRMED FIXED | Conclusion: "On a single-schema stream, where label growth supplies the routing key, per-session low-rank deltas (SBR-Recall) can replace the memory; across annotation schemas they still need it." Sec. 5.3: "On a single-schema stream it works without a memory because ...". |
+| **M3** | CONFIRMED FIXED | Conclusion: "in our experiments even a memory with true labels did not repair a readout that supervises one background class with contradictory labels." |
+| **M4** | CONFIRMED FIXED | App. E: "rewrites $0/0/0/84$ tokens on seed 42, none on seed 7 and $7/0/0/36$ on seed 123 ($84$ against the $6{,}076$ that the true-label refresh rewrites on seed 42)". 6,076 = 3120 + 2640 + 0 + 316. |
+| **M5** | CONFIRMED FIXED; accurate now | Sec. 5.2: "the document is annotated under its own schema, so no token carries a tag of $b$, and we treat every token as a negative for $b$ (a training-time convention; related schemas such as SROIE and CORD share entity kinds like totals and dates, so on Mixed it can label a real entity of another schema as background)". App. C: "This is a convention ..., not a fact about the document". It is now correct about SROIE/CORD: it names the shared kinds and says the rule can label them background. Wording nit (optional): "a token that is an entity of $b$'s kind". |
+| **M6** | CONFIRMED FIXED | `SLOT_PAIRS` reads both sides from the gate protocol: `cil_cord_colar_sbr` with exact suffix (cannot reach `_slot`), `mixed_colar_sbr2`, `dil_colar_sbr2`. New macros: `\vSbrGate` 88.0±2.0 (87.62/86.27/90.15), `\vSlotGate` 89.7±0.5, `\vSbrGateMix` 89.7 (s42 89.73), `\vSlotGateMix` 89.6±1.0, `\vSbrGateDil` 86.2±1.3, `\vSlotGateDil` 87.0±0.4. `supp_slot.tex`: one gate† row per scenario, differences unchanged from R4. Main Ablations: "In the fp32 gate runs, the only protocol in which both exist (App. D), ... ($\nSbrGate$ against $\nSlotGate$ on CIL-CORD)". |
+| L-Alg. 1 | CONFIRMED FIXED | "AdamW step on layers $k{+}1..12$ (session 1: all layers), head, all $w_b$". |
+| L1, "cannot drift" | CONFIRMED FIXED | Sec. 5.3: "each old block's $e_b$ is unchanged up to weight decay, and only competition from new blocks can move its tokens (App. C)". The new App. C paragraph gives "under $1\%$ over a run". Check: 10 epochs × (191+275+362+390) steps × 5e-7 = 0.61%. It also gives "about a point in either direction" (r64: −0.8 to +1.3). |
+| L4, almost frozen trunk | CONFIRMED FIXED | App. E takeaway and both later sentences now read "almost frozen trunk (only the last layer and the readout plastic)"; also "on the same trunk". |
+| L8, dagger on `supp_delta` and two captions | CONFIRMED FIXED | Seed column `42$^{\dagger}$` …. `tab:delta`: "fp32 gate runs$^\dagger$, ..., test-split early stopping". `tab:recallmix` and `tab:slot` captions carry †. |
+| L7, legacy-settings rows | CONFIRMED FIXED | Three new rows: "Gate controls, tab:conflict \| CIL-CORD \| 10 \| fp32 \| 50 docs/session \| 1 or 3"; "SBR, layers 1..11 frozen \| 10 \| fp32 \| none \| 1"; "SBR-Recall, rank 8 \| 10 \| fp32 \| 50 docs/session, none \| 1, 1". All agree with `training_hparams` / `method_hparams` (R4 B.2). |
+| GPU-hours line | FIXED, new LOW | Replaced by "Every run fits a single 6 GB GPU; a CoLaR-SBR run on CIL-CORD takes about two hours of training loop" (clean 1.95/2.27/2.00 h). The first clause is new and only partly true (R5-L3). |
+| L15, internal names and paths in `supp.pdf` | CONFIRMED FIXED | pdftotext of `supp.pdf`: 0 hits for `doccl`, `results/`, `scripts/`, `.py`, `2026-1x`, `_seed`, `_CORD`, `clean_2026`, `cil_protocol`. Run names are paraphrased ("rank 64, seed 42"). Remaining hardware mentions (6 GB, RTX 2060) are acceptable. `main.pdf`: 0 hits. |
+| L2, bias term | CONFIRMED FIXED | Sec. 5.2 "$o_b(x)=w_b^{\top}h(x)+c_b$"; App. C "a linear layer with bias". |
+| L6, delta storage | CONFIRMED FIXED | Cost: "($57$ MB if stored in half precision, $113$ MB in fp32 as trained and evaluated)". App. C: "This is a reporting choice. ... no run evaluated half-precision-rounded deltas." 4 × 7,077,888 × 4 B = 113.2 MB. |
+| L5, memory disclosure (PM decision) | CONFIRMED | Cost "$100.7$ MB on CIL-CORD, the method's memory as counted in App. C". App. C: "As held, a record is $406{,}800$ bytes against $402{,}689$ counted: $101.7$ against $100.7$ MB ... $122.0$ against $120.8$ MB for the $300$ of Mixed"; Mixed Recall "$177.4$ MB counted ... ($178.7$ MB as held)". Matches R4 Part D. |
+| L9, L10, L11, L12, L13, L16, L17 | CONFIRMED FIXED | `tab:dil` caption "(... saved; App. G)"; App. B "so for CoLaR-SBR the restricted AA ..."; Sec. 4.2 "the number of stale labels the true-label refresh rewrites"; App. C "the SROIE session ... (one seed, AA 66.5)"; App. A "seeded by the run seed plus the session index (the run seed for joint training)"; App. A "three annotation schemas (FUNSD for forms; SROIE and CORD for receipts)"; App. C "\cref{alg:recall} summarises training and inference". |
+| New CIL-CORD refresh counts (App. E) | CONFIRMED | `results/logs_vision/cil_cord_colar_r_oracle_seed{42,7,123}_k4_d50_r128.log` give 101/760/1461/1402, 66/944/1366/1269 and 74/943/1315/1110. The gate run behind the 61.2 (`gates/.../cil_cord_colar_r_oracle_seed42.log`) prints the same 101/760/1461/1402. So "Under restricted scoring it reaches 61.2" does not conflate two different label rewrites. |
+| L14 (race) | not a text item; did not bite | This regeneration ran at 09:55, after the s123 `metrics.json` (09:53). |
+
+**`supp_vals.tex`: how it is computed and my recomputation.** `write_supp_vals` averages the
+matrices that `matrix_choice` returns, so it uses the same source and seeds as `tab:matrices`:
+- CoLaR: rescore, s42/s7;
+- CoLaR-SBR: clean, 3 seeds;
+- Recall: gate r64, 3 seeds.
+
+It then computes:
+- `colarDropOne` = R[1,1] − R[2,1] = 94.66 − 48.12 = **46.5 → "47"**;
+- `colarDropTwo` = R[2,2] − R[3,2] = 81.95 − 54.39 = **27.6 → "28"**;
+- late diagonal (sessions 3 to 5): 37.07 / 34.00 / 18.57 → **"19" to "37"**;
+- largest later rise in any column: column 3, rows 3 → 4, 37.07 → 66.31 = **29.2 → "29"**;
+- SBR loss, diagonal − final, sessions 1 to 4 on the clean mean: 3.14 / **8.98** / **1.57** / 3.08 → "2" to "9", session "2";
+- Recall: max |diagonal − final| of the mean = **0.54 → "0.5"**.
+
+All match. The App. D.1 sentence says "on the mean", so the per-seed spread is out of its scope:
+SBR session 2 loses 9.4 on s42, 1.6 on s7 and 16.0 on s123, and session 3 gains 6.6 on s42. The
+body and Fig. 4 say "about a point" for Recall, which holds per seed (max 1.34).
+
+### The switched cell: CoLaR-SBR on CIL-CORD (clean, three seeds)
+
+- **Run.** `results/clean_2026-11/cil_cord_colar_sbr_seed123`:
+  - flags: `amp` false, `fp16` false, `val_frac` 0.1, `cil_restrict_eval` true, `full_label_eval` true (log config dump);
+  - method: epochs 10, docs 50, k 4, r 128;
+  - `replay_memory_bytes` 100,672,250;
+  - AA 86.16, BWT −8.55, `full_label_f1` 87.13 (log: "Full-label final F1 (unmasked test set): 87.13"; no "skipped" line);
+  - training loop 2.00 h.
+  - It has no DONE line in `queue.log`: v3 orphaned it at 08:14, and v4 started the next job at 09:53. The files are complete.
+- **Recomputed** (42/7/123):
+  - AA 87.76 / 91.32 / 86.16 → **88.41 ± 2.64**;
+  - full-label 88.83 / 91.19 / 87.13 → **89.05 ± 2.04**.
+  - These match `\vSbr` 88.4±2.6, `\vSbrFull` 89.1±2.0 and the 2×2 and main-table cells, now unmarked.
+- **What moved.** `git diff c53cf54..4c43de9 --stat -- 'paper_cvpr/*.tex'` touches only:
+  - `vals.tex`: `\vSbr`, `\vSbrFull`, plus the six new gate macros;
+  - `tab_2x2.tex`: CoLaR-SBR cell;
+  - `tab_main_clean.tex`: CoLaR-SBR CIL-CORD AA and full-label;
+  - `supp_perseed.tex` and `supp_conflict.tex`: the CoLaR-SBR row → "clean & 87.8 & 91.3 & 86.2 & 2.1";
+  - `supp_agree.tex`: + s123;
+  - `supp_mat_sbr.tex`: clean mean, which I recomputed to 0.05;
+  - `supp_slot.tex`: M6;
+  - `supp_delta.tex`: daggers only;
+  - `supp_vals.tex`: new;
+  - `figures/retention_cilcord.pdf`: 21397 → 21403 bytes, regenerated at 09:55 from the same `C` registry. Only the SBR source changed, so only the middle panel changed.
+- **What did not move.** Under `choose()`, no other cell has three clean seeds: clean Recall s42 is running with no `metrics.json`, and no other clean run exists. Every other generated value is byte-identical, including:
+  - Mixed SBR (rescore 89.8/89.6†) and DIL SBR (gate 86.2±1.3†);
+  - the supp Mixed matrices;
+  - the gate CoLaR-SBR runs, which are still used for the LexSlot comparison only.
+
+**Sentences that compare CoLaR-SBR on CIL-CORD with another cell.** Per seed against legacy joint
+(92.84/90.48/92.43): −5.1 / +0.8 / −6.3. Against seed-matched naive, SBR closes 93.1% / 101% /
+91.5% of the naive-to-joint gap.
+
+| Location | Text | Verdict |
+|---|---|---|
+| Abstract (source byte-identical, renders 88.4 instead of 88.0) | "together they attain $\nSbr$ average F1 against $\nJoint$ for joint training" | True as stated: it is a plain report of two means and claims no closeness. The cross-protocol pairing is visible in `tab:twobytwo` (88.4 unmarked, 91.9†). The PM should tell the user that the rendered number changed. |
+| Intro ¶3 | "the two together reach $\vSbr$, against $\vJoint$ for joint training" | True. |
+| Contribution 3 | "closes most of the gap to joint training on class-incremental CORD and reaches it on a mixed stream" | True per seed (≥ 91% of the gap on every seed). "Reaches it" on Mixed: 89.77/89.62 vs joint 86.94/88.46, both legacy. The change from "within a few points" was right: 6.3 points on s123 is not "a few". |
+| Teaser caption | "together they close most of the gap to it ... bars are the cell means of tab:twobytwo, which gives the seeds and protocol of each cell" | True, and protocol-visible. |
+| Sec. 4.3 | "Only the cell with both approaches joint training ($\vSbr$ against $\vJoint$)" | True. "Approaches" is not a per-seed "within" claim. |
+| Experiments | "the two blocked readouts close most or all of the gap: CoLaR-SBR $\vSbr$ and SBR-Recall $\vRecall$ against $\vJoint$" | True. CoLaR-SBR is clean, the other two are legacy; this is visible from `tab:main`'s marks. |
+| Ablations | "what SBR still loses to joint training is retention of early sessions (Fig. 4)" | Consistent with the clean matrix: mean diagonal-to-final losses sum to 16.8, i.e. 3.4 AA of the 3.5-point gap. |
+| Conclusion | no CoLaR-SBR number | — |
+| App. D.1, D.3 | `supp_vals` macros (clean mean) | True (above). The LexSlot comparison is now gate-only (M6). |
+| App. B | "differ by about one point or less on each seed ... for CoLaR-SBR ... not inflated" | True: +1.1 / −0.1 / +1.0. |
+| App. E takeaway | "a session-blocked readout with the same memory moves it to $\nSbr$" | True. The row is tagged "clean" in `tab:conflict`, beside gate† and rescore† rows. |
+| App. G | "The CIL-CORD cells of CoLaR-SBR, no-memory SBR, SBR-Recall and LexSlot ... are fp32 gate runs" | **Stale (R5-L1).** |
+
+The Limitations promise ("Every cell is marked by its protocol and never mixes the two, so a
+comparison across protocols is visible from the marks in the tables") holds for every table. It
+does not hold for Fig. 4, whose panel titles give n but not the protocol (R5-L2). Each comparison
+favours the reference rather than SBR, because the legacy joint runs early-stopped on the test
+split.
+
+### New findings (LOW only)
+
+- **R5-L1. App. G is stale after the switch.**
+  - Where: supp.tex:494, "The CIL-CORD cells of CoLaR-SBR, no-memory SBR, SBR-Recall and LexSlot, and the DIL SBR cells, are fp32 gate runs. In the $2{\times}2$ the shared-softmax cells are therefore fp16 or mixed and the blocked-readout cells fp32."
+  - The CoLaR-SBR CIL-CORD cell is now clean. The main 2×2 caption is still correct: "Among the † cells, the blocked-readout ones ran in fp32".
+  - Fix: drop "CoLaR-SBR" from the list, and write "In the $2{\times}2$ the shared-softmax $\dagger$ cells are fp16 or mixed and the blocked-readout $\dagger$ cells fp32". The `tab:legacyprotocol` row "CoLaR-SBR \| CIL-CORD \| fp32 \| 3" can stay, but should say "(LexSlot comparison only)".
+- **R5-L2. Fig. 4 does not show protocol per panel.** The middle panel is now clean and the outer
+  two are legacy (CoLaR rescore†, Recall gate†). Add "(CoLaR-SBR: clean protocol; CoLaR and SBR-Recall: $\dagger$)" to the caption, or put the protocol in the panel titles.
+- **R5-L3. The new App. A sentence "Every run fits a single 6 GB GPU" is not supported for every run.**
+  App. H says some first-grid rows ran on a rented GPU container, and Table 1's "--" cells did not
+  fit. Write "The runs reported here ran on a single 6 GB GPU, except some first-grid rows (App. H)".
+- **R5-L4. `supp_agree.tex` lists seeds in the order 123, 42, 7.** That is the `sorted(glob)` string
+  order. Sort by `SEEDS`.
+- **R5-L5. Note for the PM.** The clean s123 run has the largest forgetting of the three clean seeds
+  (BWT −8.55; session 2 drops 92.0 → 76.0), and no text cites a CoLaR-SBR BWT. Clean BWT is
+  −2.41 / −1.61 / −8.55 against gate −7.50 / −8.99 / −4.30.
+
+### Hygiene
+
+| Check | Result |
+|---|---|
+| Body ≤ 8 pages | PASS. "References" starts on page 8 of 10. |
+| Undefined references / overfull boxes | PASS. 0 / 0 in `main.log` and `supp.log`. |
+| `---` in paper inputs | PASS. 0 in `*.tex` and `fig/*.tex`, generated files included. |
+| Em-dash in PDFs | PASS. 0 in `main.pdf` and in `supp.pdf` (now 15 pages). |
+| Abstract | Byte-identical to 0a896ef (sha1 `fa56d93a…`). It renders "attain 88.4 average F1 against 91.9". |
+| Anonymity | PASS for both PDFs (see L15 above). |
+
+### Other clean runs
+
+None has finished besides s123. `cil_cord_colar_sbr_recall_r64_seed42` started at 09:53 (v4,
+pid 3470572); its directory holds only `tb/`.
+
+### OPEN (not counted)
+
+- Abstract clause "an effect that no memory can repair" (user).
+- Abstract clause "when label growth itself supplies the routing key" (user). The Paper agent
+  proposes adding "on a single-schema stream", which I support: it matches the corrected
+  Conclusion and Sec. 5.3.
+- CR2: the remaining † headline cells, pending data.
