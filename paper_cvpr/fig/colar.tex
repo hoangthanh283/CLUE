@@ -1,4 +1,4 @@
-% CoLaR: per-document SVD of the layer-k activations (adapted from the explainer artifact).
+% CoLaR: per-document SVD of the layer-k activations.
 \begin{figure}[t]
 \centering
 \begin{tikzpicture}[font=\footnotesize, >=Stealth,
@@ -18,6 +18,6 @@
    $\approx$0.40\,MB per document\\
    \textcolor{memgreen}{\textbf{2.7$\times$ smaller, AA 87.6 vs.\ 87.3}}};
 \end{tikzpicture}
-\caption{\textbf{CoLaR stores whole documents, compressed one at a time.} The pooled layer-$k$ feature space is near full-rank (rank 16 keeps 43\% of the variance), but a single document's activations are low-rank: its tokens share one layout and one vocabulary. Truncated SVD per document keeps every token's feature at its own position with its own label, which is the binding that every marginal summary destroys (the supplementary ladder figure).}
+\caption{\textbf{CoLaR stores whole documents, compressed one at a time.} The pooled layer-$k$ feature space is near full-rank (rank 16 keeps 43\% of the variance), but a single document's activations are low-rank: its tokens share one layout and one vocabulary. Sizes for one padded document (512 text and 197 image tokens); AA on DIL, LayoutLMv3, seed 42, against uncompressed latent replay. Truncated SVD per document keeps every token's feature at its own position with its own label, which is the binding that every marginal summary destroys (\cref{fig:ladder}).}
 \label{fig:colar}
 \end{figure}

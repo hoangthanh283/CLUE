@@ -170,7 +170,7 @@ def main():
         "Naive", fmt(*cell["naive"]), fmt(*full["naive"]), fmt(*mix["naive"]), fmt(*dil["naive"])
     )
     t += row(
-        "ER, matched memory", fmt(*cell["er"]), fmt(*full["er"]), fmt(*mix["er"]), fmt(*dil["er"])
+        "ER", fmt(*cell["er"]), fmt(*full["er"]), fmt(*mix["er"]), fmt(*dil["er"])
     )
     for label, key, dz in BASE:
         mark = "c" if dz else ""
