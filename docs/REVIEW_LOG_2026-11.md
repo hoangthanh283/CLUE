@@ -404,3 +404,303 @@ Optional page and volume completions, none of which is wrong as written:
 | 12 | "CPFD, CFNER: distillation and pseudo-labels" | SUPPORTED for CPFD; UNCLEAR for CFNER | CPFD uses pooled-feature distillation and confidence-based pseudo-labelling. CFNER's abstract describes causal-effect distillation from Other-class tokens plus curriculum learning for label noise; pseudo-labels are not named in the abstract (arXiv:2210.03980). |
 | 13 | "GenCNER: span generation" | SUPPORTED loosely | It casts continual NER as "entity triplet sequence generation" with pseudo-labelling and KD. "Entity-triplet generation" would be more exact. |
 | 14 | "EMAR, RP-CRE, CRL: episodic memory with prototypes ... all sentence-level and text-only" | SUPPORTED | Memory replay with prototypes or memory-based nearest-class-mean (NCM) classification. All are relation-extraction work on sentences. |
+
+## R2 (2026-11-11): confirmation audit
+
+Snapshot: `HEAD = 348b00f`, `main.pdf` built 07:55 (after `main.tex` 07:55:09), `supp.pdf` 07:44,
+generated tables 07:33. Recomputation: own script, raw `metrics.json`, `statistics.stdev`
+(ddof 1). No model, dataset, torch or pytest touched.
+
+### Verdict: **BLOCK** (one HIGH, text only, one Paper round)
+
+CR2 (legacy headline cells) is waived for draft uploads and the abstract clause "an effect that
+no memory can repair" is with the user; neither is counted. What blocks is **N1**: the 2×2's
+third row, its caption, §4.3 and the teaser describe the CL-LoRA cell as per-session adapters
+on a trained base. The code runs **one** LoRA adapter shared by all sessions, on a **frozen**
+pre-trained encoder. (R1's H2 table had the same error, "all task adapters applied together;
+base not frozen", and the Paper agent copied it. I correct it here.) Every R1 CRITICAL and HIGH
+item is otherwise fixed, and all numbers match.
+
+### Part A: status of the R1 and R1b items
+
+| Item | Status | Evidence (current text / code) |
+|---|---|---|
+| CR1 | CONFIRMED FIXED | `choose()` (make_clean_tables.py:44-54) returns a clean source only when `len(vs) == 3`, else the first non-empty *legacy* source; `pick()` and `matrices()` (make_retention_fig.py:22-34) both call it. Full-label: `pick_clean_only` + `fmt(show_n=True)` prints per-seed values with `^{n=k}` when n<3, mean±s.d. only at n=3. Residual: L-j (unused `\v*Full` macros). |
+| CR2 | WAIVED (data) | Every AA cell still †; 2 of 3 clean CoLaR-SBR seeds on disk, s123 running. |
+| H1 | CONFIRMED FIXED | main:128 "naive training, LwF, ER and DER++ sit at 16--19 AA against 33 for joint training, and several baselines collapse below that band". Per seed ER s7 = 14.4 (L-e). |
+| H2 | PARTLY; see **N1** | "81 to 95" fixed (diagonals 80.9 to 94.6); row relabelled; teaser softened ("a different adapter method"); main:141 adds "rather than isolating the readout alone". But the new caption text is factually wrong about the CL-LoRA cell (N1). |
+| H3 (body) | CONFIRMED FIXED | main:65 "on a fixed label space every method we tested that keeps updating a shared network without old-task supervision loses the old readout"; main:67 "Neither remedy is sufficient alone and each cause needs its own remedy". Echo of the OPEN abstract clause at main:65, "Memory ... is blind to the second" (L-o). |
+| H4 | CONFIRMED FIXED (wording) | C1 "we add a mask-free full-label F1, reported for clean-protocol runs as they complete"; Scoring "with the number of seeds marked"; cell `88.8^{n=1}`. Stale: clean s7 (91.19) landed at 07:49, after the 07:33 generation (L-m). Joint and naive full-label are still "--". |
+| H5 | CONFIRMED FIXED | `drops.append(len(kept) < len(vs))`, so the `c` mark appears only when a value was removed; IS3 is now unmarked (`5.6/7.7`); LwF keeps `c`. Footnote: "LwF only ... CPFD and IS3 keep their zero seeds". |
+| M1 | CONFIRMED FIXED | Setup:93 lists the early-stopping, epoch-cap and precision groups and the 2×2's precision split; supp `tab:legacyprotocol`. Residual: L-f (the epoch-cap list does not hold on DIL). |
+| M2 | CONFIRMED FIXED | main:122 "Where we measured the mechanism, on naive training and LwF". |
+| M3 | CONFIRMED FIXED | main:204 "rank 8 ... gives 82.5 (seed 42) ... stuck at 65 and 68" (`recall_d0_seed42`: 82.50, diag 64.9/67.7). |
+| M4 | CONFIRMED FIXED | BASE rows: `src(f"cil_cord_{key}", (RESC, ...))`, so clean names match the queue (`cil_cord_lwf`, `cil_cord_cl_lora`). |
+| M5 | PARTLY | supp Hyperparameters fixed ("differ between groups ... `tab:legacyprotocol` lists them"). Still stale: supp `tab:legacy` caption "CoLaR, CoLaR-R and the baselines use 10 training epochs per task with early stopping". The June-grid naive/LwF/ER/DER++/CODA/CL-LoRA/joint rows saved no `epochs` (script default 100/30); only CPFD/IS3/LCA show 10. This contradicts the supplement's own `tab:legacyprotocol`. |
+| M6 | CONFIRMED FIXED | main:110 "BWT −89.8 and −87.2 over three seeds, −79.1 over the two live text-only seeds"; `tab:depthprofile` text-only n=2. Re-derived exactly (Part B.5). |
+| M7 | CONFIRMED FIXED | main:204 "at most 0.6 (seed 42)". |
+| L1 | PARTLY | Main Table 1 is now generated (`tab_dil_grid.tex`) and matches the files. Regression: supp `tab:grid` is still typed by hand with the old values (BROS LwF 35.2, BROS DER++ 87.6, BERT ER ±1.0), so it disagrees with main Table 1 (35.1, 87.5, 0.9) on the same runs (L-a). |
+| L2 | CONFIRMED FIXED | supp:115 "reported as 6.1±7.3"; "zero on every domain for seed 42 and 3.0/9.7/0.0 for seed 7". |
+| L3 | CONFIRMED FIXED | main:102 "on the stream FUNSD→CORD→SROIE"; "Table 1 gives the DIL picture". |
+| L4 | CONFIRMED FIXED | main:95 "charged at most once"; C1 the same. |
+| L5 | CONFIRMED FIXED | main:204 "Unlike CoLaR, LexSlot stores the token ids of its documents." |
+| L6 | CONFIRMED FIXED | `macro()` writes `--` for empty cells. |
+| L7 | CONFIRMED FIXED | main:210 "by 5--9 points on average". |
+| L8 | CONFIRMED FIXED | `tab:ledger` ‡ "legacy scoring". |
+| L9 | CONFIRMED (monitor) | Both clean logs print "Full-label final F1 (unmasked test set)"; no "skipped". |
+| R1b `gencner` (WRONG) | CONFIRMED FIXED | .bbl: "2025 International Joint Conference on Neural Networks (IJCNN), pages 1--9, 2025. arXiv:2510.11444". |
+| R1b `lca2026` | CONFIRMED FIXED | "Danilo Vasconcellos~Vargas". |
+| R1b `kumar2023protoner` | CONFIRMED FIXED | year 2024; the bib has series and volume 492, and the bst does not print the series. |
+| R1b `gdibench` | CONFIRMED FIXED | all 16 authors, arXiv:2505.00063. |
+| R1b `zhang2023slca` | CONFIRMED FIXED | "Proceedings of the IEEE/CVF ICCV, pages 19091--19101". |
+| R1b #1b SpanKL | CONFIRMED FIXED | "SpanKL uses per-type span heads with distillation; neither replays stored examples". |
+| R1b #3 REMIND/Latent Replay (HIGH) | CONFIRMED FIXED | "REMIND stores product-quantised mid-level CNN feature maps for each training image ... Like CoLaR, REMIND and Latent Replay keep one entry per example, but each of their examples carries a single label". Consistent with R1b's facts. |
+| R1b #4 generative replay | CONFIRMED FIXED | "samples hidden representations from one class-conditional generator". |
+| R1b #5 Zhai et al. | CONFIRMED FIXED | "find that multimodal LLMs forget under fine-tuning even when the image encoder is frozen; our drift analysis agrees with the former". |
+| R1b #7 EASE/InfLoRA | CONFIRMED FIXED | "need no task identity at test time, either by combining the features of all modules (EASE) or by folding them into the pre-trained weights (InfLoRA)". Consistent with R1b's facts. |
+| R1b #8 GDI-Bench | CONFIRMED FIXED | "freezing most parameters, chosen by their update magnitude". |
+| R1b #2 ProtoNER (undersold) | FIXED, but a new claim was added (**N5**) | "ProtoNER, the closest work to ours, adds new key-information classes to a LayoutLM-family model from a few labelled documents with prototypical networks". New: "none addresses the background class under label growth". Checked against the paper; it is not supported. |
+| R1b #12 CFNER, #13 GenCNER | CONFIRMED FIXED | "causal-effect distillation with curriculum learning (CFNER) or entity-triplet generation". |
+
+### New findings
+
+#### HIGH
+
+**N1. The CL-LoRA cell of the 2×2 is misdescribed.** The code runs neither per-session adapters
+nor a trained base.
+
+Where the claim appears:
+- `tab_2x2.tex` row label (generator line 199): "Per-session low-rank adapters, no memory".
+- `tab:twobytwo` caption: "rank-8 orthogonal adapters on the attention projections, all applied together at inference, distillation loss, base trained".
+- main:141: "The third row replaces the memory by per-session low-rank adapters: CL-LoRA, with a shared softmax, collapses".
+- teaser bar-group label "per-session adapters", under the CL-LoRA bar too.
+
+Evidence:
+- `doccl/methods/o_lora.py:54-66` builds one `LoraConfig` and calls `get_peft_model` once. No
+  `add_adapter` / `set_adapter` exists anywhere in `doccl/` or `scripts/train.py`. The one
+  `default` adapter is trained in every session. `_ortho_loss` penalises its current `A`
+  against **snapshots of itself** taken at earlier session ends (`after_task`).
+- PEFT freezes every non-LoRA parameter except the head (`modules_to_save`). The legacy runs
+  confirm it: `results/rescore/cil_cord_cl_lora_seed{42,7}` `trainable_params = 489,277`.
+  That is exactly 36 rank-8 Q/K/V sites × 12,288 (= 442,368) plus the 61-way head (46,909);
+  `total_params` exceeds naive's by exactly 442,368. So the encoder is the frozen pre-trained
+  checkpoint from session 1 onward.
+- The paper contradicts itself: Related Work lists CL-LoRA among "methods over a frozen
+  backbone".
+- The module docstring ("per-task LoRA on Q/K/V") does not match the code.
+
+Fix (text, generator label; Paper owns both):
+- Row label: "Low-rank adapters, no memory" (or "Low-rank adaptation of a frozen trunk, no memory").
+- Caption, CL-LoRA clause: "CL-LoRA (our port: one rank-8 adapter on Q/K/V of the frozen
+  pre-trained encoder, shared by all sessions and trained with distillation and an
+  orthogonality penalty against its own earlier states; fp16 or fp32 by seed, 30-epoch cap)
+  with a shared softmax".
+- main:141: "CL-LoRA, one low-rank adapter shared by all sessions with a shared softmax, collapses".
+- Teaser label: "low-rank adapters".
+
+Keep "SBR-Recall (one rank-64 delta per session ...)" as is: it is correct (Part C).
+
+#### MEDIUM
+
+- **N2. CL-LoRA / O-LoRA ports are not per-task (fidelity; could change numbers).** Same code
+  as N1. Published O-LoRA/CL-LoRA keep one frozen adapter per task; this port retrains one
+  adapter and pushes it away from its own past states. That penalty actively erases the old
+  adapter. This affects:
+  - every CL-LoRA cell (tab:main CIL/Mixed/DIL; supp `tab:prompt_lora` O-LoRA and CL-LoRA rows; image tables);
+  - the supp sentence "LoRA adapters acquire but forget as much as naive training does, because the adapter does not protect the head" (the single overwritten adapter is an equally likely cause).
+
+  Fix:
+  - disclose in Setup or supp ("our port keeps a single adapter across sessions");
+  - drop the causal clause;
+  - long term, a per-task port.
+
+  The queued capacity-matched run inherits this (Part C).
+- **N3. The Limitations sentence will become false on the next regeneration.** main:210: "Cells
+  marked † ... are not compared against clean-protocol cells in the text."
+  - When `cil_cord_colar_sbr_seed123` finishes (running since 07:49), `choose()` switches `\vSbr` to clean.
+  - The abstract ("attain `\nSbr` against `\nJoint`"), intro, §4.3, §6 and the 2×2 will then compare a clean cell with † cells.
+  - Fix now: "A cell never combines the two protocols; † cells and clean cells are compared only where the text says so."
+- **N4. "EWC and LwF stay at the naive level" (tab:dil caption, main:122) fails per backbone and per seed.**
+  - EWC over naive: LiLT +8.2 (s42 52.32 vs 40.68), BERT +7.2, BROS +4.7.
+  - LwF on BROS: −5.1.
+  - Fix: "stay within about 8 points of naive and far below replay".
+- **N5. The new ProtoNER claim is not supported.** main:85: "none addresses the background class
+  under label growth". ProtoNER (arXiv:2310.02372, Sec. 3.3 Training procedure) discards the
+  "Other"-class prototypes before every incremental phase and annotates its incremental samples
+  for all n+1 classes. Its results discussion explains learning from few samples by
+  sub-clusters that future-class words, "labeled as 'Other' during the base training", form
+  under the "Other" class. Fix: "ProtoNER avoids the conflict by annotating its few incremental
+  documents for every class; none of these works separates the causes of forgetting".
+- **M5 residual** (see Part A): supp `tab:legacy` caption, "the baselines use 10 training epochs".
+
+#### LOW
+
+- L-a: supp `tab:grid` hand-typed values disagree with main Table 1 (35.2 / 35.1, 87.6 / 87.5, ±1.0 / ±0.9). Generate it, or copy the generated values.
+- L-b: supp `tab:grid` caption, "on CIL-CORD every method, replay included, sits at or below the naive level". False: LwF BROS 23.1 and BERT 24.3 against naive 19.2 and 19.3.
+- L-c: supp IS3 prose uses population s.d.: "4.4±1.7" (ddof 1: 2.2), "30.1±1.0" (ddof 1: 1.2; `tab:legacy` prints 30.10±1.18).
+- L-d: memory units are mixed.
+  - "60 MB" is decimal (DIL `replay_memory_bytes` 60,403,200 = 57.6 MiB).
+  - "96 MB" and "54 MB" are MiB (100,672,250 B; 56.6e6 B).
+  - Use one unit.
+- L-e: "16--19" per seed: ER s7 = 14.43. Write "14--19" or "on average".
+- L-f: Setup epoch caps ("100 for ... CPFD and IS3, 30 for ... CL-LoRA") hold only on CIL-CORD and Mixed. DIL CPFD and IS3 are 10; DIL CL-LoRA has script default 100. Add "on CIL-CORD and Mixed".
+- L-g: The modality-mask sentence omits the no-text condition, BWT −66.7 over three seeds (it forgets least). Add it.
+- L-h: The prose uses `\nColar` (30.4, two seeds) and `\nNoBank` (20.4, one seed) with no n (intro, §4.2, §6). The tables show seeds; the sentences do not.
+- L-i: `pick()` drops `v <= 0.5`, not exact zeros as the docstring and footnote say. It is harmless today (only LwF; its dropped values are 0.00). Use `v != 0.0` or fix the docstring.
+- L-j: `\vSbrFull`, `\vRecallFull` and `\vJointFull` print an n<3 mean with no n mark. They are unused; do not use them in prose.
+- L-k: The v3 driver has no lock. Relaunching it while a run is in progress (no `metrics.json` yet) starts a second GPU job. Add `flock` the next time a driver is written (not while this one runs).
+- L-l: `docs/LEGACY_PROTOCOL_TABLE_2026-11.md:99` says IS3 Mixed s42 was "dropped". The generator keeps it, and the doc's own note at line 129 says so.
+- L-m: Generated tables are stale. The clean CoLaR-SBR s7 run landed at 07:49; after regeneration the full-label cell reads `88.8/91.2^{n=2}`.
+- L-n: "LwF does not collapse in fp32" rests on one fp32 run (CIL-CORD s42, 18.45). Say "in its fp32 run".
+- L-o: main:65 "Memory ... is blind to the second" is the body form of the OPEN abstract clause. Resolve the two together.
+- L-p: main:198 "every method with a shared softmax stays at or below CoLaR". Joint training also uses a shared softmax. Write "every continual method".
+
+### Part B: numbers
+
+**B.1, mismatches > 0.05: none.** Every cell of `vals.tex`, `tab_2x2.tex`, `tab_main_clean.tex` and
+`tab_dil_grid.tex` reproduces from the run files (rescore runs are one directory deeper; CoLaR
+directories carry `_k4_d50_r128`). Per seed (42/7/123), new or changed cells only (the rest as
+in R1):
+- CIL-CORD LwF: 18.45/18.51/0.00 → `18.4/18.5^{†,c}`.
+- Mixed LwF: 47.75/0.00 → `47.7^{†,c}`.
+- CIL-CORD IS3: 5.60/7.67 (no mark).
+- Mixed IS3: 0.00/40.59.
+- CPFD: CIL-CORD 2.72/0.00; Mixed 0.27/15.09; DIL 0.00/4.25/14.19.
+- CL-LoRA: CIL-CORD 18.67/18.59.
+- Table 1 LiLT: naive 40.14±0.47, EWC 48.38±5.87, ER 85.65±0.48, DER++ 84.35±0.31, joint 83.79±1.18; LwF has a run directory with no `metrics.json` → "--".
+- Table 1 BROS: LwF 35.15±3.10, DER++ 87.55±1.08.
+- Table 1 BERT: ER 77.06±0.95.
+
+No cell lacks a source. The selection rule in code is exactly the stated rule, for AA (`pick`)
+and for the retention figure (`matrices`). The full-label column can show mean±s.d. only when
+three clean seeds exist.
+
+**B.2, clean-protocol runs** (`results/clean_2026-11/`; log config dump + `metrics.json`):
+
+| Run | amp / fp16 | val_frac | epochs cap (stopped at) | cil_restrict_eval | full_label_f1 | AA | BWT | final row of `matrix.npy` |
+|---|---|---|---|---|---|---|---|---|
+| `cil_cord_smoke_naive_e1_seed42` | false / false | 0.1 | 1 (smoke) | true | 12.55 | 18.05 | −76.09 | 0/0/0/0/90.26 |
+| `cil_cord_colar_sbr_seed42` | false / false | 0.1 | 10 (5/5/5/6/6) | true | 88.83 | 87.76 | −2.41 | 91.41/82.78/88.14/83.06/93.40 |
+| `cil_cord_colar_sbr_seed7` | false / false | 0.1 | 10 (8/9/9/6/3) | true | 91.19 | 91.32 | −1.61 | 92.07/91.24/92.04/88.52/92.71 |
+
+- Batches per epoch (360/172/247/326/351 at batch 2) equal 90% of the session pools in both seeds.
+- `replay_memory_bytes` = 100,672,250 in both seeds.
+- s7 has no DONE line in `queue.log` (orphaned by the v1→v2→v3 swap, logged as SWAP); its files are complete.
+- `cil_cord_colar_sbr_seed123` is running (v3 pid 3338470).
+- The log's "~130.1 MB fp16" bank line overcounts: it counts the newest batch before SVD. `replay_memory_bytes` is the right figure.
+
+**B.3, prose literals.** Every literal in `main.tex` traces to a result file, the supplement, the
+evidence ledger or `STATE.md`. New since R1, recomputed: 81--95, 16--19 (L-e), −89.8/−87.2/−79.1,
+82.5 with 64.9/67.7, 42.0 (44.17/39.85), 61.2 (61.17), 14.8 (14.77). As in R1, the CKA profile
+(1.00/0.78/0.34/0.25/0.16), the freezing numbers (41.1/0.0, 38.8/−76.8, 0.19), the ladder, the
+ViT numbers and 163 MB / 80.6 are traced to the ledger and `STATE.md`, not recomputed.
+
+**B.4, comparatives per seed** (only changed or new ones; R1's list still holds):
+
+| Sentence | Check | Verdict |
+|---|---|---|
+| "plain replay comes close to joint training on every backbone" | ER − joint: −0.9/+1.9/+0.3/−0.2 | OK |
+| "EWC and LwF stay at the naive level" | up to +8.2 (mean) and +12 (seed) | **N4** |
+| "naive, LwF, ER, DER++ sit at 16--19" | ER s7 14.4 | L-e |
+| "Only the cell with both approaches joint" | −5.2/−4.2/−2.3 | OK |
+| "sessions reach 81 to 95" | 80.9 to 94.6 | OK |
+| "every method with a shared softmax stays at or below CoLaR" | every baseline seed ≤ 26.9 < 28.8 | OK, but joint counts too (L-p) |
+| LexSlot "within two points ... narrows the spread" | +1.7 / −0.1 / +0.8; s.d. 0.46 vs 1.97, 0.36 vs 1.25 | OK |
+| "Perfect memory labels recover about half" | (61.2−28.8)/(92.8−28.8) = 0.51 | OK |
+
+**B.5, legacy-settings table and depth profile.**
+- Every row of supp `tab:legacyprotocol` agrees with `docs/LEGACY_PROTOCOL_TABLE_2026-11.md`:
+  caps, precision, memory, seeds, the LwF ‡ and the first-grid * footnote including batch 16.
+- `tab:depthprofile`, re-derived from `results/pilot/c*_seed*.json` (dead = final AA < 1.0; dead
+  runs: `c1_text_seed123` and the three unused `c1_bert` runs), matches every cell:
+  - full 273×, 0.03/0.70/0.24/0.03;
+  - text+layout 361×;
+  - text-only n=2, 801×, 0.03/0.34/0.51/0.12;
+  - no text 247×;
+  - LiLT 111×;
+  - BROS 738×;
+  - BERT 1608×.
+- BWT: full −89.8 (−89.51/−89.90/−90.03), text+layout −87.2, text-only −79.1 (−79.41/−78.73), no text −66.7 (L-g). The `_ord210` runs form their own group (−75.2) and carry no displacement records.
+
+### Part C: code review (`git diff ac76a6c..HEAD -- scripts/ doccl/ tests/ configs/`)
+
+**`doccl/methods/o_lora.py` (`layers_to_transform`): inert when unset.** With the key absent,
+`layers_to_transform=None` and `layers_pattern=None` are the `LoraConfig` defaults, so earlier
+CL-LoRA and O-LoRA results are unaffected (cannot change a paper number).
+
+Sites of the capacity-matched command (v3 `CLR64`: rank 64, alpha 128, targets query/key/value/dense, layers 4..11) against SBR-Recall:
+- SBR-Recall (`colar_sbr_recall.py:75-81`) wraps every `nn.Linear` whose last name component is in the targets, in `_encoder_layers()[4:]`. That is 6 per layer (Q, K, V, attention.output.dense, intermediate.dense, output.dense) × 8 layers = 48.
+- PEFT with `layers_pattern="layer"` and `[4..11]` hits the same 48. `tests/methods/test_olora_layers.py` pins 48 vs 72; I did not run it (rule 1).
+- Rank and alpha match, so per-session capacity matches: 7.08M parameters, one delta's worth.
+
+Differences that remain, and that the caption must state if the run is reported:
+1. **one adapter shared by all sessions** vs one delta per session (Recall stores 4×);
+2. **base = frozen pre-trained checkpoint**, layers 0..3 never adapted, vs Recall's base
+   fine-tuned on session 1 and then frozen;
+3. distillation toward the previous model (`kd_alpha` 1.0, T 2), absent in Recall;
+4. orthogonality penalty (λ 0.5) against the adapter's own earlier states, absent in Recall;
+5. LoRA dropout 0.1 vs none;
+6. one inference pass with the current adapter vs one pass per delta;
+7. PEFT-wrapped shared-softmax head vs SBR head plus per-session background logits.
+
+Items 1 and 2 are N1/N2: the run is a sites-, rank- and alpha-matched control, **not** a
+per-session-adapter control. It could change the 2×2 only as an added row.
+
+**v3 driver (`clean_protocol_v3_2026-11.sh`).**
+- Order:
+  1. CoLaR-SBR ×3;
+  2. Recall ×3;
+  3. no-memory SBR ×3;
+  4. CoLaR ×3;
+  5. joint ×3 (cap 100);
+  6. naive ×3;
+  7. CL-LoRA ×3;
+  8. CL-LoRA-r64 ×3;
+  9. ER-250 s42;
+  10. Recall o2/o3;
+  11. BROS ×3;
+  12. ER-250 s7/s123;
+  13. LwF ×3;
+  14. Mixed ×12;
+  15. DIL ×15;
+  16. Mixed Recall-c s7/s123.
+- Names are prefixes of the run directories: CoLaR runs get `_k4_d50_r128` and BROS runs `_bros`. `cil_cord_cl_lora_seed*` and `cil_cord_cl_lora_r64_seed*` cannot match each other, in the driver's `ls` or in the generator's globs.
+- Jobs run sequentially. A failure writes FAIL and moves on, and is retried on relaunch.
+- There is no lock against a second launch (L-k).
+- At the observed 1.7 to 2.3 h per CIL-CORD run, the joint/naive full-label values arrive around 20 h out and CL-LoRA-r64 around 40 h out. The full queue (about 50 runs) does not fit before the Nov 17 07:00 freeze; Mixed and DIL clean cells will likely stay †.
+
+**`scripts/rca/make_clean_tables.py`.**
+- Selection rule correct.
+- Drop-zero applies to legacy sources only (`not c`).
+- The `c` mark appears only when something was dropped.
+- BASE rows read clean names.
+- The DIL grid writer reads `results/dil_<m>_seed<s>{"", _lilt, _bros, _bert}` exactly. No suffix leak: LayoutLMv3 uses the empty suffix, so it cannot reach `_bert` and the like.
+- Findings: L-i, L-j. Neither changes a printed number today.
+
+**`pilot_depth_profile.py` / `pilot_displacement_fig.py`.**
+- Same dead rule: the figure imports `dead_reason`, and `load_pilot_results`' narrower all-zero rule is a subset.
+- Excluded runs are printed, not silently dropped.
+- The figure filters by `condition`, which would also admit `_ord210` runs, but those have no displacement records.
+- Output matches the table.
+
+The other diffs (`analyze_results.py`, `make_image_table.py`, `build_falsification_figures.py`)
+change labels and an axis limit only.
+
+### Part D: submission hygiene
+
+| Check | Result |
+|---|---|
+| Body ≤ 8 pages | PASS. "References" starts on page 8 of 10, so the body is pages 1 to 7. |
+| Undefined references / citations | PASS. 0 in `main.log` and `supp.log`; 52 cited keys, all in `refs_precompiled.bbl`. |
+| Overfull boxes | PASS. 0 in both logs. |
+| `---` in paper inputs | PASS. 0 in `main.tex`, `supp.tex`, `fig/*.tex`, `tab_*.tex`, `vals.tex`. |
+| Em-dash in PDFs | PASS. 0 in `main.pdf` and `supp.pdf`. |
+| Anonymity, main.pdf | PASS. "Anonymous CVPR submission"; no names, institution, paths, script names or dates. "6 GB GPU" in the Table 1 caption is benign. |
+| Anonymity, supp.pdf | PASS. Exposes in-house instance names (LexMem v3b/v5, HGT/CUBER, in the ledger only), public HF dataset IDs and "6 GB GPU" / "24 GB card". `.tex` comments carry repository paths and dates (`supp.tex` 110-114 and 153-155), so do not ship the source. |
+| Every float referenced | PASS. Main: teaser, `fig:conservation`, `tab:dil`, `tab:twobytwo`, `fig:pareto`, `tab:main`, `fig:retention`. Supp: all 14 labels referenced. |
+| Pointers main → supp | PASS. Sec. A (setup), D (legacy settings; displacement; `tab:grid`), C (ledger; rebalancing nulls; `tab:image`), B (`tab:image_supp`) each hold what the pointer says. Supp → main: "Sec. 3" (Setup), "Sec. 4.1" (drift), "Sec. 5.1" (CoLaR/ViT) all correct. |
+| PDFs current | PASS for text. Tables lag the disk by one clean seed (L-m). |
+
+### OPEN (not counted)
+- Abstract clause "an effect that no memory can repair" (user decision; its body echo is L-o).
+- CR2: † headline cells, pending data.
