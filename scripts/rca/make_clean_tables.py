@@ -60,7 +60,7 @@ def pick(sources, key="AA", drop_zero=False):
     got, drops = [], []
     for r, n, sfx in sources:
         vs, c = load(r, n, key, sfx), r == CLEAN
-        kept = [v for v in vs if v > 0.5] if drop_zero and not c else vs
+        kept = [v for v in vs if v != 0.0] if drop_zero and not c else vs
         got.append((kept, c))
         drops.append(len(kept) < len(vs))
     i = choose(got)
@@ -196,7 +196,7 @@ def main():
     t += "\\begin{tabular}{lcc}\n\\toprule\n & \\textbf{Shared softmax} & \\textbf{Session-blocked readout} \\\\\n\\midrule\n"
     t += f"No memory & {fmt(*cell['naive'])} & {fmt(*cell['nobank'])} \\\\\n"
     t += f"Whole-document memory (CoLaR) & {fmt(*cell['colar'])} & {fmt(*cell['sbr'], bold=True)} \\\\\n"
-    t += f"Per-session low-rank adapters, no memory & {fmt(*cell['cllora'])} & {fmt(*cell['recall'], bold=True)} \\\\\n"
+    t += f"Low-rank adapters, no memory & {fmt(*cell['cllora'])} & {fmt(*cell['recall'], bold=True)} \\\\\n"
     t += f"\\midrule\nJoint training (reference) & \\multicolumn{{2}}{{c}}{{{fmt(*cell['joint'])}}} \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_2x2.tex").write_text(t)
