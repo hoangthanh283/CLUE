@@ -5,11 +5,12 @@
 %  venues before final submission.
 % =====================================================================
 
-% ---- Backbones ----
+% == Backbones ==
 @inproceedings{huang2022layoutlmv3,
   title     = {{LayoutLMv3}: Pre-training for Document {AI} with Unified Text and Image Masking},
   author    = {Huang, Yupan and Lv, Tengchao and Cui, Lei and Lu, Yutong and Wei, Furu},
   booktitle = {Proceedings of the 30th ACM International Conference on Multimedia (MM)},
+  pages     = {4083--4091},
   year      = {2022}
 }
 
@@ -24,6 +25,9 @@
   title     = {{BROS}: A Pre-trained Language Model Focusing on Text and Layout for Better Key Information Extraction from Documents},
   author    = {Hong, Teakgyu and Kim, Donghyun and Ji, Mingi and Hwang, Wonseok and Nam, Daehyun and Park, Sungrae},
   booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  volume    = {36},
+  number    = {10},
+  pages     = {10767--10775},
   year      = {2022}
 }
 
@@ -34,7 +38,7 @@
   year      = {2021}
 }
 
-% ---- Catastrophic forgetting and continual-learning surveys ----
+% == Catastrophic forgetting and continual-learning surveys ==
 @article{mccloskey1989catastrophic,
   title   = {Catastrophic Interference in Connectionist Networks: The Sequential Learning Problem},
   author  = {McCloskey, Michael and Cohen, Neal J.},
@@ -48,10 +52,13 @@
   title   = {A Comprehensive Survey of Continual Learning: Theory, Method and Application},
   author  = {Wang, Liyuan and Zhang, Xingxing and Su, Hang and Zhu, Jun},
   journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI)},
+  volume  = {46},
+  number  = {8},
+  pages   = {5362--5383},
   year    = {2024}
 }
 
-% ---- Diagnostic / analysis foundations ----
+% == Diagnostic / analysis foundations ==
 @inproceedings{ramasesh2021anatomy,
   title     = {Anatomy of Catastrophic Forgetting: Hidden Representations and Task Semantics},
   author    = {Ramasesh, Vinay V. and Dyer, Ethan and Raghu, Maithra},
@@ -76,7 +83,7 @@
   year      = {2019}
 }
 
-% ---- Regularisation-based CL ----
+% == Regularisation-based CL ==
 @article{kirkpatrick2017ewc,
   title   = {Overcoming Catastrophic Forgetting in Neural Networks},
   author  = {Kirkpatrick, James and Pascanu, Razvan and Rabinowitz, Neil and Veness, Joel and Desjardins, Guillaume and Rusu, Andrei A. and Milan, Kieran and Quan, John and Ramalho, Tiago and Grabska-Barwinska, Agnieszka and others},
@@ -94,7 +101,7 @@
   year      = {2016}
 }
 
-% ---- Replay-based CL ----
+% == Replay-based CL ==
 @inproceedings{lopezpaz2017gem,
   title     = {Gradient Episodic Memory for Continual Learning},
   author    = {Lopez-Paz, David and Ranzato, Marc'Aurelio},
@@ -116,7 +123,7 @@
   year      = {2020}
 }
 
-% ---- Continual-learning frameworks / toolboxes ----
+% == Continual-learning frameworks / toolboxes ==
 @inproceedings{lomonaco2021avalanche,
   title     = {Avalanche: an End-to-End Library for Continual Learning},
   author    = {Lomonaco, Vincenzo and Pellegrini, Lorenzo and Cossu, Andrea and Carta, Antonio and Graffieti, Gabriele and Hayes, Tyler L. and De Lange, Matthias and Masana, Marc and Pomponi, Jary and van de Ven, Gido M. and Mundt, Martin and She, Qi and Cooper, Keiland and Forest, Jeremy and Belouadah, Eden and Calderara, Simone and Parisi, German I. and Cuzzolin, Fabio and Tolias, Andreas S. and Scardapane, Simone and Antiga, Luca and Ahmad, Subutai and Popescu, Adrian and Kanan, Christopher and van de Weijer, Joost and Tuytelaars, Tinne and Bacciu, Davide and Maltoni, Davide},
@@ -143,7 +150,7 @@
   note      = {MIT-licensed}
 }
 
-% ---- Prompt-based CL ----
+% == Prompt-based CL ==
 @inproceedings{wang2022l2p,
   title     = {Learning to Prompt for Continual Learning},
   author    = {Wang, Zifeng and Zhang, Zizhao and Lee, Chen-Yu and Zhang, Han and Sun, Ruoxi and Ren, Xiaoqi and Su, Guolong and Perot, Vincent and Dy, Jennifer and Pfister, Tomas},
@@ -165,7 +172,7 @@
   year      = {2023}
 }
 
-% ---- LoRA / parameter-efficient ----
+% == LoRA / parameter-efficient ==
 @inproceedings{hu2022lora,
   title     = {{LoRA}: Low-Rank Adaptation of Large Language Models},
   author    = {Hu, Edward J. and Shen, Yelong and Wallis, Phillip and Allen-Zhu, Zeyuan and Li, Yuanzhi and Wang, Shean and Wang, Lu and Chen, Weizhu},
@@ -188,7 +195,7 @@
   year      = {2022}
 }
 
-% ---- LoRA-based CL ----
+% == LoRA-based CL ==
 @inproceedings{wang2023olora,
   title     = {Orthogonal Subspace Learning for Language Model Continual Learning},
   author    = {Wang, Xiao and Chen, Tianze and Ge, Qiming and Xia, Han and Bao, Rong and Zheng, Rui and Zhang, Qi and Gui, Tao and Huang, Xuanjing},
@@ -200,14 +207,17 @@
   title     = {{CL-LoRA}: Continual Low-Rank Adaptation for Rehearsal-Free Class-Incremental Learning},
   author    = {He, Jiangpeng and Duan, Zhihao and Zhu, Fengqing},
   booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages     = {30534--30544},
   year      = {2025}
 }
 
-% ---- Regularisation / optimisation-based CL ----
+% == Regularisation / optimisation-based CL ==
 @inproceedings{bian2024cflat,
   title     = {Make Continual Learning Stronger via {C-Flat}},
   author    = {Bian, Ang and Li, Wei and Yuan, Hangjie and Yu, Chengrong and Wang, Mang and Zhao, Zixiang and Lu, Aojun and Ji, Pengliang and Feng, Tao},
   booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {37},
+  pages     = {7608--7630},
   year      = {2024}
 }
 
@@ -232,7 +242,7 @@
   year      = {2021}
 }
 
-% ---- Replay-based CL ----
+% == Replay-based CL ==
 @inproceedings{chaudhry2019agem,
   title     = {Efficient Lifelong Learning with {A-GEM}},
   author    = {Chaudhry, Arslan and Ranzato, Marc'Aurelio and Rohrbach, Marcus and Elhoseiny, Mohamed},
@@ -247,7 +257,7 @@
   year      = {2017}
 }
 
-% ---- Representation-based / PEFT CL ----
+% == Representation-based / PEFT CL ==
 @inproceedings{mcdonnell2023ranpac,
   title     = {{RanPAC}: Random Projections and Pre-trained Models for Continual Learning},
   author    = {McDonnell, Mark D. and Gong, Dong and Parvaneh, Amin and Abbasnejad, Ehsan and van den Hengel, Anton},
@@ -267,10 +277,11 @@
   title     = {{InfLoRA}: Interference-Free Low-Rank Adaptation for Continual Learning},
   author    = {Liang, Yan-Shuo and Li, Wu-Jun},
   booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages     = {23638--23647},
   year      = {2024}
 }
 
-% ---- Continual learning for IE (NER / RE) ----
+% == Continual learning for IE (NER / RE) ==
 @inproceedings{zheng2022cfner,
   title     = {Distilling Causal Effect from Miscellaneous Other-Class for Continual Named Entity Recognition},
   author    = {Zheng, Junhao and Liang, Zhanxian and Chen, Haibin and Ma, Qianli},
@@ -304,7 +315,8 @@
   volume    = {492},
   pages     = {70--82},
   publisher = {Springer},
-  year      = {2023}
+  year      = {2024},
+  doi       = {10.1007/978-3-031-50974-2_6}
 }
 
 @inproceedings{zhang2023cpfd,
@@ -314,7 +326,7 @@
   year      = {2023}
 }
 
-% ---- Multimodal CL benchmarks / analysis ----
+% == Multimodal CL benchmarks / analysis ==
 @inproceedings{srinivasan2022climb,
   title     = {{CLiMB}: A Continual Learning Benchmark for Vision-and-Language Tasks},
   author    = {Srinivasan, Tejas and Chang, Ting-Yun and Pinto Alva, Leticia and Chochlakis, Georgios and Rostami, Mohammad and Thomason, Jesse},
@@ -358,7 +370,7 @@
 %  Bibliographic data verified against arXiv / publisher pages.
 % =====================================================================
 
-% ---- Optimisation- and architecture-based CL ----
+% == Optimisation- and architecture-based CL ==
 @inproceedings{farajtabar2020ogd,
   title     = {Orthogonal Gradient Descent for Continual Learning},
   author    = {Farajtabar, Mehrdad and Azizan, Navid and Mott, Alex and Li, Ang},
@@ -390,7 +402,7 @@
   year      = {2023}
 }
 
-% ---- Fisher information / natural gradient ----
+% == Fisher information / natural gradient ==
 @article{amari1998natural,
   title     = {Natural Gradient Works Efficiently in Learning},
   author    = {Amari, Shun-ichi},
@@ -401,7 +413,7 @@
   year      = {1998}
 }
 
-% ---- Continual relation extraction ----
+% == Continual relation extraction ==
 @inproceedings{han2020emar,
   title     = {Continual Relation Learning via Episodic Memory Activation and Reconsolidation},
   author    = {Han, Xu and Dai, Yi and Gao, Tianyu and Lin, Yankai and Liu, Zhiyuan and Li, Peng and Sun, Maosong and Zhou, Jie},
@@ -439,18 +451,21 @@
   year      = {2025}
 }
 
-% ---- Continual NER (generative) ----
-@article{gencner,
+% == Continual NER (generative) ==
+@inproceedings{gencner,
   title     = {{GenCNER}: A Generative Framework for Continual Named Entity Recognition},
   author    = {Yang, Yawen and Ma, Fukun and Meng, Shiao and Liu, Aiwei and Wen, Lijie},
-  journal   = {arXiv preprint arXiv:2510.11444},
-  year      = {2025}
+  booktitle = {2025 International Joint Conference on Neural Networks (IJCNN)},
+  pages     = {1--9},
+  year      = {2025},
+  doi       = {10.1109/IJCNN64981.2025.11227587},
+  note      = {arXiv:2510.11444}
 }
 
-% ---- Document-level continual learning ----
+% == Document-level continual learning ==
 @article{gdibench,
   title     = {{GDI-Bench}: A Benchmark for General Document Intelligence with Vision and Reasoning Decoupling},
-  author    = {Li, Siqi and Shen, Yufan and Chen, Xiangnan and Chen, Jiayi and Ju, Hengwei and Duan, Haodong and Mao, Song and Zhou, Hongbin and Zhang, Bo and Fu, Bin and others},
+  author    = {Li, Siqi and Shen, Yufan and Chen, Xiangnan and Chen, Jiayi and Ju, Hengwei and Duan, Haodong and Mao, Song and Zhou, Hongbin and Zhang, Bo and Fu, Bin and Cai, Pinlong and Wen, Licheng and Shi, Botian and Liu, Yong and Cai, Xinyu and Qiao, Yu},
   journal   = {arXiv preprint arXiv:2505.00063},
   year      = {2025}
 }
@@ -474,7 +489,7 @@
   year      = {2018}
 }
 
-% ---- Exemplar-free feature replay (added for ICLR draft) ----
+% == Exemplar-free feature replay (added for ICLR draft) ==
 @inproceedings{zhu2021pass,
   title     = {Prototype Augmentation and Self-Supervision for Incremental Learning},
   author    = {Zhu, Fei and Zhang, Xu-Yao and Wang, Chuang and Yin, Fei and Liu, Cheng-Lin},
@@ -498,7 +513,7 @@
 
 @inproceedings{lca2026,
   title     = {{LCA}: Local Classifier Alignment for Continual Learning},
-  author    = {Tran, Tung and Vargas, Danilo and Than, Khoat},
+  author    = {Tran, Tung and Vasconcellos Vargas, Danilo and Than, Khoat},
   booktitle = {International Conference on Learning Representations (ICLR)},
   year      = {2026}
 }
@@ -529,7 +544,8 @@
 @inproceedings{zhang2023slca,
   title     = {{SLCA}: Slow Learner with Classifier Alignment for Continual Learning on a Pre-trained Model},
   author    = {Zhang, Gengwei and Wang, Liyuan and Kang, Guoliang and Chen, Ling and Wei, Yunchao},
-  booktitle = {ICCV},
+  booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+  pages     = {19091--19101},
   year      = {2023}
 }
 
