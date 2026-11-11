@@ -1,6 +1,7 @@
 """Per-session retention on CIL-CORD (session-restricted scoring): F1 on session j after each
 later session, mean over seeds, for CoLaR (shared softmax), CoLaR-SBR and SBR-Recall. Reads the
-same sources, in the same priority order, as make_clean_tables.py.
+same sources with the same selection rule as make_clean_tables.py (clean only when all three
+clean seeds exist, else the first non-empty legacy source).
 
     uv run python scripts/rca/make_retention_fig.py   ->  paper_cvpr/figures/retention_cilcord.pdf
 """
@@ -13,13 +14,14 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-from make_clean_tables import SEEDS, C  # noqa: E402
+from make_clean_tables import CLEAN, SEEDS, C, choose  # noqa: E402
 
 PANELS = [("colar", "CoLaR"), ("sbr", "CoLaR-SBR"), ("recall", "SBR-Recall")]
 
 
 def matrices(sources):
-    """Retention matrices of the first source with all seeds, else the first non-empty one."""
+    """Retention matrices chosen by the tables' rule (``choose``): the clean source only with all
+    three seeds, otherwise the first non-empty legacy source."""
     per_source = []
     for root, name, sfx in sources:
         mats = []
@@ -27,9 +29,9 @@ def matrices(sources):
             hits = sorted(glob(f"{root}/{name}_seed{s}{sfx}/**/matrix.npy", recursive=True))
             if hits:
                 mats.append(np.load(hits[0]))
-        per_source.append(mats)
-    full = [m for m in per_source if len(m) == len(SEEDS)]
-    return (full or [m for m in per_source if m] or [[]])[0]
+        per_source.append((mats, root == CLEAN))
+    i = choose(per_source)
+    return per_source[i][0] if i is not None else []
 
 
 def main():
