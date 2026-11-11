@@ -282,7 +282,8 @@ SEED_HDR = "Row & Source & 42 & 7 & 123 & h/run \\\\\n"
 
 ROW_LABEL = {"naive": "Naive", "nobank": "SBR, no memory", "colar": "CoLaR",
              "sbr": "CoLaR-SBR", "cllora": "CL-LoRA", "recall": "SBR-Recall",
-             "joint": "Joint training", "er": "ER", "slot": "CoLaR-SBR + LexSlot"}  # fmt: skip
+             "joint": "Joint training", "er": "ER", "slot": "CoLaR-SBR + LexSlot",
+             "sbr_recall_r64": "SBR-Recall", "sbr_noreplay": "SBR, no memory"}  # fmt: skip
 
 
 def write_perseed():
@@ -309,6 +310,7 @@ def write_agree():
         if "smoke" in f or m.get("full_label_f1") is None:
             continue
         rows.append((m["scenario"], m["method"], m["seed"], m["AA"], m["full_label_f1"]))
+    rows.sort(key=lambda r: (r[0], r[1], SEEDS.index(r[2]) if r[2] in SEEDS else len(SEEDS)))
     t = HDR + "\\begin{tabular}{llcccc}\n\\toprule\n"
     t += "Scenario & Method & Seed & AA & Full-label F1 & Difference \\\\\n\\midrule\n"
     for sc, me, sd, aa, fl in rows:
@@ -443,6 +445,30 @@ def write_supp():
     write_delta()
 
 
+def recall_macros() -> str:
+    """Per-seed facts about the SBR-Recall CIL-CORD cell that the text states (rule 7):
+    \\nRecallJointGap = max over seeds of |Recall - joint| (seed-matched, cells' own sources);
+    \\nRecallMaxLoss / \\nRecallMaxGain = largest fall / rise of any session below / above its
+    diagonal at any later boundary, on any seed of the chosen source."""
+    a, b = chosen_source(C["recall"]), chosen_source(C["joint"])
+    ra = load_seeds(a[0], a[1], suffix=a[2]) if a else {}
+    rb = load_seeds(b[0], b[1], suffix=b[2]) if b else {}
+    gaps = [abs(ra[s] - rb[s]) for s in SEEDS if s in ra and s in rb]
+    moves = [
+        mat[i, j] - mat[j, j]
+        for mat in matrices(C["recall"])
+        for j in range(mat.shape[0])
+        for i in range(j, mat.shape[0])
+    ]
+    vals = {  # "--" when the runs are missing, so the paper still builds
+        "nRecallJointGap": f"{max(gaps):.1f}" if gaps else "--",
+        "nRecallMaxLoss": f"{max(0.0, -min(moves)):.1f}" if moves else "--",
+        "nRecallMaxGain": f"{max(moves):.1f}" if moves else "--",
+    }
+    t = "".join(f"\\newcommand{{\\{k}}}{{{x}}}\n" for k, x in vals.items())
+    return t
+
+
 def main():
     cell = {k: pick(v) for k, v in C.items()}
     mix = {k: pick(v) for k, v in M.items()}
@@ -469,6 +495,7 @@ def main():
         v += macro(n, dil[k][0])
     for k, n in (("sbr", "SbrFull"), ("recall", "RecallFull"), ("joint", "JointFull")):
         v += macro(n, full[k][0])
+    v += recall_macros()
     (OUT / "vals.tex").write_text(v)
 
     # ---- tab_2x2.tex

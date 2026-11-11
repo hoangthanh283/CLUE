@@ -3,7 +3,8 @@ later session, mean over seeds, for CoLaR (shared softmax), CoLaR-SBR and SBR-Re
 same sources with the same selection rule as make_clean_tables.py (clean only when all three
 clean seeds exist, else the first non-empty legacy source).
 
-    uv run python scripts/rca/make_retention_fig.py   ->  paper_cvpr/figures/retention_cilcord.pdf
+    PYTHONPATH=scripts/rca uv run python scripts/rca/make_retention_fig.py
+        ->  paper_cvpr/figures/retention_cilcord.pdf (panel titles: seeds n and protocol)
 """
 
 from pathlib import Path
@@ -13,7 +14,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-from make_clean_tables import C, matrices  # noqa: E402
+from make_clean_tables import CLEAN, C, matrix_choice  # noqa: E402
 
 PANELS = [("colar", "CoLaR"), ("sbr", "CoLaR-SBR"), ("recall", "SBR-Recall")]
 
@@ -23,13 +24,15 @@ def main():
     fig, axes = plt.subplots(1, 3, figsize=(3.35, 1.45), sharey=True)
     colors = plt.cm.viridis(np.linspace(0.05, 0.85, 5))
     for ax, (key, title) in zip(axes, PANELS, strict=True):
-        mats = matrices(C[key])
+        source, by_seed = matrix_choice(C[key])
+        mats = list(by_seed.values())
         if mats:
             mean = np.mean(mats, axis=0)
             n = mean.shape[0]
             for j in range(n):
                 ax.plot(range(j + 1, n + 1), mean[j:, j], marker="o", ms=2, lw=0.9, color=colors[j])
-        ax.set_title(f"{title} (n={len(mats)})", fontsize=6, pad=2)
+        proto = "clean" if source and source[0] == CLEAN else r"$\dagger$"  # protocol per panel
+        ax.set_title(f"{title} (n={len(mats)}, {proto})", fontsize=5.5, pad=2)
         ax.set_xticks(range(1, 6))
         ax.set_ylim(0, 100)
         ax.grid(alpha=0.25, lw=0.3)
@@ -39,7 +42,7 @@ def main():
         "sessions trained (one line per session $j$, from when it is learned)", labelpad=1
     )
     fig.subplots_adjust(left=0.105, right=0.995, top=0.88, bottom=0.2, wspace=0.08)
-    out = Path("paper_cvpr/figures/retention_cilcord.pdf")
+    out = Path(__file__).resolve().parents[2] / "paper_cvpr/figures/retention_cilcord.pdf"
     fig.savefig(out)
     print("wrote", out)
 
