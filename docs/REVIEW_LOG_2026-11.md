@@ -329,3 +329,78 @@ legacy counterpart was 87.62, so held-out early stopping moves AA by +0.14 on th
   names in use. The BROS run directories carry a `_bros` suffix and cannot collide with the
   LayoutLMv3 globs. The v2 CL-LoRA clean cell uses the config defaults, which inherits H2: it is
   still not a matched control for SBR-Recall.
+
+## R1b (2026-11-11): bibliography audit
+
+Scope: all 52 keys cited in `paper_cvpr/main.tex`, `supp.tex` and `fig/*.tex` at HEAD 94c8068.
+`refs.bib` has not changed since baff53b. Keys that are in `refs.bib` but never cited (e.g.
+`le2025wavecre`, `zhang2025clcrossvqa`, `ge2025dmole`) are not in the built list and were not
+audited.
+
+Method: for each record I checked title, author list and order, venue, year and pages against the
+following sources (in this order of preference):
+- **DOI record:** the publisher-deposited Crossref metadata, at `https://doi.org/<DOI>` (38 entries);
+- **arXiv:** the arXiv API record (author order, plus the venue note in the comments field);
+- **PMLR:** the proceedings page (`zhai2023investigating`);
+- **ICLR/OpenReview pages:** for `lca2026`, `ramasesh2021anatomy` and `yoon2018den`.
+
+LoRA (ICLR 2022), OGD (AISTATS 2020) and Learning without Forgetting (LwF, ECCV 2016) have their
+venue confirmed by arXiv and Google Research pages, not by opening the proceedings page.
+
+**Verdict for the bibliography: no non-existent reference (no CRITICAL).** One entry is WRONG
+(venue), four need MINOR corrections, and 47 are OK.
+
+### Entries that need a change
+
+| Key | Status | What is wrong | Correct record | Source |
+|---|---|---|---|---|
+| `gencner` | **WRONG (venue)** | Cited as an arXiv preprint, but it is published (arXiv comment: "Accepted by IJCNN 2025") | Yang, Yawen and Ma, Fukun and Meng, Shiao and Liu, Aiwei and Wen, Lijie. "GenCNER: A Generative Framework for Continual Named Entity Recognition". 2025 International Joint Conference on Neural Networks (IJCNN), 2025, pp. 1–9, doi:10.1109/IJCNN64981.2025.11227587 (arXiv:2510.11444) | https://doi.org/10.1109/IJCNN64981.2025.11227587 ; https://arxiv.org/abs/2510.11444 |
+| `lca2026` | MINOR (author name) | Second author is given as "Vargas, Danilo" | Tran, Tung and Vasconcellos Vargas, Danilo and Than, Khoat. "LCA: Local Classifier Alignment for Continual Learning". ICLR 2026 (arXiv:2603.09888) | https://arxiv.org/abs/2603.09888 ; https://iclr.cc/virtual/2026/poster/10011599 |
+| `kumar2023protoner` | MINOR (year, series) | The publisher record dates the volume 2024 and places it in a series; the bib entry has 2023 and no series | Kumar, Ritesh and Goyal, Saurabh and Verma, Ashish and Isahagian, Vatche. "ProtoNER: Few Shot Incremental Learning for Named Entity Recognition Using Prototypical Networks". Business Process Management Workshops (BPM 2023), Lecture Notes in Business Information Processing, Springer, 2024, pp. 70–82, doi:10.1007/978-3-031-50974-2_6 | https://doi.org/10.1007/978-3-031-50974-2_6 ; https://arxiv.org/abs/2310.02372 |
+| `gdibench` | MINOR (authors truncated) | The first 10 of 16 authors are correct and in order, then "and others". No venue found: it is still arXiv only | Li, Siqi; Shen, Yufan; Chen, Xiangnan; Chen, Jiayi; Ju, Hengwei; Duan, Haodong; Mao, Song; Zhou, Hongbin; Zhang, Bo; Fu, Bin; Cai, Pinlong; Wen, Licheng; Shi, Botian; Liu, Yong; Cai, Xinyu; Qiao, Yu. arXiv:2505.00063, 2025 | https://arxiv.org/abs/2505.00063 |
+| `zhang2023slca` | MINOR (venue string) | booktitle is just "ICCV" | Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV), 2023, pp. 19091–19101, doi:10.1109/ICCV51070.2023.01754 | https://doi.org/10.1109/ICCV51070.2023.01754 |
+
+Optional page and volume completions, none of which is wrong as written:
+- `wang2024survey`: TPAMI 46(8):5362–5383, doi:10.1109/TPAMI.2024.3367329;
+- `hong2022bros`: AAAI 36(10):10767–10775;
+- `huang2022layoutlmv3`: 4083–4091;
+- `he2025cllora`: 30534–30544;
+- `liang2024inflora`: 23638–23647;
+- `bian2024cflat`: NeurIPS 37, 7608–7630.
+
+### Entries verified OK (47)
+
+| Group | Keys |
+|---|---|
+| Regularisation and replay | aljundi2018mas, buzzega2020der, kirkpatrick2017ewc, li2017lwf (ECCV 2016), lopezpaz2017gem, rebuffi2017icarl, rolnick2019er, zenke2017si |
+| Optimisation geometry | farajtabar2020ogd, saha2021gpm, bian2024cflat |
+| Pre-trained-model, prompt and adapter methods | wang2022l2p, wang2022dualprompt, smith2023coda, wang2023olora, he2025cllora, mcdonnell2023ranpac, zhou2024ease, liang2024inflora |
+| Architectural isolation | mallya2018packnet, yoon2018den |
+| Surveys and theory | masana2022class (TPAMI 2023, 45(5)), wang2024survey, kim2022theoretical |
+| Exemplar-free methods | zhu2021pass, petit2023fetril, goswami2023fecam |
+| Latent and generative replay | hayes2020remind, pellegrini2020latent, vandeven2020brain (Nat. Commun. 11:4069) |
+| Forgetting analysis and tools | ramasesh2021anatomy, zhai2023investigating (CPAL, PMLR 234:202–227), kornblith2019similarity, mccloskey1989catastrophic, hu2022lora |
+| Document encoders | huang2022layoutlmv3, wang2022lilt, hong2022bros |
+| Continual NER | zhang2023cpfd, zheng2022cfner (EMNLP 2022, 3602–3615), zhang2023spankl (AAAI 37(11):13993–14001), qiu2024is3 (Findings ACL 2024, 777–791), liu2023ice (Findings ACL 2023, 2241–2257) |
+| Continual relation extraction | han2020emar, cui2021rpcre, zhao2022crl |
+| Document continual learning | minouei2022table (Applied Sciences 12(18):8969, doi:10.3390/app12188969) |
+
+### Sentence checks: does the cited paper say what the sentence attributes to it?
+
+| # | Sentence (main.tex Related Work) | Verdict | Reason (source) |
+|---|---|---|---|
+| 1 | Current wording: "ICE trains per-session classifiers on a frozen encoder ... neither replays stored examples" | SUPPORTED | ICE stands for "Individual Classifiers with Frozen Feature Extractor": it trains one classifier per session, in the setting where no old-class samples are stored (ACL Anthology 2023.findings-acl.141). |
+| 1b | Earlier wording: "neither trains the trunk" | NOT SUPPORTED for SpanKL | SpanKL fine-tunes a shared bert-large-cased contextual encoder with AdamW (arXiv:2302.12200, Sec. on implementation). The current wording, "per-type span heads with distillation; neither replays stored examples", is SUPPORTED: SpanKL uses a span layer per task, per-type sigmoid binary cross-entropy, and Bernoulli-KL distillation, with no rehearsal. |
+| 2 | "Document-level CL is nascent: ... ProtoNER addresses few-shot incremental NER" | SUPPORTED, but undersold | ProtoNER does key-value/NER extraction on visually rich documents with LayoutLMv2/v3/LiLT-type models and adds classes from about 30 samples, using prototypical networks and a hybrid loss, without retaining the original training data (arXiv:2310.02372). It is the closest prior work to this paper's setting (class-incremental KIE on LayoutLM-family encoders). Suggest: "ProtoNER adds new KIE classes to a LayoutLM-family model from few labelled documents with prototypical networks". |
+| 3 | "REMIND quantises later-layer features, Latent Replay banks activations at a chosen layer ... **Each stores one summary per token or class** and targets image labels" | **NOT SUPPORTED, HIGH** | REMIND stores, *per training image*, product-quantised codes of a *mid-level* CNN feature map (an m×m×s integer array) and replays them through the plastic upper layers (arXiv:1910.02509, Sec. 3). Latent Replay stores per-pattern "activation volumes" at an intermediate layer (arXiv:1912.01100). Neither keeps one summary per class or token: both keep one compressed or raw entry per example. That is CoLaR's design too, so the stated distinction from the closest prior work is false. What does differ: a document has one label per token bound to a position, and per-document truncated SVD replaces product quantisation. Fix the sentence to say that, and write "mid-level", not "later-layer". |
+| 4 | "generative replay samples a per-class model" | NOT SUPPORTED | Brain-inspired replay uses a *single* conditional VAE whose latent prior is a Gaussian mixture with one mode per class, and it replays hidden-level representations (Nat. Commun. 11:4069, PMC7426273). Fix: "samples hidden representations from one class-conditional generator". |
+| 5 | "Zhai et al. report the same [forgetting at the layers nearest the output] for multimodal LLMs" | NOT SUPPORTED | Zhai et al. evaluate forgetting with EMT, treating the multimodal LLM as an image classifier, and find degradation and hallucination as fine-tuning proceeds, "even when the image encoder remains frozen". There is no layer-wise localisation (arXiv:2309.10313; PMLR 234). Fix: "and Zhai et al. find forgetting in multimodal-LLM fine-tuning even with the image encoder frozen", and drop "the same". |
+| 6 | "Kim et al. decompose class-incremental learning into within-task prediction and task-identity prediction, and tie the latter to OOD detection" | SUPPORTED | Abstract: "decomposed into ... Within-task Prediction (WP) and Task-id Prediction (TP)"; "TP is correlated with OOD detection" (NeurIPS 2022 proceedings). |
+| 7 | "recent adapter methods train one module per task and infer which to use at test time (EASE, InfLoRA)" | **NOT SUPPORTED** | EASE trains one adapter per task but concatenates all of them for "joint decision-making across multiple subspaces": there is no task inference (arXiv:2403.12030). InfLoRA reparameterises the pre-trained weights within an interference-free subspace, so a single model runs at test time with no module selection (arXiv:2404.00228). Fix: drop "and infer which to use", or cite methods that do infer task identity. HiDe-Prompt (NeurIPS 2023) and MoE-Adapters (CVPR 2024) are candidates; both are named from memory and must be verified before adding. |
+| 8 | "GDI-Bench freezes layers heuristically" | NOT SUPPORTED as worded | GDI-Model's Layer-wise Adaptive Freeze-Tuning (LW-AFT) freezes about 99% of individual *parameters*, not layers. Which ones stay trainable is set by update magnitude after a 10% expert fine-tune, with a per-layer budget (arXiv:2505.00063v2, Sec. 4). It is also a supervised fine-tuning study of a multimodal LLM, not a continual-learning method. Fix: "GDI-Bench mitigates forgetting in multimodal-LLM fine-tuning by freezing most parameters, chosen by their update magnitude". |
+| 9 | "continual table detection uses plain ER" | SUPPORTED | Abstract: "We employed an effective technique called experience replay" (doi:10.3390/app12188969). |
+| 10 | "Ramasesh et al. localise forgetting in image classifiers to the layers nearest the output" | SUPPORTED | "deeper layers are disproportionately the source of forgetting"; "higher layers refer to layers closest to the output" (arXiv:2007.07400). |
+| 11 | "LCA: merge models and realign the classifier" | SUPPORTED | It merges parameter-efficient fine-tuning (PEFT) parameters, then realigns the classifier on samples drawn from per-class Gaussians (arXiv:2603.09888). |
+| 12 | "CPFD, CFNER: distillation and pseudo-labels" | SUPPORTED for CPFD; UNCLEAR for CFNER | CPFD uses pooled-feature distillation and confidence-based pseudo-labelling. CFNER's abstract describes causal-effect distillation from Other-class tokens plus curriculum learning for label noise; pseudo-labels are not named in the abstract (arXiv:2210.03980). |
+| 13 | "GenCNER: span generation" | SUPPORTED loosely | It casts continual NER as "entity triplet sequence generation" with pseudo-labelling and KD. "Entity-triplet generation" would be more exact. |
+| 14 | "EMAR, RP-CRE, CRL: episodic memory with prototypes ... all sentence-level and text-only" | SUPPORTED | Memory replay with prototypes or memory-based nearest-class-mean (NCM) classification. All are relation-extraction work on sentences. |
