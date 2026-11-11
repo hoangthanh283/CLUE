@@ -34,6 +34,7 @@ from doccl.methods.colar_bal import CoLaRBal
 from doccl.methods.colar_cb import CoLaRCB
 from doccl.methods.colar_knn import CoLaRKNN
 from doccl.methods.colar_meta import CoLaRMeta
+from doccl.methods.colar_mib import CoLaRMiB
 from doccl.methods.colar_pp import CoLaRPP
 from doccl.methods.colar_r import CoLaRRefresh
 from doccl.methods.colar_sbr import CoLaRSBR
@@ -304,6 +305,7 @@ METHOD_REGISTRY = {
     # CoLaR-Meta: memory in weight DYNAMICS — Benna-Fusi multi-timescale consolidation on
     # the plastic bucket, composed with replay. Falsification-risk track (EWC precedent).
     "colar_meta": CoLaRMeta,
+    "colar_mib": CoLaRMiB,  # D14b control: CoLaR + shared softmax + MiB-style unbiased CE
     # LARM: CoLaR replay fused with a lexically-routed additive feature-rewrite memory (replay
     # writes the memory values, OCR-cosine routing reads them). Targets BWT×FWT Pareto-dominance.
     "larm": LARM,
@@ -1176,6 +1178,7 @@ def main(cfg: DictConfig) -> None:
         # runs its own model forward, bypassing method.evaluate's kNN blend) — known gap.
         "colar_knn",
         "colar_meta",
+        "colar_mib",
         "larm",
         "nullspace_analytic",
         "fisher_mask",
