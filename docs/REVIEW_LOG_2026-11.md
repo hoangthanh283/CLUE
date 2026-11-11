@@ -704,3 +704,128 @@ change labels and an axis limit only.
 ### OPEN (not counted)
 - Abstract clause "an effect that no memory can repair" (user decision; its body echo is L-o).
 - CR2: † headline cells, pending data.
+
+## R3 (2026-11-11): confirmation of P4
+
+Scope: `git diff cfccda1..37e7df4 -- paper_cvpr/ scripts/rca/make_clean_tables.py
+scripts/rca/make_retention_fig.py`, the PDFs rebuilt at 08:16, and the v4 driver (5be5c26).
+Read-only. No model or dataset touched.
+
+### Verdict: **PASS for draft upload**
+
+N1 is fixed everywhere. No CRITICAL or HIGH finding remains besides the waived CR2 and the
+user-pending abstract clause. Two MEDIUM items should go into the next Paper round:
+- **N4 residual:** the new "within ten points / thirty points below" bounds fail per seed.
+- **N6 (new):** the new Sec. 5.3 sentence contradicts the paper's own Related Work.
+
+### Status table
+
+| Item | Status | Current text / cell |
+|---|---|---|
+| **N1** generator label | CONFIRMED FIXED | `make_clean_tables.py`: `f"Low-rank adapters, no memory & ..."`; `tab_2x2.tex` row "Low-rank adapters, no memory". |
+| **N1** `tab:twobytwo` caption | CONFIRMED FIXED | "its two cells differ in adapter design as well as in readout: our port of CL-LoRA (one rank-8 adapter on the attention projections of the frozen pre-trained encoder, shared by all sessions, trained with distillation and an orthogonality penalty against its own earlier states; fp16 or fp32 by seed, 30-epoch cap) with a shared softmax, and SBR-Recall (one rank-64 delta per session on the attention and feed-forward layers above k, base frozen after the first session, fp32, 10-epoch cap)". Matches the code. |
+| **N1** Sec. 4.3 | CONFIRMED FIXED | "CL-LoRA, one low-rank adapter shared by all sessions, with a shared softmax, collapses ... SBR-Recall, one low-rank delta per session ... This row is not a controlled swap of the readout". |
+| **N1** teaser | CONFIRMED FIXED | Bar label "low-rank adapters". Caption: "one low-rank delta per session with a blocked readout (SBR-Recall) is on par with it without a memory, while a single low-rank adapter shared by all sessions with a shared softmax (our CL-LoRA port) collapses". |
+| **N1** leftovers | CONFIRMED FIXED | Every remaining "per-session" in main.tex and supp.tex refers to SBR, SBR-Recall, ICE, scoring or session pools; none refers to CL-LoRA. Cosmetic only: the v4 driver comment (line 40) still says "per-session isolation with a shared softmax". |
+| **N2** | CONFIRMED FIXED | main:91: "Our CL-LoRA port trains a single rank-8 adapter on the attention projections of the frozen encoder, shared by all sessions, unlike the published one-adapter-per-task design, so its numbers describe this port." The supp Hyperparameters paragraph states the same for O-LoRA and CL-LoRA, with λ = 0.5 and T = 2, both matching the configs. The causal clause is gone: "Our single-adapter LoRA ports acquire but forget as much as naive training does." |
+| **N3** | CONFIRMED FIXED | Limitations: "Every cell is marked by its protocol and never mixes the two, so a comparison across protocols is visible from the marks in the tables". |
+| **N4** | **PARTLY (MEDIUM)** | See below. Affects the `tab:dil` caption and main:122 ("EWC and LwF stay within ten points of naive training and at least thirty points below joint training"), and the supp `tab:grid` caption ("regularisation and distillation stay within ten points of naive training"). |
+| **N5** | CONFIRMED FIXED | "None of these document-level works separates the causes of forgetting." (The background claim is removed.) |
+| M5 residual | PARTLY (now LOW) | The false "10 epochs" claim is gone. The new pointer misleads: "`tab:legacyprotocol` lists them for the rows shared with the main paper". `tab:legacy`'s CIL-CORD and Mixed columns are the earlier grid (`results/{cil_cord,mixed}_<m>_seed*`, legacy scoring), not the rescore runs behind the main paper's † cells; only its DIL column is shared. |
+| L1 residual | CONFIRMED FIXED | supp `tab:grid`: BROS LwF `35.1±3.1`, DER++ `87.5±1.1`, BERT ER `77.1±0.9`, equal to `tab_dil_grid.tex`. The table is still typed by hand. |
+| Units (L-d) | CONFIRMED FIXED for the file-backed numbers | 101 MB = 100,672,250 B; 57 MB = 4 × 7,077,888 × 2 B = 56.6e6; 60 MB = 60,403,200 B. Note: "163 MB", "about 32 MB" and the pareto labels (0.45/0.39/0.48 MB) come from the ledger and figure constants ("restored from logs"); their unit cannot be confirmed from a `metrics.json`. The logs print MB as bytes/1e6, so decimal is likely. |
+| "16--19 AA on average" (L-e) | CONFIRMED FIXED | main:128. |
+| IS3 s.d. (L-c) | CONFIRMED FIXED | "AA 4.4±2.2 ... 30.1±1.2". ddof 1 on 5.02/6.17/2.00 and 28.85/31.18/30.26. The run-set scoping is still open; see (a). |
+| supp grid caption (L-b) | CONFIRMED FIXED | "on CIL-CORD every method stays below joint training under this scoring, and only LwF (on BROS and BERT) rises above naive training". Checked against every grid cell. Its "within ten points" clause is N4. |
+| zero-drop rule (L-i) | CONFIRMED FIXED | `kept = [v for v in vs if v != 0.0] ...`. The output is unchanged (the LwF zeros are exact). |
+| no-text condition (L-g) | CONFIRMED FIXED | "the model without text forgets least, −66.7 over three seeds" (−65.92/−66.15/−67.93). |
+| L-n, L-p, L-f, L-o | CONFIRMED FIXED | "did not collapse in its fp32 run"; "every continual method with a shared softmax"; "On CIL-CORD and Mixed, epoch caps differ by method (the DIL caps are in the supplement)"; "no memory we tested resolved the second". |
+
+**N4 per seed** (DIL run files; difference to naive of the same seed, and distance below joint
+of the same seed):
+
+| Backbone | Method | s42 | s7 | s123 |
+|---|---|---|---|---|
+| LayoutLMv3 | EWC | +0.1 / 49.5 | −0.7 / 46.7 | +0.3 / 46.3 |
+| LayoutLMv3 | LwF | +2.5 / 47.1 | +1.6 / 44.4 | +3.0 / 43.7 |
+| LiLT | EWC | **+11.6** / 30.6 | +1.8 / 43.5 | **+11.3** / 32.2 |
+| BROS | EWC | +6.3 / 38.9 | +1.2 / 48.3 | +6.7 / 40.1 |
+| BROS | LwF | −3.1 / 48.2 | −6.6 / 56.1 | −5.8 / 52.6 |
+| BERT | EWC | +6.4 / 31.9 | **+10.3 / 27.2** | +4.9 / 32.8 |
+| BERT | LwF | +1.0 / 37.2 | +0.8 / 36.7 | +1.5 / 36.2 |
+
+The bounds hold on the means (largest gain over naive +8.2, LiLT EWC; smallest gap to joint
+30.6, BERT EWC) but fail in three runs. Fix: write "on average" in all three places, or use
+per-run bounds ("within 12 points of naive training and at least 27 below joint training in
+every run").
+
+### New findings
+
+**MEDIUM N6. The new Sec. 5.3 sentence overclaims and contradicts Related Work.** main:187:
+"It has no shared-softmax counterpart: per-session deltas need something to select them at test
+time, and without blocks the only selector would be a task-identity oracle". Related Work
+(main:81) says the opposite: "recent adapter methods add one module per task and need no task
+identity at test time, either by combining the features of all modules (EASE) or by folding
+them into the pre-trained weights (InfLoRA)". Kim et al. is cited there for task-identity
+*prediction*, not an oracle. Fix: "A shared-softmax counterpart would have to combine or merge
+the deltas (as EASE and InfLoRA do) or predict the session with a separate model; we did not
+run one. SBR's per-session background logit is such a predictor, trained at no extra cost."
+
+**LOW**
+- (a) The supp IS3 sentence and `tab:main` use different run sets *and* different scorings.
+  - Supp prose ("AA 4.4±2.2 on CIL-CORD ... 30.1±1.2", "diagonal ... on seed 123"; also `tab:legacy`): the earlier grid `results/{cil_cord,mixed}_is3_seed{42,7,123}`. Three seeds, 10-epoch cap, fp32, test-split early stopping, **legacy scoring** (no restriction; it predates c430b87).
+  - `tab:main` IS3 cells (5.6/7.7, 0.0/40.6): `results/rescore/{cil_cord,mixed}_is3_seed{42,7}`. Two seeds, **100-epoch cap**, fp32 in effect, test-split early stopping, **session-restricted scoring** (log `cil_restrict_eval: true`).
+  - The Mixed seed-42 runs differ (28.85 vs 0.00) although the precision is the same, so the zero is not a rescoring of the same model.
+  - The supp sentence must say: "In the earlier grid (legacy scoring, 10-epoch cap, three seeds) IS3 ... gives AA 4.4±2.2 on CIL-CORD ... 30.1±1.2 on Mixed (`tab:legacy`); the session-restricted re-runs in the main comparison (100-epoch cap, two seeds) read 5.6/7.7 and 0.0/40.6."
+  - The CPFD sentence in the same paragraph ("AA 2.7 and 0.0 on seeds 42 and 123"; "on Mixed it reads 6.0, 0.0 and 0.1") is also from the earlier grid and needs the same qualifier.
+- (b) CoLaR-R, sliced. A row is needed in `tab:legacyprotocol`, because main:130 quotes a legacy number from it: "42.0 (two seeds)" = `results/rescore/cil_cord_colar_r_sliced_seed{42,7}` (44.17/39.85). The row: "CIL-CORD | cap 10 | fp16 (log `amp: true`, CoLaR loop wired) | 50 docs/session | 2 seeds" (test-split early stopping, restricted scoring).
+  - The same sentence's oracle refresh, "61.2 (seed 42)" = `gates/.../cil_cord_colar_r_oracle_seed42_k4_d50_r128`, is fp32, cap 10, 50 docs, 1 seed, and is not listed either.
+  - `docs/LEGACY_PROTOCOL_TABLE_2026-11.md` has neither.
+  - `tab:legacy`'s own CoLaR-R row (25.38±2.38 / 61.30±1.91) is a third run set (`results/{cil_cord,mixed}_colar_r_sliced_seed*_k4_d50_r128`: fp32, cap 10, 3 seeds, legacy scoring). It is covered by fixing the M5 pointer.
+- M5 pointer, suggested text: "Its CIL-CORD and Mixed columns are runs of the earlier grid, not the † cells of the main paper: CoLaR, CoLaR-R, LexSlot, CPFD, IS3 and LCA ran in fp32 with a 10-epoch cap; the other rows saved no configuration (grid default cap 100, 30 for CODA-Prompt). The DIL column is the main paper's."
+
+### Regenerated tables
+
+Only three things changed:
+- the row label;
+- the CoLaR-SBR full-label cell, `88.8/91.2^{n=2}` (clean s42 88.83, s7 91.19);
+- `\vSbrFull` 90.0 (= 90.01; unused in prose).
+
+Every other cell of `vals.tex`, `tab_2x2.tex` and `tab_main_clean.tex` is byte-identical to R2.
+`retention_cilcord.pdf` was regenerated from the same inputs (CoLaR n=2 legacy, SBR n=3 gate,
+Recall n=3 gate).
+
+### Clean runs
+
+There is no new finished run. `cil_cord_colar_sbr_seed123` is running (orphan of v3, pid 3395398,
+30 min at 08:20, no `metrics.json`); v4 (pid 3470572) waits on it.
+
+### Queue driver v4 (`clean_protocol_v4_2026-11.sh`)
+
+- **Lock:** `exec 9>$P/.driver.lock; flock -n 9 || {... REFUSED ...; exit 1}` before the wait. Children get `9>&-`, so the lock dies with the driver. This closes L-k for v4-style drivers; v1 to v3 are dead.
+- **Order:**
+  1. CoLaR-SBR, Recall-r64, no-memory SBR, CoLaR, joint and naive on CIL-CORD;
+  2. CL-LoRA;
+  3. ER-250 s42;
+  4. Recall o2/o3;
+  5. Mixed SBR and joint;
+  6. BROS;
+  7. ER-250 s7/s123;
+  8. LwF;
+  9. the rest of Mixed;
+  10. DIL;
+  11. Mixed Recall-c.
+
+  No `cl_lora_r64`.
+- **Names:** unchanged from v3; every run name is a prefix of its run directory (`_k4_d50_r128`, `_bros`), and no two names prefix each other.
+- **Failure:** same as v3: FAIL logged, the queue continues, and a relaunch retries.
+- **Caveat:** the clean ER cell needs ER-250 s7/s123, which come after BROS, so the ER row will likely stay † at the freeze.
+
+### Hygiene
+
+- Body: "References" starts on page 8 of 10.
+- `main.log` and `supp.log`: 0 undefined, 0 overfull.
+- `---`: 0 in every paper input.
+- Em-dash: 0 in both PDFs.
+- Abstract: byte-identical to 0a896ef (sha1 `fa56d93a…` for both).
+- `supp.pdf` is now 8 pages.
