@@ -1526,3 +1526,191 @@ pid 3470572); its directory holds only `tb/`.
   proposes adding "on a single-schema stream", which I support: it matches the corrected
   Conclusion and Sec. 5.3.
 - CR2: the remaining † headline cells, pending data.
+
+## R6 (2026-11-11): audit of P8, the clean SBR-Recall cell
+
+Snapshot: `HEAD = d559dd7`. Tracked paper files are clean against HEAD. The generated files (15:13)
+postdate the last clean Recall `metrics.json` (s123, 14:54). `main.pdf` and `supp.pdf` (15:14/15:15)
+postdate `main.tex`. I rebuilt both from `git archive d559dd7` in a scratch directory, so no tracked
+file was touched. The pdftotext of each rebuild is byte-identical to the committed PDF.
+
+Scope: `git diff d50d267..d559dd7 -- paper_cvpr scripts/rca/make_clean_tables.py scripts/rca/make_retention_fig.py`.
+My own script recomputed every number from `metrics.json`, `matrix.npy` and the logs. No generator,
+model, dataset, torch or pytest was run. The clean `cil_cord_colar_sbr_noreplay_seed42` was running
+during the audit (started 14:54, only `tb/` so far). No paper file reads it.
+
+### Verdict: **PASS**
+
+The three runs are clean and complete, and every Recall value they feed recomputes exactly. The
+diff moves only the Recall cells, plus a reordering of `supp_agree`. Every comparative sentence
+about SBR-Recall holds per seed. The single cross-protocol pairing (clean Recall and CoLaR-SBR
+against fp16 legacy joint) is stated truthfully, in the 2×2 caption and again in App. G. R5 L1–L4
+are fixed. There is no CRITICAL, HIGH or MEDIUM finding. Five LOW items follow.
+
+### A. The three clean SBR-Recall runs
+
+**Config.** The config dumps (log lines 1–40) are identical except for `seed`:
+- `method.name colar_sbr_recall`, `lora_rank 64`, `lora_alpha 128`, targets query/key/value/dense;
+- `epochs 10`, `docs_per_task 0`, `split_layer_k 4`;
+- `amp false`, `fp16 false`, `val_frac 0.1`, `cil_restrict_eval true`, `full_label_eval true`;
+- batch 2 with gradient checkpointing, `output_dir results/clean_2026-11`.
+
+`metrics.json` `training_hparams` / `method_hparams` agree with the dumps. `rank_r: 128` is inert
+because there is no memory.
+
+**Completion.** Every run has a DONE line in `queue.log`:
+- s42: 09:53 to 11:27;
+- s7: 11:27 to 13:07;
+- s123: 13:07 to 14:54.
+
+Each log has "Saved matrix", "Saved metrics" and "Full-label final F1" lines (91.53 / 93.52 / 92.62),
+with no "skipped" line and no traceback. The only ERROR lines are the HF `trust_remote_code` notice,
+which every run shows (CoLaR-SBR clean s42 too).
+
+**Other fields.** `replay_memory_bytes` is 56,623,104 on all three: the four deltas at 2 B per
+parameter (4 × 7,077,888 × 2), i.e. the "57 MB if stored in half precision" of the Cost paragraph.
+`matrix.npy` equals `metrics.json["matrix"]` on all three.
+
+**Matrices (rows: after session i).** No collapsed session:
+- diagonals 92.6/86.9/94.5/85.6/94.9 (s42), 95.0/89.0/90.5/91.7/94.3 (s7), 94.1/89.3/91.1/90.7/94.4 (s123);
+- BWT +0.60 / +0.64 / −0.06;
+- the only exact zeros are the first super-diagonal (the zero-shot reading of a session's not-yet-added labels). Clean CoLaR-SBR and gate Recall have the same zeros, so they are systemic, not a fault.
+
+**Recomputed (42/7/123).**
+
+| Value | Per seed | Mean ± s.d. | Generated | OK |
+|---|---|---|---|---|
+| AA | 91.35 / 92.62 / 91.86 | 91.94 ± 0.64 | `\vRecall` 91.9{\pm}0.6, `\nRecall` 91.9; 2×2 and main-table cell bold, unmarked | ✓ |
+| full-label F1 | 91.53 / 93.52 / 92.62 | 92.56 ± 0.99 | `\vRecallFull` 92.6{\pm}1.0; main-table full-label cell, no n mark | ✓ |
+| full − AA | +0.18 / +0.89 / +0.76 | | `supp_agree` +0.2/+0.9/+0.8, seeds in 42/7/123 order | ✓ |
+| h/run (`total_wall_time_s`) | 1.45 / 1.53 / 1.67 | 1.55 | `supp_perseed` "clean & 91.4 & 92.6 & 91.9 & 1.6" | ✓ |
+| mean matrix | | | `supp_mat_recall` (title "seeds 42/7/123, clean") equals my mean to 0.05 in every cell | ✓ |
+| `\recallDevMax` = max \|diag − final\| of the mean | session 2: 88.37 → 89.68 | 1.31 | "1.3" | ✓ |
+| `\nRecallJointGap` = max \|Recall − joint\| | −1.49 / **+2.14** / −0.57 | | "2.1" | ✓ |
+| `\nRecallMaxLoss` = largest R[i,j] < R[j,j] | s123 session 4, 90.66 → 90.11 = 0.549 | | "0.5" | ✓ (rounding: see L1) |
+| `\nRecallMaxGain` | s42 session 2, 86.86 → 88.89 = 2.03 | | "2.0" | ✓ |
+
+The joint reference is −1.49 at s42 and +2.14 at s7; Recall is above joint at s7.
+
+**Joint cell.** `\vJoint` 91.9{\pm}1.3 (92.84 / 90.48 / 92.43) is `results/rescore/cil_cord_joint_seed{42,7,123}`.
+All three log "Mixed precision enabled" plus a `GradScaler`, i.e. fp16 on the Turing card. Their
+config dumps match the clean joint recipe in every key except `amp: true` (and the absent
+`full_label_eval`):
+- `epochs 100`, `val_frac 0.1`, `cil_restrict_eval true`;
+- batch 2, gradient checkpointing, lr 5e-5, wd 0.01, clip 1.0.
+
+So this cross-protocol pairing differs **only in precision**, and the "(fp16)" in the 2×2 caption
+is correct.
+
+**What moved.** In the generated files, the diff touches:
+- `vals.tex`: `\vRecall`, `\vRecallFull`, and the three new macros;
+- `tab_2x2.tex` and `tab_main_clean.tex`: the Recall row only;
+- `supp_perseed.tex`: the Recall row only;
+- `supp_mat_recall.tex`;
+- `supp_vals.tex`: `\recallDevMax` only;
+- `supp_agree.tex`: three Recall rows plus the seed reorder;
+- the figure.
+
+Every other generated cell is byte-identical (`git diff --stat`). Rule 6 holds: Recall switched with
+3/3 clean seeds. Clean no-memory SBR has 0 complete seeds and is ignored by `choose()`. No other
+clean source exists.
+
+**Generator review.**
+- `recall_macros()`: the gap uses `chosen_source` of both cells, seed-matched, with abs: the right definition for "within X on every seed". The moves are `mat[i,j] − mat[j,j]` for i ≥ j over the matrices of the chosen source, on every seed. That is exactly "largest fall below / rise above its diagonal at any later boundary, on any seed". `max(0, −min)` is correct because the diagonal term contributes 0.
+- AA (`metrics.json`) and matrices (`matrix.npy`) are chosen by two separate `choose()` calls. They agree here, and could only disagree if a run had one file and not the other (train.py writes the matrix first).
+- Seed sort: `(scenario, method, SEEDS.index)` is correct.
+- `ROW_LABEL` maps `colar_sbr_recall_r64` → "SBR-Recall" (see L5 for BROS).
+- `make_retention_fig.py`: it now uses `matrix_choice` (the same rule as the tables). Its titles read "CoLaR (n=2, †)", "CoLaR-SBR (n=3, clean)", "SBR-Recall (n=3, clean)", which is correct (CoLaR = rescore s42/s7). Its output path is resolved from `__file__`.
+
+### B. Paper audit
+
+| Location | Rendered text | Per-seed check | Verdict |
+|---|---|---|---|
+| Teaser caption | "SBR-Recall comes within 2.1 points of it on every seed without a memory" | \|−1.49\|, 2.14, \|−0.57\| ≤ 2.14 | True. The bars read 18.9/20.4/30.4/88.4/18.6/91.9 from `vals.tex`, with the joint line at 91.9. |
+| 2×2 caption | "The two bold cells are clean; joint training is still a † cell (fp16), so until its clean runs complete a comparison of either bold cell with it crosses protocols" | Bold = 88.4±2.6 and 91.9±0.6, both clean. The only blocked-readout † cell is no-memory SBR (gate, fp32), which matches "the blocked-readout one in fp32". | True |
+| Sec. 4.3 | "SBR-Recall ... reaches 91.9±0.6" | — | True |
+| Main comparison | "the two blocked readouts close most of the gap, SBR-Recall all or nearly all of it on every seed" | Gap closed against seed-matched naive (18.97/19.08/18.60): Recall 98.0% / 103.0% / 99.2%; CoLaR-SBR 93.1% / 101% / 91.5% | True |
+| Fig. 4 caption | "no session falls more than 0.5 points below its diagonal on any seed, and the larger moves, up to 2.0, are gains" | Max loss 0.549. Every move > 0.55 is a gain (2.03, 1.88, 1.29, 0.63, ...). | True to one decimal (L1) |
+| Retention ¶ | "the curves are flat, no session losing more than 0.5 points on any seed" | As above. It omits the gains up to 2.0 that the caption states. | True (L1) |
+| Ablations | "rank 64 ... learns them on all three seeds, both in legacy runs ... and in the clean runs of Tab. 3" | Clean diagonals of sessions 3/4: 94.5/85.6, 90.5/91.7, 91.1/90.7, against 61–68 at rank 8 | True |
+| Limitations | "visible from the marks in the tables and in the panel titles of Fig. 4" | Titles carry the protocol | True |
+| App. B | "For the CoLaR-SBR and SBR-Recall runs listed the two differ by about one point or less on each seed" | Recall +0.2/+0.9/+0.8; SBR +1.1/−0.1/+1.0 | True |
+| App. C "cannot drift" | "in the clean rank-64 runs no session falls more than 0.5 points below its diagonal at any later boundary and none rises more than 2.0" | 0.549 / 2.03 | True to one decimal (L1) |
+| App. D.1 | "every column of the mean matrix ends within 1.3 points of its diagonal" | 1.31 (mean, session 2, a gain) | True to one decimal (L1) |
+| App. D.3 LexSlot | "It stays below SBR-Recall on CIL-CORD on every seed, against both the gate and the clean SBR-Recall runs" | LexSlot gate 90.2/89.7/89.2 < clean 91.35/92.62/91.86 and < gate 92.69/93.37/92.44 | True. The cross-protocol side is named explicitly, so this is not a silent mix. |
+| App. D.4 delta | "All rows of tab:delta are legacy gate runs ...; the clean rank-64 runs ... learn sessions 3 and 4 as well" | Clean range 85.6–94.5 vs the gate's 88.8–96.2 | Ambiguous (L2) |
+| App. G | "the CIL-CORD cells of CoLaR-SBR and SBR-Recall are clean, and their fp32 gate runs appear only in the LexSlot comparison and the delta-capacity table" | The CoLaR-SBR gate run feeds `tab:slot` and `\vSbrGate`. The Recall gate run feeds `tab:delta` and the LexSlot sentence. `tab:conflict` "CoLaR-SBR" reads `C["sbr"]` = clean. The § footnote is scoped "On CIL-CORD", so the Mixed Recall gate cell (85.9†,b) is correctly not covered. | True |
+| App. H wall-clock | "an SBR-Recall run without memory about 1.5 to 1.7 (clean runs)" | 1.45 / 1.53 / 1.67 h | True, but typed (L3) |
+
+**Cross-protocol statement.** It appears once in the body (the 2×2 caption) and once in App. G, which
+is where the protocols are stated. No remaining sentence says or implies that Recall and joint
+share a protocol. "SBR-Recall 91.9±0.6 against 91.9±1.3" in the Main comparison relies on the table
+marks, as every other cell does.
+
+**The abstract's "reaches 91.9, on par with joint training"** (source unchanged, sha1 `163dd69a`
+before and after; advice only).
+
+The evidence:
+- The means are 91.94 against 91.92.
+- The seed-paired differences are −1.49 / +2.14 / −0.57: mean +0.03, s.d. 1.9, with both signs.
+- The largest deficit (1.5, s42) is about one joint s.d. (1.26). The largest gap (2.1) favours Recall.
+- The protocols differ only in precision (above).
+
+My judgement is that **"on par" is defensible as rendered**: it claims neither "above" nor
+"matches", and on every seed the two are within 2.1 points in a direction that changes sign. With
+n = 3 it means "not distinguishable", not "equal". If the user wants wording that holds per seed
+by construction and survives a reviewer reading rule-7 strictly, I would use "reaches $\nRecall$,
+within $\nRecallJointGap$ points of joint training on every seed". Both macros exist, and the text
+then tracks the clean joint cell when it lands. Either way, re-check this clause when clean joint
+lands: if clean joint rises (fp32) by more than about 1.5 on s42, "on par" will need re-checking.
+
+**R5 L1–L4.**
+
+| Item | Status |
+|---|---|
+| L1, App. G stale | FIXED. The text quoted above; the 2×2 phrase is now "the blocked-readout † cell fp32"; § rows added. |
+| L2, Fig. 4 protocol | FIXED. Panel titles give "(n=…, clean/†)", and the caption explains †. |
+| L3, 6 GB sentence | FIXED. "The runs reported here ran on a single 6 GB GPU, except some first-grid rows (app:repro)". |
+| L4, seed order | FIXED. 42/7/123 for both methods. |
+
+### New findings (LOW only)
+
+- **R6-L1. Upper bounds are rounded to nearest, so three "no more than / within" bounds are below the true maximum by 0.01 to 0.05.**
+  - Where:
+    - `vals.tex` `\nRecallMaxLoss` "0.5": true 0.549 (s123, session 4). Used in the Fig. 4 caption, the Retention ¶ and App. C.
+    - `\nRecallMaxGain` "2.0": true 2.03 (s42, session 2). App. C reads "none rises more than 2.0".
+    - `supp_vals.tex` `\recallDevMax` "1.3": true 1.31.
+  - At the paper's one-decimal precision these are the right values, and no per-seed matrix is printed, so no reader can see a contradiction. Strictly, though, "falls no more than 0.5" is false for a 0.55 loss.
+  - Fix, either:
+    - (a) round bound macros up in `recall_macros()` / `write_supp_vals()` (`math.ceil(10*x)/10` gives 0.6 / 2.1 / 1.4); or
+    - (b) word them "about 0.5", "about 2".
+  - Optional in the same edit: give the body Retention ¶ the caption's "and the larger moves, up to \nRecallMaxGain, are gains", since "the curves are flat" omits a 2-point rise.
+- **R6-L2. App. D.4, "the clean rank-64 runs ... learn sessions 3 and 4 as well" (supp.tex:298) can be read as "equally well".**
+  - The clean diagonals of sessions 3 and 4 span 85.6 to 94.5. The s42 session-4 value is 85.6, below the gate range of 88.8 to 96.2 quoted two sentences earlier.
+  - Fix: "also learn sessions 3 and 4 (\cref{tab:matrices})", or give the range from a generated macro.
+- **R6-L3. App. H wall-clock "about 1.5 to 1.7 (clean runs)" is a typed run value (rule 6).**
+  - It is true (1.45 / 1.53 / 1.67 h), and earlier rounds accepted the typed CoLaR-SBR "2 to 2.5".
+  - Fix (optional): point to the h/run column of `tab:perseed` (1.6), which is generated.
+- **R6-L4. Advisory: the 2×2 caption and App. G could say that the legacy joint cell differs from the clean protocol only in precision.**
+  - Its config dumps have `val_frac 0.1`, 100 epochs and the clean recipe otherwise; `amp true` gives fp16 on all three seeds.
+  - This is stronger and more useful than the generic "crosses protocols". App. G's "three ways" do not apply to joint.
+  - Fix (optional): "(fp16; otherwise the clean recipe)".
+- **R6-L5. Latent generator label (`write_agree`).**
+  - The queued clean BROS runs have `run_alias colar_sbr_bros`. That maps to the key `sbr_bros`, which `ROW_LABEL` lacks, so the agreement table would print "sbr\_bros".
+  - Fix: add `"sbr_bros": "CoLaR-SBR (BROS)"` before those runs land. No effect today.
+
+### Hygiene
+
+| Check | Result |
+|---|---|
+| Build | PASS. `latexmk -pdf main.tex` = 0, `supp.tex` = 0 (scratch rebuild of d559dd7). 0 undefined references or citations in `main.log` and `supp.log`. |
+| Body ≤ 8 pages | PASS. `main.pdf` is now **11** pages (10 at d50d267). "References" starts on p. 8, right column, after the Conclusion; pp. 9–10 are references, and p. 11 holds only ref. [52]. No float or body text after p. 8. Note for the PM: Overleaf will now show 11 pp. The body itself did not cross p. 8. `supp.pdf` is 15 pp. |
+| `---` | PASS. 0 in every tracked `paper_cvpr/*.tex` and `fig/*.tex`; 0 em-dashes in either PDF. |
+| Anonymity | PASS. 0 hits for doccl / results/ / scripts/ / .py / clean_2026 / _seed / author or affiliation strings in either PDF. PDF Author fields are empty. |
+| Abstract | Source byte-identical to d50d267. It renders "attain 88.4 average F1 against 91.9" and "reaches 91.9, on par with joint training". |
+| Teaser / figure | The teaser bar values and labels come from `vals.tex` macros and match. Fig. 4 titles state n and protocol correctly. |
+
+### OPEN (not counted)
+
+- Clean joint and no-memory SBR on CIL-CORD are queued; when they land, re-check the abstract's "on par" (above), `\nRecallJointGap`, and the 2×2 caption sentence, which will then be stale.
+- CR2: the remaining † headline cells, pending data.
