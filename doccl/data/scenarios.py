@@ -104,6 +104,11 @@ def build_cil_funsd() -> CLScenario:
 
     train_dss = _wrap("train")
     eval_dss = _wrap("test")
+    # AGENT IMPL (2026-11-11): full-label joint pool + unmasked test set, as in build_cil_cord
+    # (without the pool, joint concatenates the session-masked copies and collapses).
+    full = {s: FUNSDDataset(split=s) for s in ("train", "test")}
+    joint_train = [CIL_LabelRemapper(full["train"], full["train"].id_to_label, snapshots[-1])]
+    full_eval = CIL_LabelRemapper(full["test"], full["test"].id_to_label, snapshots[-1])
 
     tasks = [
         TaskInfo(
@@ -115,7 +120,15 @@ def build_cil_funsd() -> CLScenario:
         )
         for i in range(len(splits))
     ]
-    return CLScenario("cil_funsd", ScenarioType.CIL, tasks, train_dss, eval_dss)
+    return CLScenario(
+        "cil_funsd",
+        ScenarioType.CIL,
+        tasks,
+        train_dss,
+        eval_dss,
+        joint_train_datasets=joint_train,
+        full_eval_dataset=full_eval,
+    )
 
 
 # Canonical 5×6 CORD partition (validated). Super-class-respecting; flattening it
