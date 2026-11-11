@@ -1,4 +1,4 @@
-\begin{thebibliography}{52}
+\begin{thebibliography}{56}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -29,6 +29,22 @@ Pietro Buzzega, Matteo Boschini, Angelo Porrello, Davide Abati, and Simone
 \newblock In \emph{Advances in Neural Information Processing Systems
   (NeurIPS)}, 2020.
 
+\bibitem[Cermelli et~al.(2020)Cermelli, Mancini, Rota~Bul{\`o}, Ricci, and
+  Caputo]{cermelli2020mib}
+Fabio Cermelli, Massimiliano Mancini, Samuel Rota~Bul{\`o}, Elisa Ricci, and
+  Barbara Caputo.
+\newblock Modeling the background for incremental learning in semantic
+  segmentation.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, 2020.
+
+\bibitem[Cha et~al.(2021)Cha, Kim, Yoo, and Moon]{cha2021ssul}
+Sungmin Cha, Beomyoung Kim, YoungJoon Yoo, and Taesup Moon.
+\newblock {SSUL}: Semantic segmentation with unknown label for exemplar-based
+  class-incremental learning.
+\newblock In \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, 2021.
+
 \bibitem[Cui et~al.(2021)Cui, Yang, Yu, Hu, Cheng, Yi, and Xiao]{cui2021rpcre}
 Li Cui, Deqing Yang, Jiaxin Yu, Chengwei Hu, Jiayang Cheng, Jingjie Yi, and
   Yanghua Xiao.
@@ -36,6 +52,14 @@ Li Cui, Deqing Yang, Jiaxin Yu, Chengwei Hu, Jiayang Cheng, Jingjie Yi, and
   continual relation extraction.
 \newblock In \emph{Proceedings of the 59th Annual Meeting of the Association
   for Computational Linguistics (ACL-IJCNLP)}, 2021.
+
+\bibitem[Douillard et~al.(2021)Douillard, Chen, Dapogny, and
+  Cord]{douillard2021plop}
+Arthur Douillard, Yifu Chen, Arnaud Dapogny, and Matthieu Cord.
+\newblock {PLOP}: Learning without forgetting for continual semantic
+  segmentation.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, pages 4040--4050, 2021.
 
 \bibitem[Farajtabar et~al.(2020)Farajtabar, Azizan, Mott, and
   Li]{farajtabar2020ogd}
@@ -201,6 +225,13 @@ Mohammad Minouei, Khurram~Azeem Hashmi, Mohammad~Reza Soheili, Muhammad~Zeshan
   Afzal, and Didier Stricker.
 \newblock Continual learning for table detection in document images.
 \newblock \emph{Applied Sciences}, 12\penalty0 (18):\penalty0 8969, 2022.
+
+\bibitem[Monaikul et~al.(2021)Monaikul, Castellucci, Filice, and
+  Rokhlenko]{monaikul2021extendner}
+Natawut Monaikul, Giuseppe Castellucci, Simone Filice, and Oleg Rokhlenko.
+\newblock Continual learning for named entity recognition.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial
+  Intelligence}, pages 13570--13577, 2021.
 
 \bibitem[Pellegrini et~al.(2020)Pellegrini, Graffieti, Lomonaco, and
   Maltoni]{pellegrini2020latent}
