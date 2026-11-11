@@ -48,11 +48,16 @@ class OLoRA(NaiveFineTune):
         # as a saved/trainable module explicitly (TOKEN_CLS did that implicitly), so the
         # ModulesToSaveWrapper re-sync in ``before_task`` keeps working unchanged.
         is_image = getattr(self.model, "task_type", "token") == "image"
+        # Optional encoder-layer restriction (e.g. [4..11] to match SBR-Recall's sites on
+        # layers >= k). None (default) = every layer, the original behaviour.
+        layers = config.get("layers_to_transform")
         peft_config = LoraConfig(
             r=self.rank,
             lora_alpha=self.alpha,
             lora_dropout=self.dropout,
             target_modules=target_modules,
+            layers_to_transform=list(layers) if layers is not None else None,
+            layers_pattern="layer" if layers is not None else None,
             bias="none",
             task_type=None if is_image else "TOKEN_CLS",
             modules_to_save=["classifier"] if is_image else None,
