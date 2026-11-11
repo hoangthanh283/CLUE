@@ -1714,3 +1714,304 @@ lands: if clean joint rises (fp32) by more than about 1.5 on s42, "on par" will 
 
 - Clean joint and no-memory SBR on CIL-CORD are queued; when they land, re-check the abstract's "on par" (above), `\nRecallJointGap`, and the 2×2 caption sentence, which will then be stale.
 - CR2: the remaining † headline cells, pending data.
+
+
+## R7 (2026-11-11): audit of P9, the story rewrite, and a referee report
+
+Snapshot: paper at `00dd224` (HEAD has since gained Dev commits `b27c824`, `25f4d2f`, which touch no
+paper file). Tracked paper files are clean against `00dd224`. I rebuilt both PDFs from
+`git archive 00dd224` in my scratchpad; the pdftotext of each rebuild is byte-identical to the
+committed `main.pdf` / `supp.pdf`. Scope: `git diff 2dc86ad..00dd224 -- paper_cvpr
+scripts/rca/make_clean_tables.py scripts/rca/make_retention_fig.py`, plus the whole new `main.tex`
+read against the old one. Every number below was recomputed by my own script from `metrics.json`,
+`matrix.npy`, config dumps and logs. No generator, model, dataset or pytest was run. During the
+audit `cil_cord_colar_seed123` (clean) was still running; no paper file reads it yet.
+
+### Verdict: **BLOCK** (one HIGH, text-only, about five minutes to fix)
+
+Every generated number recomputes exactly, and the new prose is accurate almost everywhere. What
+blocks is one headline number. The abstract's "closes only 46% of it" is a ratio whose terms come
+from two protocols, and neither `main.tex` nor `supp.tex` says so. It rests on one seed, which the
+abstract does not say. And a reader who computes it from the paper's own Table 2 gets 50%, not 46%.
+"About half" is true on every way of computing it. Six MEDIUM and ten LOW items follow. The
+bibliography additions are correct, and so is every sentence about what MiB, PLOP, SSUL and
+ExtendNER do. One sentence omits that SSUL pseudo-labels, and the SSUL positioning is weaker than
+it reads (M6).
+
+### A. Numbers recomputed
+
+| Macro / claim | Source (my recomputation) | Rendered | OK |
+|---|---|---|---|
+| `\nErDil` / `\nJointDil` (abstract, intro) | `results/dil_er_seed{42,7,123}` 86.21/88.73/88.62; `dil_joint` 89.68/89.03/87.49 (first grid: test-split stopping, config not saved, ER buffer 200) | 87.9 / 88.7 | ✓ |
+| `\nEr` / `\nJoint` | `rescore/cil_cord_er` 26.91/22.05/24.01 (buffer 200, test-split stopping, fp16 except s42); `rescore/cil_cord_joint` 92.84/90.48/92.43 (amp true, `val_frac` 0.1) | 24.3 / 91.9 | ✓ |
+| `\nOracle` 61.2 | gate `cil_cord_colar_r_oracle_seed42_k4_d50_r128` AA 61.171; amp false, no `val_frac` (test-split stopping) | 61.2 | ✓ |
+| `\nColarGateSeed` 34.1 | gate `cil_cord_colar_seed42_k4_d50_r128` 34.063. The config dump equals the oracle's except `method.name/run_alias/refresh`, so "the same memory without the refresh" is true. | 34.1 | ✓ |
+| `\nOracleShare` 46 | (61.171 − 34.063)/(92.837 − 34.063) = 46.1%. The denominator's joint term is **rescore seed 42, fp16, held-out stopping**; the other two terms are fp32 gate runs with test-split stopping. | 46 | value ✓, disclosure ✗ (H1) |
+| `\nOracleRelabel` | oracle log: "refreshed 50/100/150/200 docs, 101/760/1461/1402 tokens relabelled" | 101/760/1461/1402 | ✓ |
+| `\nOracleLateMin/Max` | oracle diagonal 95.16/79.09/**31.82/14.43/23.01** | 14 to 32 | ✓ (gate CoLaR, no refresh: 14.7/10.2/11.4) |
+| `\nSlicedReplay` 42.0 | `rescore/cil_cord_colar_r_sliced` 44.17/39.85 (fp16) | 42.0 (two seeds) | ✓ (L3) |
+| `\nSlicedBoth` 60.5 | gate `sliced2` 62.86/69.24/49.45 (fp32) | 60.5 | ✓ |
+| `\nPseudoBoth` 44.1 | gate `bilc` s42 44.108 | 44.1 (one seed) | ✓ |
+| `\nLabelRepairMax` 69.3 | max over the 6 listed sources = sliced2 s7 69.235, rounded up. I also searched every `cil_cord*colar_r*`, `*sliced*` and `*bilc*` run on disk: the earlier-grid ones are legacy-scored and all ≤ 29.6, and no restricted-scored repair exceeds 69.24. | 69.3 | ✓ (L2) |
+| `\vNoBank` / `\vNoBankFull` | clean noreplay AA 21.245/19.591/23.954 → 21.6 ± 2.2; full 8.958/11.721/13.619 → 11.4 ± 2.3 | ✓ | ✓ |
+| `\nobankOldMax` 15 | final-row old sessions: s42 0.3/10.8/1.3/0.9; s7 0.0/1.1/0.9/3.2; s123 11.7/**14.47**/1.2/0.0 → ceil 15 | "at or below 15 ... on every seed" | ✓ |
+| `\nRecallJointGap` / `MaxLoss` / `MaxGain` / `\recallDevMax` | 2.140 / 0.549 / 2.028 / 1.302, rounded up → 2.2 / 0.6 / 2.1 / 1.4 (R6-L1 fixed). `\nRecallJointGap` is no longer used anywhere. | ✓ | ✓ |
+| "On every seed the clean runs rank the methods the same way under both metrics" | s42 AA 21.2 < 33.6 < 87.8 < 91.4, full 9.0 < 32.4 < 88.8 < 91.5; s7 19.6 < 32.4 < 91.3 < 92.6, full 11.7 < 30.5 < 91.2 < 93.5; s123 24.0 < 86.2 < 91.9, full 13.6 < 87.1 < 92.6 | true | ✓ (but see L7a) |
+| "restricted AA ... more lenient for weak models ... within about a point for CoLaR-SBR and SBR-Recall" | full − AA: nobank −12.3/−7.9/−10.3; CoLaR −1.2/−1.9; SBR +1.1/−0.1/+1.0; Recall +0.2/+0.9/+0.8 | true for nobank, weakly for CoLaR | L4 |
+| `tab_2x2` / `tab_main_clean` / `supp_agree` / `supp_conflict` / `supp_perseed` new cells | all match the files above (CoLaR clean s42/s7 AA 33.59/32.44, full 32.38/30.54) | ✓ | ✓ |
+| Intro "Distillation, prompts, low-rank adapters and the continual-NER methods ... do no better" | per seed, every such row ≤ ER's same seed (DER++ 21.3/18.8/21.1 vs ER 26.9/22.0/24.0; all others lower) | true | ✓ |
+| Receipt example | `menu.price` is session 1 and `total.total_price` session 5 (`tab:cilsessions`) | ✓ | ✓ |
+| Body "CPFD learns no session after the first, in fp32 as in fp16; IS3 ... and CODA-Prompt end at zero F1 on every session but the last; LCA's merged model keeps little of the early sessions" | rescore matrices: CPFD diag 93.8/0/0/0/0 (s42), 94.8/0/0/0/0 (s7); IS3 final [0,0,0,0,28.0] / [0,0,0,0,38.3]; CODA [0,0,0,0,69.8] / [0,0,0,0,79.4]; LCA [0,0,3.9,23.7,40.9] / [0,1.4,3.6,3.7,26.1] | true as stated, but not the "why" (M1) | M1 |
+
+Rule 6: the no-memory SBR cell switched to clean with 3/3 seeds, and its gate row was removed from
+`tab:legacyprotocol` correctly. No other cell switched. CoLaR s123 clean is running; when it lands
+the CoLaR shared-softmax AA cell switches to clean (see M3).
+
+### B. Findings
+
+**HIGH**
+
+- **R7-H1. "46%" is undisclosed cross-protocol, one-seed, and not reproducible from the paper's tables.**
+  - Where: abstract (main.tex:55, "even a memory refreshed with the true labels closes only $\nOracleShare\%$ of it"), intro (main.tex:65), Sec. 4.2 (main.tex:119), App. E (supp.tex:321).
+  - Evidence:
+    - The numerator uses two fp32 gate runs with test-split early stopping. Their config dumps have no `val_frac`.
+    - The denominator's joint term is `rescore/cil_cord_joint_seed42` (`amp: true`, GradScaler, `val_frac 0.1`).
+    - Sec. 4.2 says only "(seed 42, both fp32 runs)". App. E says "under the same protocol" of the CoLaR term only. The joint term's protocol is stated nowhere for this ratio. The Setup's precision-only sentence covers comparisons of a *clean* cell with joint, not gate runs, which also differ in early stopping.
+    - The abstract gives no seed count. The Limitations section does call the refresh single-seed.
+    - The share depends on which runs fill the ratio:
+      - 46.1% as generated;
+      - 46.5% with clean CoLaR s42 (33.59);
+      - 46.9% with the joint mean;
+      - **50.1% from the cells a reader sees in Tab. 2** (30.4 → 61.2 against 91.9). The abstract's "it" points the reader at that factorial.
+  - Fix (text only, now):
+    - abstract: "closes only about half of it";
+    - intro: "closes only about half of the gap (one seed)";
+    - Sec. 4.2: keep the macro, but write "...to $\nOracle$ (seed 42, both fp32 gate runs): $\nOracleShare\%$ of the gap to the fp16 joint-training reference of the same seed (App. G)";
+    - App. E: the same clause.
+    - The Conclusion and the "What is new" paragraph already say "about half", which is right.
+  - Follow-up (generator): when the clean oracle ×3 (v7 block 2) lands, `conflict_macros()` will not see it, because it hardcodes the gate `ORACLE` and `COLAR_GATE`. Meanwhile its joint term switches to clean joint by itself, so the ratio's mix of protocols changes silently. Rewrite it to use seed-matched clean oracle, clean CoLaR and clean joint, and report the per-seed range ("46 to 52%").
+
+**MEDIUM**
+
+- **R7-M1. The CPFD/IS3/CODA/LCA sentence (main.tex:191) is true but gives the wrong "why".**
+  - Naive training also ends at zero on every session but the last: final rows [0,0,0,0,94.8], [0,0,0,0,95.4], [0,0,0,0,93.0].
+  - What puts these four below naive is plasticity:
+    - IS3's diagonals after session 1 are 28–39 (s42) and 27–64 (s7), against naive's 90–97;
+    - CODA-Prompt never learns some sessions (diagonal 0.0 for sessions 2–3 on s42, session 3 on s7);
+    - LCA learns sessions 3–5 to 26–54.
+  - AA keeps essentially the last diagonal, so naive 94.8 beats IS3 28.0/38.3, CODA 69.8/79.4 and LCA 40.9/26.1.
+  - Also, "well below naive" is a 3 to 5 point gap for CODA (14.0/15.9 against 19.0/19.1).
+  - Fix: "CPFD learns no session after the first (in fp32 as in fp16), and IS3, CODA-Prompt and LCA learn later sessions only partly (diagonals 0 to 64 F1, against 90 to 97 for naive training); like naive training they end near zero on every earlier session (App. G)".
+- **R7-M2. The 2×2 compares full-label F1 with joint training's AA.**
+  - Where: `tab:twobytwo` caption "approaches joint training, under either metric", and main.tex:134 "88.4 AA and 89.1 full-label F1, against 91.9 for joint training".
+  - Joint training has no full-label F1 (the table prints "--"), so the full-label half of the claim cannot be checked.
+  - Fix until clean joint lands: "approaches joint training in AA, and is the only cell above 33 full-label F1".
+- **R7-M3. In the CoLaR shared-softmax row, AA and full-label F1 come from different runs, with nothing to say so.**
+  - Where: `tab_2x2.tex` and `tab_main_clean.tex`.
+  - AA 28.8/31.9† is the fp16 rescore; full-label 32.4/30.5 (n=2) is the clean run. Read side by side, they suggest full-label F1 is above AA, but in the same runs it is 1.2/1.9 *below* (clean AA 33.6/32.4).
+  - The marks are correct, but a reader assumes a row is one model.
+  - Fix: add one caption clause ("a † AA cell and a clean full-label cell in the same row are different runs"), or simply regenerate after clean CoLaR s123 lands (running; it will switch the AA cell to clean ×3 and remove the problem).
+- **R7-M4. The Setup calls full-label F1 the primary number, but every headline number is AA.**
+  - "On CIL-CORD the primary number is the full-label F1" (main.tex:94), yet the abstract, the teaser, the 2×2 ordering, "on par with joint training" and the Recall bounds are all AA. Joint training has no full-label value at all.
+  - A referee will read this as metric-switching.
+  - Fix now: "We report both: session-restricted AA, which every cell has, and the mask-free full-label F1, which clean runs add". Once clean joint lands, promote full-label F1 in the abstract if wanted.
+- **R7-M5. "the correction cannot come from better labels" (main.tex:123) is an unscoped universal from one seed.**
+  - The decisive label-side combination, true-label memory plus a sliced current loss, was started and never finished. `results/gates/cil_protocol_2026-11/cil_cord_colar_r_sliced2_oracle_seed42.log` (2026-11-02) stops in task 2, with no run directory.
+  - The current-document pull is also exactly MiB's background shift, which MiB corrects on the label side within a shared softmax.
+  - Fix: "in no repair we ran did the correction come from better labels"; name the current-side pull as the shift MiB addresses; let the queued `colar_mib` control speak to it.
+- **R7-M6. The SSUL positioning (main.tex:65, 80) is accurate in its parts but undersells SSUL.**
+  - Verified against the paper (arXiv 2106.11562 full text):
+    - SSUL freezes the backbone and the past classifiers;
+    - it learns a new background classifier at each step ("only learn the 1×1 filters φ_cb, φ_cu and {φ_c}");
+    - it uses per-class sigmoids with BCE because "the relative scoring of softmax could cause significant forgetting of past classes" when background targets are noisy (the paper's paraphrase is correct);
+    - it also **pseudo-labels** the background ("we adopt the pseudo-labeling strategy as in [PLOP]"), which the Related-Work sentence omits. "SBR ... needs no old-model pseudo-labels" is therefore a real difference that should name SSUL.
+  - But SSUL's frozen per-class sigmoids already give old classes a decision that is never trained on stale "O" and is decoupled from the shared background. That is the property SBR's "never stale" sentence claims.
+  - So "corrected while keeping one shared background class ... we remove the shared background instead" is literally true (SSUL keeps one background classifier), but it overstates the gap.
+  - The true differences:
+    1. SBR keeps the upper trunk and the old blocks trainable and re-grounds them from a memory, with labels that are valid per block;
+    2. the decision is grouped per session, with a per-block softmax;
+    3. routing uses each block's background claim.
+  - Fix: one sentence in Related Work stating these, plus "(SSUL also pseudo-labels the background)" in its description.
+
+**LOW**
+
+- **R7-L1.** main.tex:67 says CoLaR 30.4 and no-memory SBR 21.6 are "both close to naive fine-tuning (18.9)". CoLaR is 10–13 points above naive per seed (clean: 14). The old "far closer to naive fine-tuning than to joint training" was true; restore it.
+- **R7-L2.** main.tex:121 "below every seed of the blocked readout": no-memory SBR is a blocked readout (21.2/19.6/24.0). Write "of CoLaR-SBR". The pairing also crosses protocols (gate/rescore against clean). Harmless for an upper bound, but say it.
+- **R7-L3.** main.tex:121: "42.0 (two seeds)" is the fp16 rescore, and the next clause's 60.5 is the fp32 gate. The same-protocol pair is 39.4 → 62.9 on seed 42. Name the sources, or use the gate pair.
+- **R7-L4.** main.tex:94 "restricted AA is the more lenient of the two for weak models": it is lenient by 8–12 points for no-memory SBR but only 1–2 for CoLaR, which is also weak. Write "much more lenient for no-memory SBR, by 1 to 2 points for CoLaR".
+- **R7-L5. Two disclosures were shortened away.**
+  - The teaser caption no longer points to the protocol of its bars: it mixes clean and † cells with no marks. Add "(seeds and protocol per cell in Tab. 2)".
+  - The Fig. 4 caption no longer names the metric (session-restricted).
+  - Everything else that was disclosed at `2dc86ad` still exists in `main.tex` + `supp.tex` (list below).
+- **R7-L6.** The `tab:dil` caption reads "On average replay ...; EWC and LwF stay within ten points of naive training". The "on average" scope of the second clause is now ambiguous; per run the bound is 12 (R3-N4). Write "both on average".
+- **R7-L7. Latent generator issues.**
+  - (a) `write_agree` silently drops clean runs whose alias has no `ROW_LABEL`.
+    - Queued aliases that will be dropped: `cl_lora` (the label key is `cllora`), `er250`, `er_sbr`, `colar_r_oracle`, `colar_mib`.
+    - Yet the caption says "every clean-protocol CIL-CORD run", and the Scoring paragraph's "on every seed the clean runs rank the methods the same way" would then hold only over a filtered set.
+    - Fix: add the labels, or print unlabelled runs under their raw alias.
+    - Its docstring says "LayoutLMv3", but there is no backbone filter; BROS rows are included by design, and the caption says so.
+  - (b) See H1: the oracle sources are hardcoded.
+  - (c) `if o` / `if cg` treat 0.0 as missing. Trivial.
+- **R7-L8.** supp.tex:323 "leaves the newest session weak on its own diagonal (31.8, 14.4 and 23.0 for sessions 3 to 5)": write "the three newest sessions".
+- **R7-L9.** The `cermelli2020mib` entry lacks pages (CVPR 2020, pp. 9233–9242). Optional; everything else in the four entries matches the publisher records.
+- **R7-L10.** The Setup's "tokens of classes not yet introduced are labelled O" (main.tex:88) understates the masking. Tokens of *every* out-of-session class, earlier ones included, are O (`scenarios.py:73`, "out-of-session entities relabelled to O"). The current-document half of the conflict, now central to the story, depends on the earlier-class half. Pre-existing text, now load-bearing.
+
+### C. Disclosure audit ("move, never delete")
+
+Every protocol or scope disclosure present at `2dc86ad` was checked against `00dd224`. All of the
+following still exist:
+
+| Disclosure | Now in |
+|---|---|
+| joint differs only in precision | Setup + App. G (R6-L4 done) |
+| shared-softmax † cells fp16 | App. G |
+| ER 200 vs as-many-as-memory | Setup |
+| LwF, CPFD and IS3 zero seeds and precision | body + App. G |
+| test-split early stopping except joint | Setup + App. G + `tab:legacyprotocol` |
+| first grid saved no configuration | App. G |
+| the coverage caveat of restricted scoring | App. B |
+| the legacy "floor" band 16–19 | App. B |
+| the CL-LoRA port design | Setup + App. G |
+| CL-LoRA's 81–95 diagonals | App. G (recomputed: 80.9–94.6) |
+| LexSlot "fp32 gate runs only" and "stores token ids" | App. D.3 |
+| modality masks, Fisher-by-construction, EWC sign flip, five-family numbers, marginal-snap, ViT numbers | App. F.1 |
+| single-seed diagnostics | Limitations (now including the refresh) |
+
+The old Limitations sentence "comparison across protocols is visible from the marks" was dropped,
+but the Setup paragraph covers it. Lost: only the two caption pointers in L5. Nothing was deleted
+that changes a claim.
+
+### D. Citations (new entries)
+
+All four were verified against the publisher records and the papers themselves.
+
+| Key | Record | Body sentence |
+|---|---|---|
+| `cermelli2020mib` | CVPR 2020; authors and title correct; no pages (L9) | Unbiased CE ("background label matched with background or any old class") and unbiased KD ("old background with background or any new class"): correct. |
+| `douillard2021plop` | CVPR 2021, pp. 4040–4050; correct | Pseudo-labelling with the old model's confident (low-entropy) predictions plus Local POD multi-scale pooled distillation: correct. |
+| `cha2021ssul` | NeurIPS 2021, Cha, Kim, Yoo, Moon; correct | Unknown class inside the background, frozen backbone and past classifiers, tiny exemplar memory (SSUL-M), sigmoid instead of softmax with the stated rationale: all verified in the full text. Omits pseudo-labelling (M6). |
+| `monaikul2021extendner` | AAAI 35(15):13570–13577, 2021, DOI 10.1609/aaai.v35i15.17600; correct | KL to the teacher on O-labelled tokens, CE on new-type tokens (Sec. 3.4): correct. |
+
+`refs_precompiled.bbl` = the old 52 entries unchanged plus exactly these 4 (56). 56 distinct keys
+are cited.
+
+### E. Invariants and generator review
+
+| Check | Result |
+|---|---|
+| Build | PASS. `latexmk -pdf` main = 0 and supp = 0 from `git archive 00dd224`. 0 undefined references or citations; 0 "??" in either PDF. |
+| Pages | `main.pdf` has 10 pp (11 at R6). The Conclusion ends and "References" begins in the **left column of p. 8**; pp. 9–10 are references; no float or body text after p. 8. `supp.pdf` has 16 pp. |
+| `---` / em-dash | 0 in every tracked `paper_cvpr/*.tex` and `fig/*.tex`; 0 em-dashes in either PDF. |
+| Anonymity | 0 hits for doccl / results/ / scripts/ / .py / clean_2026 / _seed / names; the PDF Author field is empty. |
+| Teaser | The bars read `\nNaive` 18.9, `\nNoBank` 21.6, `\nColar` 30.4, `\nSbr` 88.4, `\nRecall` 91.9, with the joint line at `\nJoint` 91.9. Labels match the 2×2 rows; SBR-Recall is separated by a dotted rule and labelled "(no memory)". |
+| Appendix cross-references after the move | App. A–H letters match the supp sections. App. F = drift with the new F.1, E = conflict, G = baselines/protocols, D.4/D.5 = Mixed Recall/delta. Every body "App. X" pointer targets the right section; supp "Sec. 4.1 / Tab. 1 / Tab. 3 of the main paper" still resolve (Tab. 1 = DIL, 2 = 2×2, 3 = comparison). |
+| R6 L1–L5 | All fixed: `up1()` bounds; "also learn"; h/run pointer in place of the typed hours; precision-only joint in Setup/App. G; `sbr_bros` label. |
+| Generator diff | `up1()` is correct (`ceil(10x − 1e-9)/10`). `conflict_macros()` reads the right runs and parses the right log line. `write_agree` adds a scenario filter (correct: it keeps `cil_funsd` and `er_sbr` out). The strict 2×2 uses `pick_clean_only` for full-label (no legacy source can leak in) and prints n. Issues are listed in H1 (follow-up) and L7. |
+
+### F. Question 3 of the brief: the abstract's two load-bearing clauses
+
+- **The opening sentence is true as rendered.**
+  - Both pairs are legacy:
+    - DIL ER and joint come from the first grid (test-split stopping, configuration not saved, ER buffer 200);
+    - on CIL-CORD, ER is the 200-doc rescore (test-split stopping) and joint is fp16 with held-out stopping.
+  - The protocol differences within a pair favour ER (test-split stopping), so they cannot have created the contrast.
+  - The minimal wording that is true today is the current one, or "Plain replay of 200 stored documents ..." (exact). The intro sentence should carry "(legacy cells, †)" once.
+  - When the clean DIL joint/ER and ER-250 land, the macros switch by themselves. The clean DIL ER keeps the default buffer of 200 (`configs/method/er.yaml`) and the CIL ER-250 keeps 250, so "a few hundred" stays true. The intro's "the same method" with "200 stored documents" would then need "250".
+- **"Closes only 46% of it" is not acceptable as rendered (H1).** Until the clean oracle ×3 lands, write "closes only about half of it". Afterwards, report the seed-matched clean range.
+
+### Part B. Referee report (advice; does not decide PASS/BLOCK)
+
+I read the rebuilt `main.pdf` once through, as a CVPR reviewer who has not seen the project, and
+compared it with the `2dc86ad` abstract, introduction and Sec. 4.
+
+**Summary of claims (in my words).** Replay works for continual key-information extraction when
+only the input domain shifts (ER 87.9 vs joint 88.7), but fails when the label set grows (24.3 vs
+91.9). The authors attribute this to a second cause, *background conflict*. Under label growth,
+stored and current documents label each other's entities "O", and a single shared background logit
+is trained in contradictory directions. A 2×2 on class-incremental CORD (memory × readout) is the
+evidence:
+- memory alone gives 30;
+- a session-blocked readout alone gives 22;
+- both together give 88.4 against joint 91.9;
+- a memory refreshed with true labels recovers only about half the gap.
+
+The proposed readout (SBR) gives each session its own background logit and softmax, and routes
+tokens by the strongest claim. A per-session-LoRA variant (SBR-Recall) needs no memory on a
+single-schema stream and reaches 91.9. A compressed latent memory (per-document SVD, CoLaR) matches
+raw replay on DIL at 60 MB.
+
+**Strengths.**
+1. A genuine hook, stated in the first sentence, with a clean factorial that a reader can check in one table.
+2. The true-label-memory control is the right experiment, and the receipt example makes the mechanism concrete.
+3. A large effect on CIL-CORD (~25 → 88–92), with flat retention for SBR-Recall.
+4. Unusually careful protocol accounting and honest limitations, which reviewers reward.
+5. Drift is shown on four backbones.
+
+**Weaknesses, ranked by how much they lower the score.**
+1. **Novelty against the background-shift literature, with no working baseline from it.**
+   - The current-document pull is MiB's background shift.
+   - SSUL already diagnoses softmax relative scoring under noisy background labels and removes the coupling with per-class sigmoids and frozen old heads.
+   - SBR is, to a segmentation reviewer, "SSUL/ICE-style per-session heads plus replay".
+   - The only background-shift methods in the table (CPFD, IS3) learn nothing after session 1 or never relearn old classes. Below naive, they look like broken ports, not like evidence.
+   - Without a MiB- or SSUL-style control on the same memory, the claim "the shared background must be removed, not corrected" is untested against the strongest alternative.
+2. **One class-incremental dataset.** The 2×2, the oracle control and every SBR number rest on CORD: 100 test receipts, one session partition, one order. Mixed has 1–2 seeds of legacy cells. CVPR reviewers will ask for a second scenario.
+3. **Protocol heterogeneity.** Many cells are †, the joint reference is fp16, the DIL table is legacy, and the headline ratio mixes protocols (H1). The paper reads as unfinished even though it is honest about it.
+4. **Metric.**
+   - Session-restricted AA is the authors' own metric. The mask-free full-label F1, which a reviewer trusts more, exists only for clean runs, and joint training has none.
+   - "Primary = full-label" (M4) while the headlines are AA invites "you changed the metric".
+5. **The key diagnostics are single-seed:** the oracle, the freezing experiment and the memory ladder. SBR's s.d. is 2.6 against a gap of 3.5.
+6. **CoLaR dilutes the story.** It is evaluated as a contribution only on DIL, which is the "known cause", and its DIL evidence is the single-seed ladder in Fig. 3. On CIL-CORD it is just "the memory".
+7. **SBR-Recall is narrow:**
+   - single-schema only;
+   - about 3.7× encoder compute at five sessions;
+   - its base is frozen after session 1, and order sensitivity is untested;
+   - its Mixed result is one seed.
+
+**Three rebuttal questions.**
+1. With the same CoLaR memory and a shared softmax, how far do MiB's unbiased cross-entropy and an SSUL-style per-class sigmoid head get on CIL-CORD? If they reach ~85, what remains of "remove, don't correct"?
+2. Does the strict 2×2, with full-label F1 in every cell including joint, replicate on a second class-incremental dataset or partition and a second backbone, under one protocol?
+3. Are the CPFD/IS3/CODA-Prompt ports faithful: do they reproduce their published numbers on a native NER benchmark? If not, why should their collapse count as evidence?
+
+(Reserve: the true-label memory plus a sliced current loss is the label-side upper bound for a shared softmax. Why was it not run to completion?)
+
+**Score (CVPR 2025-style six-point scale: 1 Reject … 3 Borderline Reject, 4 Borderline Accept … 6 Accept).**
+- **As it stands: 3, Borderline Reject.** Expected spread across reviewers 2–4. A CISS-aware reviewer gives 2 on weakness 1; a document-AI reviewer gives 4 on the hook and the effect size.
+- **`2dc86ad`: about 2–3, Weak/Borderline Reject.**
+  - Its abstract opened on a strawman ("commonly treated as a single problem").
+  - Contribution 1 was a "corrected protocol" that sounded like metric-gaming.
+  - The hook was buried in Sec. 4.2.
+  - Above all, the background-shift prior art (MiB/PLOP/SSUL/ExtendNER) was absent; any CISS reviewer would have scored novelty at 1–2 and called it a missing-related-work reject.
+- The rewrite fixes the framing and the prior-art hole. It moves the expected score up about half a point, not more, because the comparison the new related work invites is still missing.
+
+**What would raise the score before the freeze, in order of value per hour.**
+
+*Text only:*
+1. H1: "about half" (5 min).
+2. M6 + M5: one honest SSUL sentence (what SSUL already does; what SBR adds: a trainable trunk and old blocks re-grounded by memory, per-session grouping, claim routing), and scope "cannot come from better labels" (20 min). This turns the biggest reviewer attack into an acknowledged comparison.
+3. M1: the correct "why" for the sub-naive baselines, plus one sentence on port fidelity (what was checked; if nothing, say "our ports"; 15 min).
+4. M4 + M2 + M3: make the metric story consistent. Report both, and stop calling full-label primary until joint has it (15 min).
+5. Consider demoting CoLaR from contribution 3 to "the memory we use (Sec. 5.1)". This sharpens the story to diagnosis + readout. It is the user's call; it changes the contributions list.
+6. The LOW items (30 min in total).
+
+*GPU runs (all queued in v7 except where noted). They matter most in this order:*
+1. **`colar_mib` (MiB-style UCE + CoLaR, shared softmax) ×3.** This is the run that decides the novelty claim against the literature. It is at block 7 in v7, behind Mixed, cil_funsd, BROS and er_sbr. **Move it right after clean joint.** If time allows one seed of something not queued, it would be an **SSUL-style per-class sigmoid head with the CoLaR memory**, the other half of the attack. Not queued.
+2. **Clean joint ×3** (block 1): makes every headline comparison same-protocol and gives the 2×2 its joint full-label F1 (M2, M4). Already first; keep it there.
+3. **Clean oracle ×3** (block 2): turns the abstract's clause into three seeds. Update `conflict_macros()` before it lands (H1 follow-up).
+4. **er_sbr ×3** (block 6): shows the readout effect does not depend on CoLaR (raw memory × blocked readout). It strengthens the factorial's generality cheaply. Move it ahead of BROS.
+5. **The second class-incremental scenario (cil_funsd, two sessions)**: necessary but weak. FUNSD has three entity types, so two sessions on 50 test forms is a thin replication; a referee will still call the CIL evidence "one dataset". If anything is cut, keep it, but do not oversell it ("secondary replication" is the right word).
+6. **Clean naive ×3** (block 1): makes the 2×2 fully clean, with full-label F1. Cheap; keep.
+7. **CoLaR-SBR on BROS ×3:** a second backbone for the method. Moderate value.
+8. **Mixed CoLaR-SBR/joint ×3:** moderate. Mixed is "where both causes act", but its cells are 1–2 legacy seeds. Useful for the per-seed claims there.
+9. **Clean DIL joint/ER:** low for the story (the hook cannot flip: test-split stopping favoured ER), but it removes † from the first sentence.
+10. **Recall session-order o2/o3 (seed 42):** low-moderate; answers a stated limitation.
+11. **CL-LoRA clean, ER-250, LwF fp32:** low. Drop them first if the queue is late.
+
+*Still missing (not queued):*
+- the SSUL-style sigmoid-head control;
+- the true-label memory + sliced current loss (the gate run died in task 2), which is the label-side upper bound for a shared softmax and about 2 h;
+- any fidelity check of the CPFD/IS3 ports. Probably too costly; handle it in text.
+
+### OPEN (not counted)
+
+- Clean CoLaR s123 (running) will switch the CoLaR AA cell to clean. Regenerate, and re-check M3 and `\nColar` (the intro and teaser use it).
+- When clean joint lands: re-check "on par" (R6), M2, M4, the precision-only sentences in Setup/App. G (then stale), and `\nOracleShare` (its denominator switches by itself).
