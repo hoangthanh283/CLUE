@@ -2,7 +2,7 @@
 
 Writes into paper_cvpr/:
   vals.tex            \\newcommand macros for the headline cells (used by abstract, intro, teaser)
-  tab_2x2.tex         memory x readout on CIL-CORD (+ isolation row)
+  tab_2x2.tex         memory x readout on CIL-CORD (strict 2x2; AA and full-label F1)
   tab_main_clean.tex  comparison table (CIL-CORD AA, CIL-CORD full-label F1, Mixed AA, DIL AA)
   tab_dil_grid.tex    DIL AA of the classical methods on four backbones (legacy grid)
 
@@ -18,6 +18,7 @@ exact-zero legacy seed was actually dropped.
 """
 
 import json
+import math
 import re
 from glob import glob
 from pathlib import Path
@@ -114,6 +115,11 @@ def pick_clean_only(sources, key):
     """For a metric only the clean protocol writes (full-label F1): the clean seeds that exist."""
     vs = [v for r, n, sfx in sources if r == CLEAN for v in load(r, n, key, sfx)]
     return vs, True, False
+
+
+def up1(x: float) -> str:
+    """Round an upper bound UP to one decimal, so "no more than / within X" stays true."""
+    return f"{math.ceil(10 * x - 1e-9) / 10:.1f}"
 
 
 def fmt(vs, clean, dropped=False, bold=False, mark="", show_n=False):
@@ -283,7 +289,8 @@ SEED_HDR = "Row & Source & 42 & 7 & 123 & h/run \\\\\n"
 ROW_LABEL = {"naive": "Naive", "nobank": "SBR, no memory", "colar": "CoLaR",
              "sbr": "CoLaR-SBR", "cllora": "CL-LoRA", "recall": "SBR-Recall",
              "joint": "Joint training", "er": "ER", "slot": "CoLaR-SBR + LexSlot",
-             "sbr_recall_r64": "SBR-Recall", "sbr_noreplay": "SBR, no memory"}  # fmt: skip
+             "sbr_recall_r64": "SBR-Recall", "sbr_noreplay": "SBR, no memory",
+             "sbr_bros": "CoLaR-SBR (BROS)"}  # fmt: skip
 
 
 def write_perseed():
@@ -303,11 +310,16 @@ def write_perseed():
 
 
 def write_agree():
-    """Session-restricted AA next to full-label F1 for every clean run that records both."""
+    """Session-restricted AA next to full-label F1 for every clean CIL-CORD LayoutLMv3 run that
+    records both, restricted to methods with a row label (the table is CIL-CORD-only: runs of other
+    scenarios, e.g. cil_funsd, or methods not yet described in the paper, e.g. er_sbr, stay out
+    until a label is added here)."""
     rows = []
-    for f in sorted(glob(f"{CLEAN}/*/metrics.json")):
+    for f in sorted(glob(f"{CLEAN}/cil_cord_*/metrics.json")):
         m = json.loads(Path(f).read_text())
-        if "smoke" in f or m.get("full_label_f1") is None:
+        if "smoke" in f or m.get("full_label_f1") is None or m.get("scenario") != "cil_cord":
+            continue
+        if m["method"].replace("colar_sbr", "sbr") not in ROW_LABEL:
             continue
         rows.append((m["scenario"], m["method"], m["seed"], m["AA"], m["full_label_f1"]))
     rows.sort(key=lambda r: (r[0], r[1], SEEDS.index(r[2]) if r[2] in SEEDS else len(SEEDS)))
@@ -424,7 +436,10 @@ def write_supp_vals():
         t += m("sbrLossMin", f"{loss.min():.0f}") + m("sbrLossMax", f"{loss.max():.0f}")
         t += m("sbrLossMaxSession", str(int(loss.argmax()) + 1))
     if rc is not None:
-        t += m("recallDevMax", f"{np.abs(np.diag(rc) - rc[-1]).max():.1f}")
+        t += m("recallDevMax", up1(np.abs(np.diag(rc) - rc[-1]).max()))
+    nb = matrices(C["nobank"])
+    if nb:  # final F1 of every old session of no-memory SBR, any seed (an upper bound)
+        t += m("nobankOldMax", f"{math.ceil(max(mt[-1, :-1].max() for mt in nb)):.0f}")
     (OUT / "supp_vals.tex").write_text(t)
 
 
@@ -461,12 +476,60 @@ def recall_macros() -> str:
         for i in range(j, mat.shape[0])
     ]
     vals = {  # "--" when the runs are missing, so the paper still builds
-        "nRecallJointGap": f"{max(gaps):.1f}" if gaps else "--",
-        "nRecallMaxLoss": f"{max(0.0, -min(moves)):.1f}" if moves else "--",
-        "nRecallMaxGain": f"{max(moves):.1f}" if moves else "--",
+        "nRecallJointGap": up1(max(gaps)) if gaps else "--",
+        "nRecallMaxLoss": up1(max(0.0, -min(moves))) if moves else "--",
+        "nRecallMaxGain": up1(max(moves)) if moves else "--",
     }
     t = "".join(f"\\newcommand{{\\{k}}}{{{x}}}\n" for k, x in vals.items())
     return t
+
+
+ORACLE = (GATE, "cil_cord_colar_r_oracle", "_k4_d50_r128")
+COLAR_GATE = (GATE, "cil_cord_colar", "_k4_d50_r128")
+LABEL_REPAIRS = (  # label-side repairs of the shared softmax (rows of tab:conflict)
+    (RESC, "cil_cord_colar_r_sliced", ""), (GATE, "cil_cord_colar_r_sliced", "_k4_d50_r128"),
+    (GATE, "cil_cord_colar_r_sliced2", "_k4_d50_r128"),
+    (GATE, "cil_cord_colar_r_sliced2_pseudo", "_k4_d50_r128"),
+    (GATE, "cil_cord_colar_r_bilc", "_k4_d50_r128"), ORACLE,
+)  # fmt: skip
+
+
+def conflict_macros() -> str:
+    """Facts about the background-conflict controls that the body states (Sec. 4.2):
+    the true-label refresh (seed 42, gate) and its share of the gap between CoLaR with a shared
+    softmax (same protocol, seed 42) and joint training (seed 42 of the joint cell's source);
+    its late diagonals; the stale tokens it rewrites at each refresh (from its log); the sliced
+    controls; and the best seed of any label-side repair."""
+
+    def one(r):
+        return load_seeds(r[0], r[1], suffix=r[2])
+
+    o, cg = one(ORACLE).get(42), one(COLAR_GATE).get(42)
+    j = chosen_source(C["joint"])
+    jv = load_seeds(j[0], j[1], suffix=j[2]).get(42) if j else None
+    v = {"nOracle": f"{o:.1f}" if o else "--", "nColarGateSeed": f"{cg:.1f}" if cg else "--"}
+    v["nOracleShare"] = f"{100 * (o - cg) / (jv - cg):.0f}" if o and cg and jv else "--"
+    om = matrices_by_seed([ORACLE]).get(42)
+    late = np.diag(om)[2:] if om is not None else []
+    v["nOracleLateMin"] = f"{min(late):.0f}" if len(late) else "--"
+    v["nOracleLateMax"] = f"{max(late):.0f}" if len(late) else "--"
+    logs = sorted(glob(f"{ORACLE[0]}/{ORACLE[1]}_seed42*.log"))
+    counts = (
+        re.findall(r"refreshed \d+ docs, (\d+) tokens relabelled", Path(logs[0]).read_text())
+        if logs
+        else []
+    )
+    v["nOracleRelabel"] = "/".join(counts) if counts else "--"
+    v["nOracleRelabelMax"] = str(max(map(int, counts))) if counts else "--"
+    sl1 = load(RESC, "cil_cord_colar_r_sliced", suffix="")
+    sl2 = load(GATE, "cil_cord_colar_r_sliced2", suffix="_k4_d50_r128")
+    v["nSlicedReplay"] = f"{np.mean(sl1):.1f}" if sl1 else "--"
+    v["nSlicedBoth"] = f"{np.mean(sl2):.1f}" if sl2 else "--"
+    allr = [x for r in LABEL_REPAIRS for x in one(r).values()]
+    v["nLabelRepairMax"] = up1(max(allr)) if allr else "--"
+    pb = one((GATE, "cil_cord_colar_r_bilc", "_k4_d50_r128")).get(42)
+    v["nPseudoBoth"] = f"{pb:.1f}" if pb else "--"  # pseudo-labels on both sides, seed 42
+    return "".join(f"\\newcommand{{\\{k}}}{{{x}}}\n" for k, x in v.items())
 
 
 def main():
@@ -475,7 +538,7 @@ def main():
     dil = {k: pick(v) for k, v in D.items()}
     full = {
         k: pick_clean_only(C[k], "full_label_f1")
-        for k in ("naive", "colar", "sbr", "recall", "joint", "er")
+        for k in ("naive", "nobank", "colar", "sbr", "recall", "joint", "er")
     }
 
     # ---- vals.tex
@@ -493,18 +556,32 @@ def main():
         v += macro(n, mix[k][0])
     for k, n in (("sbr", "SbrDil"), ("joint", "JointDil"), ("colar", "ColarDil"), ("er", "ErDil")):
         v += macro(n, dil[k][0])
-    for k, n in (("sbr", "SbrFull"), ("recall", "RecallFull"), ("joint", "JointFull")):
+    for k, n in (
+        ("sbr", "SbrFull"),
+        ("recall", "RecallFull"),
+        ("joint", "JointFull"),
+        ("nobank", "NoBankFull"),
+    ):
         v += macro(n, full[k][0])
     v += recall_macros()
+    v += conflict_macros()
     (OUT / "vals.tex").write_text(v)
 
     # ---- tab_2x2.tex
     t = "% AUTO-GENERATED by scripts/rca/make_clean_tables.py -- do not edit.\n"
-    t += "\\begin{tabular}{lcc}\n\\toprule\n & \\textbf{Shared softmax} & \\textbf{Session-blocked readout} \\\\\n\\midrule\n"
-    t += f"No memory & {fmt(*cell['naive'])} & {fmt(*cell['nobank'])} \\\\\n"
-    t += f"Whole-document memory (CoLaR) & {fmt(*cell['colar'])} & {fmt(*cell['sbr'], bold=True)} \\\\\n"
-    t += f"Low-rank adapters, no memory & {fmt(*cell['cllora'])} & {fmt(*cell['recall'], bold=True)} \\\\\n"
-    t += f"\\midrule\nJoint training (reference) & \\multicolumn{{2}}{{c}}{{{fmt(*cell['joint'])}}} \\\\\n"
+
+    def fl2(k, **kw):  # full-label F1 beside AA: clean seeds only, n marked when < 3
+        return fmt(*full[k], show_n=True, **kw)
+
+    t += "\\begin{tabular}{lcccc}\n\\toprule\n"
+    t += " & \\multicolumn{2}{c}{\\textbf{Shared softmax}} & \\multicolumn{2}{c}{\\textbf{Session-blocked readout}} \\\\\n"
+    t += "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}\n & AA & full-label F1 & AA & full-label F1 \\\\\n\\midrule\n"
+    t += f"No memory & {fmt(*cell['naive'])} & {fl2('naive')} & {fmt(*cell['nobank'])} & {fl2('nobank')} \\\\\n"
+    t += (f"CoLaR memory & {fmt(*cell['colar'])} & {fl2('colar')} & "
+          f"{fmt(*cell['sbr'], bold=True)} & {fl2('sbr', bold=True)} \\\\\n")  # fmt: skip
+    # The reference is not a cell of the 2x2: one row spanning both readouts, labelled metrics.
+    t += (f"\\midrule\nJoint training (reference) & \\multicolumn{{4}}{{c}}{{AA {fmt(*cell['joint'])}, "
+          f"full-label F1 {fl2('joint')}}} \\\\\n")  # fmt: skip
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_2x2.tex").write_text(t)
 
