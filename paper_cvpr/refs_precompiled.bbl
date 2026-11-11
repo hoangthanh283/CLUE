@@ -121,12 +121,13 @@ Simon Kornblith, Mohammad Norouzi, Honglak Lee, and Geoffrey Hinton.
 \newblock In \emph{Proceedings of the 36th International Conference on Machine
   Learning (ICML)}, 2019.
 
-\bibitem[Kumar et~al.(2024)]{kumar2024protoner}
-Kumar et~al.
-\newblock {ProtoNER}: Few-shot incremental named entity recognition for
-  visually-rich documents.
-\newblock In \emph{International Workshop on Document Analysis Systems (DAS)},
-  2024.
+\bibitem[Kumar et~al.(2023)Kumar, Goyal, Verma, and
+  Isahagian]{kumar2023protoner}
+Ritesh Kumar, Saurabh Goyal, Ashish Verma, and Vatche Isahagian.
+\newblock {ProtoNER}: Few shot incremental learning for named entity
+  recognition using prototypical networks.
+\newblock In \emph{Business Process Management Workshops (BPM 2023
+  International Workshops)}, pages 70--82. Springer, 2023.
 
 \bibitem[Li et~al.(2025)Li, Shen, Chen, Chen, Ju, Duan, Mao, Zhou, Zhang, Fu,
   et~al.]{gdibench}
@@ -355,25 +356,24 @@ Gengwei Zhang, Liyuan Wang, Guoliang Kang, Ling Chen, and Yunchao Wei.
   on a pre-trained model.
 \newblock In \emph{ICCV}, 2023{\natexlab{b}}.
 
+\bibitem[Zhang and Chen(2023)]{zhang2023spankl}
+Yunan Zhang and Qingcai Chen.
+\newblock A neural span-based continual named entity recognition model.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial
+  Intelligence}, pages 13993--14001, 2023.
+
 \bibitem[Zhao et~al.(2022)Zhao, Xu, Yang, and Gao]{zhao2022crl}
 Kang Zhao, Hua Xu, Jiangong Yang, and Kai Gao.
 \newblock Consistent representation learning for continual relation extraction.
 \newblock In \emph{Findings of the Association for Computational Linguistics:
   ACL 2022}, 2022.
 
-\bibitem[Zheng et~al.(2022)]{zheng2022cfner}
-Junhao Zheng et~al.
+\bibitem[Zheng et~al.(2022)Zheng, Liang, Chen, and Ma]{zheng2022cfner}
+Junhao Zheng, Zhanxian Liang, Haibin Chen, and Qianli Ma.
 \newblock Distilling causal effect from miscellaneous other-class for continual
   named entity recognition.
 \newblock In \emph{Proceedings of the 2022 Conference on Empirical Methods in
-  Natural Language Processing (EMNLP)}, 2022.
-
-\bibitem[Zheng et~al.(2023)]{zheng2023spankl}
-Junhao Zheng et~al.
-\newblock {SpanKL}: A span-based knowledge-localisation method for continual
-  named entity recognition.
-\newblock In \emph{Proceedings of the AAAI Conference on Artificial
-  Intelligence}, 2023.
+  Natural Language Processing (EMNLP)}, pages 3602--3615, 2022.
 
 \bibitem[Zhou et~al.(2024)Zhou, Sun, Ye, and Zhan]{zhou2024ease}
 Da-Wei Zhou, Hai-Long Sun, Han-Jia Ye, and De-Chuan Zhan.
