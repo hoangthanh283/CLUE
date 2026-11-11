@@ -33,7 +33,11 @@ Agents cannot message each other. Report to the PM; the PM relays.
    restart `scripts/rca/audit_gates_2026-11.sh` or `scripts/rescore_cil_2026-11.sh` (old protocol,
    stopped on purpose).
 3. **Configs.** `configs/` is add-only; use CLI overrides for one-off changes.
-4. **Git.** Commit only your own paths with explicit `git add <paths>` (never `-A`, never `.`).
+4. **Git.** Several agents share one index, so a bare `git commit` sweeps up files another agent
+   has staged (this happened on 2026-11-11: commit 8edfcfc carries Dev's figure under the
+   Reviewer's message). **Always commit with a pathspec**: `git add <paths>` then
+   `git commit -F <msgfile> -- <paths>` (or `-m ... -- <paths>`), which commits only those paths
+   whatever else is staged. Never `git add -A`, never `git add .`, never a bare `git commit`.
    If `.git/index.lock` exists, wait and retry. No amend, rebase, reset or force. Put `git commit`
    in its own Bash call, with no `-n` flag anywhere in that call (a hook rejects it). Dev prefixes
    code commits `AGENT IMPL:` / `AGENT FIX:`. Do not push; the PM pushes. End every commit message
