@@ -6,7 +6,6 @@ clean seeds exist, else the first non-empty legacy source).
     uv run python scripts/rca/make_retention_fig.py   ->  paper_cvpr/figures/retention_cilcord.pdf
 """
 
-from glob import glob
 from pathlib import Path
 
 import matplotlib
@@ -14,24 +13,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-from make_clean_tables import CLEAN, SEEDS, C, choose  # noqa: E402
+from make_clean_tables import C, matrices  # noqa: E402
 
 PANELS = [("colar", "CoLaR"), ("sbr", "CoLaR-SBR"), ("recall", "SBR-Recall")]
-
-
-def matrices(sources):
-    """Retention matrices chosen by the tables' rule (``choose``): the clean source only with all
-    three seeds, otherwise the first non-empty legacy source."""
-    per_source = []
-    for root, name, sfx in sources:
-        mats = []
-        for s in SEEDS:
-            hits = sorted(glob(f"{root}/{name}_seed{s}{sfx}/**/matrix.npy", recursive=True))
-            if hits:
-                mats.append(np.load(hits[0]))
-        per_source.append((mats, root == CLEAN))
-    i = choose(per_source)
-    return per_source[i][0] if i is not None else []
 
 
 def main():
