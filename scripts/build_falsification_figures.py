@@ -43,8 +43,8 @@ LADDER = [
     ("Real whole-document activations (converged)", 87.3, True),
     ("Whole documents, matched 5-epoch budget", 63.8, True),
     ("Decoupled carriers (same features)", 36.7, False),
-    ("Rank-16 spectral summary (SLR)", 41.9, False),
-    ("Per-class Gaussians, full-$d$ (AGLR-CL)", 39.4, False),
+    ("Rank-16 spectral summary", 41.9, False),
+    ("Per-class Gaussians, full-$d$", 39.4, False),
     ("Real $k$-means centroids", 36.7, False),
 ]
 
@@ -53,7 +53,7 @@ PARETO = [
     ("Raw latent replay", 163, 87.3, False),
     ("CoLaR (per-doc SVD, $r{=}128$)", 60, 87.6, True),
     ("Spectral $r{=}16$", 0.45, 41.9, False),
-    ("AGLR Gaussians", 0.39, 39.4, False),
+    ("Per-class Gaussians", 0.39, 39.4, False),
     ("Coreset centroids", 0.48, 36.7, False),
 ]
 
@@ -120,7 +120,7 @@ def fig_pareto() -> None:
         "Raw latent replay": (9, -4, "left"),
         "CoLaR (per-doc SVD, $r{=}128$)": (-9, 3, "right"),
         "Spectral $r{=}16$": (9, 12, "left"),
-        "AGLR Gaussians": (-9, -3, "right"),
+        "Per-class Gaussians": (-9, -3, "right"),
         "Coreset centroids": (9, -19, "left"),
     }
     for name, mb, aa, hl in PARETO:
@@ -135,7 +135,7 @@ def fig_pareto() -> None:
             fontweight="bold" if hl else "normal",
         )
     ax.set_xscale("log")
-    ax.set_xlim(0.04, 900)
+    ax.set_xlim(0.015, 900)
     ax.set_ylim(25, 100)
     ax.set_xlabel("Replay memory (MB, log scale)")
     ax.set_ylabel("AA (entity-F1, DIL)")
