@@ -263,12 +263,12 @@ No task identity is used, and the session restriction of the evaluation is appli
 
 \subsection{Stacking LexSlot on CoLaR-SBR}
 \label{app:slot}
-LexSlot adds extra head slots that a session updates only when the OCR vocabulary of its documents selects them; it stores the token ids of its documents, unlike CoLaR. Stacked on CoLaR-SBR (\cref{tab:slot}) it moves the per-seed AA by a few points in either direction and leaves the mean within two points on every scenario; in the runs of \cref{tab:slot} it narrows the spread between seeds on CIL-CORD and DIL ($\vSbr$ against $\vSlot$ on CIL-CORD). It stays below SBR-Recall on CIL-CORD. We read it as a second partition of the same readout that SBR already partitions, and keep it as a row, not a method.
+LexSlot adds extra head slots that a session updates only when the OCR vocabulary of its documents selects them; it stores the token ids of its documents, unlike CoLaR. LexSlot exists only as fp32 gate runs, so \cref{tab:slot} compares it with the CoLaR-SBR gate runs of the same protocol, never with the main-table source. Stacked on CoLaR-SBR it moves the per-seed AA by a few points in either direction and leaves the mean within two points on every scenario, and it narrows the spread between seeds on CIL-CORD ($\vSbrGate$ against $\vSlotGate$) and DIL ($\vSbrGateDil$ against $\vSlotGateDil$). It stays below SBR-Recall on CIL-CORD. We read it as a second partition of the same readout that SBR already partitions, and keep it as a row, not a method.
 
 \begin{table}[t]
 \centering\scriptsize
 \setlength{\tabcolsep}{2.5pt}
-\caption{\textbf{CoLaR-SBR / + LexSlot (difference)}, AA per seed. The LexSlot runs are fp32 gate runs; the CoLaR-SBR source is the one of the main table, and for Mixed also the fp32 gate run of seed 42, since the main-table Mixed source is fp16. Generated (\texttt{supp\_slot.tex}).}
+\caption{\textbf{CoLaR-SBR / + LexSlot (difference)}, AA per seed; both sides are fp32 gate runs$^\dagger$ (one protocol per row; Mixed CoLaR-SBR has one gate seed). Generated.}
 \label{tab:slot}
 \resizebox{\linewidth}{!}{\input{supp_slot}}
 \end{table}
