@@ -66,8 +66,12 @@ session's training data, never the test split), `method.epochs=10` (joint: 100),
 `metrics.json`: final model on the unmasked CORD test set), seeds 42/7/123,
 `output_dir=results/clean_2026-11`. Queue log: `results/clean_2026-11/queue.log`.
 
-Known hazard: fp16 mixed precision makes LwF and IS3 collapse to exactly 0; those cells are not
-method results.
+Known hazard (corrected 2026-11-11 from `docs/LEGACY_PROTOCOL_TABLE_2026-11.md`): the LwF zeros
+(CIL-CORD seed 123, Mixed seed 7) and the CPFD CIL-CORD seed-7 zero are fp16 runs; LwF never
+collapses in fp32. **IS3 never enables mixed precision** (`is3.py` has no `_amp_setup`), so its
+Mixed seed-42 zero is a genuine fp32 result and must not be dropped or blamed on precision. Several
+legacy cells mix precisions across seeds (seed 42 fp32, later seeds fp16); the legacy table lists
+each.
 
 ## One cycle (at every milestone)
 
