@@ -69,9 +69,9 @@ METHOD_ORDER = [
     "bert_textonly",  # external text-only comparator (naive on BERT backbone)
 ]  # 'joint' is rendered separately as the oracle row
 METHOD_DISPLAY = {
-    "naive": "Naive (lower bound)",
-    "joint": "Joint (upper bound)",
-    "independent": "Independent (one model per task, task-ID oracle)",
+    "naive": "Naive",
+    "joint": "Joint training (reference)",
+    "independent": "Independent (one model per task)",
     "ewc": "EWC",
     "lwf": "LwF",
     "er": "ER",

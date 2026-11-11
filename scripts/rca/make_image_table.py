@@ -23,7 +23,7 @@ SCEN = ("cil_cifar100", "cil_imagenet_r")
 
 # label, {scenario: run-dir template with {sc} and {sd}} (None = not applicable), group
 ROWS = [
-    ("Naive (lower bound)", "{sc}_naive_seed{sd}_vit", "base"),
+    ("Naive", "{sc}_naive_seed{sd}_vit", "base"),
     ("LwF", "{sc}_lwf_seed{sd}_vit", "base"),
     ("ER (2{,}000 exemplars)", "{sc}_er_b2000_seed{sd}_vit", "base"),
     ("DER++ (2{,}000 exemplars)", "{sc}_der_pp_b2000_seed{sd}_vit", "base"),
@@ -33,7 +33,7 @@ ROWS = [
     ("RanPAC (2023)", "{sc}_ranpac_seed{sd}_vit", "base"),
     ("LCA (2026)", "{sc}_lca_seed{sd}_vit", "base"),
     (
-        "\\textbf{Latent bank, 500/class (ours, uncompressed)}",
+        "\\textbf{Latent memory, 500/class (ours, uncompressed)}",
         "{sc}_bank500_seed{sd}_vit_k4_d500",
         "ours",
     ),
@@ -42,7 +42,7 @@ ROWS = [
         {"cil_cifar100": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128", "cil_imagenet_r": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128"},
         "ours",
     ),
-    ("Joint (upper bound)", "{sc}_joint_seed{sd}_vit", "oracle"),
+    ("Joint training (reference)", "{sc}_joint_seed{sd}_vit", "oracle"),
 ]
 # Ridge-readout probe on the adapted latent-bank trunk (Pass 2b, seed 42): rp_full from probes.json.
 PROBE = {
