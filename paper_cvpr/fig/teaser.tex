@@ -12,12 +12,21 @@
   \draw[black!60] (0,\t*\ys) -- (-0.06,\t*\ys) node[left, inner sep=1.5pt] {\scriptsize \t};
 }
 \node[rotate=90, anchor=south] at (-0.55,1.55) {AA, CIL-CORD};
+% Dashed joint line first, so tall bars cover it; its value label sits at the right end only.
 \draw[densely dashed, black!70] (0,\nJoint*\ys) -- (6.5,\nJoint*\ys)
   node[right, inner sep=2pt, align=left] {\scriptsize joint\\[-2pt]\scriptsize \nJoint};
-\foreach \x/\v/\c in {0.60/\nNaive/black!28, 1.28/\nNoBank/ourteal, 2.80/\nColar/black!28,
-                      3.48/\nSbr/ourteal, 5.00/\nClLora/black!28, 5.68/\nRecall/ourteal} {
+% Bar values: inside the top of the bar when the bar is tall (> 50), above it otherwise, so the
+% labels never meet the joint line whatever the generated values are.
+\foreach \x/\v/\c/\lc in {0.60/\nNaive/black!28/black, 1.28/\nNoBank/ourteal/white,
+                          2.80/\nColar/black!28/black, 3.48/\nSbr/ourteal/white,
+                          5.00/\nClLora/black!28/black, 5.68/\nRecall/ourteal/white} {
   \fill[fill=\c] (\x-0.29,0) rectangle (\x+0.29,\v*\ys);
-  \node[above=1pt, inner sep=1pt, fill=white] at (\x,\v*\ys) {\scriptsize \v};
+  \pgfmathtruncatemacro{\tall}{\v>50 ? 1 : 0}
+  \ifnum\tall=1
+    \node[below=1pt, inner sep=1pt, text=\lc] at (\x,\v*\ys) {\scriptsize\bfseries \v};
+  \else
+    \node[above=1pt, inner sep=1pt] at (\x,\v*\ys) {\scriptsize \v};
+  \fi
 }
 \node[below, align=center] at (0.94,-0.03) {no memory};
 \node[below, align=center] at (3.14,-0.03) {whole-document\\memory (CoLaR)};
@@ -26,7 +35,7 @@
 \fill[ourteal] (2.95,3.55) rectangle (3.25,3.75); \node[right, inner sep=2pt] at (3.28,3.65) {session-blocked readout};
 \node[anchor=north west] at (-0.8,-0.95) {\textbf{(a)}};
 % ==== (b) schematic
-\begin{scope}[xshift=8.6cm]
+\begin{scope}[xshift=7.75cm]
 \node[box, minimum width=2.3cm] (tok) at (1.15,0.15) {tokens, boxes, page};
 \node[box, minimum width=2.3cm, draw=black!45, pattern=north east lines, pattern color=black!15]
   (low) at (1.15,1.25) {layers $1..k$\\frozen after session 1};
@@ -41,7 +50,7 @@
 \node at (6.05,2.55) {$\cdots$};
 \node[box, draw=ourteal, thick] (b3) at (7.1,2.55) {$[\mathrm{O}_B\,|\,\text{tags}_B]$};
 \draw[->] (up) -- (b1);
-\node[align=center] at (5.25,3.4) {$e_b = 1 - p_b(\mathrm{O}_b)$: the block with the largest $e_b>0.5$ claims the token};
+\node[align=center] at (5.25,3.45) {$e_b = 1 - p_b(\mathrm{O}_b)$; the block with the\\largest $e_b>0.5$ claims the token};
 \node[align=left, anchor=west] at (2.75,0.15) {\textcolor{memgreen}{\textbf{CoLaR}} answers drift; \textcolor{ourteal}{\textbf{SBR}} un-shares the\\background; \textcolor{ourteal}{\textbf{SBR-Recall}} reads block $b$ under $\Delta_b$.};
 \node[anchor=north west] at (-0.2,-0.5) {\textbf{(b)}};
 \end{scope}

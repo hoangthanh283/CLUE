@@ -37,6 +37,9 @@
 
 \author{Anonymous CVPR submission}
 
+%% Headline numbers shared with the main paper (generated, never typed by hand).
+\input{vals}
+
 \begin{document}
 \maketitlesupplementary
 \appendix
@@ -129,7 +132,7 @@ The CoLaR schematic (\cref{fig:colar}), the displacement profile (\cref{fig:disp
 \begin{table}[t]
 \centering
 \setlength{\tabcolsep}{4pt}
-\caption{\textbf{Fixed comparison set on image CIL} (ViT-B/16, ten sessions, AA, mean $\pm$ s.d., seeds 42/7/123): the same references (naive, joint training) and baselines as the comparison table of the main paper, with SLCA and RanPAC in the slots CPFD and IS3 take on documents. ER/DER++/SLCA keep $2{,}000$ exemplars; the uncompressed latent memory (``latent bank'') and CoLaR keep $500$/class. Ridge is a diagnostic readout refit, not a method.}
+\caption{\textbf{Fixed comparison set on image CIL} (ViT-B/16, ten sessions, AA, mean $\pm$ s.d., seeds 42/7/123): the same references (naive, joint training) and baselines as the comparison table of the main paper, with SLCA and RanPAC in the slots CPFD and IS3 take on documents. ER/DER++/SLCA keep $2{,}000$ exemplars; the uncompressed latent memory and CoLaR keep $500$/class. Ridge is a diagnostic readout refit, not a method.}
 \label{tab:image}
 \resizebox{\linewidth}{!}{\input{tab_image_core}}
 \end{table}
@@ -166,6 +169,8 @@ Label refresh (latent memory) & CoLaR-R pseudo (CIL-CORD / Mixed, 3 seeds each)$
 
 \paragraph{Routing which stored document to replay (null).} The OCR vocabulary of a document is set by the input and does not drift with training, which suggests a drift-free sampler: a softmax over term-frequency signature scores $s_j=\sigma(x)^{\top}\sigma_j$ in three directions (\emph{near}, \emph{far}, \emph{task}), uniform as the zero-point. The seed-42 reading was promising (far $+1.8$ over uniform $86.4$ at $d{=}50$), so we fixed that single arm in advance for confirmation. Across three seeds the gap collapses to $+1.8/+0.4/-0.6$, mean $+0.5$ pp with a sign flip, inside the uniform-sampling spread: lexical routing is a null, and the CoLaR results do not depend on it.
 
+\paragraph{Rebalancing and reading the memory (nulls).} On DIL with LayoutLMv3 (CoLaR, $k{=}4$, $r{=}128$, $50$ documents per task; base $87.6$ on seed 42), three changes to how the memory is filled or weighted leave AA where it was: a class-balanced replay loss gives $87.1$, coverage-based ($k$-centre) document selection $86.8$ and entity-weighted compression $87.1$ (seed 42 each). Each trades FUNSD retention for SROIE retention at about $1{:}1$, so the changes redistribute retention between tasks rather than add to it. A three-seed check finds no lever above the base (class-balanced $87.8$, $k$-centre $87.0$, against $\vColarDil$ for the base). Two read-side additions are negative: blending a $k$NN readout over the stored latents into the head is inert or harmful, and metaplastic consolidation of the readout lowers AA from $85.9$ to $79.5$ at its own operating point.
+
 \paragraph{A bounded positive on the storage side.} Replaying pseudo-labelled \emph{public} documents through the same mechanism (zero private bytes) recovers dense-label tasks (FUNSD $76.1$) but not one the proxy pool does not cover (SROIE $\sim7$), topping out at $58.9$: coverage-limited transfer. Budget-adaptive allocation across tasks moves along a Pareto frontier, not beyond it (\cref{app:extra}).
 
 
@@ -175,7 +180,7 @@ Label refresh (latent memory) & CoLaR-R pseudo (CIL-CORD / Mixed, 3 seeds each)$
 
 \begin{table}[h]
 \centering\small
-\setlength{\tabcolsep}{4pt}
+\setlength{\tabcolsep}{3pt}
 \caption{Fisher-weighted displacement at the first task boundary under naive fine-tuning (mean over three seeds). ``Head ratio'': classifier $D_g$ over the largest encoder bucket. ``Encoder share'': each bucket's fraction of the encoder total with the head excluded.}
 \label{tab:depthprofile}
 \begin{tabular}{lrcccc}
