@@ -1,4 +1,5 @@
-% Teaser: (a) memory x readout on CIL-CORD, bar heights read from the generated vals.tex;
+% Teaser: (a) the strict memory x readout 2x2 on CIL-CORD plus SBR-Recall as a separate,
+% memory-free bar; bar heights read from the generated vals.tex;
 % (b) SBR / SBR-Recall schematic.
 \begin{strip}
 \centering
@@ -19,7 +20,7 @@
 % labels never meet the joint line whatever the generated values are.
 \foreach \x/\v/\c/\lc in {0.60/\nNaive/black!28/black, 1.28/\nNoBank/ourteal/white,
                           2.80/\nColar/black!28/black, 3.48/\nSbr/ourteal/white,
-                          5.00/\nClLora/black!28/black, 5.68/\nRecall/ourteal/white} {
+                          5.55/\nRecall/ourteal/white} {
   \fill[fill=\c] (\x-0.29,0) rectangle (\x+0.29,\v*\ys);
   \pgfmathtruncatemacro{\tall}{\v>50 ? 1 : 0}
   \ifnum\tall=1
@@ -28,9 +29,11 @@
     \node[above=1pt, inner sep=1pt] at (\x,\v*\ys) {\scriptsize \v};
   \fi
 }
+% SBR-Recall is not a cell of the 2x2: a separator and its own label mark it as the memory-free variant.
+\draw[black!45, densely dotted] (4.55,0) -- (4.55,3.0);
 \node[below, align=center] at (0.94,-0.03) {no memory};
 \node[below, align=center] at (3.14,-0.03) {whole-document\\memory (CoLaR)};
-\node[below, align=center] at (5.34,-0.03) {low-rank\\adapters};
+\node[below, align=center] at (5.55,-0.03) {SBR-Recall\\(no memory)};
 \fill[black!28] (0.25,3.55) rectangle (0.55,3.75); \node[right, inner sep=2pt] at (0.58,3.65) {shared softmax};
 \fill[ourteal] (2.95,3.55) rectangle (3.25,3.75); \node[right, inner sep=2pt] at (3.28,3.65) {session-blocked readout};
 \node[anchor=north west] at (-0.8,-0.95) {\textbf{(a)}};
@@ -56,7 +59,7 @@
 \end{scope}
 \end{tikzpicture}
 \captionsetup{hypcap=false}
-\captionof{figure}{\textbf{Two causes of forgetting, and a remedy matched to each.} (a) Class-incremental CORD, LayoutLMv3, AA under session-restricted scoring; bars are the cell means of \cref{tab:twobytwo}, which gives the seeds and protocol of each cell. A whole-document memory alone and a session-blocked readout alone both stay far below joint training; together they close most of the gap to it, and one low-rank delta per session with a blocked readout (SBR-Recall) comes within $\nRecallJointGap$ points of it on every seed without a memory, while a single low-rank adapter shared by all sessions with a shared softmax (our CL-LoRA port) collapses. (b) Layers $1..k$ are frozen after the first session; the memory stores per-document SVDs of layer-$k$ activations and re-grounds the drifting upper layers (CoLaR); each session gets its own background logit and tokens are routed with no task identity (SBR); SBR-Recall evaluates each block under the trunk delta of the session that created it.}
+\captionof{figure}{\textbf{Two causes of forgetting, and a remedy matched to each.} (a) Class-incremental CORD, LayoutLMv3, AA. Left: the $2{\times}2$ of \cref{tab:twobytwo}; a whole-document memory alone and a session-blocked readout alone stay far below joint training (dashed), together they close most of the gap. Right: SBR-Recall (\cref{sec:recall}) replaces the memory with one low-rank trunk delta per session. (b) CoLaR replays per-document SVDs of layer-$k$ activations against drift; SBR gives each session its own background logit and routes tokens without task identity; SBR-Recall reads block $b$ under delta $\Delta_b$.}
 \captionsetup{hypcap=true}
 \label{fig:teaser}
 \end{strip}
