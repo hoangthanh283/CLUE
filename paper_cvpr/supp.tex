@@ -121,7 +121,7 @@ The CoLaR schematic (\cref{fig:colar}), the displacement profile (\cref{fig:disp
 
 \begin{figure*}[t]\centering
 \includegraphics[width=0.92\linewidth]{figures/pilot_displacement_bars.pdf}
-\caption{Where forgetting lives. Old-task-Fisher-weighted displacement $D_g$ by depth bucket (log scale, first boundary), for the four LayoutLMv3 modality-mask conditions, text-only BERT, LiLT and BROS; mean over three seeds, $\pm$1 s.d. The classifier head's weighted displacement is two to four orders of magnitude above any encoder layer's on every backbone.}
+\caption{Where forgetting lives. Old-task-Fisher-weighted displacement $D_g$ by depth bucket (log scale, first boundary), for the four LayoutLMv3 modality-mask conditions, text-only BERT, LiLT and BROS; mean over three seeds, $\pm$1 s.d. The classifier head's weighted displacement is two or more orders of magnitude above any encoder layer's on every backbone.}
 \label{fig:displacement}\end{figure*}
 
 \begin{figure*}[t]\centering
@@ -176,25 +176,25 @@ Label refresh (latent memory) & CoLaR-R pseudo (CIL-CORD / Mixed, 3 seeds each)$
 
 \section{Drift analysis details and legacy-scored tables}
 \label{sec:supp-drift}
-\paragraph{Displacement by depth, with and without the head.} For a checkpoint pair $(\theta^{(t-1)},\theta^{(t)})$ and a parameter group $g$ we compute the old-task-Fisher-weighted displacement $D_g=\sum_{\phi\in g}F^{(t-1)}_\phi(\theta^{(t)}_\phi-\theta^{(t-1)}_\phi)^2$. \cref{tab:depthprofile} reports it at the first task boundary, mean over three seeds. The classifier's $D_g$ is two to four orders of magnitude above the largest encoder bucket on every condition. This ratio is inflated by construction: the empirical Fisher of a token classifier is largest at the head whatever the task ($0.22$ against $0.005$ for the next group on LayoutLMv3), so the weighting itself favours the head. The informative part is the encoder-only share: with the head excluded, weighted displacement sits in the early and middle layers on every document encoder and is smallest in the late layers. Representational drift measured by CKA, in contrast, grows with depth because it accumulates. The two instruments therefore agree on the classifier and disagree on the late encoder layers, and the main text claims only what both support.
+\paragraph{Displacement by depth, with and without the head.} For a checkpoint pair $(\theta^{(t-1)},\theta^{(t)})$ and a parameter group $g$ we compute the old-task-Fisher-weighted displacement $D_g=\sum_{\phi\in g}F^{(t-1)}_\phi(\theta^{(t)}_\phi-\theta^{(t-1)}_\phi)^2$. \cref{tab:depthprofile} reports it at the first task boundary, mean over the live seeds of each condition. The classifier's $D_g$ is two to three orders of magnitude above the largest encoder bucket on every condition ($111\times$ to $1608\times$). This ratio is inflated by construction: the empirical Fisher of a token classifier is largest at the head whatever the task ($0.22$ against $0.005$ for the next group on LayoutLMv3), so the weighting itself favours the head. The informative part is the encoder-only share: with the head excluded, weighted displacement sits in the early and middle layers on every document encoder and is smallest in the late layers. Representational drift measured by CKA, in contrast, grows with depth because it accumulates. The two instruments therefore agree on the classifier and disagree on the late encoder layers, and the main text claims only what both support.
 
 \begin{table}[h]
 \centering\small
-\setlength{\tabcolsep}{3pt}
-\caption{Fisher-weighted displacement at the first task boundary under naive fine-tuning (mean over three seeds). ``Head ratio'': classifier $D_g$ over the largest encoder bucket. ``Encoder share'': each bucket's fraction of the encoder total with the head excluded.}
+\setlength{\tabcolsep}{2pt}
+\caption{Fisher-weighted displacement at the first task boundary under naive fine-tuning (mean over the $n$ live seeds; a run whose final AA is below $1.0$ is dead and excluded, which removes one text-only LayoutLMv3 seed). ``Head ratio'': classifier $D_g$ over the largest encoder bucket. ``Encoder share'': each bucket's fraction of the encoder total with the head excluded.}
 \label{tab:depthprofile}
-\begin{tabular}{lrcccc}
+\begin{tabular}{lcrcccc}
 \toprule
- & & \multicolumn{4}{c}{Encoder share} \\
-Condition & Head ratio & input & early & mid & late \\
+ & & & \multicolumn{4}{c}{Encoder share} \\
+Condition & $n$ & Head ratio & input & early & mid & late \\
 \midrule
-LayoutLMv3, full & $273\times$ & $0.03$ & $0.70$ & $0.24$ & $0.03$ \\
-LayoutLMv3, text+layout & $361\times$ & $0.05$ & $0.65$ & $0.27$ & $0.02$ \\
-LayoutLMv3, text only & $9505\times$ & $0.03$ & $0.33$ & $0.50$ & $0.13$ \\
-LayoutLMv3, no text & $247\times$ & $0.06$ & $0.80$ & $0.13$ & $0.01$ \\
-LiLT & $111\times$ & $0.05$ & $0.88$ & $0.06$ & $0.00$ \\
-BROS & $738\times$ & $0.21$ & $0.37$ & $0.37$ & $0.05$ \\
-BERT & $1608\times$ & $0.18$ & $0.32$ & $0.36$ & $0.14$ \\
+LayoutLMv3, full & $3$ & $273\times$ & $0.03$ & $0.70$ & $0.24$ & $0.03$ \\
+LayoutLMv3, text+layout & $3$ & $361\times$ & $0.05$ & $0.65$ & $0.27$ & $0.02$ \\
+LayoutLMv3, text only & $2$ & $801\times$ & $0.03$ & $0.34$ & $0.51$ & $0.12$ \\
+LayoutLMv3, no text & $3$ & $247\times$ & $0.06$ & $0.80$ & $0.13$ & $0.01$ \\
+LiLT & $3$ & $111\times$ & $0.05$ & $0.88$ & $0.06$ & $0.00$ \\
+BROS & $3$ & $738\times$ & $0.21$ & $0.37$ & $0.37$ & $0.05$ \\
+BERT & $3$ & $1608\times$ & $0.18$ & $0.32$ & $0.36$ & $0.14$ \\
 \bottomrule
 \end{tabular}
 \end{table}
