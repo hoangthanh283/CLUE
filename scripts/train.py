@@ -60,6 +60,7 @@ from doccl.methods.doccl import DocCL, DocCL_A, DocCL_B, DocCL_C
 from doccl.methods.dualprompt import DualPrompt
 from doccl.methods.er import ER
 from doccl.methods.er_cflat import ERCFlat
+from doccl.methods.er_sbr import ERSBR
 from doccl.methods.ewc import EWC
 from doccl.methods.fisher_mask import FisherMaskFreeze
 from doccl.methods.frozen_ptm import RanPAC, SimpleCIL
@@ -265,6 +266,7 @@ METHOD_REGISTRY = {
     "colar_sbr": CoLaRSBR,
     "colar_sbr_recall": CoLaRSBRRecall,
     "colar_sbr_slot": CoLaRSBRSlot,
+    "er_sbr": ERSBR,  # D12 E1 control: raw-document memory x blocked readout, nothing frozen
     # CoLaR++: + head alignment on real stored latents, slow trunk, WA, balanced replay,
     # int8 / token-pooled storage (image CIL; docs/IMAGE_SCOPE_PREREG.md Amendment 5).
     "colar_pp": CoLaRPP,

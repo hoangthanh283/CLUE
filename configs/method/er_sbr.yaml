@@ -1,0 +1,12 @@
+name: er_sbr
+# ER-SBR (2026-11-11, D12 E1): the "ER + SBR" control of the memory x readout 2x2. CoLaR-SBR's
+# readout, supervision plan and 50-docs/session draw, but the memory stores RAW documents
+# (token ids, boxes, pixels, mask, labels) and nothing is frozen. See doccl/methods/er_sbr.py.
+sbr_threshold: 0.5
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8      # unused (no freeze map, no latent injection); kept for the base class
+docs_per_task: 50
+replay_batch_size: 4
