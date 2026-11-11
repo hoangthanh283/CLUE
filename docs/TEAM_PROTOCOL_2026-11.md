@@ -37,9 +37,10 @@ Agents cannot message each other. Report to the PM; the PM relays.
    If `.git/index.lock` exists, wait and retry. No amend, rebase, reset or force. Put `git commit`
    in its own Bash call, with no `-n` flag anywhere in that call (a hook rejects it). Dev prefixes
    code commits `AGENT IMPL:` / `AGENT FIX:`. Do not push; the PM pushes. End every commit message
-   with:
+   with a co-author line naming the model you actually run on (sub-agents: Opus 5.5; the PM:
+   Fable 5.2) and the session line:
    ```
-   Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+   Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
    Claude-Session: https://claude.ai/code/session_018guzpoJbFfkTJTp1h4Vaaz
    ```
 5. **Shell.** Non-interactive: `rm -f`, `cp -f`, `mv -f`. Run Python through `uv run`.
