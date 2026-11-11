@@ -390,9 +390,40 @@ def write_delta():
         for sd, mat in matrices_by_seed([(GATE, name, sfx)]).items():
             dg = " & ".join(f"{mat[j, j]:.1f}" for j in range(mat.shape[0]))
             fr = " & ".join(f"{v:.1f}" for v in mat[-1])
-            t += f"{label} & {sd} & {dg} & & {fr} & {np.mean(mat[-1]):.1f} \\\\\n"
+            t += f"{label} & {sd}$^{{\\dagger}}$ & {dg} & & {fr} & {np.mean(mat[-1]):.1f} \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_delta.tex").write_text(t)
+
+
+def write_supp_vals():
+    """Macros that describe the mean retention matrices of tab:matrices, so the appendix prose
+    follows the matrices when their source switches protocol (supp_vals.tex)."""
+
+    def mean(sources):
+        mats = list(matrices_by_seed(sources).values())
+        return np.mean(mats, axis=0) if mats else None
+
+    def m(name, val):
+        return f"\\newcommand{{\\{name}}}{{{val}}}\n"
+
+    t = HDR
+    co, sb, rc = mean(C["colar"]), mean(C["sbr"]), mean(C["recall"])
+    if co is not None:
+        n = co.shape[0]
+        rises = [co[i + 1, j] - co[i, j] for j in range(n) for i in range(j, n - 1)]
+        t += m("colarDropOne", f"{co[0, 0] - co[1, 0]:.0f}") + m(
+            "colarDropTwo", f"{co[1, 1] - co[2, 1]:.0f}"
+        )
+        t += m("colarLateDiagMin", f"{min(np.diag(co)[2:]):.0f}")
+        t += m("colarLateDiagMax", f"{max(np.diag(co)[2:]):.0f}")
+        t += m("colarMaxRise", f"{max(rises):.0f}")
+    if sb is not None:
+        loss = np.diag(sb)[:-1] - sb[-1, :-1]
+        t += m("sbrLossMin", f"{loss.min():.0f}") + m("sbrLossMax", f"{loss.max():.0f}")
+        t += m("sbrLossMaxSession", str(int(loss.argmax()) + 1))
+    if rc is not None:
+        t += m("recallDevMax", f"{np.abs(np.diag(rc) - rc[-1]).max():.1f}")
+    (OUT / "supp_vals.tex").write_text(t)
 
 
 def write_supp():
@@ -404,6 +435,7 @@ def write_supp():
                  src(None, (GATE, "mixed_colar_sbr_recall_r64b")))  # fmt: skip
     write_matrix("supp_mat_recall_mix_mem.tex", "SBR-Recall, Mixed, 50-document memory",
                  M["recall"])  # fmt: skip
+    write_supp_vals()
     write_perseed()
     write_conflict()
     write_agree()
