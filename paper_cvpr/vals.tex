@@ -33,23 +33,23 @@
 \newcommand{\nRecallJointGap}{2.1}
 \newcommand{\nRecallMaxLoss}{0.6}
 \newcommand{\nRecallMaxGain}{2.1}
-\newcommand{\nOracleScope}{seed 42, one seed so far}
-\newcommand{\nOracle}{65.8}
-\newcommand{\nOracleFull}{79.1}
-\newcommand{\nColarSeed}{33.6}
-\newcommand{\nColarSeedFull}{32.4}
-\newcommand{\nJointSeed}{91.1}
-\newcommand{\nJointSeedFull}{91.7}
-\newcommand{\nSbrSeed}{87.8}
-\newcommand{\nSbrSeedFull}{88.8}
-\newcommand{\nOracleShare}{56}
-\newcommand{\nOracleShareFull}{79}
-\newcommand{\nOracleN}{one seed}
+\newcommand{\nOracleScope}{seeds 42/7, two seeds so far}
+\newcommand{\nOracle}{65.8/62.8}
+\newcommand{\nOracleFull}{79.1/74.9}
+\newcommand{\nColarSeed}{33.6/32.4}
+\newcommand{\nColarSeedFull}{32.4/30.5}
+\newcommand{\nJointSeed}{91.1/90.5}
+\newcommand{\nJointSeedFull}{91.7/91.8}
+\newcommand{\nSbrSeed}{87.8/91.3}
+\newcommand{\nSbrSeedFull}{88.8/91.2}
+\newcommand{\nOracleShare}{56/52}
+\newcommand{\nOracleShareFull}{79/72}
+\newcommand{\nOracleN}{two seeds}
 \newcommand{\nOracleLateMin}{2}
 \newcommand{\nOracleLateMax}{15}
 \newcommand{\nOracleNextMin}{74}
-\newcommand{\nOracleNextMax}{84}
-\newcommand{\nOracleLast}{14.7}
+\newcommand{\nOracleNextMax}{88}
+\newcommand{\nOracleLast}{14.7/3.9}
 \newcommand{\nOracleLastShare}{8}
 \newcommand{\nOracleRelabel}{105/1019/1394/1239}
 \newcommand{\nOracleRelabelTrain}{105/1019/1394}
@@ -58,6 +58,7 @@
 \newcommand{\nSlicedReplay}{42.0}
 \newcommand{\nSlicedReplayGate}{39.4}
 \newcommand{\nSlicedBoth}{60.5}
+\newcommand{\nSlicedBothGate}{62.9}
 \newcommand{\nLabelRepairMax}{69.3}
 \newcommand{\nPseudoBoth}{44.1}
 \newcommand{\nAgreeLowMin}{4.8}
@@ -75,9 +76,25 @@
 \newcommand{\nRecallMixNoMem}{44.7}
 \newcommand{\nRecallMixMem}{85.9}
 \newcommand{\nSbrFrozen}{14.8}
+\newcommand{\mNaiveRMin}{0.0}
+\newcommand{\mNaiveRMax}{0.0}
+\newcommand{\mNaivePMin}{--}
+\newcommand{\mNaivePMax}{--}
+\newcommand{\mNaiveOwnerMin}{--}
+\newcommand{\mNaiveOwnerMax}{--}
+\newcommand{\mNaiveToOMin}{--}
+\newcommand{\mNaiveToOMax}{--}
+\newcommand{\mNaiveSameMin}{--}
+\newcommand{\mNaiveSameMax}{--}
+\newcommand{\mNaiveOtherMin}{--}
+\newcommand{\mNaiveOtherMax}{--}
+\newcommand{\mNaiveFalseMin}{--}
+\newcommand{\mNaiveFalseMax}{--}
+\newcommand{\mNaiveIndMin}{98}
+\newcommand{\mNaiveIndMax}{100}
 \newcommand{\mColarRMin}{18.7}
 \newcommand{\mColarRMax}{22.6}
-\newcommand{\mColarPMin}{72.7}
+\newcommand{\mColarPMin}{72.8}
 \newcommand{\mColarPMax}{80.8}
 \newcommand{\mColarOwnerMin}{--}
 \newcommand{\mColarOwnerMax}{--}
@@ -89,6 +106,8 @@
 \newcommand{\mColarOtherMax}{--}
 \newcommand{\mColarFalseMin}{--}
 \newcommand{\mColarFalseMax}{--}
+\newcommand{\mColarIndMin}{89}
+\newcommand{\mColarIndMax}{95}
 \newcommand{\mNoBankRMin}{0.4}
 \newcommand{\mNoBankRMax}{13.2}
 \newcommand{\mNoBankPMin}{3.4}
@@ -103,6 +122,8 @@
 \newcommand{\mNoBankOtherMax}{93.5}
 \newcommand{\mNoBankFalseMin}{17.0}
 \newcommand{\mNoBankFalseMax}{24.3}
+\newcommand{\mNoBankIndMin}{0}
+\newcommand{\mNoBankIndMax}{82}
 \newcommand{\mSbrRMin}{88.4}
 \newcommand{\mSbrRMax}{92.6}
 \newcommand{\mSbrPMin}{84.8}
@@ -117,6 +138,8 @@
 \newcommand{\mSbrOtherMax}{38.4}
 \newcommand{\mSbrFalseMin}{0.6}
 \newcommand{\mSbrFalseMax}{1.7}
+\newcommand{\mSbrIndMin}{0}
+\newcommand{\mSbrIndMax}{0}
 \newcommand{\mRecallRMin}{92.7}
 \newcommand{\mRecallRMax}{94.0}
 \newcommand{\mRecallPMin}{90.4}
@@ -131,9 +154,11 @@
 \newcommand{\mRecallOtherMax}{30.4}
 \newcommand{\mRecallFalseMin}{0.4}
 \newcommand{\mRecallFalseMax}{0.8}
-\newcommand{\mOracleRMin}{77.2}
+\newcommand{\mRecallIndMin}{0}
+\newcommand{\mRecallIndMax}{0}
+\newcommand{\mOracleRMin}{71.5}
 \newcommand{\mOracleRMax}{77.3}
-\newcommand{\mOraclePMin}{88.1}
+\newcommand{\mOraclePMin}{87.1}
 \newcommand{\mOraclePMax}{88.2}
 \newcommand{\mOracleOwnerMin}{--}
 \newcommand{\mOracleOwnerMax}{--}
@@ -145,6 +170,8 @@
 \newcommand{\mOracleOtherMax}{--}
 \newcommand{\mOracleFalseMin}{--}
 \newcommand{\mOracleFalseMax}{--}
+\newcommand{\mOracleIndMin}{64}
+\newcommand{\mOracleIndMax}{69}
 \newcommand{\mSessOneShare}{57}
 \newcommand{\mTestSpans}{1{,}306}
 \newcommand{\mPoolGapMax}{0.4}
@@ -155,3 +182,4 @@
 \newcommand{\mNoBankBoundMax}{81}
 \newcommand{\mColarImpPMin}{71.8}
 \newcommand{\mColarImpPMax}{79.2}
+\newcommand{\mColarOldPLb}{71.6}

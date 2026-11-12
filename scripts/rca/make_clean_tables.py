@@ -424,6 +424,30 @@ def write_delta():
     (OUT / "supp_delta.tex").write_text(t)
 
 
+DROPPED = (("EWC", "ewc"), ("L2P", "l2p"), ("DualPrompt", "dualprompt"), ("O-LoRA", "o_lora"),
+           ("ER + C-Flat++", "er_cflat"))  # fmt: skip
+DROPPED_REF = (("Naive (reference)", "naive"), ("ER (kept)", "er"))
+
+
+def write_dropped():
+    """R9-H2: the first CIL-CORD grid (results/cil_cord_<m>_seed<s>, LayoutLMv3, legacy scoring)
+    for the methods dropped when the comparison set was fixed, per seed, beside naive and ER of
+    the same grid. The text says every dropped seed is below every naive seed: checked here."""
+    t = HDR + "\\begin{tabular}{lccc}\n\\toprule\nMethod & 42 & 7 & 123 \\\\\n\\midrule\n"
+    vals = {}
+    for label, key in DROPPED_REF + DROPPED:
+        vals[key] = load_seeds("results", f"cil_cord_{key}", suffix="")
+        t += f"{label} & " + " & ".join(
+            f"{vals[key][s]:.1f}" if s in vals[key] else "--" for s in SEEDS) + " \\\\\n"  # fmt: skip
+        if key == "er":
+            t += "\\midrule\n"
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "supp_dropped.tex").write_text(t)
+    drop = [x for _, k in DROPPED for x in vals[k].values()]
+    if not vals["naive"] or not drop or max(drop) >= min(vals["naive"].values()):
+        _warn("a dropped method reaches a naive seed on the first CIL-CORD grid (H2 disclosure)")
+
+
 def write_supp_vals():
     """Macros that describe the mean retention matrices of tab:matrices, so the appendix prose
     follows the matrices when their source switches protocol (supp_vals.tex)."""
@@ -473,6 +497,7 @@ def write_supp():
     write_agree()
     write_slot()
     write_delta()
+    write_dropped()
 
 
 def _clean(k, key="AA"):
@@ -623,6 +648,11 @@ def conflict_macros() -> str:
     v["nSlicedReplay"] = f"{np.mean(sl1):.1f}" if sl1 else "--"  # rescore (fp16)
     v["nSlicedReplayGate"] = f"{slg:.1f}" if slg is not None else "--"  # gate (fp32), seed 42
     v["nSlicedBoth"] = f"{np.mean(sl2):.1f}" if sl2 else "--"  # gate (fp32)
+    # R9-M3: the one same-protocol, H2-specific number: seed 42, sliced replay -> + sliced current
+    s2g = one((GATE, "cil_cord_colar_r_sliced2", "_k4_d50_r128")).get(42)
+    v["nSlicedBothGate"] = f"{s2g:.1f}" if s2g is not None else "--"
+    if s2g is not None and slg is not None and s2g <= slg:
+        _warn("slicing the current loss no longer adds to the sliced replay (seed 42)")
     allr = [x for r in LABEL_REPAIRS for x in one(r).values()]
     v["nLabelRepairMax"] = up1(max(allr)) if allr else "--"
     if allr and sbr_min(C) <= max(allr):
@@ -710,7 +740,7 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
      "a memory that retains under domain shift retains here; raw beats compressed",
      "whole-document memory (CoLaR), shared softmax", "colar", C["colar"], C["colar"], "cell",
      "refutes", 0),
-    ("", "", "", "raw-document memory (ER), shared softmax", "er", C["er"], C["er"], "cell",
+    ("", "", "", "raw-document memory (ER), shared softmax$^{e}$", "er", C["er"], C["er"], "cell",
      "refutes", 0),
     ("", "", "", "raw-document memory, blocked readout", "er_sbr", src("cil_cord_er_sbr"),
      src("cil_cord_er_sbr"), "slot", "", 3),
@@ -723,7 +753,7 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
     ("H2", "Current documents mislabel old entities",
      "a loss that lets ``O'' mean ``O or an old class'' closes the gap",
      "replay and current losses sliced to their classes", "sliced2",
-     src(None, (GATE, "cil_cord_colar_r_sliced2", "_k4_d50_r128")), [], "cell", "partly", 0),
+     src(None, (GATE, "cil_cord_colar_r_sliced2", "_k4_d50_r128")), [], "cell", "open", 0),
     ("", "", "", "MiB-style unbiased cross-entropy, both directions", "colar_mib",
      src("cil_cord_colar_mib"), src("cil_cord_colar_mib"), "slot", "", 3),
     ("H3", "The shared background normalisation",
@@ -748,8 +778,45 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
 )  # fmt: skip
 
 
+def _gap_share(a: dict, lo: dict, hi: dict) -> list[float]:
+    """Per seed (seeds in all three): share of the lo -> hi gap that ``a`` covers."""
+    return [(a[s] - lo[s]) / (hi[s] - lo[s]) for s in SEEDS if s in a and s in lo and s in hi]
+
+
+def verdict_ok(key: str, verdict: str) -> bool | None:
+    """R9-L7: the per-seed condition behind every typed verdict word (None: no check exists).
+    Every condition must hold on every seed, under both metrics where both exist."""
+    m2 = ("AA", "full_label_f1")
+    c = {k: [_clean(k, m) for m in m2] for k in ("naive", "colar", "sbr", "nobank", "recall", "joint")}
+    orc = [load_seeds(*ORACLE_CLEAN[:2], key=m, suffix="*") for m in m2]
+    mix = {k: load_seeds(*s[:2], suffix=s[2]).get(42) for k, s in
+           (("nomem", MIX_RECALL_NOMEM), ("mem", MIX_RECALL_MEM))}  # fmt: skip
+    i = (0, 1)
+    checks = {
+        ("colar", "refutes"): lambda: all(x < 0.5 for j in i for x in
+                                          _gap_share(c["colar"][j], c["naive"][j], c["joint"][j])),
+        ("er", "refutes"): lambda: max(pick(C["er"])[0]) < min(pick(C["colar"])[0]),
+        ("oracle", "partly"): lambda: bool(orc[0]) and all(
+            c["colar"][j][s] < orc[j][s] < c["joint"][j][s] for j in i for s in orc[j]),
+        ("sliced2", "open"): lambda: True,  # legacy, cross-protocol: no verdict is claimed
+        ("sbr", "supports"): lambda: all(x >= 0.5 for j in i for x in
+                                         _gap_share(c["sbr"][j], c["colar"][j], c["joint"][j]))
+        and all(min(c["sbr"][j].values()) > max(orc[j].values(), default=-1) for j in i),
+        ("nobank", "supports"): lambda: all(x < 0.5 for j in i for x in
+                                            _gap_share(c["nobank"][j], c["naive"][j], c["joint"][j])),
+        ("recall", "supports"): lambda: all(abs(c["recall"][j][s] - c["joint"][j][s]) < 3
+                                            for j in i for s in c["recall"][j] if s in c["joint"][j]),
+        ("mix_nomem", "supports"): lambda: mix["nomem"] < mix["mem"]
+        and mix["nomem"] < min(pick(M["sbr"])[0]),
+        ("mix_mem", "supports"): lambda: mix["mem"] > mix["nomem"],
+    }  # fmt: skip
+    f = checks.get((key, verdict))
+    return None if f is None else bool(f())
+
+
 def write_ladder() -> None:
-    t = HDR + "\\begin{tabular}{@{}l p{2.6cm} p{3.7cm} p{4.4cm} c c l@{}}\n\\toprule\n"
+    errors = []
+    t = HDR + "\\begin{tabular}{@{}l p{2.6cm} p{3.6cm} p{4.1cm} c c l@{}}\n\\toprule\n"
     t += ("Rung & Hypothesis & Prediction if true & Intervention (CIL-CORD unless stated) & "
           "Full-label F1 & AA & Verdict \\\\\n\\midrule\n")  # fmt: skip
     for rung, hyp, pred, interv, key, aa_s, full_s, kind, verdict, min_n in LADDER:
@@ -761,38 +828,49 @@ def write_ladder() -> None:
                     print(f"slot {key}: {len(aa[0])} clean seed(s), renders at {min_n}")
                 continue
             verdict = SLOT_VERDICT.get(key, "")
-            if not verdict:
-                _warn(f"ladder slot {key} landed: set SLOT_VERDICT and write its prose")
         elif kind == "clean":
             aa, full = pick_clean_only(aa_s, "AA"), pick_clean_only(full_s, "full_label_f1")
         else:
             aa = pick(aa_s)
             full = pick_clean_only(full_s, "full_label_f1") if full_s else ([], True, False)
+        # R9-L7: every rendered rung row carries a verdict, and the verdict's per-seed condition
+        if key not in ("naive", "joint"):  # the two references carry none
+            ok = verdict_ok(key, verdict) if verdict else False
+            if not verdict:
+                errors.append(f"ladder row {key} renders with no verdict: set SLOT_VERDICT")
+            elif ok is None:
+                errors.append(f"ladder row {key}: no check for verdict '{verdict}' (verdict_ok)")
+            elif not ok:
+                errors.append(f"ladder row {key}: verdict '{verdict}' fails its per-seed check")
         if rung or key == "joint":
             t += "\\midrule\n"
-        # full-label F1 is clean-only, so n is always marked; AA marks n off the rule-6 cells
+        # n is marked on every cell with fewer than three seeds, clean or legacy (R9-L1)
         t += (f"{rung} & {hyp} & {pred} & {interv} & {fmt(*full, show_n=True)} & "
-              f"{fmt(*aa, show_n=kind != 'cell')} & {verdict} \\\\\n")  # fmt: skip
+              f"{fmt(*aa, show_n=True)} & {verdict} \\\\\n")  # fmt: skip
+    if errors:
+        raise SystemExit("make_clean_tables: ladder verdicts:\n  " + "\n  ".join(errors))
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_ladder.tex").write_text(t)
 
 
 # ---------------------------------------------------------------------------- P11: mechanism
 MECH_JSON = Path(CLEAN) / "mechanism_analysis.json"
-MECH_ROWS = (  # (label, method alias in metrics.json, analysis section)
-    ("CoLaR, shared softmax", "colar", "masked_splits"),
-    ("Older documents relabelled$^{r}$", "colar_r_oracle", "masked_splits"),
-    ("Blocked readout, no memory", "colar_sbr_noreplay", "masked_splits"),
-    ("CoLaR-SBR", "colar_sbr", "masked_splits"),
-    ("SBR-Recall", "colar_sbr_recall_r64", "masked_splits"),
+MECH_ROWS = (  # (column label, method alias in metrics.json, analysis section, readout)
+    ("Naive", "naive", "masked_splits", "shared"),  # R9-H1: the shared-softmax signature, no memory
+    ("CoLaR", "colar", "masked_splits", "shared"),
+    ("Relab.$^{r}$", "colar_r_oracle", "masked_splits", "shared"),
     # per-token outputs on the unmasked test set (seed-42 re-runs): render only once they exist
-    ("CoLaR, shared softmax$^{d}$", "colar_dump", "full_label"),
-    ("Naive fine-tuning$^{d}$", "naive_dump", "full_label"),
+    ("CoLaR$^{d}$", "colar_dump", "full_label", "shared"),
+    ("Naive$^{d}$", "naive_dump", "full_label", "shared"),
+    ("No mem.", "colar_sbr_noreplay", "masked_splits", "blocked"),
+    ("CoLaR-SBR", "colar_sbr", "masked_splits", "blocked"),
+    ("SBR-Recall", "colar_sbr_recall_r64", "masked_splits", "blocked"),
 )
 
 
 def _mech_runs(res: dict, method: str, section: str) -> list[dict]:
-    return [r[section] for r in res.get("runs", {}).values()
+    """Whole run records (``aa_vs_full`` and ``section``) of one method, in file order."""
+    return [r for r in res.get("runs", {}).values()
             if r.get("method") == method and r.get(section)]  # fmt: skip
 
 
@@ -809,14 +887,20 @@ def _rng(vals, pct=False, upper=False) -> str:
 
 
 def mech_stats(res: dict, method: str, section: str) -> dict | None:
-    rs = _mech_runs(res, method, section)
-    if not rs:
+    runs = _mech_runs(res, method, section)
+    if not runs:
         return None
+    rs = [r[section] for r in runs]
     old = [r["old"] for r in rs]
     sp = [o["spans"] for o in old]
+    # precision is undefined with no predicted old span (naive: TP = FP = 0); seqeval prints 0
     out = {"n": len(rs), "recall": [s["recall"] for s in sp],
-           "precision": [s["precision"] for s in sp],
-           "p_upper": any(s.get("fp_is_lower_bound") for s in sp)}  # fmt: skip
+           "precision": [s["precision"] if s["tp"] + s["fp"] else None for s in sp],
+           "p_upper": any(s.get("fp_is_lower_bound") for s in sp),
+           "tp_old": [s["tp"] for s in sp],
+           # span-level indicator over ALL sessions' missed spans (App. B): not a bound
+           "indicator": [(r.get("aa_vs_full", {}).get("implied") or {}).get("min_share_missed_spans_all_O")
+                         for r in runs]}  # fmt: skip
     errs = [o.get("errors") for o in old]
     if all(errs):
         for k in ("share_to_O", "share_to_same_session", "share_to_other_session"):
@@ -833,48 +917,65 @@ def mech_stats(res: dict, method: str, section: str) -> dict | None:
 def write_mechanism() -> str:
     """tab_mech.tex (old-session spans and tokens of the final model) + macros for the prose."""
     res = json.loads(MECH_JSON.read_text()) if MECH_JSON.exists() else {}
-    t = HDR + "\\begin{tabular}{@{}lcccccccc@{}}\n\\toprule\n"
-    t += (" & & \\multicolumn{2}{c}{Old spans} & \\multicolumn{5}{c}{Old entity tokens} \\\\\n"
-          "\\cmidrule(lr){3-4}\\cmidrule(l){5-9}\n"
-          "Run & $n$ & R & P & owner & $\\to$O & same & other & false \\\\\n\\midrule\n")  # fmt: skip
-    st = {}
-    for label, method, section in MECH_ROWS:
+    # transposed (R9 layout): one column per run, grouped by readout; one row per measure
+    st, cols = {}, []
+    for label, method, section, readout in MECH_ROWS:
         s = mech_stats(res, method, section)
         if s is None:
             continue
         st[method] = s
         p = _rng(s["precision"], upper=s["p_upper"])
-        if s["p_upper"]:  # FP is a lower bound for per-class reports: precision is an upper bound
+        if s["p_upper"] and p:  # FP a lower bound (per-class reports): precision an upper bound
             p = "$\\le$" + p
-        cells = [_rng(s["recall"]), p, _rng(s.get("owner", []), True),
-                 _rng(s.get("share_to_O", []), True), _rng(s.get("share_to_same_session", []), True),
-                 _rng(s.get("share_to_other_session", []), True),
-                 _rng(s.get("false_claim", []), True)]  # fmt: skip
-        t += f"{label} & {s['n']} & " + " & ".join(cells) + " \\\\\n"
+        cols.append((label, readout, [f"${s['n']}$", _rng(s["recall"]), p,
+                     _rng(s["indicator"], True), _rng(s.get("owner", []), True),
+                     _rng(s.get("share_to_O", []), True),
+                     _rng(s.get("share_to_same_session", []), True),
+                     _rng(s.get("share_to_other_session", []), True),
+                     _rng(s.get("false_claim", []), True)]))  # fmt: skip
+    n_sh = sum(c[1] == "shared" for c in cols)
+    n_bl = len(cols) - n_sh
+    t = HDR + "\\begin{tabular}{@{}l" + "c" * len(cols) + "@{}}\n\\toprule\n"
+    t += (f" & \\multicolumn{{{n_sh}}}{{c}}{{Shared softmax}} & "
+          f"\\multicolumn{{{n_bl}}}{{c}}{{Blocked readout}} \\\\\n"
+          f"\\cmidrule(lr){{2-{1 + n_sh}}}\\cmidrule(l){{{2 + n_sh}-{1 + len(cols)}}}\n")  # fmt: skip
+    t += " & " + " & ".join(c[0] for c in cols) + " \\\\\n\\midrule\n"
+    names = ("seeds $n$", "spans: R", "\\quad P", "\\quad missed at O$^{i}$", "tokens: owner",
+             "\\quad wrong $\\to$ O", "\\quad $\\to$ same session", "\\quad $\\to$ other session",
+             "false claims")  # fmt: skip
+    for i, name in enumerate(names):
+        t += name + " & " + " & ".join(c[2][i] for c in cols) + " \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_mech.tex").write_text(t)
 
     v = {}
 
-    def put(name, vals, pct=False, lo=True):
+    def put(name, vals, pct=False, lo=True, up=False):
+        """lo: the minimum (rounded down, or up when ``up``: an upper bound); else the max (up)."""
         vs = [100 * x if pct else x for x in vals or [] if x is not None]
-        v[name] = (down1(min(vs)) if lo else up1(max(vs))) if vs else "--"
+        v[name] = ((up1 if up else down1)(min(vs)) if lo else up1(max(vs))) if vs else "--"
 
-    for m, pre in (("colar", "Colar"), ("colar_sbr_noreplay", "NoBank"), ("colar_sbr", "Sbr"),
-                   ("colar_sbr_recall_r64", "Recall"), ("colar_r_oracle", "Oracle")):  # fmt: skip
+    for m, pre in (("naive", "Naive"), ("colar", "Colar"), ("colar_sbr_noreplay", "NoBank"),
+                   ("colar_sbr", "Sbr"), ("colar_sbr_recall_r64", "Recall"),
+                   ("colar_r_oracle", "Oracle")):  # fmt: skip
         s = st.get(m) or {}
         for k, short, pct in (("recall", "R", False), ("precision", "P", False),
                               ("owner", "Owner", True), ("share_to_O", "ToO", True),
                               ("share_to_same_session", "Same", True),
                               ("share_to_other_session", "Other", True),
                               ("false_claim", "False", True)):  # fmt: skip
-            put(f"m{pre}{short}Min", s.get(k), pct, True)
+            # R9-L8: an upper bound (precision from per-class reports) rounds up at both ends
+            up = k == "precision" and s.get("p_upper")
+            put(f"m{pre}{short}Min", s.get(k), pct, True, bool(up))
             put(f"m{pre}{short}Max", s.get(k), pct, False)
+        ind = [100 * x for x in s.get("indicator") or [] if x is not None]  # whole percent
+        v[f"m{pre}IndMin"] = f"{math.floor(min(ind))}" if ind else "--"
+        v[f"m{pre}IndMax"] = f"{math.ceil(max(ind))}" if ind else "--"
     spans = res.get("gold_spans_per_session_test_split") or []
     v["mSessOneShare"] = f"{100 * spans[0] / sum(spans):.0f}" if spans else "--"
     v["mTestSpans"] = f"{sum(spans):,}".replace(",", "{,}") if spans else "--"
     # pooled per-session own-class counts vs the full-label F1 of the same final model
-    gaps, gaps_nb, missed_o, last, imp_p, nb_bound = [], [], [], [], [], []
+    gaps, gaps_nb, missed_o, last, imp_p, nb_bound, old_p_lb = [], [], [], [], [], [], []
     for r in res.get("runs", {}).values():
         a, me = r["aa_vs_full"], r["method"]
         if me.endswith("_dump") or a.get("pooled_own_class_f1_from_splits") is None:
@@ -889,6 +990,10 @@ def write_mechanism() -> str:
             last.append(a["last_session_f1"])
             if imp.get("full_tp"):  # precision implied by the exact full-label F1, all sessions
                 imp_p.append(100 * imp["full_tp"] / (imp["full_tp"] + imp["full_fp_implied"]))
+                # R9-M1: a true lower bound on OLD-span precision: every old-class false positive
+                # is one of the full test set's false positives, so FP_old <= FP_implied (all)
+                tp_old = r["masked_splits"]["old"]["spans"]["tp"]
+                old_p_lb.append(100 * tp_old / (tp_old + imp["full_fp_implied"]))
     v["mPoolGapMax"] = up1(max(gaps)) if gaps else "--"
     v["mPoolGapNoBankMax"] = up1(max(gaps_nb)) if gaps_nb else "--"
     v["mColarMissedOMin"] = (
@@ -901,9 +1006,18 @@ def write_mechanism() -> str:
     v["mColarImpPMin"], v["mColarImpPMax"] = (
         (down1(min(imp_p)), up1(max(imp_p))) if imp_p else ("--", "--")
     )
+    v["mColarOldPLb"] = down1(min(old_p_lb)) if old_p_lb else "--"
     nb = st.get("colar_sbr_noreplay")
     if nb and max(nb.get("share_to_O", [1])) > 0:
         _warn("no-memory SBR now has predicted-O errors on old sessions")
+    # H0 rests on: CoLaR's newest session ends far below every diagonal of naive training (per
+    # seed), naive keeps no old span, CoLaR keeps some
+    naive_diag = [np.diag(m).min() for m in matrices(C["naive"])]
+    if last and naive_diag and max(last) >= min(naive_diag):
+        _warn("a CoLaR seed's newest session reaches a naive-training diagonal (H0)")
+    nv, co = st.get("naive") or {}, st.get("colar") or {}
+    if max(nv.get("recall", [0])) > 0 or min(co.get("recall", [0])) <= 0:
+        _warn("naive keeps an old span, or a CoLaR seed keeps none (H0)")
     return _defs(v)
 
 

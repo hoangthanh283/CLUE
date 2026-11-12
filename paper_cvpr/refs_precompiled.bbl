@@ -1,4 +1,4 @@
-\begin{thebibliography}{61}
+\begin{thebibliography}{62}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -28,6 +28,15 @@ Pietro Buzzega, Matteo Boschini, Angelo Porrello, Davide Abati, and Simone
   baseline.
 \newblock In \emph{Advances in Neural Information Processing Systems
   (NeurIPS)}, 2020.
+
+\bibitem[Caccia et~al.(2022)Caccia, Aljundi, Asadi, Tuytelaars, Pineau, and
+  Belilovsky]{caccia2022erace}
+Lucas Caccia, Rahaf Aljundi, Nader Asadi, Tinne Tuytelaars, Joelle Pineau, and
+  Eugene Belilovsky.
+\newblock New insights on reducing abrupt representation change in online
+  continual learning.
+\newblock In \emph{International Conference on Learning Representations
+  (ICLR)}, 2022.
 
 \bibitem[Cermelli et~al.(2020)Cermelli, Mancini, Rota~Bul{\`o}, Ricci, and
   Caputo]{cermelli2020mib}
@@ -260,7 +269,8 @@ Mohammad Minouei, Khurram~Azeem Hashmi, Mohammad~Reza Soheili, Muhammad~Zeshan
 Qijie Mo, Yipeng Gao, Shenghao Fu, Junkai Yan, Ancong Wu, and Wei-Shi Zheng.
 \newblock Bridge past and future: Overcoming information asymmetry in
   incremental object detection.
-\newblock In \emph{European Conference on Computer Vision (ECCV)}, 2024.
+\newblock In \emph{European Conference on Computer Vision (ECCV)}, pages
+  463--480. Springer, 2024.
 
 \bibitem[Monaikul et~al.(2021)Monaikul, Castellucci, Filice, and
   Rokhlenko]{monaikul2021extendner}
@@ -322,22 +332,22 @@ Gobinda Saha, Isha Garg, and Kaushik Roy.
   (ICLR)}, 2021.
 
 \bibitem[Sassioui et~al.(2026{\natexlab{a}})Sassioui, Elouargui, El~Kamili,
-  Benouini, Benyoussef, Chergui, and Ouzzif]{sassioui2026documents}
-Abdellatif Sassioui, Yasser Elouargui, M. El~Kamili, Rachid Benouini, E.
-  Benyoussef, M. Chergui, and M. Ouzzif.
-\newblock When documents evolve: Decomposing catastrophic forgetting in
-  layout-aware document models.
-\newblock In \emph{International Conference on Wireless Communications and
-  Mobile Computing (IWCMC)}, 2026{\natexlab{a}}.
-
-\bibitem[Sassioui et~al.(2026{\natexlab{b}})Sassioui, Elouargui, El~Kamili,
   Benouini, Benyoussef, Chergui, and Ouzzif]{sassioui2026amdproj}
 Abdellatif Sassioui, Yasser Elouargui, Mohamed El~Kamili, Rachid Benouini,
   El~Mehdi Benyoussef, Meriyem Chergui, and Mohammed Ouzzif.
 \newblock {AMD-Proj}: Adaptive memory-driven selective gradient projection for
   continual learning in document understanding.
 \newblock \emph{Technologies}, 14\penalty0 (5):\penalty0 250,
-  2026{\natexlab{b}}.
+  2026{\natexlab{a}}.
+
+\bibitem[Sassioui et~al.(2026{\natexlab{b}})Sassioui, Elouargui, El~Kamili,
+  Benouini, Benyoussef, Chergui, and Ouzzif]{sassioui2026documents}
+Abdellatif Sassioui, Yasser Elouargui, Mohamed El~Kamili, Rachid Benouini,
+  El~Mehdi Benyoussef, Meriyem Chergui, and Mohamed Ouzzif.
+\newblock When documents evolve: Decomposing catastrophic forgetting in
+  layout-aware document models.
+\newblock In \emph{International Conference on Wireless Communications and
+  Mobile Computing (IWCMC)}, pages 1124--1129, 2026{\natexlab{b}}.
 
 \bibitem[Smith et~al.(2023)Smith, Karlinsky, Gutta, Cascante-Bonilla, Kim,
   Arbelle, Panda, Feris, and Kira]{smith2023coda}

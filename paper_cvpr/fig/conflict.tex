@@ -1,0 +1,52 @@
+% Fig. 1 (P12, R9 referee (c)): the background conflict on one receipt line, and the readout
+% that removes it. Schematic only: no result number. Okabe-Ito blue (stored document, solid)
+% and vermillion (current document, dashed): distinguishable under colour-vision deficiency
+% and in greyscale.
+\definecolor{cstored}{HTML}{0072B2}
+\definecolor{ccurrent}{HTML}{D55E00}
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[font=\scriptsize, >={Stealth[length=4pt]}, x=1cm, y=1cm,
+  st/.style={cstored, line width=0.9pt},
+  cu/.style={ccurrent, line width=0.9pt, densely dashed},
+  cell/.style={draw=black!70, fill=white, minimum height=0.40cm, inner sep=1pt, anchor=west},
+  bg/.style={cell, fill=black!12}]
+% One label table per panel: two tokens of one receipt line (rows) as two documents label
+% them (columns). Column centres: tokens 0.30, stored 1.30, current 2.95.
+\newcommand{\labtab}[1]{%
+  \node[cstored, align=center] at (#1+1.30,2.62) {stored\\[-2pt](session 1)};
+  \node[ccurrent, align=center] at (#1+2.95,2.62) {current\\[-2pt](session 5)};
+  \draw[black!40] (#1+0.00,2.32) -- (#1+3.80,2.32);
+  \node at (#1+0.30,2.12) {4.50};
+  \node[cstored] at (#1+1.30,2.12) {menu.price};
+  \node[ccurrent] at (#1+2.95,2.12) {\textbf{O}};
+  \node at (#1+0.30,1.78) {9.00};
+  \node[cstored] at (#1+1.30,1.78) {\textbf{O}};
+  \node[ccurrent] at (#1+2.95,1.78) {total\_price};
+}
+% ==== (a) one shared softmax: both documents' "O" train the one background logit
+\node[anchor=west, font=\scriptsize\bfseries] at (0,3.08) {(a) one shared softmax};
+\labtab{0}
+\node[cell] (ma) at (0.88,0.95) {\makebox[0.90cm]{menu.$\ast$}};
+\node[bg] (oa) at (ma.east) {\makebox[0.40cm]{O}};
+\node[cell] (ta) at (oa.east) {\makebox[0.90cm]{total.$\ast$}};
+\draw[->, st] (1.30,1.58) -- (oa.north west);
+\draw[->, cu] (2.95,1.58) -- (oa.north east);
+\node[anchor=north, align=center, inner sep=1pt] at (1.90,0.68)
+  {one background logit, trained by both;\\each ``O'' counts against every class};
+% ==== (b) one background per session: each document trains only the block it annotates
+\def\bx{4.20}
+\node[anchor=west, font=\scriptsize\bfseries] at (\bx,3.08) {(b) one background per session};
+\labtab{\bx}
+\node[bg] (o1) at (\bx+0.55,0.95) {\makebox[0.40cm]{O$_1$}};
+\node[cell] (m1) at (o1.east) {\makebox[0.90cm]{menu.$\ast$}};
+\node[bg] (o5) at (\bx+2.20,0.95) {\makebox[0.40cm]{O$_5$}};
+\node[cell] (t5) at (o5.east) {\makebox[0.90cm]{total.$\ast$}};
+\draw[->, st] (\bx+1.30,1.58) -- (\bx+1.30,1.15);
+\draw[->, cu] (\bx+2.95,1.58) -- (\bx+2.95,1.15);
+\node[anchor=north, align=center, inner sep=1pt] at (\bx+1.90,0.68)
+  {block $b$ learns only from documents that\\annotate it; ``O'' counts against its classes};
+\end{tikzpicture}
+\caption{\textbf{The background conflict on one receipt line.} A receipt stored in session~1 labels the total ``O''; a current receipt of session~5 labels the item price ``O''. (a) With one shared softmax both ``O'' labels train the same background logit, against every class. (b) With one background per session, an ``O'' is evidence only against the classes its annotator could see.}
+\label{fig:conflict}
+\end{figure}
