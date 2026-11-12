@@ -1,0 +1,47 @@
+% Fig. (P14, Sec. 5): the two readouts on the same encoder and layer-4 latent memory, and the
+% per-session deltas of SBR-Recall. Schematic only: no result number.
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[font=\scriptsize, >={Stealth[length=3.5pt]}, x=1cm, y=1cm,
+  box/.style={draw, rounded corners=1.5pt, align=center, inner sep=2pt, minimum height=0.46cm},
+  tg/.style={draw=black!70, minimum height=0.36cm, inner sep=1pt, anchor=west},
+  bgc/.style={tg, fill=black!12}]
+% ==== encoder
+\node[box, minimum width=2.4cm] (in) at (1.2,0) {tokens, boxes, page image};
+\node[box, minimum width=2.4cm, draw=black!45, pattern=north east lines, pattern color=black!12]
+  (low) at (1.2,0.78) {layers $1..4$\\frozen after session 1};
+\node[box, minimum width=2.4cm, draw=ourteal, thick] (up) at (1.2,1.75) {layers $5..12$, base $\theta_0$};
+\draw[->] (in) -- (low);
+\draw[->] (low) -- (up);
+% ==== memory, injected between layer 4 and layer 5
+\node[box, draw=memgreen, thick, minimum width=4.85cm] (mem) at (5.35,0.4)
+  {\textcolor{memgreen}{\textbf{memory}}: per stored document, a rank-128 SVD of\\its layer-4 activations, with its boxes, labels and session};
+\draw[->, memgreen, thick] (4.55,0.4|-mem.north) |- (2.42,1.27);
+\node[anchor=north west, inner sep=1pt, text=memgreen] at (2.45,1.22) {replayed at layer 4};
+% ==== SBR-Recall deltas
+\foreach \b/\x in {2/3.45,3/4.1,5/5.05} {
+  \node[box, draw=ourteal, densely dashed, minimum width=0.5cm, minimum height=0.36cm] (d\b) at (\x,1.75) {$\Delta_{\b}$};
+}
+\node at (4.58,1.75) {$\cdots$};
+\node[anchor=west, align=left, text=ourteal, inner sep=1pt] at (5.42,1.75) {SBR-Recall: block $b$\\read under $\theta_0{+}\Delta_b$};
+% ==== (a) shared softmax
+\node[anchor=west, font=\scriptsize\bfseries, inner sep=1pt] at (0,3.1) {(a) shared softmax};
+\node[bgc] (sa) at (0,2.65) {\makebox[0.3cm]{O}};
+\node[tg] (sb) at (sa.east) {\makebox[2.15cm]{tags of sessions $1..5$}};
+\draw[->] ([xshift=-0.5cm]up.north) -- ([xshift=0.7cm]sa.south);
+% ==== (b) session-blocked readout
+\node[anchor=west, font=\scriptsize\bfseries, inner sep=1pt] at (3.2,3.1) {(b) one background per session (SBR)};
+\node[bgc] (o1) at (3.2,2.65) {\makebox[0.3cm]{O$_1$}};
+\node[tg] (t1) at (o1.east) {\makebox[0.42cm]{$\mathcal{T}_1$}};
+\node[bgc] (o2) at (4.3,2.65) {\makebox[0.3cm]{O$_2$}};
+\node[tg] (t2) at (o2.east) {\makebox[0.42cm]{$\mathcal{T}_2$}};
+\node at (5.6,2.65) {$\cdots$};
+\node[bgc] (o5) at (5.95,2.65) {\makebox[0.3cm]{O$_5$}};
+\node[tg] (t5) at (o5.east) {\makebox[0.42cm]{$\mathcal{T}_5$}};
+\draw[->] ([xshift=0.6cm]up.north) |- (3.65,2.22) -- (3.65,2.47);
+\draw[->, ourteal, densely dashed] (d2.north) -- ([xshift=0.1cm]o2.south);
+\draw[->, ourteal, densely dashed] (d5.north) -- ([xshift=0.1cm]o5.south);
+\end{tikzpicture}
+\caption{\textbf{The two readouts on one encoder and memory.} (a) One softmax over all tags and one background. (b) SBR: one background logit per session, trained only by documents that annotate it (\cref{eq:sbr}); the largest claim $e_b=1-p_b(\mathrm{O}_b)>0.5$ labels the token. SBR-Recall drops the memory and reads block $b$ under its session's delta $\Delta_b$ (\cref{eq:recall}).}
+\label{fig:method}
+\end{figure}
