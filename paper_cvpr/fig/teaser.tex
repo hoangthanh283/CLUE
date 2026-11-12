@@ -12,15 +12,15 @@
 \foreach \t in {0,25,50,75,100} {
   \draw[black!60] (0,\t*\ys) -- (-0.06,\t*\ys) node[left, inner sep=1.5pt] {\scriptsize \t};
 }
-\node[rotate=90, anchor=south] at (-0.55,1.55) {AA, CIL-CORD};
+\node[rotate=90, anchor=south] at (-0.55,1.55) {full-label F1, CIL-CORD};
 % Dashed joint line first, so tall bars cover it; its value label sits at the right end only.
-\draw[densely dashed, black!70] (0,\nJoint*\ys) -- (6.5,\nJoint*\ys)
-  node[right, inner sep=2pt, align=left] {\scriptsize joint\\[-2pt]\scriptsize \nJoint};
+\draw[densely dashed, black!70] (0,\nJointFull*\ys) -- (6.5,\nJointFull*\ys)
+  node[right, inner sep=2pt, align=left] {\scriptsize joint\\[-2pt]\scriptsize \nJointFull};
 % Bar values: inside the top of the bar when the bar is tall (> 50), above it otherwise, so the
 % labels never meet the joint line whatever the generated values are.
-\foreach \x/\v/\c/\lc in {0.60/\nNaive/black!28/black, 1.28/\nNoBank/ourteal/white,
-                          2.80/\nColar/black!28/black, 3.48/\nSbr/ourteal/white,
-                          5.55/\nRecall/ourteal/white} {
+\foreach \x/\v/\c/\lc in {0.60/\nNaiveFull/black!28/black, 1.28/\nNoBankFull/ourteal/white,
+                          2.80/\nColarFull/black!28/black, 3.48/\nSbrFull/ourteal/white,
+                          5.55/\nRecallFull/ourteal/white} {
   \fill[fill=\c] (\x-0.29,0) rectangle (\x+0.29,\v*\ys);
   \pgfmathtruncatemacro{\tall}{\v>50 ? 1 : 0}
   \ifnum\tall=1
@@ -59,7 +59,7 @@
 \end{scope}
 \end{tikzpicture}
 \captionsetup{hypcap=false}
-\captionof{figure}{\textbf{Two causes of forgetting, and a remedy matched to each.} (a) Class-incremental CORD, LayoutLMv3, AA. Left: the $2{\times}2$ of \cref{tab:twobytwo}; a whole-document memory alone and a session-blocked readout alone stay far below joint training (dashed), together they close most of the gap. Right: SBR-Recall (\cref{sec:recall}) replaces the memory with one low-rank trunk delta per session. (b) CoLaR replays per-document SVDs of layer-$k$ activations against drift; SBR gives each session its own background logit and routes tokens without task identity; SBR-Recall reads block $b$ under delta $\Delta_b$.}
+\captionof{figure}{\textbf{Two causes of forgetting, and a remedy matched to each.} (a) Class-incremental CORD, LayoutLMv3, full-label F1 (mean of three clean seeds; AA and per-seed values in \cref{tab:twobytwo} and App.~D). Left: the $2{\times}2$ of \cref{tab:twobytwo}; a whole-document memory alone and a session-blocked readout alone stay far below joint training (dashed), together they close most of the gap. Right: SBR-Recall (\cref{sec:recall}) replaces the memory with one low-rank trunk delta per session. (b) CoLaR replays per-document SVDs of layer-$k$ activations against drift; SBR gives each session its own background logit and routes tokens without task identity; SBR-Recall reads block $b$ under delta $\Delta_b$.}
 \captionsetup{hypcap=true}
 \label{fig:teaser}
 \end{strip}
