@@ -687,6 +687,211 @@ def write_perclass_vals(perclass: dict) -> None:
     print("wrote", OUT / "supp_perclass_vals.tex")
 
 
+# ---------------------------------------------------------------- P18: ablation grid (App. K)
+ABL_COLOR = {"naive": "naive", "colar": "colar", "nobank": "nobank", "sbr": "sbr",
+             "recall": "recall", "oracle": "oracle", "joint": "joint"}  # fmt: skip
+
+
+def fig_ablation() -> dict:
+    """tab:ablation as bars: full-label F1 (dark) and AA (light), per-seed dots."""
+    from make_clean_tables import ABLATION, _abl_seeds
+
+    rows = [r for r in ABLATION
+            if len(_abl_seeds(r[1], "full_label_f1")) == 3 and len(_abl_seeds(r[1], "AA")) == 3]  # fmt: skip
+    fig, ax = plt.subplots(figsize=(COL, 1.9))
+    w, out = 0.38, {}
+    for i, (_label, key, *_) in enumerate(rows):
+        col = STYLE[ABL_COLOR[key]][1]
+        fl, aa = list(_abl_seeds(key, "full_label_f1").values()), list(
+            _abl_seeds(key, "AA").values()
+        )
+        out[key] = (fl, aa)
+        _bar(ax, i - w / 2, fl, True, col, False, w)
+        _bar(ax, i + w / 2, aa, True, col, True, w)
+    ax.set_xticks(range(len(rows)), [re.sub(r"\$\^\{r\}\$", "", r[0]) for r in rows], rotation=35,
+                  ha="right", rotation_mode="anchor")  # fmt: skip
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("CIL-CORD score", labelpad=1)
+    ax.tick_params(length=1.5, pad=1)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    h = [plt.Rectangle((0, 0), 1, 1, fc="#666666", ec="black", lw=0.4),
+         plt.Rectangle((0, 0), 1, 1, fc="#666666", alpha=0.45, ec="black", lw=0.4)]  # fmt: skip
+    ax.legend(h, ["full-label F1", "AA"], loc="upper left", frameon=False, handlelength=1.2)
+    fig.subplots_adjust(left=0.12, right=0.99, top=0.97, bottom=0.37)
+    save(fig, "ablation.pdf")
+    return out
+
+
+# ---------------------------------------------------------------- P18: image appendix (App. L)
+IMG_DS = (("cil_cifar100", "CIFAR-100"), ("cil_imagenet_r", "ImageNet-R"))
+IMG_STYLE = {  # key of make_image_table.VAL_RUNS -> (label, colour); one colour per method
+    "Naive": ("Naive", "#8C8C8C"), "Lwf": ("LwF", "#BBBBBB"),
+    "ErTwoK": ("ER, 2,000", "#F0E442"), "DerTwoK": ("DER++, 2,000", "#DDCC77"),
+    "Coda": ("CODA-Prompt", "#AA4499"), "Cllora": ("CL-LoRA", "#882255"),
+    "Slca": ("SLCA", "#332288"), "Ranpac": ("RanPAC", "#88CCEE"), "Lca": ("LCA", "#44AA99"),
+    "Bank": ("Latent memory", "#CC6677"), "Colar": ("CoLaR", "#D55E00"),
+    "ErTwoH": ("ER, 200", "#F0E442"), "DerTwoH": ("DER++, 200", "#DDCC77"),
+    "Joint": ("Joint training", "#000000"),
+}  # fmt: skip
+IMG_EXTRA_RUNS = {"Lwf": "{sc}_lwf_seed{sd}_vit", "Coda": "{sc}_coda_prompt_seed{sd}_vit",
+                  "Cllora": "{sc}_cl_lora_seed{sd}_vit"}  # fmt: skip
+IMG_AA_KEYS = ("Naive", "Lwf", "Coda", "Cllora", "ErTwoK", "DerTwoK", "Lca", "Ranpac", "Slca",
+               "Bank", "Colar")  # fmt: skip
+
+
+def _img_tmpl(key):
+    from make_image_table import VAL_RUNS
+
+    return VAL_RUNS.get(key) or IMG_EXTRA_RUNS[key]
+
+
+def _img_seeds(key, sc):
+    from make_image_table import seeds_of
+
+    return seeds_of(_img_tmpl(key), sc)
+
+
+def fig_image_aa() -> dict:
+    """AA per method on both datasets (bars = mean of three seeds, dots = seeds), joint a line."""
+    fig, axes = plt.subplots(1, 2, figsize=(WIDE, 1.9), sharey=True)
+    out = {}
+    for ax, (sc, title) in zip(axes, IMG_DS, strict=True):
+        for i, k in enumerate(IMG_AA_KEYS):
+            d = _img_seeds(k, sc)
+            out[(k, sc)] = d
+            if len(d) == 3:
+                ax.barh(i, np.mean(list(d.values())), 0.7, color=IMG_STYLE[k][1], ec="black",
+                        lw=0.4)  # fmt: skip
+            ax.scatter(list(d.values()), [i] * len(d), s=4, color="black", zorder=3, lw=0)
+        j = _img_seeds("Joint", sc)
+        out[("Joint", sc)] = j
+        ax.axvline(np.mean(list(j.values())), color="black", lw=0.8, ls="--")
+        ax.text(np.mean(list(j.values())) - 1, -0.9, "joint", ha="right", va="center",
+                fontsize=6.5)  # fmt: skip
+        ax.set_title(title, pad=2)
+        ax.set_xlim(0, 100)
+        ax.set_xticks([0, 20, 40, 60, 80])
+        ax.set_xlabel("AA after ten sessions", labelpad=1)
+        ax.tick_params(length=1.5, pad=1)
+        ax.grid(axis="x", alpha=0.3, lw=0.3)
+    axes[0].set_yticks(range(len(IMG_AA_KEYS)), [IMG_STYLE[k][0] for k in IMG_AA_KEYS])
+    axes[0].invert_yaxis()
+    fig.subplots_adjust(left=0.11, right=0.99, top=0.9, bottom=0.2, wspace=0.05)
+    save(fig, "image_aa.pdf")
+    return out
+
+
+IMG_TRAJ_KEYS = ("Naive", "ErTwoK", "Bank", "Colar", "Slca")
+
+
+def _img_matrix(key, sc, sd):
+    run = _img_tmpl(key).format(sc=sc, sd=sd)
+    f = Path("results") / run / "matrix.npy"
+    if f.exists():
+        return np.load(f)
+    return np.array(json.loads((Path("results") / run / "metrics.json").read_text())["matrix"],
+                    dtype=float)  # fmt: skip
+
+
+def fig_image_traj() -> dict:
+    """AA over the sessions seen after each session (mean over seeds); joint: one pooled run."""
+    fig, axes = plt.subplots(1, 2, figsize=(WIDE, 1.7), sharey=True)
+    out = {}
+    for ax, (sc, title) in zip(axes, IMG_DS, strict=True):
+        for k in IMG_TRAJ_KEYS:
+            mats = [_img_matrix(k, sc, sd) for sd in SEEDS]
+            y = np.mean([[np.nanmean(m[i, : i + 1]) for i in range(m.shape[0])] for m in mats], 0)
+            out[(k, sc)] = y
+            ax.plot(range(1, len(y) + 1), y, marker="o", ms=2, lw=0.9, color=IMG_STYLE[k][1],
+                    mec="black", mew=0.2, label=IMG_STYLE[k][0])  # fmt: skip
+        jv = np.mean([np.mean(_img_matrix("Joint", sc, sd)[-1]) for sd in SEEDS])
+        out[("Joint", sc)] = jv
+        ax.scatter(10, jv, marker="*", s=30, color="black", zorder=3, label="Joint (pooled run)")
+        ax.set_title(title, pad=2)
+        ax.set_xticks(range(1, 11))
+        ax.set_ylim(0, 100)
+        ax.set_xlabel("sessions trained", labelpad=1)
+        ax.grid(alpha=0.25, lw=0.3)
+        ax.tick_params(length=1.5, pad=1)
+    axes[0].set_ylabel("AA over sessions seen", labelpad=1)
+    axes[1].legend(loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False, fontsize=6.5,
+                   labelspacing=0.25)  # fmt: skip
+    fig.subplots_adjust(left=0.07, right=0.83, top=0.88, bottom=0.22, wspace=0.06)
+    save(fig, "image_traj.pdf")
+    return out
+
+
+IMG_BUDGET = (("ErTwoH", "200 raw images"), ("ErTwoK", "2,000 raw images"),
+              ("DerTwoH", "200 raw images"), ("DerTwoK", "2,000 raw images"),
+              ("Bank", "5,000 latents"), ("Colar", "5,000 latents, rank 128"))  # fmt: skip
+
+
+def fig_image_budget() -> dict:
+    """ER / DER++ at 200 and 2,000 raw exemplars against the latent memory (500 per session)."""
+    fig, axes = plt.subplots(1, 2, figsize=(WIDE, 1.6), sharey=True)
+    out = {}
+    for ax, (sc, title) in zip(axes, IMG_DS, strict=True):
+        for i, (k, _lab) in enumerate(IMG_BUDGET):
+            d = _img_seeds(k, sc)
+            out[(k, sc)] = d
+            ax.barh(i, np.mean(list(d.values())), 0.7, color=IMG_STYLE[k][1], ec="black", lw=0.4,
+                    alpha=0.5 if k.endswith("TwoH") else 1.0)  # fmt: skip
+            ax.scatter(list(d.values()), [i] * len(d), s=4, color="black", zorder=3, lw=0)
+        ax.set_title(title, pad=2)
+        ax.set_xlim(0, 100)
+        ax.set_xticks([0, 20, 40, 60, 80])
+        ax.set_xlabel("AA after ten sessions", labelpad=1)
+        ax.grid(axis="x", alpha=0.3, lw=0.3)
+        ax.tick_params(length=1.5, pad=1)
+    axes[0].set_yticks(range(len(IMG_BUDGET)),
+                       [f"{IMG_STYLE[k][0].split(',')[0]}: {lab}" for k, lab in IMG_BUDGET])  # fmt: skip
+    axes[0].invert_yaxis()
+    fig.subplots_adjust(left=0.25, right=0.99, top=0.88, bottom=0.24, wspace=0.05)
+    save(fig, "image_budget.pdf")
+    return out
+
+
+def _tab_cell(fname: str, label_start: str, col: int) -> str:
+    """The mean printed in column ``col`` (0-based, after the label) of a generated image table."""
+    line = next(x for x in (OUT / fname).read_text().splitlines() if x.startswith(label_start))
+    return re.match(r"\s*([0-9.]+)", line.split("&")[1 + col]).group(1)
+
+
+def selfcheck_p18(abl, img_aa, img_traj, img_budget) -> None:
+    tab = (OUT / "tab_ablation.tex").read_text().splitlines()
+    from make_clean_tables import ABLATION
+
+    for label, key, *_ in ABLATION:  # ablation bars = tab_ablation.tex cells
+        if key in abl:
+            line = next(x for x in tab if x.startswith(label + " &"))
+            for vs in abl[key]:
+                assert f"{np.mean(vs):.1f}" in line, (key, line)
+    CHECKS.append(f"ablation: {len(abl)} rows = tab_ablation.tex")
+    core = {"Naive": "Naive &", "Lwf": "LwF &", "ErTwoK": "ER (2", "DerTwoK": "DER++ (2",
+            "Coda": "CODA-Prompt &", "Cllora": "CL-LoRA", "Slca": "SLCA (2023)",
+            "Ranpac": "RanPAC", "Lca": "LCA", "Bank": "\\textbf{Latent memory",
+            "Colar": "\\textbf{CoLaR", "Joint": "Joint training"}  # fmt: skip
+    supp = {"ErTwoH": "ER (200", "DerTwoH": "DER++ (200"}
+    n = 0
+    for (k, sc), d in {**img_aa, **img_budget}.items():
+        ci = [s for s, _ in IMG_DS].index(sc)
+        if k in core:
+            assert (
+                _tab_cell("tab_image_core.tex", core[k], ci) == f"{np.mean(list(d.values())):.1f}"
+            ), k
+        else:
+            assert (
+                _tab_cell("tab_image_supp.tex", supp[k], 2 * ci)
+                == f"{np.mean(list(d.values())):.1f}"
+            ), k
+        n += 1
+    for sc, _ in IMG_DS:  # trajectory end point = AA of metrics.json (mean over seeds)
+        for k in IMG_TRAJ_KEYS:
+            assert abs(img_traj[(k, sc)][-1] - np.mean(list(_img_seeds(k, sc).values()))) < 1e-6, k
+    CHECKS.append(f"image: {n} bars = tab_image_core/supp cells; trajectories end at AA")
+
+
 def main() -> None:
     FIG.mkdir(exist_ok=True)
     cells = fig_findings_a()
@@ -700,6 +905,7 @@ def main() -> None:
     perclass = fig_perclass()
     write_perclass_vals(perclass)
     selfcheck(cells, cols, pts, means, dots, traj, counts, spans, perclass)
+    selfcheck_p18(fig_ablation(), fig_image_aa(), fig_image_traj(), fig_image_budget())
     print("self-check passed:\n  " + "\n  ".join(CHECKS))
 
 

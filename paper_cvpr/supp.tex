@@ -44,12 +44,13 @@
 \input{vals}
 \input{supp_vals}
 \input{supp_perclass_vals}
+\input{image_vals}
 
 \begin{document}
 \maketitlesupplementary
 \appendix
 
-\paragraph{Roadmap.} This appendix holds the detail behind every claim of the main paper, which is organised as a ladder of hypotheses (its Tab.~1); material that left the main body in the restructure (the memory $\times$ readout factorial as a table and a figure, the drift evidence with its four-encoder table, and the memory-content ladder with the compression trade-off) is here, in \cref{app:conflict,app:drift}. \cref{app:setup} gives the datasets, the exact session composition of each scenario and the clean protocol in full. \cref{app:scoring} defines the three ways we score a class-incremental session, works one receipt through them, and compares session-restricted AA with the mask-free full-label F1. \cref{app:method} describes CoLaR, SBR and SBR-Recall at the level of the code, with the supervision plan of every (session, block) pair, pseudo-code and memory accounting. \cref{app:results} gives the retention matrices, the per-seed values behind every headline cell, the LexSlot stacking comparison, SBR-Recall on the mixed stream and the delta-capacity ablation. \cref{app:conflict} collects the evidence that the background conflict sits in the labels and not in the memory; \cref{app:drift} does the same for drift, with the measurements the main paper only summarises, and holds the falsification ledger, the memory-content ladder and the image comparison. \cref{app:baselines} documents the baselines, our ports and the settings of every legacy-protocol ($\dagger$) cell, and \cref{app:repro} lists what is needed to reproduce the runs. \cref{app:pictures} draws the results as figures, and \cref{app:related} holds the related work and the comparators that left the main body. Every number in the generated tables is read from the run files by our table generator; a $\dagger$ marks a legacy-protocol source, ``clean'' the clean protocol, and ``gate'', ``rescore'' and ``grid'' name the three groups of legacy runs described in \cref{app:baselines}.
+\paragraph{Roadmap.} This appendix holds the detail behind every claim of the main paper, which is organised as a ladder of hypotheses (its Tab.~1); material that left the main body in the restructure (the memory $\times$ readout factorial as a table and a figure, the drift evidence with its four-encoder table, and the memory-content ladder with the compression trade-off) is here, in \cref{app:conflict,app:drift}. \cref{app:setup} gives the datasets, the exact session composition of each scenario and the clean protocol in full. \cref{app:scoring} defines the three ways we score a class-incremental session, works one receipt through them, and compares session-restricted AA with the mask-free full-label F1. \cref{app:method} describes CoLaR, SBR and SBR-Recall at the level of the code, with the supervision plan of every (session, block) pair, pseudo-code and memory accounting. \cref{app:results} gives the retention matrices, the per-seed values behind every headline cell, the LexSlot stacking comparison, SBR-Recall on the mixed stream and the delta-capacity ablation. \cref{app:conflict} collects the evidence that the background conflict sits in the labels and not in the memory; \cref{app:drift} does the same for drift, with the measurements the main paper only summarises, and holds the falsification ledger, the memory-content ladder and the image comparison. \cref{app:baselines} documents the baselines, our ports and the settings of every legacy-protocol ($\dagger$) cell, and \cref{app:repro} lists what is needed to reproduce the runs. \cref{app:pictures} draws the results as figures, and \cref{app:related} holds the related work and the comparators that left the main body, \cref{app:ablations} gathers the ablations, and \cref{app:image} is the image-classification benchmark. Every number in the generated tables is read from the run files by our table generator; a $\dagger$ marks a legacy-protocol source, ``clean'' the clean protocol, and ``gate'', ``rescore'' and ``grid'' name the three groups of legacy runs described in \cref{app:baselines}.
 
 %% ============================================================================ A
 \section{Setup details}
@@ -262,7 +263,13 @@ No task identity is used, and the session restriction of the evaluation is appli
 
 \subsection{Retention matrices}
 \label{app:matrices}
-\cref{tab:matrices} gives $R[i,j]$, the F1 on session $j$ after training session $i$, averaged over the seeds named in each title; the sources follow the same rule as the main tables, so a matrix moves to the clean protocol with its table cell. The matrices are the numbers behind the retention figure of the main paper; the figures in this paragraph are computed from the mean matrices shown, so they follow the table when its source changes. With a shared softmax the curves fall steeply and irregularly: the first session loses \colarDropOne\ points at the next boundary, the later sessions are learned only to \colarLateDiagMin\ to \colarLateDiagMax\ F1 on their own diagonal, and columns are not monotone afterwards (a column rises by up to \colarMaxRise\ points at a later boundary). With the blocked readout every session is learned: CoLaR-SBR and SBR without a memory, which share CoLaR's freezing of the embeddings and layers $1..4$ after the first session, learn every session to at least $\nSbrDiagMin$ F1 on its own diagonal on every seed (rung H0 of the main paper); from its diagonal to the final row a column loses \sbrLossMin\ to \sbrLossMax\ points on the mean, session~\sbrLossMaxSession\ the most. Under SBR-Recall every column of the mean matrix ends within \recallDevMax\ points of its diagonal. On Mixed, in the runs shown, CoLaR-SBR keeps every session close to its diagonal and the FUNSD sessions rise again at the revisit.
+\cref{tab:matrices} gives $R[i,j]$, the F1 on session $j$ after training session $i$, averaged over the seeds named in each title; the sources follow the same rule as the main tables, so a matrix moves to the clean protocol with its table cell. The matrices are the numbers behind \cref{fig:retention}; the figures in this paragraph are computed from the mean matrices shown, so they follow the table when its source changes. With a shared softmax the curves fall steeply and irregularly: the first session loses \colarDropOne\ points at the next boundary, the later sessions are learned only to \colarLateDiagMin\ to \colarLateDiagMax\ F1 on their own diagonal, and columns are not monotone afterwards (a column rises by up to \colarMaxRise\ points at a later boundary). With the blocked readout every session is learned: CoLaR-SBR and SBR without a memory, which share CoLaR's freezing of the embeddings and layers $1..4$ after the first session, learn every session to at least $\nSbrDiagMin$ F1 on its own diagonal on every seed (rung H0 of the main paper); from its diagonal to the final row a column loses \sbrLossMin\ to \sbrLossMax\ points on the mean, session~\sbrLossMaxSession\ the most. Under SBR-Recall every column of the mean matrix ends within \recallDevMax\ points of its diagonal. On Mixed, in the runs shown, CoLaR-SBR keeps every session close to its diagonal and the FUNSD sessions rise again at the revisit.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{figures/retention_cilcord.pdf}
+\caption{\textbf{Retention per session on CIL-CORD} (session-restricted F1 on session $j$ after each later session, mean over the seeds; panel titles give their number $n$ and the protocol, $\dagger$ = legacy). With a shared softmax the curves fall steeply and late sessions are learned poorly; with the blocked readout most sessions hold; under SBR-Recall no session falls more than $\nRecallMaxLoss$ points below its diagonal on any seed.}
+\label{fig:retention}\end{figure}
+\paragraph{Where the remaining gap lies.} With a shared softmax some sessions partly recover at a later boundary (\cref{fig:retention}); with the blocked readout every session is learned and one early session loses the most; under SBR-Recall the larger moves, up to $\nRecallMaxGain$ points, are gains (\cref{tab:delta}).
 
 \begin{table*}[t]
 \centering\small
@@ -284,47 +291,6 @@ No task identity is used, and the session restriction of the evaluation is appli
 \label{tab:perseed}
 \input{supp_perseed}
 \end{table}
-
-\subsection{Stacking LexSlot on CoLaR-SBR}
-\label{app:slot}
-LexSlot adds extra head slots that a session updates only when the OCR vocabulary of its documents selects them; it stores the token ids of its documents, unlike CoLaR. LexSlot exists only as fp32 gate runs, so \cref{tab:slot} compares it with the CoLaR-SBR gate runs of the same protocol, never with the main-table source. Stacked on CoLaR-SBR it moves the per-seed AA by a few points in either direction and leaves the mean within two points on every scenario, and it narrows the spread between seeds on CIL-CORD ($\vSbrGate$ against $\vSlotGate$) and DIL ($\vSbrGateDil$ against $\vSlotGateDil$). It stays below SBR-Recall on CIL-CORD on every seed, against both the gate and the clean SBR-Recall runs. We read it as a second partition of the same readout that SBR already partitions, and keep it as a row, not a method.
-
-\begin{table}[t]
-\centering\scriptsize
-\setlength{\tabcolsep}{2.5pt}
-\caption{\textbf{CoLaR-SBR / + LexSlot (difference)}, AA per seed; both sides are fp32 gate runs$^\dagger$ (one protocol per row; Mixed CoLaR-SBR has one gate seed). Generated.}
-\label{tab:slot}
-\resizebox{\linewidth}{!}{\input{supp_slot}}
-\end{table}
-
-\subsection{SBR-Recall on the mixed stream}
-\label{app:recallmix}
-Three Mixed runs of SBR-Recall exist, all rank 64 and seed 42. The first computed the cross-schema terms under the wrong delta (\cref{app:recall}) and is not a result. The second is the corrected method without a memory; the third adds the $50$-document CoLaR memory. Their matrices are in \cref{tab:recallmix}.
-
-\paragraph{Without a memory the blocks see-saw.} Read the no-memory matrix by columns. FUNSD sessions~1 and~2 are learned ($87.6$, $90.8$) and fall to $0.0$ as soon as SROIE arrives in session~3; SROIE is learned ($82.0$) and falls below $10$ when CORD arrives; both CORD sessions hold ($95.8$, $95.5$) until the FUNSD revisit, when FUNSD returns ($87.3$, $85.6$) and SROIE and the CORD blocks fall to $8.1$ or below. The mechanism is the all-background mode. On a current document of another schema every old block is trained towards $\mathrm{O}_b$ on every token, and without stored documents nothing trains it towards its own tags, so its background logit wins and the block stops claiming tokens. The trunk is frozen and the old deltas are not updated, so this is a readout effect, not drift: the readout rows and background weights of the old blocks are shared across deltas and are moved by these terms. When a block's own schema returns, it is supervised fully again and recovers within one session.
-
-\paragraph{With the memory the see-saw disappears.} Stored documents supply the positive counterweight: in the with-memory matrix no column falls to zero, the CORD blocks hold above $96$, and the run reaches $85.9$. The weakest cell is FUNSD session~2 ($46$--$48$ through the SROIE and CORD sessions, $75.0$ after the revisit). Across schemas, isolation by deltas does not replace the memory, and CoLaR-SBR ($\nSbrMix$ in the main table) remains the better method on Mixed; one seed.
-
-\begin{table}[t]
-\centering\small
-\setlength{\tabcolsep}{3pt}
-\caption{\textbf{SBR-Recall on Mixed} (rank 64, seed 42, fp32 gate runs$^\dagger$; session-restricted scoring), without and with the $50$-document memory. Sessions as in \cref{tab:mixsessions}. Generated.}
-\label{tab:recallmix}
-\input{supp_mat_recall_mix_nomem}\\[6pt]
-\input{supp_mat_recall_mix_mem}
-\end{table}
-
-\subsection{Delta capacity}
-\label{app:delta}
-\cref{tab:delta} gives the diagonal and the final row of every SBR-Recall capacity run on CIL-CORD. Without a memory the final row is within $1.5$ points of the diagonal at either rank, so isolation retains what was learned. At rank $8$ on query, key and value, however, sessions~3 and~4 (the sub-total and total fields, mostly prices) are learned only to between $61$ and $68$ F1 on the diagonal, and adding the memory does not help (AA $80.5$ against $82.5$). At rank $64$ with the attention output and feed-forward layers added, those two diagonals reach $88.8$ to $96.2$ on all three seeds. Isolation was sound at rank $8$; the capacity of the delta was the limit. We adopted rank $64$ with the feed-forward layers from these legacy runs, which early-stopped on the test split, before the clean re-runs; it is the one setting chosen on CIL-CORD. All rows of \cref{tab:delta} are legacy gate runs, so the comparison stays within one protocol; the clean rank-64 runs of the main tables (mean matrix in \cref{tab:matrices}) also learn sessions~3 and~4.
-
-\begin{table*}[t]
-\centering\small
-\setlength{\tabcolsep}{4pt}
-\caption{\textbf{SBR-Recall delta capacity on CIL-CORD} (fp32 gate runs$^\dagger$, $10$-epoch cap, test-split early stopping, session-restricted scoring): diagonal $R[j,j]$ (each session when learned), final row $R[5,j]$ and AA. Generated.}
-\label{tab:delta}
-\input{supp_delta}
-\end{table*}
 
 %% ============================================================================ E
 \section{Analysis of the background conflict}
@@ -479,66 +445,6 @@ Label refresh (latent memory) & CoLaR-R pseudo (CIL-CORD / Mixed, 3 seeds each)$
 \end{tabular}}
 \end{table*}
 
-\subsection{What the memory must hold}
-\label{app:ladder}
-\paragraph{Takeaway.} Whole documents retain and every summary of the same store collapses; each document can then be compressed on its own (\cref{fig:colar,fig:ladder,fig:pareto}). In the main paper this memory is a component of the experiments, not a contribution; this subsection holds what its body described before the restructure.
-
-\paragraph{Whole documents retain; summaries collapse.} To find the least a memory must store we vary the stored object and hold the mechanism fixed: activations are captured at the output of layer $k$, layers $1..k$ are frozen after the first task, and stored activations are replayed through the plastic upper layers and head (DIL, LayoutLMv3; single-seed diagnostics unless stated). Replaying the stored activations of $50$ whole documents per task retains AA $87.3$. Summaries of the \emph{same} store collapse to the naive level: a rank-16 pooled spectral summary $41.9$, per-class Gaussians $39.4$, real $k$-means centroids $36.7$--$39.7$. A single-variable control isolates the ingredient: four whole documents retain $63.8$, and the identical token features placed on layout carriers from other documents retain $36.7$; the binding of a token's feature to its position and its label is worth $27$ points. The contrast is not documents against images but where the statistic enters the network. Used at the readout, a class-conditional Gaussian head (SLCA) beats the same latent memory on images (\cref{app:image}); injected below the self-attention layers, per-class Gaussians fall to the naive level on images as well ($10.7$, \cref{app:image}); and on documents the readout-level Gaussian realignment we ran, LCA's after merging, reaches only $43.9$ on DIL (\cref{tab:ledger}), though its merge step confounds the comparison.
-
-\paragraph{Per-document compression.} The pooled feature space is close to full rank, but one document's tokens share a layout and a vocabulary, so its activation matrix $H_j\in\mathbb{R}^{N_j\times d}$ is low-rank. CoLaR stores a rank-$r$ truncated SVD per document, $H_j\approx U_r\Sigma_rV_r^{\top}$, with the document's boxes, attention mask and labels, rebuilds $\hat H_j$ at replay, and injects it at layer $k$; the loss is cross-entropy on the current batch plus cross-entropy on replayed documents. Per-sequence truncated SVD of transformer activations is an existing format (it compresses key caches); what is ours is its use as a replay memory. At $k{=}4$, $r{=}128$ and $50$ documents per task it retains $\vColarDil$ AA on DIL in $60$\,MB, against $\vErDil$ for ER with $200$ raw documents and $\vJointDil$ for joint training, and is $2.7\times$ smaller than the uncompressed latent memory it matches ($87.3$ at about $163$\,MB; \cref{fig:pareto}); $r{=}64$ gives $80.6$ at about $32$\,MB. These are the settings carried unchanged to every class-incremental stream. Rebalancing the memory does not move AA, and read-side additions lower it (below).
-
-\begin{figure}[t]\centering
-\includegraphics[width=\linewidth]{figures/colar_pareto.pdf}
-\caption{Memory size versus retention (DIL, LayoutLMv3, AA, seed 42; log-scale memory). Per-document SVD (CoLaR) matches raw latent replay at $2.7\times$ less storage; every summary that breaks whole-document binding falls to the naive level.}
-\label{fig:pareto}\end{figure}
-
-\input{fig/colar}
-
-\begin{figure}[t]\centering
-\includegraphics[width=\linewidth]{figures/falsification_ladder.pdf}
-\caption{\textbf{What the memory must hold} (DIL, LayoutLMv3, layer $k{=}8$, AA, single-seed diagnostics). Whole documents retain; summaries of the same store fall to the naive level (41.3), and the identical features on decoupled layout carriers lose 27 points against matched whole documents.}
-\label{fig:ladder}\end{figure}
-
-\paragraph{Routing which stored document to replay (null).} The OCR vocabulary of a document is set by the input and does not drift with training, which suggests a drift-free sampler: a softmax over term-frequency signature scores $s_j=\sigma(x)^{\top}\sigma_j$ in three directions (\emph{near}, \emph{far}, \emph{task}), uniform as the zero-point. The seed-42 reading was promising (far $+1.8$ over uniform $86.4$ at $d{=}50$), so we fixed that single arm in advance for confirmation. Across three seeds the gap collapses to $+1.8/+0.4/-0.6$, mean $+0.5$ points with a sign flip, inside the uniform-sampling spread: lexical routing is a null, and the CoLaR results do not depend on it.
-
-\paragraph{Rebalancing and reading the memory (nulls).} On DIL with LayoutLMv3 (CoLaR, $k{=}4$, $r{=}128$, $50$ documents per task; base $87.6$ on seed 42), three changes to how the memory is filled or weighted leave AA where it was: a class-balanced replay loss gives $87.1$, coverage-based ($k$-centre) document selection $86.8$ and entity-weighted compression $87.1$ (seed 42 each). Each trades FUNSD retention for SROIE retention at about $1{:}1$, so the changes redistribute retention between tasks rather than add to it. A three-seed check finds no lever above the base (class-balanced $87.8$, $k$-centre $87.0$, against $\vColarDil$ for the base). Two read-side additions are negative: blending a $k$NN readout over the stored latents into the head is inert or harmful, and metaplastic consolidation of the readout lowers AA from $85.9$ to $79.5$ at its own operating point.
-
-\paragraph{Budget-adaptive allocation is a frontier, not a gain.} Allocating a fixed compressed-replay budget unevenly across tasks (documents $[18,5,2]$, ranks $[64,128,64]$ vs.\ a uniform $10$ documents at rank $64$; 5 epochs, $k{=}4$) gave $+4.0$ AA on seed 42 while passing a per-domain guard fixed in advance. On seeds 7 and 123 the same comparison gave $-8.0$ and $+5.7$: $+0.6\pm7.5$ over three seeds, a null. The seed-42 result was a point on a Pareto frontier (old-domain retention traded against the final domain at $\approx9{:}1$), not a shift of the frontier, and we report it as such.
-
-\paragraph{A bounded positive on the storage side.} Replaying pseudo-labelled \emph{public} documents through the same mechanism (zero private bytes) recovers dense-label tasks (FUNSD $76.1$) but not one the proxy pool does not cover (SROIE $\sim7$), topping out at $58.9$: coverage-limited transfer.
-
-\subsection{Image class-incremental learning}
-\label{app:image}
-\paragraph{Takeaway.} On images the ranking inverts: a class-conditional Gaussian head beats the same latent memory, because an image carries one label and its readout is summarised by a per-class statistic; the trunk is intact and the gap is readout coverage.
-
-\cref{tab:image} gives the fixed comparison set on ViT-B/16 (CIFAR-100, ImageNet-R; ten sessions) and \cref{tab:image_supp} extends it with BWT and with every image run outside the fixed set that we keep as evidence, all under the same recipe (\cref{app:repro}). Two readings matter. Replay at $200$ exemplars is far below the $2{,}000$-exemplar rows ($42.3/21.6$ vs.\ $76.2/54.8$ for ER), so the memory size in \cref{tab:image} is the one at which replay is competitive, not a favourable choice for our rows. SLCA's whole margin comes from its classifier alignment: without it the same recipe falls to $38.0/25.8$, below $200$-exemplar replay on CIFAR-100, which is the image-side instance of the head-locus finding. Per-class Gaussian latent replay, the image port of the document-side Gaussian store, sits at the naive level ($10.7$).
-
-\begin{table}[t]
-\centering
-\setlength{\tabcolsep}{4pt}
-\caption{\textbf{Fixed comparison set on image CIL} (ViT-B/16, ten sessions, AA, mean $\pm$ s.d., seeds 42/7/123): the same references (naive, joint training) and baselines as the comparison table of the main paper, with SLCA and RanPAC in the slots CPFD and IS3 take on documents. ER/DER++/SLCA keep $2{,}000$ exemplars; the uncompressed latent memory and CoLaR keep $500$/class. Ridge is a diagnostic readout refit, not a method.}
-\label{tab:image}
-\resizebox{\linewidth}{!}{\input{tab_image_core}}
-\end{table}
-
-\begin{table}[t]
-\centering\small
-\caption{Image class-incremental learning, AA and BWT, mean$\pm$std over seeds 42/7/123 (ViT-B/16, ten sessions). Fixed comparison set first, our rows, joint training (reference), then the dominated rows kept as evidence. SimpleCIL is a single seed.}
-\label{tab:image_supp}
-\setlength{\tabcolsep}{2pt}\scriptsize
-\resizebox{\linewidth}{!}{\input{tab_image_supp}}
-\end{table}
-
-\paragraph{Ridge decomposition of the plastic-head gap.} \cref{tab:probe} reports a ridge-readout probe on the trained trunk of our replay rows (seed 42). After the last session the trunk is frozen and a closed-form ridge readout (random projection to $10{,}000$ ReLU features, $\lambda{=}10$, the RanPAC recipe) is fitted under three data conditions: on the stored memory only (deployable), on all training data of all sessions (a non-deployable ceiling on what the features support), and on all data through the frozen pre-trained trunk (image only). Three differences follow: the \emph{head gap} (full ridge minus the trained head) is the total headroom of the readout; the \emph{coverage gap} (full minus stored) is the part that needs features of inputs the memory does not hold; the \emph{trunk gap} (adapted minus frozen) is what replay-driven adaptation bought. On images the head gap is $9.5/16.1$ points and is mostly coverage ($7.5/14.3$), so a better analytic head on the stored latents does not close the gap to SLCA; the adapted trunk is nevertheless $2.9/15.0$ points better than the frozen one under the same readout, so adaptation is not the problem. On documents the head gap of CoLaR is within one point on DIL and Mixed and $7.7$ points on CIL-CORD with zero coverage gap, i.e.\ the compressed store already covers its documents and the residual is the plastic head itself. The probe reads every past training image once at the end and is therefore a diagnostic, not a continual method.
-
-\begin{table}[t]
-\centering\small
-\caption{Ridge decomposition, seed 42, AA (LayoutLMv3 on documents, ViT-B/16 on images). \emph{Head}: the trained plastic head. \emph{Ridge, stored/full/frozen}: closed-form readout on the stored latents, on all seen training data, and on all data through the frozen pre-trained trunk. Gaps as defined in the text; a dash means the condition does not apply (documents have no frozen-trunk reference).}
-\label{tab:probe}
-\setlength{\tabcolsep}{2pt}\scriptsize
-\resizebox{\linewidth}{!}{\input{tab_probe_decomp}}
-\end{table}
-
 %% ============================================================================ G
 \section{Baselines and protocols}
 \label{app:baselines}
@@ -562,6 +468,8 @@ Label refresh (latent memory) & CoLaR-R pseudo (CIL-CORD / Mixed, 3 seeds each)$
 \label{tab:dropped}
 \input{supp_dropped}
 \end{table}
+
+\paragraph{Why four baselines end below naive training.} On CIL-CORD four baselines end below naive training on every seed because they learn later sessions poorly: CPFD learns no session after the first (at most $\nCpfdLateMax$ F1 on a later diagonal), and IS3, CODA-Prompt and LCA each learn some later session on every seed to at most $\nBaseWorstLateMax$ F1, where naive training learns every session to at least $\nNaiveDiagMin$; like naive training they keep little of the earlier sessions (``Null cells among the fixed baselines'' below). These rows are our ports onto one growing token head, not checked against their published NER numbers.
 
 \paragraph{Prompt-, LoRA- and flatness-based baselines.} \cref{tab:prompt_lora} reports the frozen-backbone prompt family (L2P, DualPrompt, CODA-Prompt), the orthogonal/continual LoRA family and ER with SAM (our C-Flat++ port with its curvature weight at $0$) on DIL, three seeds, LayoutLMv3 and BERT. The prompt family forgets little but never acquires the task (AA $\approx30$--$35$, below the naive level of $41.3$): a frozen document encoder with a drifting shared head cannot be routed back into place. Our single-adapter LoRA ports acquire but forget as much as naive training does. Only the replay-based variant reaches the level of replay, and SAM adds nothing over plain ER ($88.4$ vs.\ $87.9$ on LayoutLMv3), consistent with rung H0 of the main paper (Sec.~4.1): the remedy ordering is set by whether the head is re-grounded, not by the optimiser. On CIL-CORD our CL-LoRA port learns each session ($81$ to $95$ F1 on the diagonal in the re-runs of the main table) and ends at zero on every session but the last.
 
@@ -676,7 +584,7 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 \section{Reproducibility}
 \label{app:repro}
 
-\paragraph{Hyperparameters.} Documents (every method but LCA; LCA: \cref{app:baselines}): AdamW, learning rate $5{\times}10^{-5}$ (constant), weight decay $0.01$, gradient clipping $1.0$, batch size $2$ with gradient checkpointing, early stopping with patience $2$ and $\delta{=}0.1$ F1 points with best-weight restoration. CoLaR family: $k{=}4$, $r{=}128$, $50$ documents per session, $4$ replayed documents per step, replay weight $1$. SBR: threshold $\tau{=}0.5$, all-background weight $1$. SBR-Recall: rank $64$, $\alpha{=}128$ on query, key, value and dense layers above $k$ (capacity ablation: rank $8$, $\alpha{=}16$, query/key/value). Baselines as in \cref{app:baselines}. Image CIL (CIFAR-100, ImageNet-R; ViT-B/16, ten sessions): every reported cell, including the frozen-backbone and replay baselines, was trained on a 6\,GB GPU at batch size 16 in fp32 with gradient checkpointing, 100-epoch cap with early stopping (patience 2), seeds 42/7/123; the CODA-Prompt, CL-LoRA and LCA image cells use this recipe unchanged.
+\paragraph{Hyperparameters.} Documents (every method but LCA; LCA: \cref{app:baselines}): AdamW, learning rate $5{\times}10^{-5}$ (constant), weight decay $0.01$, gradient clipping $1.0$, batch size $2$ with gradient checkpointing, early stopping with patience $2$ and $\delta{=}0.1$ F1 points with best-weight restoration. CoLaR family: $k{=}4$, $r{=}128$, $50$ documents per session, $4$ replayed documents per step, replay weight $1$. SBR: threshold $\tau{=}0.5$, all-background weight $1$. SBR-Recall: rank $64$, $\alpha{=}128$ on query, key, value and dense layers above $k$ (capacity ablation: rank $8$, $\alpha{=}16$, query/key/value). Baselines as in \cref{app:baselines}. Image CIL (CIFAR-100, ImageNet-R; ViT-B/16, ten sessions): every reported cell was trained on a 6\,GB GPU at batch size 16 with a 100-epoch cap and early stopping (patience 2), seeds 42/7/123, in fp32 with gradient checkpointing, except where \cref{tab:imagesetup} records otherwise (the latent memory and CoLaR ran in mixed precision without checkpointing; SLCA has a 20-epoch cap).
 
 \paragraph{Seeds and hardware.} Seeds 42, 7 and 123 for every three-seed cell; a cell with fewer seeds shows its per-seed values. The clean runs, the gate runs and the rescore runs ran one at a time on a single NVIDIA RTX 2060 (6\,GB) with about 14\,GB of host memory; some rows of the first DIL grid ran on a rented GPU container (\cref{tab:legacyprotocol}, first-grid rows).
 
@@ -687,7 +595,7 @@ Scenario & Backbone & Naive & Indep. & Joint & EWC & LwF & ER & DER++ \\
 %% ============================================================================ I
 \section{Results in pictures}
 \label{app:pictures}
-Every chart in this section is drawn by our figure generator from the same run files, with the same selection rule as the tables: a cell is clean only with its three clean seeds, legacy cells are marked $\dagger$ (dashed or hatched), and a cell with fewer seeds shows its seeds and $n$. The generator checks that what it plots equals what the tables print. Each method keeps one colour in every figure. The retention per session and the summary of the findings are in the main paper (Fig.~2 and~4); the gold spans per session are in \cref{fig:spans}.
+Every chart in this section is drawn by our figure generator from the same run files, with the same selection rule as the tables: a cell is clean only with its three clean seeds, legacy cells are marked $\dagger$ (dashed or hatched), and a cell with fewer seeds shows its seeds and $n$. The generator checks that what it plots equals what the tables print. Each method keeps one colour in every figure. The retention per session and the summary of the findings are in Fig.~2 of the main paper and in \cref{fig:retention}; the gold spans per session are in \cref{fig:spans}.
 
 \begin{figure*}[t]\centering
 \includegraphics[width=\linewidth]{figures/heatmaps.pdf}
@@ -734,6 +642,164 @@ Every chart in this section is drawn by our figure generator from the same run f
 \paragraph{Latent replay and drift.} REMIND, Latent Replay and generative replay replay mid-network representations through the plastic upper layers~\citep{hayes2020remind,pellegrini2020latent,vandeven2020brain}; exemplar-free methods keep class statistics instead~\citep{zhu2021pass,petit2023fetril,goswami2023fecam,zhang2023slca,chen2023star}. Our memory keeps whole documents, one truncated SVD each, a per-sequence factorisation used to compress key caches~\citep{sun2025shadowkv}. Forgetting in image classifiers sits in the layers nearest the output~\citep{ramasesh2021anatomy}, and in domain-incremental segmentation freezing early layers moves the representation shift to later ones~\citep{kalb2023principles}. Continual relation extraction~\citep{han2020emar,cui2021rpcre,zhao2022crl}, like continual NER, is sentence-level and text-only. The broader CL families~\citep{kirkpatrick2017ewc,li2017lwf,lopezpaz2017gem,buzzega2020der,rebuffi2017icarl,saha2021gpm,wang2022l2p,smith2023coda,mallya2018packnet} are surveyed by \citet{wang2024survey}.
 
 \paragraph{Comparators we did not run.} From this literature: a faithful ICE-O (frozen encoder, one head per session, constant Other logit), SBR with a constant background, a separated softmax with one shared background, per-class sigmoid heads (SSUL, SpanKL), MiB's distillation, PLOP and BPF. The MiB-style loss of rung H2 is the background-shift correction we queue on the same memory.
+
+%% ============================================================================ K
+\section{Ablations, extended}
+\label{app:ablations}
+The ablation table of the main paper (its Tab.~4) asks what each component buys on CIL-CORD; \cref{fig:ablation} draws it with the seeds. This section gathers the design-choice ablations around it: the capacity of SBR-Recall's deltas, head slots stacked on CoLaR-SBR, the memory under SBR-Recall across schemas, and what the memory must hold. Except for the last subsection's three-seed checks, these are legacy gate runs or single-seed diagnostics, marked as such. The ladder controls not yet run (a raw-document memory with the blocked readout, relabelling every stored document before each session, the MiB-style loss, a constant background logit, ICE-O) join Tab.~1 and Fig.~2a of the main paper when their three clean seeds exist. We ran no shared-softmax counterpart that combines or merges the deltas (as EASE and InfLoRA do~\citep{zhou2024ease,liang2024inflora}); our CL-LoRA port shares one adapter across sessions.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{figures/ablation.pdf}
+\caption{\textbf{The component grid on CIL-CORD} (Tab.~4 of the main paper; clean protocol; bar: mean of three seeds, dots: the seeds). Full-label F1 dark, AA light.}
+\label{fig:ablation}\end{figure}
+
+\subsection{Delta capacity}
+\label{app:delta}
+\emph{What it ablates:} the capacity of SBR-Recall's deltas (rank and which layers) and, at rank 8, the memory.
+\cref{tab:delta} gives the diagonal and the final row of every SBR-Recall capacity run on CIL-CORD. Without a memory the final row is within $1.5$ points of the diagonal at either rank, so isolation retains what was learned. At rank $8$ on query, key and value, however, sessions~3 and~4 (the sub-total and total fields, mostly prices) are learned only to between $61$ and $68$ F1 on the diagonal, and adding the memory does not help (AA $80.5$ against $82.5$). At rank $64$ with the attention output and feed-forward layers added, those two diagonals reach $88.8$ to $96.2$ on all three seeds. Isolation was sound at rank $8$; the capacity of the delta was the limit. We adopted rank $64$ with the feed-forward layers from these legacy runs, which early-stopped on the test split, before the clean re-runs; it is the one setting chosen on CIL-CORD. All rows of \cref{tab:delta} are legacy gate runs, so the comparison stays within one protocol; the clean rank-64 runs of the main tables (mean matrix in \cref{tab:matrices}) also learn sessions~3 and~4.
+
+\begin{table*}[t]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{SBR-Recall delta capacity on CIL-CORD} (fp32 gate runs$^\dagger$, $10$-epoch cap, test-split early stopping, session-restricted scoring): diagonal $R[j,j]$ (each session when learned), final row $R[5,j]$ and AA. Generated.}
+\label{tab:delta}
+\input{supp_delta}
+\end{table*}
+
+\subsection{Stacking LexSlot on CoLaR-SBR}
+\label{app:slot}
+\emph{What it ablates:} a second partition of the readout, head slots selected by OCR vocabulary, stacked on CoLaR-SBR.
+LexSlot adds extra head slots that a session updates only when the OCR vocabulary of its documents selects them; it stores the token ids of its documents, unlike CoLaR. LexSlot exists only as fp32 gate runs, so \cref{tab:slot} compares it with the CoLaR-SBR gate runs of the same protocol, never with the main-table source. Stacked on CoLaR-SBR it moves the per-seed AA by a few points in either direction and leaves the mean within two points on every scenario, and it narrows the spread between seeds on CIL-CORD ($\vSbrGate$ against $\vSlotGate$) and DIL ($\vSbrGateDil$ against $\vSlotGateDil$). It stays below SBR-Recall on CIL-CORD on every seed, against both the gate and the clean SBR-Recall runs. We read it as a second partition of the same readout that SBR already partitions, and keep it as a row, not a method.
+
+\begin{table}[t]
+\centering\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\caption{\textbf{CoLaR-SBR / + LexSlot (difference)}, AA per seed; both sides are fp32 gate runs$^\dagger$ (one protocol per row; Mixed CoLaR-SBR has one gate seed). Generated.}
+\label{tab:slot}
+\resizebox{\linewidth}{!}{\input{supp_slot}}
+\end{table}
+
+\subsection{SBR-Recall on the mixed stream}
+\label{app:recallmix}
+\emph{What it ablates:} the memory under SBR-Recall when the stream crosses annotation schemas, where the task-identity view predicts isolation alone must fail.
+Three Mixed runs of SBR-Recall exist, all rank 64 and seed 42. The first computed the cross-schema terms under the wrong delta (\cref{app:recall}) and is not a result. The second is the corrected method without a memory; the third adds the $50$-document CoLaR memory. Their matrices are in \cref{tab:recallmix}.
+
+\paragraph{Without a memory the blocks see-saw.} Read the no-memory matrix by columns. FUNSD sessions~1 and~2 are learned ($87.6$, $90.8$) and fall to $0.0$ as soon as SROIE arrives in session~3; SROIE is learned ($82.0$) and falls below $10$ when CORD arrives; both CORD sessions hold ($95.8$, $95.5$) until the FUNSD revisit, when FUNSD returns ($87.3$, $85.6$) and SROIE and the CORD blocks fall to $8.1$ or below. The mechanism is the all-background mode. On a current document of another schema every old block is trained towards $\mathrm{O}_b$ on every token, and without stored documents nothing trains it towards its own tags, so its background logit wins and the block stops claiming tokens. The trunk is frozen and the old deltas are not updated, so this is a readout effect, not drift: the readout rows and background weights of the old blocks are shared across deltas and are moved by these terms. When a block's own schema returns, it is supervised fully again and recovers within one session.
+
+\paragraph{With the memory the see-saw disappears.} Stored documents supply the positive counterweight: in the with-memory matrix no column falls to zero, the CORD blocks hold above $96$, and the run reaches $85.9$. The weakest cell is FUNSD session~2 ($46$--$48$ through the SROIE and CORD sessions, $75.0$ after the revisit). Across schemas, isolation by deltas does not replace the memory, and CoLaR-SBR ($\nSbrMix$ in the main table) remains the better method on Mixed; one seed.
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\caption{\textbf{SBR-Recall on Mixed} (rank 64, seed 42, fp32 gate runs$^\dagger$; session-restricted scoring), without and with the $50$-document memory. Sessions as in \cref{tab:mixsessions}. Generated.}
+\label{tab:recallmix}
+\input{supp_mat_recall_mix_nomem}\\[6pt]
+\input{supp_mat_recall_mix_mem}
+\end{table}
+
+\subsection{What the memory must hold}
+\label{app:ladder}
+\emph{What it ablates:} what the memory stores, at a fixed mechanism, from whole documents to every summary of them.
+\paragraph{Takeaway.} Whole documents retain and every summary of the same store collapses; each document can then be compressed on its own (\cref{fig:colar,fig:ladder,fig:pareto}). In the main paper this memory is a component of the experiments, not a contribution; this subsection holds what its body described before the restructure.
+
+\paragraph{Whole documents retain; summaries collapse.} To find the least a memory must store we vary the stored object and hold the mechanism fixed: activations are captured at the output of layer $k$, layers $1..k$ are frozen after the first task, and stored activations are replayed through the plastic upper layers and head (DIL, LayoutLMv3; single-seed diagnostics unless stated). Replaying the stored activations of $50$ whole documents per task retains AA $87.3$. Summaries of the \emph{same} store collapse to the naive level: a rank-16 pooled spectral summary $41.9$, per-class Gaussians $39.4$, real $k$-means centroids $36.7$--$39.7$. A single-variable control isolates the ingredient: four whole documents retain $63.8$, and the identical token features placed on layout carriers from other documents retain $36.7$; the binding of a token's feature to its position and its label is worth $27$ points. The contrast is not documents against images but where the statistic enters the network. Used at the readout, a class-conditional Gaussian head (SLCA) beats the same latent memory on images (\cref{app:image}); injected below the self-attention layers, per-class Gaussians fall to the naive level on images as well ($10.7$, \cref{app:image}); and on documents the readout-level Gaussian realignment we ran, LCA's after merging, reaches only $43.9$ on DIL (\cref{tab:ledger}), though its merge step confounds the comparison.
+
+\paragraph{Per-document compression.} The pooled feature space is close to full rank, but one document's tokens share a layout and a vocabulary, so its activation matrix $H_j\in\mathbb{R}^{N_j\times d}$ is low-rank. CoLaR stores a rank-$r$ truncated SVD per document, $H_j\approx U_r\Sigma_rV_r^{\top}$, with the document's boxes, attention mask and labels, rebuilds $\hat H_j$ at replay, and injects it at layer $k$; the loss is cross-entropy on the current batch plus cross-entropy on replayed documents. Per-sequence truncated SVD of transformer activations is an existing format (it compresses key caches); what is ours is its use as a replay memory. At $k{=}4$, $r{=}128$ and $50$ documents per task it retains $\vColarDil$ AA on DIL in $60$\,MB, against $\vErDil$ for ER with $200$ raw documents and $\vJointDil$ for joint training, and is $2.7\times$ smaller than the uncompressed latent memory it matches ($87.3$ at about $163$\,MB; \cref{fig:pareto}); $r{=}64$ gives $80.6$ at about $32$\,MB. These are the settings carried unchanged to every class-incremental stream. Rebalancing the memory does not move AA, and read-side additions lower it (below).
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{figures/colar_pareto.pdf}
+\caption{Memory size versus retention (DIL, LayoutLMv3, AA, seed 42; log-scale memory). Per-document SVD (CoLaR) matches raw latent replay at $2.7\times$ less storage; every summary that breaks whole-document binding falls to the naive level.}
+\label{fig:pareto}\end{figure}
+
+\input{fig/colar}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{figures/falsification_ladder.pdf}
+\caption{\textbf{What the memory must hold} (DIL, LayoutLMv3, layer $k{=}8$, AA, single-seed diagnostics). Whole documents retain; summaries of the same store fall to the naive level (41.3), and the identical features on decoupled layout carriers lose 27 points against matched whole documents.}
+\label{fig:ladder}\end{figure}
+
+\paragraph{Routing which stored document to replay (null).} The OCR vocabulary of a document is set by the input and does not drift with training, which suggests a drift-free sampler: a softmax over term-frequency signature scores $s_j=\sigma(x)^{\top}\sigma_j$ in three directions (\emph{near}, \emph{far}, \emph{task}), uniform as the zero-point. The seed-42 reading was promising (far $+1.8$ over uniform $86.4$ at $d{=}50$), so we fixed that single arm in advance for confirmation. Across three seeds the gap collapses to $+1.8/+0.4/-0.6$, mean $+0.5$ points with a sign flip, inside the uniform-sampling spread: lexical routing is a null, and the CoLaR results do not depend on it.
+
+\paragraph{Rebalancing and reading the memory (nulls).} On DIL with LayoutLMv3 (CoLaR, $k{=}4$, $r{=}128$, $50$ documents per task; base $87.6$ on seed 42), three changes to how the memory is filled or weighted leave AA where it was: a class-balanced replay loss gives $87.1$, coverage-based ($k$-centre) document selection $86.8$ and entity-weighted compression $87.1$ (seed 42 each). Each trades FUNSD retention for SROIE retention at about $1{:}1$, so the changes redistribute retention between tasks rather than add to it. A three-seed check finds no lever above the base (class-balanced $87.8$, $k$-centre $87.0$, against $\vColarDil$ for the base). Two read-side additions are negative: blending a $k$NN readout over the stored latents into the head is inert or harmful, and metaplastic consolidation of the readout lowers AA from $85.9$ to $79.5$ at its own operating point.
+
+\paragraph{Budget-adaptive allocation is a frontier, not a gain.} Allocating a fixed compressed-replay budget unevenly across tasks (documents $[18,5,2]$, ranks $[64,128,64]$ vs.\ a uniform $10$ documents at rank $64$; 5 epochs, $k{=}4$) gave $+4.0$ AA on seed 42 while passing a per-domain guard fixed in advance. On seeds 7 and 123 the same comparison gave $-8.0$ and $+5.7$: $+0.6\pm7.5$ over three seeds, a null. The seed-42 result was a point on a Pareto frontier (old-domain retention traded against the final domain at $\approx9{:}1$), not a shift of the frontier, and we report it as such.
+
+\paragraph{A bounded positive on the storage side.} Replaying pseudo-labelled \emph{public} documents through the same mechanism (zero private bytes) recovers dense-label tasks (FUNSD $76.1$) but not one the proxy pool does not cover (SROIE $\sim7$), topping out at $58.9$: coverage-limited transfer.
+
+
+%% ============================================================================ L
+\section{Image classification benchmark}
+\label{app:image}
+\paragraph{Setup.} We test the memory and the drift diagnosis on a second modality, image class-incremental learning on CIFAR-100 and ImageNet-R (\cref{tab:imagesetup}). The comparison set mirrors the documents' (naive and joint training as references, then ER, DER++, LwF, CODA-Prompt, CL-LoRA and LCA), with SLCA~\citep{zhang2023slca} and RanPAC in the slots CPFD and IS3 take on documents. The rows run the house recipe of \cref{tab:imagesetup}, not the clean document protocol of the main paper.
+
+\begin{table}[t]
+\centering\scriptsize
+\setlength{\tabcolsep}{3pt}
+\caption{\textbf{Image benchmark settings}, read from the scenario and model configurations and from each run's recorded hyper-parameters.}
+\label{tab:imagesetup}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{1.9cm}>{\raggedright\arraybackslash}p{5.9cm}@{}}
+\toprule
+Datasets & CIFAR-100 (100 classes); ImageNet-R (200 classes) \\
+Sessions & $10$; $10$ or $20$ new classes per session; class order seed $1993$, as in SLCA and RanPAC \\
+Backbone & ViT-B/16 pre-trained on ImageNet-21k, linear head on the CLS token \\
+Optimiser & AdamW, learning rate $5{\times}10^{-5}$, weight decay $0.01$; SLCA and LCA: SGD at $0.01$ (SLCA's trunk at $1\%$ of it) \\
+Recipe & batch size $16$; epoch cap $100$ (SLCA: $20$; RanPAC and SimpleCIL fit their readout in one pass) \\
+Precision & fp32 with gradient checkpointing; the latent memory and CoLaR: mixed precision without checkpointing; RanPAC and SimpleCIL: mixed precision enabled \\
+Memory & ER, DER++: $200$ or $2{,}000$ raw images (reservoir); latent memory: $500$ images per session as layer-4 activations; CoLaR: the same at rank $128$; SLCA: class Gaussians \\
+Seeds, metric & 42, 7, 123; AA, the mean of the final accuracy over the ten sessions \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure*}[t]\centering
+\includegraphics[width=\linewidth]{figures/image_aa.pdf}
+\caption{\textbf{Image class-incremental learning, AA per method} (ViT-B/16, ten sessions; bar: mean of three seeds, dots: the seeds; dashed: joint training). Numbers: \cref{tab:image}.}
+\label{fig:image_aa}\end{figure*}
+
+\begin{figure*}[t]\centering
+\includegraphics[width=\linewidth]{figures/image_traj.pdf}
+\caption{\textbf{AA over the sessions seen, after each session} (mean over three seeds; joint training is one pooled run, star).}
+\label{fig:image_traj}\end{figure*}
+
+\begin{figure*}[t]\centering
+\includegraphics[width=\linewidth]{figures/image_budget.pdf}
+\caption{\textbf{Memory budget}: ER and DER++ with $200$ (light) and $2{,}000$ raw images against the latent memory and CoLaR with $500$ images per session as latents ($5{,}000$ after ten sessions). Bar: mean of three seeds; dots: the seeds. Numbers: \cref{tab:image,tab:image_supp}.}
+\label{fig:image_budget}\end{figure*}
+
+\paragraph{Takeaway.} On images the ranking inverts: a class-conditional Gaussian head beats the same latent memory, because an image carries one label and its readout is summarised by a per-class statistic; the trunk is intact and the gap is readout coverage.
+
+\paragraph{Results.} \cref{tab:image} gives the comparison set and \cref{fig:image_aa} draws it with the seeds; \cref{tab:image_supp} adds BWT and every other image run we keep as evidence, and \cref{fig:image_traj} follows AA after each session. SLCA and RanPAC lead on both datasets, above the latent memory and CoLaR on every seed (SLCA $\imgSlcaCifar$ / $\imgSlcaImnr$ and RanPAC $\imgRanpacCifar$ / $\imgRanpacImnr$ on CIFAR-100 / ImageNet-R, against $\imgBankCifar$ / $\imgBankImnr$ for the latent memory and $\imgColarCifar$ / $\imgColarImnr$ for CoLaR), and SLCA is the highest final AA of \cref{fig:image_traj} on every seed. We make no state-of-the-art claim on images. Our SLCA runs are also below SLCA's published numbers ($91.53$ on CIFAR-100 and $77.0$ on ImageNet-R, with joint training at $93.22$ and $79.6$~\citep{zhang2023slca}); our recipe (\cref{tab:imagesetup}) is not the published one, and our joint-training references are lower too ($\imgJointCifar$ / $\imgJointImnr$).
+
+\paragraph{What transfers.} \emph{The whole-sample latent memory.} On CIFAR-100 the latent memory and CoLaR are above ER and DER++ with $2{,}000$ raw images on every seed; on ImageNet-R they are within $\imgBankErGapImnr$ and $\imgColarErGapImnr$ points of ER on every seed (\cref{fig:image_budget}). They store more items, $500$ images per session as latents ($5{,}000$ after ten sessions; $\imgBankMB$\,MB and $\imgColarMB$\,MB as recorded), against $2{,}000$ raw images, and no pixel; replay with $200$ raw images falls to $\imgErTwoHCifar$ / $\imgErTwoHImnr$ (ER). Compressing each stored latent to rank $128$ moves AA by at most $\imgColarBankGapMax$ points on any seed. \emph{The head locus.} SLCA's margin comes from its classifier alignment: without it the same recipe falls to $\imgSlcaNocaCifar$ / $\imgSlcaNocaImnr$. A ridge readout refit on all training data through the latent memory's own adapted trunk is above the trained head on both datasets (seed 42, \cref{tab:image,tab:probe}): the trunk supports more than the head reads out, as on documents (\cref{app:driftbody}).
+
+\paragraph{What does not transfer.} An image carries one label and has no background class, so there is no background conflict to remove: SBR and SBR-Recall are not run on images, and a stored image's label never goes stale. With a plain softmax head the latent memory reaches $\imgColarCifar$ / $\imgColarImnr$ against $\imgJointCifar$ / $\imgJointImnr$ for joint training, whereas on CIL-CORD the same memory with a shared softmax reaches $\nColar$ AA against $\nJoint$: a much larger gap, consistent with a cause that only token labelling has. Per-class Gaussian latent replay, the image port of the document-side Gaussian store, sits at the naive level (\cref{tab:image_supp}).
+
+\begin{table}[t]
+\centering
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{Fixed comparison set on image CIL} (ViT-B/16, ten sessions, AA, mean $\pm$ s.d., seeds 42/7/123): the same references (naive, joint training) and baselines as the comparison table of the main paper, with SLCA and RanPAC in the slots CPFD and IS3 take on documents. ER and DER++ keep $2{,}000$ raw images and SLCA class statistics; the latent memory and CoLaR keep $500$ images per session as layer-4 latents (\cref{tab:imagesetup}). Ridge is a diagnostic readout refit, not a method.}
+\label{tab:image}
+\resizebox{\linewidth}{!}{\input{tab_image_core}}
+\end{table}
+
+\begin{table}[t]
+\centering\small
+\caption{Image class-incremental learning, AA and BWT, mean$\pm$std over seeds 42/7/123 (ViT-B/16, ten sessions). Fixed comparison set first, our rows, joint training (reference), then the dominated rows kept as evidence. SimpleCIL is a single seed.}
+\label{tab:image_supp}
+\setlength{\tabcolsep}{2pt}\scriptsize
+\resizebox{\linewidth}{!}{\input{tab_image_supp}}
+\end{table}
+
+\paragraph{Ridge decomposition of the plastic-head gap.} \cref{tab:probe} reports a ridge-readout probe on the trained trunk of our replay rows (seed 42). After the last session the trunk is frozen and a closed-form ridge readout (random projection to $10{,}000$ ReLU features, $\lambda{=}10$, the RanPAC recipe) is fitted under three data conditions: on the stored memory only (deployable), on all training data of all sessions (a non-deployable ceiling on what the features support), and on all data through the frozen pre-trained trunk (image only). Three differences follow: the \emph{head gap} (full ridge minus the trained head) is the total headroom of the readout; the \emph{coverage gap} (full minus stored) is the part that needs features of inputs the memory does not hold; the \emph{trunk gap} (adapted minus frozen) is what replay-driven adaptation bought. On images the head gap is $9.5/16.1$ points and is mostly coverage ($7.5/14.3$), so a better analytic head on the stored latents does not close the gap to SLCA; the adapted trunk is nevertheless $2.9/15.0$ points better than the frozen one under the same readout, so adaptation is not the problem. On documents the head gap of CoLaR is within one point on DIL and Mixed and $7.7$ points on CIL-CORD with zero coverage gap, i.e.\ the compressed store already covers its documents and the residual is the plastic head itself. The probe reads every past training image once at the end and is therefore a diagnostic, not a continual method.
+
+\begin{table}[t]
+\centering\small
+\caption{Ridge decomposition, seed 42, AA (LayoutLMv3 on documents, ViT-B/16 on images). \emph{Head}: the trained plastic head. \emph{Ridge, stored/full/frozen}: closed-form readout on the stored latents, on all seen training data, and on all data through the frozen pre-trained trunk. Gaps as defined in the text; a dash means the condition does not apply (documents have no frozen-trunk reference).}
+\label{tab:probe}
+\setlength{\tabcolsep}{2pt}\scriptsize
+\resizebox{\linewidth}{!}{\input{tab_probe_decomp}}
+\end{table}
+
 
 {
     \small
