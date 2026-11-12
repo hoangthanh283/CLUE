@@ -3324,3 +3324,149 @@ Scope: `git diff 49fd09b..11f87d4 -- paper_cvpr scripts/rca` (worktree = `11f87d
 
 The referee score is unchanged at **3 (+0.25)**. Clean DER++-250 with full-label F1 (queue v12, `36f1db8`) is one of the
 items listed for a 4.
+
+## R13 (2026-11-12): audit of P18 (`0d95f7f`): body Ablations section, App. K (ablations, extended), App. L (image benchmark)
+
+Scope: `git diff 00b0041..0d95f7f -- paper_cvpr scripts/rca` (worktree = `0d95f7f`).
+- **Documents.** I recomputed every document cell from `results/clean_2026-11/*/metrics.json` and `matrix.npy`.
+- **Images.** I recomputed every image cell from `results/cil_{cifar100,imagenet_r}_*_vit*/metrics.json` (AA and recorded
+  `method_hparams` / `training_hparams` / `replay_memory_bytes`) and the vision logs.
+- **Code and configs.** I checked `configs/scenario/cil_*.yaml`, `configs/model/vit_b16.yaml`, `doccl/methods/buffer.py`,
+  `doccl/data/vision.py` and `docs/IMAGE_SCOPE_VERDICT.md`.
+- **Generator re-run.** I re-ran `make_clean_tables.py` with `OUT` in my scratchpad: byte-identical, no warning. I did not
+  run the image or figure generators.
+- **Builds.** I built from `git archive 0d95f7f paper_cvpr` and rendered main p. 8 and supp pp. 20–24.
+
+### Verdict: **BLOCK** (one HIGH, a generator row label, about 5 minutes)
+
+The ablation section is correct on every seed and every image number recomputes. What blocks is a leftover: the
+correction "500 per class" → "500 per session" was applied to the prose, the captions and the CoLaR row, but not to the
+latent-memory row label, which still prints "500/class" in two rendered tables.
+
+### A. Numbers recomputed
+
+| Item | Recomputed (seeds 42 / 7 / 123) | Paper | OK |
+|---|---|---|---|
+| `tab:ablation` cells | naive 13.0±0.2 / 18.3±0.5; CoLaR 30.7±1.5 / 33.5±1.0; no-mem SBR 11.4±2.3 / 21.6±2.2; CoLaR-SBR 89.1±2.0 / 88.4±2.6; SBR-Recall 92.6±1.0 / 91.9±0.6; relabelled 76.5±2.3 / 63.6±1.9; joint 92.0±0.4 / 91.3±0.8. All clean with three seeds. MB from `replay_memory_bytes`: 0 / 100.672 / 0 / 100.672 / 56.623 / 100.928 | same | ✓ rule 6 |
+| Memory alone, full-label F1 | +19.16 / +17.73 / +16.35 | "16.3 to 19.2" (outward) | ✓ |
+| Blocked readout alone | −4.26 / −1.09 / +0.65 | "−4.3 to +0.7" | ✓ |
+| Both | +75.61 / +78.38 / +74.16; the sum of the two singles is 14.9 / 16.6 / 17.0. Super-additive on every seed; also in AA (68.97 / 73.05 / 68.38 against 17.3 / 15.5 / 22.8) | "74.1 to 78.4", "more than the two alone add up to" | ✓ |
+| Deltas against CoLaR-SBR | full 91.53 > 88.83, 93.52 > 91.19, 92.62 > 87.13; AA 91.35 > 87.76, 92.62 > 91.32, 91.86 > 86.16; 56.6 vs 100.7 MB | "above ... under both metrics" | ✓ |
+| Relabelled < CoLaR-SBR | 79.1 < 88.8, 74.9 < 91.2, 75.4 < 87.1; 65.8 < 87.8, 62.8 < 91.3, 62.4 < 86.2 | ✓ | ✓ |
+| Image AA (16 rows × 2 datasets) | e.g. CIFAR: latent memory 80.51 / 79.27 / 80.27 (80.0±0.7), CoLaR 80.63 / 79.08 / 78.83 (79.5±1.0), ER-2000 75.59 / 75.39 / 77.58, DER++-2000 77.04 / 74.89 / 77.68, SLCA 87.36 / 87.48 / 87.68, RanPAC 85.38 / 85.38 / 85.25, joint 89.5±0.4. ImageNet-R: latent memory 56.62 / 54.23 / 54.48, CoLaR 53.84 / 56.70 / 55.24, ER-2000 53.96 / 55.12 / 55.33, SLCA 65.0±0.3, RanPAC 58.5±0.3. SLCA without CA 38.0 / 25.8; ER-200 42.3 / 21.6 | `tab_image_core`, `tab_image_supp`, `image_vals.tex`, Figs. 16–18 | ✓ every cell |
+| "above ER and DER++ with 2,000 on every CIFAR seed" | latent memory and CoLaR > max(ER, DER++) on all 3 seeds | ✓ | ✓ |
+| "within 2.7 / 1.6 of ER on ImageNet-R, every seed" | latent memory − ER = +2.66 / −0.88 / −0.85; CoLaR − ER = −0.12 / +1.58 / −0.09 | ✓ | ✓ |
+| "compression moves AA by at most 2.8 on any seed" | CoLaR − latent memory: +0.12, −0.19, −1.44 (CIFAR); −2.78, +2.46, +0.77 (ImageNet-R) | 2.8 | ✓ |
+| SLCA and RanPAC above both of ours on every seed; SLCA highest continual AA on every seed | true | ✓ | ✓ (L3) |
+| SLCA published 91.53 / 77.0, joint 93.22 / 79.6, cited `zhang2023slca` | = `docs/IMAGE_SCOPE_VERDICT.md:10` | ✓ | ✓ |
+| Memory items and size | `docs_per_task` 500 on every latent-memory and CoLaR run, so 500 per session = 5,000 after ten (50/class CIFAR-100, 25/class ImageNet-R); `replay_memory_bytes` 1,513,000,000 and 1,235,240,000 | 1,513 / 1,235 MB | ✓ |
+| Settings table | class order seed 1993 and 10 sessions (configs) ✓; ViT-B/16 in21k ✓. Recorded: AdamW 5e-5 / wd 0.01 for the rest; SLCA lr 0.01, backbone scale 0.01, cap 20; LCA lr 0.01. Precision: fp32 + checkpointing except the latent memory and CoLaR (amp, no checkpointing) and RanPAC / SimpleCIL (amp, no checkpointing) | same | ✓ (L4) |
+
+### B. Findings
+
+**HIGH**
+
+- **R13-H1. "Latent memory, 500/class" survives as a row label in two rendered tables.**
+  - Where: `tab_image_core.tex` and `tab_image_supp.tex` (supp Tabs. 23 and 24, rendered p. 24); generator
+    `make_image_table.py:36`.
+  - Evidence: every `cil_*_bank500_*` run records `docs_per_task: 500` with 10 or 20 classes per session, i.e. 500 per
+    session = 50 / 25 per class. The adjacent CoLaR row, the Tab. 23 caption, the settings table and the prose all
+    now say "500 per session". The label is false and contradicts its own table.
+  - Fix: `"\\textbf{Latent memory, 500/session (ours, uncompressed)}"` at `make_image_table.py:36`, then regenerate.
+  - I grepped `main.tex`, `supp.tex` and the generated tables for "/class", "per class" and "fp32". No other false
+    leftover: supp.tex:587 now defers to `tab:imagesetup` for precision.
+
+**MEDIUM**
+
+- **R13-M1. The ablation ticks hide a confound: "memory" and "blocked readout" each come with the freeze map.**
+  - Evidence: the logs of `cil_cord_colar_seed42` and `cil_cord_colar_sbr_noreplay_seed42` both print "freeze map —
+    layers <4 + embeddings frozen"; naive has none.
+  - So "the memory alone" is memory + freezing, and "the blocked readout alone" is readout + freezing. The interaction
+    claim is unaffected, because both singles and the pair share the freezing; but "alone" is not literally one
+    component.
+  - Fix (caption of `tab:ablation`): "Mem. and Blk. rows also freeze the embeddings and layers 1–4 after session 1, as
+    does SBR-Recall's base (App. D); naive training does not."
+- **R13-M2. The "What transfers" comparison is not budget-matched, and the bytes of the baseline are not given.**
+  - The latent memory holds 2.5× the items of ER-2000. The prose says so ("They store more items, ... 5,000 ...,
+    against 2,000 raw images"), so the per-seed statements are true as worded. But only our bytes are given.
+  - As implemented, ER's buffer stores the transformed float32 `pixel_values` (3×224×224×4 B = 602 KB per image;
+    `buffer.py:42`, `vision.py:22-24`), about 1.2 GB for 2,000. That is comparable to CoLaR's 1.235 GB. At uint8 it
+    would be 301 MB, or 6 MB for CIFAR at native 32×32.
+  - Fix: add "ER's 2,000 images take about 1.2 GB as our buffer stores them (float32, 224²)". The heading should read as
+    "competitive with raw replay at 2.5× the items", not "transfers" outright.
+  - The ER-200 sentence is fine.
+- **R13-M3. The contribution clause overstates and names the wrong diagnosis.**
+  - main.tex:75 says "on images, which have no background class, the memory and the drift diagnosis carry over
+    (App. L)".
+  - App. L shows the head-locus reading (one seed-42 ridge probe plus the SLCA-without-CA row), not a drift diagnosis.
+    The memory is competitive with raw replay only at 2.5× the items, and below SLCA and RanPAC.
+  - Fix: "on images, which have no background class, the latent memory is competitive with raw replay and the head-locus
+    reading recurs (one-seed probe), while SLCA and RanPAC lead (App. L)".
+  - The body pointer sentence (Sec. 6, "The comparison set") is fine as worded. It says "SLCA and RanPAC lead" and "SBR
+    is not run", and it makes no state-of-the-art claim.
+- **R13-M4. The ridge probe is attributed to "the latent memory's own adapted trunk", but it comes from other runs.**
+  - Source runs (`make_image_table.py:49-50`, `:100-101`):
+    - CIFAR probe: `cil_cifar100_rcaBank_seed42_vit` (uncompressed, `replay_task_balance: true`, head AA 78.8). The
+      `tab:image` latent-memory cell at seed 42 is `bank500` with AA 80.51.
+    - ImageNet-R probe: `cil_imagenet_r_colar_pp_seed42_vit`, which is **rank-128 CoLaR**, 20-epoch cap, task-balanced
+      replay (head 56.2).
+  - The new App. L sentence ("through the latent memory's own adapted trunk"), the `tab:image` row "Ridge readout on
+    the latent-memory trunk" and the `tab:probe` row labels "latent memory" are therefore not literally true. The
+    qualitative reading (ridge above the head of the same run, 88.3 > 78.8 and 72.3 > 56.2) holds for the runs probed.
+  - The labels predate this round, but P18 restates them.
+  - Fix: label them "a seed-42 latent-memory variant (task-balanced replay; ImageNet-R: CoLaR rank 128, 20-epoch cap)",
+    or re-probe the `bank500` seed-42 run.
+- **R13-M5. A moved pointer now cites the wrong evidence.**
+  - supp.tex:272 ("Where the remaining gap lies") ends "... up to $\nRecallMaxGain$ points, are gains
+    (\cref{tab:delta})".
+  - `\nRecallMaxGain` (2.1) is computed from the **clean** SBR-Recall matrices (final − diagonal: 0.43 / 2.03 / −0.04;
+    0.13 / 1.88 / 0.56; …, max 2.03 on seed 42). `tab:delta` holds the legacy gate runs, whose largest gain is about 1.0.
+  - Fix: cite `tab:matrices` (clean mean) and "seed 42", as the body's former "App. D" did.
+
+**LOW**
+
+- R13-L1. RanPAC is named in the body (main.tex, Sec. 6) and in App. L but never cited. `mcdonnell2023ranpac` is in
+  `refs.bib` but not in `refs_precompiled.bbl`; regenerate the .bbl per rule 8. SLCA is cited only in the appendix;
+  cite it at the body mention too.
+- R13-L2. App. L "What does not transfer": "the latent memory reaches $\imgColarCifar$ / $\imgColarImnr$" uses the
+  CoLaR macros (79.5 / 55.3). The uncompressed latent memory is 80.0 / 55.1. Say "CoLaR reaches", or use `\imgBank*`.
+- R13-L3. App. L: "SLCA is the highest final AA of Fig. 17 on every seed". Joint training (star, 89.5 / 77.6) is
+  higher. Write "the highest among the continual methods".
+- R13-L4. "Without it the same recipe falls to 38.0 / 25.8": SLCA-without-CA recorded a 100-epoch cap against SLCA's 20.
+  Early stopping ended every session by epoch 8 (noCA) and 12 (SLCA) in the CIFAR seed-42 logs, so the cap never binds.
+  The sentence is fair in substance; add "(epoch caps 100 vs 20, never reached)" or align the setting.
+- R13-L5. Figs. 16–18 colour the latent memory `#CC6677`, close to the documents' relabelled-memory pink `#CC79A7`. App. I
+  promises one colour per method across figures. They are different methods, so this is optional.
+
+### C. Moved content and cross-references
+
+- `fig:retention`, "Where the remaining gap lies" (see M5), "Ablations and cost", the CPFD / IS3 / CODA / LCA late-session
+  sentence (`\nCpfdLateMax`, `\nBaseWorstLateMax` → App. G, supp.tex:472) and the EASE/InfLoRA disclosure → App. K.
+  Nothing is lost or duplicated.
+- The body's "not checked against their published NER numbers" is now "all rows are our ports onto one growing token
+  head". That is weaker, but still a disclosure; the published-number caveat remains in App. G.
+- Pointers:
+  - Body: App. K (memory content, Mixed SBR-Recall); App. G and K (settings); App. D (per-seed values and retention);
+    "App. I, Fig. 10" = `fig:routing` (10) ✓; "App. B, Tab. 3" = `tab:mech` ✓.
+  - Supp: "Tab. 4 of the main paper" = `tab:ablation` (4) ✓; "Fig. 2 of the main paper and \cref{fig:retention}" ✓;
+    "Tab. 1 and Fig. 2a" ✓.
+- Builds:
+  - `latexmk -pdf`: main 0, supp 0. 0 undefined references, 0 "??", 0 overfull, 0 `---`.
+  - Main 11 pp.: the Conclusion ends p. 8, References at the top of p. 9. Supp 27 pp.
+- Rendering:
+  - `tab:ablation` (main p. 8) and Fig. 12 (ablation grid) are legible, with colours consistent with Fig. 2.
+  - Figs. 16–18 are legible: axes labelled, joint dashed or star, seeds as dots.
+  - `tab:imagesetup` is legible.
+
+### D. Referee view
+
+The Ablations section is what a CVPR reviewer looks for: one table answering "which component", with an interaction
+that holds on every seed. The image appendix answers "does it generalise beyond documents" honestly (SLCA and RanPAC
+lead, no SOTA claim, SBR not applicable).
+
+What still blocks a 4 is unchanged:
+- the H2 controls (MiB-style loss, relabel-before) at three seeds;
+- clean ER and DER++ with full-label F1 (DER++-250 is queued in v12);
+- a second backbone for H3 on CIL-CORD.
+
+**Score: 3 (Borderline Reject), now +0.5 over R10.**
