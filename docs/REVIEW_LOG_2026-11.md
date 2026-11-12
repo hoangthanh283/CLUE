@@ -3242,3 +3242,26 @@ Fig. 13 now carries the joint-training dump:
   2402.10447) is Qiu, Zheng, Liu, Luo and Ma, as the bibliography has it. A Dev nit.
 
 The referee score is unchanged at **3 (+0.25)**. P15 is presentation and accuracy, not new evidence (see R11 §D).
+
+## R11c (2026-11-12): confirmation of P16 (`642048c`) against R11b
+
+Scope: `git diff 2ec05b1..642048c -- paper_cvpr scripts/rca` (worktree = `642048c`). I built both PDFs from
+`git archive 642048c paper_cvpr` and rendered supp p. 18 (`tab:legacyprotocol`).
+
+### Verdict: **PASS**
+
+| Item | Status and evidence |
+|---|---|
+| R11b-H1 (CL-LoRA Memory) | **Fixed.** `BASE_INFO["cl_lora"]` = "previous model, past adapter matrices", in `tab:main` and the card. Evidence: `cl_lora.py:54` (frozen previous-task teacher) and `o_lora.py:69,203` (`past_A_matrices`). |
+| LCA Memory "base and per-session backbones, class Gaussians" | ✓ `lca.py:81` declares `_base_backbone`, `:128-130` stashes it once, `:182-184` appends each session's backbone to `_task_backbones` before the TIES merge; the class Gaussians come from `_compute_class_stats`. |
+| `tab:legacyprotocol` Memory, hand-edited | ✓ LwF "previous model" (`lwf.py:129-137`); CPFD "previous model" (`cpfd.py:194`); IS3 "previous model, prototypes" (`is3.py:87`, `prototypes` at `:195`); CODA-Prompt "none" (no teacher or buffer in `coda_prompt.py` / `prompt_base.py`); CL-LoRA now its own row, "previous model, past adapters", with the same cap 30, fp32/fp16 and seeds 2, 2 as the old combined row; LCA "backbones, class Gaussians". Consistent with `tab:main`. The table fits the text width at `\tabcolsep` 3.5pt; no overfull box in either log. |
+| New App. I sentence | ✓ Recomputed from `full_label_dump.pt` (seqeval by document). The naive re-run is non-zero only on `total.total_price` (95), a session-5 class. Joint training is non-zero on 21 of the 23 classes that occur in the test set; the two zeros are `menu.itemsubtotal` (support 6) and `total.total_etc` (support 3). "Almost every class that occurs in the test set" holds. |
+| Invariants | `latexmk -pdf`: main 0, supp 0. 0 undefined references or citations, 0 "??", 0 overfull. Main 11 pp.: Conclusion on p. 8, References at the top of p. 9. Supp 25 pp. 0 `---` in any .tex. |
+
+**LOW (optional)**
+- R11c-L1. In `tab:legacyprotocol` the Memory column now lists kept models (previous model, backbones). Yet "SBR-Recall,
+  rank 8 / rank 64" still reads "none" for the runs without the document memory. Those runs keep a frozen base and one
+  delta per session (56.6 MB at rank 64, as `tab:main` reports). Write "deltas" or "deltas, 50 docs/session".
+- R11b-L2 (the `is3.py` docstring authors) is still open. It is code only.
+
+The referee score is unchanged at **3 (+0.25)**.
