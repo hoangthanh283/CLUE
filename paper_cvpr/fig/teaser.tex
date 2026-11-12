@@ -1,7 +1,7 @@
-% Teaser: (a) the strict memory x readout 2x2 on CIL-CORD plus SBR-Recall as a separate,
-% memory-free bar; bar heights read from the generated vals.tex;
+% Former teaser (moved to the appendix in P11): (a) the strict memory x readout 2x2 on CIL-CORD
+% plus SBR-Recall as a separate, memory-free bar; bar heights read from the generated vals.tex;
 % (b) SBR / SBR-Recall schematic.
-\begin{strip}
+\begin{figure*}[t]
 \centering
 \begin{tikzpicture}[font=\footnotesize, >=Stealth,
   box/.style={draw, rounded corners=2pt, align=center, inner sep=3pt, minimum height=0.66cm}]
@@ -54,12 +54,10 @@
 \node[box, draw=ourteal, thick] (b3) at (7.1,2.55) {$[\mathrm{O}_B\,|\,\text{tags}_B]$};
 \draw[->] (up) -- (b1);
 \node[align=center] at (5.25,3.45) {$e_b = 1 - p_b(\mathrm{O}_b)$; the block with the\\largest $e_b>0.5$ claims the token};
-\node[align=left, anchor=west] at (2.75,0.15) {\textcolor{memgreen}{\textbf{CoLaR}} answers drift; \textcolor{ourteal}{\textbf{SBR}} un-shares the\\background; \textcolor{ourteal}{\textbf{SBR-Recall}} reads block $b$ under $\Delta_b$.};
+\node[align=left, anchor=west] at (2.75,0.15) {\textcolor{memgreen}{\textbf{memory}} answers drift; \textcolor{ourteal}{\textbf{SBR}} un-shares the\\background; \textcolor{ourteal}{\textbf{SBR-Recall}} reads block $b$ under $\Delta_b$.};
 \node[anchor=north west] at (-0.2,-0.5) {\textbf{(b)}};
 \end{scope}
 \end{tikzpicture}
-\captionsetup{hypcap=false}
-\captionof{figure}{\textbf{Two causes of forgetting, and a remedy matched to each.} (a) Class-incremental CORD, LayoutLMv3, full-label F1 (mean of three clean seeds; AA and per-seed values in \cref{tab:twobytwo} and App.~D). Left: the $2{\times}2$ of \cref{tab:twobytwo}; a whole-document memory alone and a session-blocked readout alone stay far below joint training (dashed), together they close most of the gap. Right: SBR-Recall (\cref{sec:recall}) replaces the memory with one low-rank trunk delta per session. (b) CoLaR replays per-document SVDs of layer-$k$ activations against drift; SBR gives each session its own background logit and routes tokens without task identity; SBR-Recall reads block $b$ under delta $\Delta_b$.}
-\captionsetup{hypcap=true}
+\caption{\textbf{The memory $\times$ readout factorial and the two readouts.} (a) CIL-CORD, LayoutLMv3, full-label F1 (mean of three clean seeds; AA and per-seed values in \cref{tab:twobytwo,tab:perseed}). Left: a whole-document memory alone and a session-blocked readout alone stay far below joint training (dashed), together they close most of the gap. Right: SBR-Recall replaces the memory with one low-rank trunk delta per session. (b) The memory replays per-document SVDs of layer-$k$ activations; SBR gives each session its own background logit and routes tokens without task identity; SBR-Recall reads block $b$ under delta $\Delta_b$.}
 \label{fig:teaser}
-\end{strip}
+\end{figure*}
