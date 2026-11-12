@@ -1343,6 +1343,74 @@ def write_baselines() -> None:
     (OUT / "supp_baselines_hp.tex").write_text(h)
 
 
+# ---------------------------------------------------------------------------- P18: ablation
+# The component grid of CIL-CORD (main paper, tab:ablation): the ladder's clean cells, read by the
+# same loaders, one row per combination. A row renders only with its three clean seeds (rule 6).
+ABLATION = (  # (label, key, memory, blocked, deltas, true labels)
+    ("Naive", "naive", 0, 0, 0, 0),
+    ("+ memory (CoLaR)", "colar", 1, 0, 0, 0),
+    ("+ blocked readout", "nobank", 0, 1, 0, 0),
+    ("+ both (CoLaR-SBR)", "sbr", 1, 1, 0, 0),
+    ("SBR-Recall", "recall", 0, 1, 1, 0),
+    ("Relabelled memory$^{r}$", "oracle", 1, 0, 0, 1),
+    ("Joint (reference)", "joint", 0, 0, 0, 1),
+)
+
+
+def _abl_sources(key):
+    return [ORACLE_CLEAN] if key == "oracle" else [C[key][0]]
+
+
+def _abl_seeds(key, metric):
+    r, n, sfx = _abl_sources(key)[0]
+    return load_seeds(r, n, metric, sfx) if r == CLEAN else {}
+
+
+def write_ablation() -> None:
+    """tab_ablation.tex: ticks, full-label F1, AA and stored MB (as recorded) per configuration."""
+    tick = ("", "$\\checkmark$")
+    t = HDR + "\\begin{tabular}{@{}lccccccc@{}}\n\\toprule\n"
+    t += ("Configuration & Mem. & Blk. & $\\Delta$ & True & Full-label F1 & AA & MB \\\\\n"
+          "\\midrule\n")  # fmt: skip
+    for label, key, *flags in ABLATION:
+        fl, aa = _abl_seeds(key, "full_label_f1"), _abl_seeds(key, "AA")
+        if len(fl) < len(SEEDS) or len(aa) < len(SEEDS):
+            continue
+        b = set(_abl_seeds(key, "replay_memory_bytes").values())
+        mb = "--" if key == "joint" else (f"{max(b) / 1e6:.1f}" if b and max(b) else "0")
+        t += (f"{label} & " + " & ".join(tick[f] for f in flags)
+              + f" & {fmt(list(fl.values()), True)} & {fmt(list(aa.values()), True)} & {mb} \\\\\n")  # fmt: skip
+        if key in ("naive", "recall"):
+            t += "\\midrule\n"
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "tab_ablation.tex").write_text(t)
+
+
+def ablation_macros() -> str:
+    """Per-seed facts of the Ablations text (rule 7), full-label F1 unless stated; every condition
+    the prose states is checked here on every seed, both metrics where it names both."""
+    f = {k: _abl_seeds(k, "full_label_f1") for k in ("naive", "colar", "nobank", "sbr", "recall")}
+    a = {k: _abl_seeds(k, "AA") for k in ("sbr", "recall")}
+    v = {}
+    if not all(len(d) == len(SEEDS) for d in f.values()):
+        return _defs(dict.fromkeys(("nAblMemMin", "nAblMemMax", "nAblReadMin", "nAblReadMax", "nAblBothMin", "nAblBothMax", "nAblRecallMB", "nAblSbrMB"), "--"))  # fmt: skip
+    mem = [f["colar"][s] - f["naive"][s] for s in SEEDS]
+    read = [f["nobank"][s] - f["naive"][s] for s in SEEDS]
+    both = [f["sbr"][s] - f["naive"][s] for s in SEEDS]
+    v["nAblMemMin"], v["nAblMemMax"] = down1(min(mem)), up1(max(mem))
+    v["nAblReadMin"], v["nAblReadMax"] = (f"{min(read):+.1f}".replace("-", "$-$"),
+                                          f"{max(read):+.1f}")  # fmt: skip
+    v["nAblBothMin"], v["nAblBothMax"] = down1(min(both)), up1(max(both))
+    if any(b <= m + r for b, m, r in zip(both, mem, read, strict=True)):
+        _warn("memory + blocked readout is not above the sum of the two alone on every seed")
+    if any(f["recall"][s] <= f["sbr"][s] or a["recall"][s] <= a["sbr"][s] for s in SEEDS):
+        _warn("SBR-Recall is not above CoLaR-SBR on every seed under both metrics")
+    for k, nm in (("recall", "nAblRecallMB"), ("sbr", "nAblSbrMB")):
+        b = set(_abl_seeds(k, "replay_memory_bytes").values())
+        v[nm] = f"{max(b) / 1e6:.1f}" if b else "--"
+    return _defs(v)
+
+
 def main():
     cell = {k: pick(v) for k, v in C.items()}
     mix = {k: pick(v) for k, v in M.items()}
@@ -1380,6 +1448,7 @@ def main():
     v += f"\\newcommand{{\\nErCilBuf}}{{{250 if er_src and er_src[0] == CLEAN else 200}}}\n"
     v += recall_macros() + oracle_macros() + conflict_macros() + agree_macros()
     v += baseline_macros() + gap_macros() + write_mechanism() + write_dropped()
+    v += ablation_macros()
     (OUT / "vals.tex").write_text(v)
     write_ladder()
     write_beyond()
@@ -1403,6 +1472,7 @@ def main():
     (OUT / "tab_2x2.tex").write_text(t)
 
     write_main(cell, mix, dil, full)
+    write_ablation()
     write_bench()
     write_baselines()
     write_dil_grid()
