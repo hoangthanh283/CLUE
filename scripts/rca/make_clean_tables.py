@@ -639,7 +639,9 @@ def oracle_macros() -> str:
             f"{math.floor(min(nxt))}",
             f"{math.ceil(max(nxt))}",
         )
-        v["nOracleLast"] = _per_seed({s: m[-1, -1] for s, m in mats.items()}, seeds)
+        last = [mats[s][-1, -1] for s in seeds]  # R11-H1: a range, never a mean no seed reaches
+        v["nOracleLast"] = (_span(last, "{:.1f}") if len(last) == len(SEEDS)
+                            else "/".join(f"{x:.1f}" for x in last))  # fmt: skip
         if any(m[j + 1, j] <= m[j, j] for m in mats.values() for j in range(2, t - 1)):
             _warn("an oracle session 3..T-1 does not rise at the next boundary")
         f = _run_file(CLEAN, ORACLE_CLEAN[1], seeds[0], "*", "per_class_f1.json")
@@ -1082,7 +1084,7 @@ def gap_macros() -> str:
     jd = load_seeds(*chosen_source(D["joint"])[:2], suffix=chosen_source(D["joint"])[2])
     for k, nm in (("colar", "nColarDilGapMax"), ("er", "nErDilGapMax")):
         sd = load_seeds(*chosen_source(D[k])[:2], suffix=chosen_source(D[k])[2])
-        g = [jd[x] - sd[x] for x in SEEDS if x in sd and x in jd]
+        g = [abs(jd[x] - sd[x]) for x in SEEDS if x in sd and x in jd]  # R10b-L2: |gap|
         v[nm] = up1(max(g)) if len(g) == len(SEEDS) else "--"
     # R10-M2: the blocked readout shares CoLaR's freeze map (layers 1..4 and embeddings) with and
     # without the memory; its smallest diagonal over both runs and all seeds
@@ -1161,8 +1163,8 @@ BASE_INFO = {  # family, what is stored (descriptive; supp.tex App. G)
     "coda_prompt": ("Prompt, LoRA", "none (prompt pool)"),
     "cl_lora": ("Prompt, LoRA", "none (one shared adapter)"),
     "cpfd": ("Continual NER", "previous model"),
-    "is3": ("Continual NER", "previous model"),
-    "lca": ("Merging", "class Gaussians"),
+    "is3": ("Continual NER", "previous model, class prototypes"),
+    "lca": ("Merging", "per-session backbones, class Gaussians"),
 }
 FAMILY_ORDER = ("Reference", "Regularisation", "Replay", "Prompt, LoRA", "Continual NER",
                 "Merging", "This paper")  # fmt: skip
@@ -1266,28 +1268,38 @@ def write_bench() -> None:
     (OUT / "tab_bench.tex").write_text(t)
 
 
-# Baseline card (supp tab:baselines): venue from refs_precompiled.bbl; port notes from supp.tex
-# App. G; hyper-parameters as RECORDED by the CIL-CORD run the main table reads (method_hparams).
+# Baseline card (supp tab:baselines): venue from refs_precompiled.bbl; what the port keeps and
+# changes from each method file's docstring (doccl/methods/*.py) and supp.tex App. G; the
+# hyper-parameters as RECORDED by the CIL-CORD run the main table reads (method_hparams).
 CARD = (  # (label, key, venue, what our port keeps, what it changes, hparam keys shown)
-    ("ER", "er", "NeurIPS 2019", "reservoir of raw documents replayed in each step", "--",
+    ("ER", "er", "NeurIPS 2019", "reservoir buffer replayed in every step", "--",
      ("buffer_size", "replay_batch_size")),
-    ("DER++", "der_pp", "NeurIPS 2020", "replay of documents and their stored logits", "--",
+    ("DER++", "der_pp", "NeurIPS 2020", "replay of documents with labels and stored logits", "--",
      ("buffer_size", "alpha", "beta")),
-    ("LwF", "lwf", "ECCV 2016", "distillation towards the previous model", "--",
-     ("alpha", "temperature")),
-    ("CODA-Prompt", "coda_prompt", "CVPR 2023", "prompt-component pool on a frozen encoder",
-     "one growing token head", ("n_components", "prompt_length", "lambda_ortho")),
-    ("CL-LoRA", "cl_lora", "CVPR 2025", "orthogonality penalty, distillation",
-     "one shared adapter (published: shared + task-specific)",
-     ("lora_rank", "lora_alpha", "lambda_ortho", "kd_alpha", "temperature")),
-    ("CPFD", "cpfd", "EMNLP 2023", "pseudo-labels, attention and logit distillation",
-     "one growing token head (published: per-task classifiers)",
+    ("LwF", "lwf", "ECCV 2016", "distillation of the old logits towards the previous model",
+     "--", ("alpha", "temperature")),
+    ("CODA-Prompt", "coda_prompt", "CVPR 2023",
+     "attention-weighted prompt components with an orthogonality penalty, frozen encoder",
+     "prompts prepended to the input sequence (an input-prepend variant)",
+     ("n_components", "prompt_length", "lambda_ortho")),
+    ("CL-LoRA", "cl_lora", "CVPR 2025",
+     "orthogonality penalty, distillation towards the previous model",
+     "one shared rank-8 adapter retrained each session (published: random-orthogonal shared "
+     "and block-wise task-specific adapters, early-exit distillation); gradient reassignment "
+     "at scale 1, i.e.\\ off",
+     ("lora_rank", "lora_alpha", "lambda_ortho", "kd_alpha", "temperature", "shared_grad_scale")),
+    ("CPFD", "cpfd", "EMNLP 2023",
+     "confidence pseudo-labels, logit and attention-map distillation, adaptive CE factor",
+     "one growing token head (published: per-task classifiers); sample weights set to 1",
      ("distill_weight", "threshold")),
-    ("IS3", "is3", "Findings ACL 2024", "distillation on ``O'' tokens",
+    ("IS3", "is3", "Findings ACL 2024",
+     "distillation on ``O'' tokens, head-row gradient surgery, prototype replay",
      "one growing token head (published: per-task classifiers)",
      ("kd_weight", "proto_weight", "grad_weight")),
-    ("LCA", "lca", "ICLR 2026", "TIES merge, Gaussian classifier realignment", "--",
-     ("lr", "merge_method", "merge_topk", "ca_epochs", "ca_samples_per_cls")),
+    ("LCA", "lca", "ICLR 2026",
+     "per-session fine-tuning (SGD), TIES backbone merge, Gaussian classifier realignment",
+     "one growing token head (published: per-task heads); Gaussians per token class, "
+     "``O'' excluded", ("lr", "merge_method", "merge_topk", "ca_epochs", "ca_samples_per_cls")),
 )  # fmt: skip
 
 
@@ -1301,13 +1313,17 @@ def _proto(sources, dz=False) -> str:
 
 
 def write_baselines() -> None:
-    """supp_baselines.tex: one row per baseline of the comparison set."""
+    """supp_baselines.tex (what each port keeps, changes and stores) and supp_baselines_hp.tex
+    (recorded hyper-parameters, protocol and seeds per cell): two tables at natural width."""
     dzs = {k: dz for _, k, dz in BASE}
-    t = HDR + "\\begin{tabular}{@{}lll" + ">{\\raggedright\\arraybackslash}p{3.0cm}" * 2 + "l"
-    t += ">{\\raggedright\\arraybackslash}p{3.6cm}ccc@{}}\n\\toprule\n"
-    t += (" & & & & & & & \\multicolumn{3}{c}{Protocol, seeds} \\\\\n\\cmidrule(l){8-10}\n"
-          "Method & Venue & Family & Our port keeps & Our port changes & Memory & "
-          "Hyper-parameters (recorded, CIL-CORD) & CIL-CORD & Mixed & DIL \\\\\n\\midrule\n")  # fmt: skip
+    rag = ">{\\raggedright\\arraybackslash}p"
+    t = HDR + f"\\begin{{tabular}}{{@{{}}lll{rag}{{4.0cm}}{rag}{{4.6cm}}{rag}{{2.6cm}}@{{}}}}\n"
+    t += ("\\toprule\nMethod & Venue & Family & Our port keeps & Our port changes & Memory "
+          "\\\\\n\\midrule\n")  # fmt: skip
+    h = HDR + f"\\begin{{tabular}}{{@{{}}l{rag}{{9.6cm}}ccc@{{}}}}\n\\toprule\n"
+    h += (" & & \\multicolumn{3}{c}{Protocol, seeds} \\\\\n\\cmidrule(l){3-5}\n"
+          "Method & Hyper-parameters (recorded, CIL-CORD) & CIL-CORD & Mixed & DIL \\\\\n"
+          "\\midrule\n")  # fmt: skip
     for label, key, venue, keeps, changes, hkeys in CARD:
         cil = C["er"] if key == "er" else src(f"cil_cord_{key}", (RESC, f"cil_cord_{key}", ""))
         mixs = M["er"] if key == "er" else src(f"mixed_{key}", (RESC, f"mixed_{key}", ""))
@@ -1318,11 +1334,13 @@ def write_baselines() -> None:
         if "buffer_size" in hp:
             mem = f"{hp['buffer_size']} {mem}"
         dz = dzs.get(key, False)
-        t += (f"{label} & {venue} & {fam} & {keeps} & {changes} & {mem} & "
-              f"{', '.join(shown) or '--'} & {_proto(cil, dz)} & {_proto(mixs, dz)} & "
+        t += f"{label} & {venue} & {fam} & {keeps} & {changes} & {mem} \\\\\n"
+        h += (f"{label} & {', '.join(shown) or '--'} & {_proto(cil, dz)} & {_proto(mixs, dz)} & "
               f"{_proto(dils)} \\\\\n")  # fmt: skip
     t += "\\bottomrule\n\\end{tabular}\n"
+    h += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_baselines.tex").write_text(t)
+    (OUT / "supp_baselines_hp.tex").write_text(h)
 
 
 def main():
