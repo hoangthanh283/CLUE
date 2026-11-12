@@ -2015,3 +2015,219 @@ raw replay on DIL at 60 MB.
 
 - Clean CoLaR s123 (running) will switch the CoLaR AA cell to clean. Regenerate, and re-check M3 and `\nColar` (the intro and teaser use it).
 - When clean joint lands: re-check "on par" (R6), M2, M4, the precision-only sentences in Setup/App. G (then stale), and `\nOracleShare` (its denominator switches by itself).
+
+## R8 (2026-11-12): audit of P10 (`5cfef5b`): clean joint/naive/CoLaR cells, oracle wording, headline metric
+
+Snapshot: the paper files at HEAD equal `5cfef5b` (the later commit `51218a6` touches no paper
+file). Scope: `git diff 269fd11..5cfef5b -- paper_cvpr scripts/rca/make_clean_tables.py`, plus a
+full read of the new `main.tex` and the changed parts of `supp.tex`. My own script recomputed every
+number below from `results/clean_2026-11/*/metrics.json`, `matrix.npy`, `per_class_f1.json`, the
+config headers of the logs, and `results/rescore/*` matrices. I also read
+`doccl/methods/colar_r.py` and `latent_replay.py`. I ran no generator, model, dataset or pytest.
+
+**Oracle seed 7 status at audit time (07:13–07:22).** `cil_cord_colar_r_oracle_seed7` is still in
+task 0 (log at "LR T0 ep9/10"). Its run directory holds only `tb/`, so it has no metrics yet. Every
+"one seed" statement is therefore still current, and nothing newer exists to report. I judge the
+commit against the files as they were, which are also the files as they are now.
+
+### Verdict: **BLOCK** (one HIGH, text-only fix available; optional re-run is a PM decision)
+
+Every generated number recomputes exactly, and so does every changed cell and macro. Every new
+clean run is clean and complete. Every per-seed comparative sentence I was asked to check holds
+under both metrics. The headline-metric rule is applied consistently. The generator changes are
+correct. What blocks is the description of the control the paper's central claim rests on.
+Abstract, Sec. 4.2 and App. E say the stored documents are refreshed with the true labels of
+every class seen so far. In fact the code never refreshes the documents of the session that has
+just finished, and those documents carry "O" on every earlier-session entity during the whole of
+the next session. The paper's account of what stale labels remain after the refresh omits exactly
+this part. One MEDIUM (an ambiguous "below the blocked readout") and nine LOW items follow.
+
+### A. Numbers recomputed
+
+| Macro / cell | My recomputation | Rendered | OK |
+|---|---|---|---|
+| Clean protocol of the new runs | joint ×3, naive ×3, CoLaR ×3 and oracle s42: log config `amp: false`, `fp16: false`, `val_frac: 0.1`, `cil_restrict_eval: true`, `full_label_eval: true`, `epochs` 10 (joint 100); `metrics.json` `training_hparams.amp=false`; full 5×5 matrices; queue DONE lines; 0 tracebacks. Joint s42 log shows held-out early stopping (`T0 ep7 ... bad=2 -> STOP`). CoLaR s123 ran as the v4 orphan and finished at 23:36 (DONE logged). | | ✓ |
+| `\vNaive` / `\vNaiveFull` | AA 18.79/18.27/17.78 → 18.3±0.5; full 13.22/12.81/12.97 → 13.0±0.2 | same | ✓ |
+| `\vNoBank` / `Full` | 21.25/19.59/23.95 → 21.6±2.2; 8.96/11.72/13.62 → 11.4±2.3 | same | ✓ |
+| `\vColar` / `Full` | 33.59/32.44/34.42 → 33.5±1.0; 32.38/30.54/29.32 → 30.7±1.5 | same | ✓ (R7-M3 gone: one row = one set of runs) |
+| `\vSbr` / `Full` | 87.76/91.32/86.16 → 88.4±2.6; 88.83/91.19/87.13 → 89.1±2.0 | same | ✓ |
+| `\vRecall` / `Full` | 91.35/92.62/91.86 → 91.9±0.6; 91.53/93.52/92.62 → 92.6±1.0 | same | ✓ |
+| `\vJoint` / `Full` | 91.13/90.54/92.12 → 91.3±0.8; 91.70/91.80/92.38 → 92.0±0.4 | same | ✓ |
+| `tab_2x2`, CIL-CORD columns of `tab_main_clean`, teaser bars and joint line | all the values above. The teaser plots the five `*Full` macros and `\nJointFull`, and the caption says "full-label F1 (mean of three clean seeds)". | | ✓ |
+| `\nOracle` / `Full` | oracle s42 AA 65.812, full 79.091 | 65.8 / 79.1 | ✓ |
+| `\nColarSeed(Full)`, `\nJointSeed(Full)`, `\nSbrSeed(Full)` | 33.59/32.38, 91.13/91.70, 87.76/88.83 | same | ✓ |
+| "the same memory without the refresh" | the clean CoLaR s42 log config equals the oracle's except `name: colar_r`, `run_alias`, `refresh: oracle`. Matrices are identical through row 2, as expected, since the first refresh acts from session 3 on. | | ✓ |
+| `\nOracleShare` / `Full` | (65.81−33.59)/(91.13−33.59) = 56.0%; (79.09−32.38)/(91.70−32.38) = 78.7% → 79. All terms clean, seed-matched (R7-H1 follow-up done). | 56 / 79 | ✓ |
+| `\nOracleRelabel` | clean log: "refreshed 50/100/150/200 docs, 105/1019/1394/1239 tokens relabelled" | same | value ✓, wording ✗ (H1) |
+| `\nOracleLateMin/Max` | diagonal 95.43/48.51/**6.76/2.20/14.68** | 2 / 15 | ✓ |
+| `\nOracleNextMin/Max` | R[4,3] = 83.007, R[5,4] = 74.644 | 75 / 83 | L3 (74.6 is printed as "75") |
+| `\nOracleLast` / `\nOracleLastShare` | R[5,5] = 14.68. Entity support per session from `per_class_f1.json`, excluding the avg rows: 744/140/143/180/99, so the last session holds 7.6%. | 14.7 / 8 | ✓ |
+| Why AA and full-label F1 disagree (main.tex:119, supp.tex:323) | Supported by the run's own files. The entity-weighted mean of the final row is 77.3, against AA 65.8 and full-label 79.1, so weighting explains about 11.5 of the 13.3 points. Session 1 holds 57% of the entities and ends at 86.7. | | ✓ |
+| Oracle below joint and below every CoLaR-SBR seed | AA 65.8 < 91.1 and < min SBR 86.2; full 79.1 < 91.7 and < min SBR 87.1 | | ✓ |
+| `\nAgreeLowMin/Max` | AA − full: naive 5.57/5.46/4.81, no-memory 12.29/7.87/10.33 → down 4.8, up 12.3 | 4.8 / 12.3 | ✓ |
+| `\nAgreeColarMin/Max` | 1.202/1.902/5.105 → 1.2 / 5.2 | same | ✓ |
+| `\nAgreeHighMax` | max |AA − full| over SBR 1.07/0.13/0.97, Recall 0.18/0.89/0.76, joint 0.58/1.26/0.26 → 1.3 | 1.3 | ✓ |
+| Group order (main.tex:94, supp.tex:125) | s42 AA {18.8, 21.2} < 33.6 < 65.8 < {87.8, 91.4, 91.1}; full {13.2, 9.0} < 32.4 < 79.1 < {88.8, 91.5, 91.7}. s7 AA {18.3, 19.6} < 32.4 < {91.3, 92.6, 90.5}; full {12.8, 11.7} < 30.5 < {91.2, 93.5, 91.8}. s123 AA {17.8, 24.0} < 34.4 < {86.2, 91.9, 92.1}; full {13.0, 13.6} < 29.3 < {87.1, 92.6, 92.4}. "naive and no-memory SBR swap on two seeds" (s42, s7) ✓; top-group swaps are 0.2–0.8 apart ✓. | true | ✓ |
+| `\nRecallJointGap` | max over seeds and both metrics: AA +0.22/+2.08/−0.27, full −0.17/+1.72/+0.24 → up1(2.085) = 2.1 | 2.1 | ✓ "within 2.1 on every seed under either metric" |
+| `\nRecallMaxLoss/Gain`, `\recallDevMax` | unchanged runs; 0.549/2.028/1.302 (R7) | 0.6/2.1/1.4 | ✓ |
+| `\nCpfdLateMax` | rescore CPFD diagonals [93.8,0,0,0,0], [94.8,0,0,0,0] | 0.0 | ✓ |
+| `\nBaseWorstLateMax` | worst later diagonal: IS3 27.98/27.04, CODA 0.0/0.0, LCA 32.27/26.14 → max 32.27 → 32.3 | 32.3 | ✓ |
+| `\nNaiveDiagMin` | clean naive min diagonal 78.67 (s42, session 4) → 78.6 | 78.6 | ✓ |
+| "Four baselines end below naive training on every seed" | CPFD 2.7/0.0, IS3 5.6/7.7, CODA 14.0/15.9, LCA 13.7/7.0, against clean naive 18.8/18.3 (and legacy 19.0/19.1) | true | ✓ |
+| "every continual method with a shared softmax stays at or below CoLaR in AA" | max baseline seed ER 26.9 < min CoLaR 32.4 | true | ✓ (cross-protocol, favours the baselines) |
+| `\nLabelRepairMax` | now also includes the clean oracle (65.8). Max is still sliced2 s7 69.235 → 69.3, below min SBR 86.2. | 69.3 | ✓ |
+| `\nSlicedReplayGate` 39.4, `\nSlicedReplay` 42.0, `\nSlicedBoth` 60.5, `\nOracleGate` 61.2 | gate/rescore files as in R7 | same | ✓ (R7-L3 fixed) |
+| `supp_mat_colar` (now clean, 3 seeds) and `supp_vals` | mean matrix diagonal 93.9/70.8/25.8/8.4/9.2; `\colarDropOne` 93.9−72.3 = 22; `\colarLateDiagMin/Max` 8/26; `\colarMaxRise` col 3: 25.8→57.2 = 31.4 → "31" | same | ✓ (31 is a rounded-down "up to"; trivial) |
+| Fig. 4 | panel titles "CoLaR (n=3, clean)", "CoLaR-SBR (n=3, clean)", "SBR-Recall (n=3, clean)"; caption names session-restricted F1 | | ✓ (R7-L5b fixed) |
+| `supp_agree` | 19 rows = every clean CIL-CORD run with both metrics on disk (oracle under its label) | | ✓ |
+
+Rule 6: the 2×2 and its joint reference are entirely clean, three seeds each, under both metrics,
+and so are the CIL-CORD naive, CoLaR, CoLaR-SBR, SBR-Recall and joint rows of Tab. 3. No cell mixes
+protocols. The only clean single-seed value (the oracle) appears as a per-seed row in
+`tab:conflict` and as `\nOracle*` macros with `\nOracleScope`, never as a table cell. ✓
+
+### B. Findings
+
+**HIGH**
+
+- **R8-H1. The true-label refresh is not "the true labels of every class seen so far": the code never refreshes the documents stored at the boundary itself, and the paper's account of the stale labels that remain omits them.**
+  - What the code does:
+    - `LatentReplay.after_task` banks the session's 50 documents first (`latent_replay.py:335-336`). Then `CoLaRRefresh.after_task` refreshes only the documents with `n_labels < n_cur` (`colar_r.py:150-157`).
+    - A document banked in this session has `n_labels == n_cur`, so it is skipped.
+    - Its labels are the CIL-masked session labels: every out-of-session entity, *earlier ones included*, is "O" (`cord.py:283-291`; Setup, main.tex:88).
+    - So during session t+1 the 50 documents of session t are replayed with "O" on every entity of sessions 1..t−1. They are corrected only at the end of session t+1.
+    - The log confirms it: "refreshed 50/100/150/200 docs" while the memory held 100/150/200/250 (`replay_memory_bytes` 100,928,000 = 250 × 403,712).
+    - In replayed documents, stale "O" on earlier classes therefore remains on 1/2 of the memory in session 3, 1/3 in session 4 and 1/4 in session 5.
+    - The fourth refresh (1239 tokens) runs after the last session and affects no training. "Rewrites ... at the four boundaries" counts it, and the boundary after session 1 has no refresh at all.
+  - Where the paper states otherwise:
+    - abstract (main.tex:55): "a memory refreshed with the true labels of every class seen so far";
+    - intro (main.tex:65): "refreshing the stored labels with the true labels of every class seen so far";
+    - Sec. 4.2 (main.tex:119): "a document stored at session t carries 'O' on every entity introduced after t. We therefore refresh the stored labels at every boundary with the documents' true labels for every class seen so far; a refresh at a boundary cannot cover the session trained next". This names only the future-class part of the staleness that is left;
+    - main.tex:121: "The refresh removes the first pull only for the classes known at the last boundary, and current documents keep the second". The newest stored documents also keep a pull on earlier classes;
+    - "What is new" and the Conclusion: "with the true labels in the memory"; the Conclusion: "against a memory that already has the true labels"; contribution 1: "a memory with true labels shows that better memory labels alone do not close the gap";
+    - supp.tex:321: "The refresh runs at the end of each session and gives the stored documents the true labels of every class seen so far".
+  - Why HIGH:
+    - This is the control behind the paper's claim that better labels do not close the gap.
+    - As described it would be the label-side upper bound. As run it leaves 25–50% of the replayed documents stale on earlier classes in every session after the second. That is the same direction of pull as the current documents', which the paper blames for the remaining gap.
+    - The headline inference may survive (CoLaR-SBR is 8–12 points above it in full-label F1 and 20–26 in AA on every seed), but the description is factually wrong in the abstract.
+  - Fix (text, required for PASS):
+    - Abstract: "a memory whose stored documents are given the true labels of every class seen so far, from the boundary after they are stored, ...".
+    - Sec. 4.2: replace the two sentences with "A document stored at session t carries 'O' on every entity of another session, earlier or later. At the end of each session we give every document stored *before* it the true labels of all classes seen so far. The documents of the session just finished keep their own labels until the next boundary, and no refresh can cover the session trained next." Then: "The refresh rewrites 105/1019/1394 stale tokens before sessions 3 to 5 (and 1239 after the last session; seed 42)".
+    - main.tex:121: "The refresh removes the first pull for the documents stored before the last boundary ...".
+    - Soften "with the true labels in the memory" (What is new, Conclusion ×2, contribution 1) to "with true labels in the older stored documents", or to "with the memory's stale labels refreshed".
+    - supp.tex:321: the same correction as Sec. 4.2.
+  - Optional (PM decision, GPU): a complete refresh would also unmask the just-banked documents, i.e. call `oracle_refresh(..., n_cur)` on them at capture. It must be a **new mode/alias** (e.g. `refresh: oracle_full`), not an edit of `oracle`. Oracle s7 is running and s123 is queued under the current code. Editing `oracle` in place would change the experiment between seeds, because s123 would load the edited file. About 1.8 h per seed.
+
+**MEDIUM**
+
+- **R8-M1. "below the blocked readout" reads as the no-memory cell, which the oracle is far above.**
+  - Abstract (main.tex:55): "a session-blocked readout alone ... stays far below ..., and a memory refreshed ... stays below joint training and below the blocked readout, which never sees those labels". The nearest antecedent is "a session-blocked readout alone" (11.4 full-label / 21.6 AA), and the oracle is at 79.1 / 65.8.
+  - The same phrase appears in the intro (main.tex:65, "below the blocked readout introduced here"), in "What is new" (main.tex:123) and in the Conclusion (main.tex:209, "below a blocked readout that never sees them").
+  - Only main.tex:119 and 121 say "CoLaR-SBR", which is the true comparison. It holds on every seed under both metrics.
+  - This is the R7-L2 issue, fixed in one place and repeated in four.
+  - Fix: "below the same memory with the blocked readout (CoLaR-SBR), which never sees those labels".
+
+**LOW**
+
+- **R8-L1. Typed "(one seed)" will go stale by itself.** The oracle's scope is a macro (`\nOracleScope`) in Sec. 3 and Sec. 4.2. It is typed in the abstract, the intro, "What is new", the Conclusion and Limitations ("single-seed diagnostics"). When oracle s7/s123 land, the macros switch and these five do not. Also "below joint training on the same seed" then needs "seeds". Note this in the next Paper round.
+- **R8-L2. The generator will print v9's mechanism-dump runs in `tab:agree`.**
+  - v9 queues `colar_dump`, `naive_dump` and `joint_dump` (seed 42, `full_label_eval` on).
+  - `write_agree` now keeps every clean CIL-CORD run. These would appear as raw rows "colar\_dump" etc. under a caption that says "every clean-protocol CIL-CORD run": duplicate seed-42 models outside the stated groups.
+  - The cell loaders are safe: `cil_cord_naive_seed42*` does not match `cil_cord_naive_dump_seed42`.
+  - Fix: skip aliases ending in `_dump` in `write_agree`.
+- **R8-L3. `\nOracleNextMin` rounds 74.64 to "75" in "rise to 75 to 83"**, and `\nOracleLateMin/Max` and `NextMax` use plain rounding too. Use floor for the low end and ceil for the high end, as `down1`/`up1` do elsewhere ("74 to 84"), or one decimal.
+- **R8-L4. `agree_macros` does not check the sign of the "more lenient" claim.** If a future clean run makes AA − full ≤ 0 for a no-memory or CoLaR run, `\nAgreeLowMin` prints a negative or zero value under "more lenient by". Add `_warn` when `min(low) <= 0` or `min(diff['colar']) <= 0`.
+- **R8-L5. Two AA-only comparisons do not name the metric in the sentence.** main.tex:191: "On Mixed, CoLaR-SBR reaches 89.7 against 87.7 ..." and "On DIL ... (87.8, 86.2, 87.9 against 88.7)". The Scoring rule says such comparisons are "labelled so". Add "AA" once. (The abstract's first sentence carries "average F1"; the intro says "session-restricted AA".)
+- **R8-L6. Stale legacy descriptions after the switch.**
+  - The `tab:perseed` caption and the App. G "Settings" paragraph still describe "rescore = re-runs ... of CoLaR on CIL-CORD and Mixed". No CIL-CORD cell, figure or matrix reads the CoLaR rescore any more.
+  - The same paragraph lists "100 for naive, joint training" as a CIL-CORD and Mixed legacy cap, but CIL-CORD naive and joint training are now clean.
+  - Fix: write "of CoLaR on Mixed" and "on Mixed" for naive/joint. (`tab:legacyprotocol` itself is correct: Mixed only.)
+- **R8-L7. App. B's "joint training ... reads 33.3 under legacy scoring (tab:grid) and \vJoint under restricted scoring"** now sets an earlier-grid run against the clean cell, so the 58-point contrast is no longer one model scored two ways. It was not one model before either (the rescore run); the illustration still holds. Optional: "(different runs)".
+- **R8-L8 (R7-L6 still open).** The `tab:dil` caption changed only ";" to ", and". "On average" still need not scope the EWC/LwF clause, and per run that bound is 12 (R3-N4). Write "On average, replay ... and EWC and LwF stay within ten points of naive training".
+- **R8-L9 (contribution 1, main.tex:71).** "a memory with true labels shows that better memory labels alone do not close the gap" is the only place outside Limitations where the single-seed scope is missing. With H1 this needs the softer wording anyway.
+
+### C. Rule 7 on the sentences of the brief (per seed, both metrics where both are used)
+
+| Sentence | Check | Result |
+|---|---|---|
+| "on par with joint training" (abstract, SBR-Recall) | full −0.17/+1.72/+0.24, AA +0.22/+2.08/−0.27 | ✓ |
+| "within 2.1 points of joint training on every seed under either metric" | max 2.085 | ✓ |
+| "closes most of the gap, on every seed" (CoLaR-SBR, 2×2) | gap closed from CoLaR, full: 95/99/92%; AA: 94/101/90%. Final full 88.8/91.2/87.1 vs joint 91.7/91.8/92.4 | ✓ |
+| "SBR-Recall all or nearly all of it on every seed" | above | ✓ |
+| "both far closer to naive fine-tuning (13.0) than to joint training" (intro, full-label) | CoLaR 32.4/30.5/29.3 and no-memory SBR 9.0/11.7/13.6, against naive 13.2/12.8/13.0 and joint 91.7/91.8/92.4 | ✓ (R7-L1 fixed) |
+| "below joint training and below the blocked readout (one seed)" | true against CoLaR-SBR on every seed, both metrics; false against no-memory SBR | M1 |
+| "below every seed of CoLaR-SBR" (label repairs, AA) | 69.24 < 86.16 | ✓ |
+| Group-order statement | §A | ✓ |
+| "Four baselines end below naive training on every seed" + diagonal facts | §A | ✓ |
+| "Only the cell with both remedies approaches joint training, under either metric" (2×2 caption) | joint now has full-label F1 (R7-M2 resolved) | ✓ |
+
+### D. Question 4: the abstract's opening contrast
+
+- DIL pair: `\nErDil` 87.9 (86.21/88.73/88.62) against `\nJointDil` 88.7 (89.68/89.03/87.49). Both are first-grid legacy: test-split stopping, no saved config, ER 200.
+- CIL-CORD pair: `\nEr` 24.3 (26.91/22.05/24.01; rescore, 200 documents, test-split stopping, fp16 except s42) against `\nJoint` 91.3 (clean ×3). All four numbers are right.
+- "A few hundred" = 200 ✓.
+- Disclosure: the intro says "Both ER cells are legacy-protocol runs (†) that early-stop on the test split, which favours ER". `tab:dil` says all of its cells are legacy, and Setup gives the legacy precision and epoch-cap variation. The abstract carries no protocol words, which is normal for an abstract.
+- The ER cell's fp16 seeds (22.0, 24.0, against fp32 s42 26.9) may disfavour ER by a few points. That cannot close a 67-point contrast. No finding.
+
+### E. Question 5: the headline-metric rule
+
+Full-label F1 leads wherever both metrics exist:
+- abstract: SBR 89.1, Recall 92.6 against 92.0;
+- teaser (axis label and caption);
+- intro paragraph 3;
+- Sec. 4.2 (full-label first, then AA);
+- Sec. 4.3 and `tab:twobytwo` (full-label column first);
+- Experiments;
+- `tab:main` (full-label column first).
+
+AA is used on both sides wherever one side has only AA: the abstract/intro ER contrast, "at or below CoLaR in AA", Mixed, DIL, the label-repair bounds, the ablations ("21.6 AA", "82.5 AA").
+
+The Conclusion quotes no number. The only gaps are the two unlabelled sentences in L5. The rule is applied consistently. R7-M4 is resolved.
+
+### F. R7 items
+
+| R7 | Status |
+|---|---|
+| H1 ("46%") | **Fixed.** No share in the abstract. Sec. 4.2/App. E give seed-matched clean shares in both metrics (56% / 79%) with scope. `oracle_macros()` reads the clean oracle, clean CoLaR and clean joint by seed. |
+| M1 (why below naive) | **Fixed**, generated diagonals, plus the port-fidelity sentence ("not checked against their published NER numbers"). |
+| M2 (2×2 joint full-label) | **Fixed** (clean joint ×3). |
+| M3 (mixed-run CoLaR row) | **Fixed** (CoLaR clean ×3 in both metrics). |
+| M4 (primary metric) | **Fixed** (rule stated in Scoring and applied; §E). |
+| M5 ("cannot come from better labels") | **Fixed** ("In no label-side repair we ran ..."; MiB named; Limitations: MiB/SSUL not ported). H1 changes what "better labels" covered. |
+| M6 (SSUL) | **Fixed.** "also pseudo-labels the background", "SSUL is the closest", the three differences, "Unlike PLOP, CPFD and SSUL it needs no old-model pseudo-labels". |
+| L1 | **Fixed.** |
+| L2 | **Fixed** at main.tex:121 ("of CoLaR-SBR", with the protocol caveat). The same ambiguity reappears in four other places (M1). |
+| L3 | **Fixed** (rescore and gate sources named, gate pair 39.4 given). |
+| L4 | **Fixed** (generated ranges per group). |
+| L5 | **Fixed** (teaser: "mean of three clean seeds; AA and per-seed values in Tab. 2 and App. D"; Fig. 4 names session-restricted F1). |
+| L6 | **Open** (L8 above). |
+| L7a/b/c | **Fixed.** Labels added, raw-alias fallback with `_` escaped, oracle sources clean, `is not None` tests. New edge in L2. |
+| L8 | **Fixed** ("sessions 3 to 5"). |
+| L9 | Not done (optional, as declared). |
+| L10 | **Fixed in Setup** ("earlier or later"). Not carried into Sec. 4.2's description of stored-document staleness ("introduced after t"), which is where H1 bites. |
+
+**Disclosures deleted rather than moved.** Two sentences were removed, and both had become false:
+- the precision-only note on the CIL-CORD joint reference (joint is now clean);
+- "the two shared-softmax † cells of the 2×2 ran in fp16" (both are now clean).
+
+The single-seed scope of the oracle is kept (Limitations, abstract), and so is the legacy gate oracle (61.2, `tab:conflict`, `tab:legacyprotocol`). The disclosure list in R7 §C still holds otherwise. Nothing true and needed was deleted.
+
+### G. Invariants and generator review
+
+| Check | Result |
+|---|---|
+| Build | PASS. From `git archive 5cfef5b paper_cvpr` in my scratchpad: `latexmk -pdf` main exit 0 (4 runs), supp exit 0. 0 undefined references or citations in either log; 0 "??" in either PDF. The pdftotext of each rebuild is byte-identical to the committed `main.pdf` / `supp.pdf`. |
+| Pages | `main.pdf` 10 pp. Body: the left column of p. 8 ends with Cost and the start of Limitations. The right column continues Limitations, then the Conclusion, then "References" begins in the **right column of p. 8**. pp. 9–10 are references only, with no float or body text after p. 8. `supp.pdf` 16 pp. |
+| `---` / em-dash | 0 in every tracked `paper_cvpr/*.tex` and `fig/*.tex`; 0 em-dashes in either PDF. |
+| Anonymity | 0 hits for doccl / results/ / scripts/ / .py / clean_2026 / _seed / author or institution names in either PDF; the PDF Author field is empty. |
+| Appendix cross-references | Supp sections A Setup, B Scoring, C Method, D Extended results, E Conflict, F Drift, G Baselines/protocols, H Reproducibility. Every body pointer (A×1, B×1, C×5, D×5, E×4, F×5, G×5, H×1) targets the right section. "Tab. 3 of the main paper" = `tab:main` ✓. |
+| `oracle_macros()` | Correct. It uses clean runs only. Seeds are the intersection with clean CoLaR, joint and SBR, in both metrics. It prints the mean only at n = 3, else per-seed, and `\nOracleScope` names the seeds. Shares are seed-matched and per-seed (a range at n = 3). It warns if any seed is not below joint and below *every* CoLaR-SBR seed under both metrics, and if session 3..T−1 does not rise at the next boundary. The entity share excludes the avg rows. The relabel counts come from the seed-42 log, and the paper says "(seed 42)". The `--` defaults keep the build alive with no clean oracle. (The rounding of the ranges is L3.) |
+| Warning logic | `conflict_macros`: warns if any label repair reaches the minimum CoLaR-SBR seed. `baseline_macros`: warns if any seed of a sub-naive baseline reaches the *minimum* naive seed, which is stricter than per seed. `agree_macros`: the group-order check inserts the oracle between CoLaR and the top group, drops empty groups and compares max(lower) < min(upper) per seed and metric. This is correct and matches the prose. It does not check the "lenient" sign (L4). Every check passes on the current files by my recomputation. |
+| Unlabelled-alias fallback | `ROW_LABEL.get(alias, alias).replace("_", "\\_")`: builds safely. The silent drop (R7-L7a) is gone. The v9 dump aliases are L2. |
+| `nErCilBuf` | 250 only when the ER cell's chosen source is clean (ER-250), else 200; it renders 200 ✓. |
+| `_per_seed`, `_span`, `down1` | correct; `down1` = floor(10x + 1e-9)/10 mirrors `up1`. |
+
+### OPEN (not counted)
+
+- When oracle s7/s123 land: regenerate, re-check `\nOracleScope`, the shares (a range at n = 3), "below joint training on the same seed", the group-order warning, and the five typed "(one seed)" (L1).
+- If the PM queues a complete refresh (H1, optional), compare it with `oracle` on the same seeds before any wording claims a label-side upper bound.
