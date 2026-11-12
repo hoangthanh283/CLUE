@@ -30,23 +30,25 @@
 \node[cell] (ma) at (0.88,0.95) {\makebox[0.90cm]{menu.$\ast$}};
 \node[bg] (oa) at (ma.east) {\makebox[0.40cm]{O}};
 \node[cell] (ta) at (oa.east) {\makebox[0.90cm]{total.$\ast$}};
-\draw[->, st] (1.30,1.58) -- (oa.north west);
-\draw[->, cu] (2.95,1.58) -- (oa.north east);
+\draw[->, st] (1.30,1.62) -- (oa.north west);
+% the current document's arrow leaves its own "O" (row 4.50) and passes right of its total_price
+\draw[->, cu] (3.12,2.12) .. controls (4.05,2.15) and (4.00,1.40) .. (oa.north east);
 \node[anchor=north, align=center, inner sep=1pt] at (1.90,0.68)
   {one background logit, trained by both;\\each ``O'' counts against every class};
 % ==== (b) one background per session: each document trains only the block it annotates
 \def\bx{4.20}
 \node[anchor=west, font=\scriptsize\bfseries] at (\bx,3.08) {(b) one background per session};
 \labtab{\bx}
-\node[bg] (o1) at (\bx+0.55,0.95) {\makebox[0.40cm]{O$_1$}};
-\node[cell] (m1) at (o1.east) {\makebox[0.90cm]{menu.$\ast$}};
-\node[bg] (o5) at (\bx+2.20,0.95) {\makebox[0.40cm]{O$_5$}};
-\node[cell] (t5) at (o5.east) {\makebox[0.90cm]{total.$\ast$}};
-\draw[->, st] (\bx+1.30,1.58) -- (\bx+1.30,1.15);
-\draw[->, cu] (\bx+2.95,1.58) -- (\bx+2.95,1.15);
+% blocks 1 and 5 shown; each arrow lands on its block's own background logit
+\node[bg] (o1) at (\bx+0.30,0.95) {\makebox[0.40cm]{O$_1$}};
+\node[cell] (m1) at (o1.east) {\makebox[1.0cm]{s1 tags}};
+\node[bg] (o5) at (\bx+2.05,0.95) {\makebox[0.40cm]{O$_5$}};
+\node[cell] (t5) at (o5.east) {\makebox[1.0cm]{s5 tags}};
+\draw[->, st] (1.30+\bx,1.62) -- (o1.north);
+\draw[->, cu] (\bx+3.12,2.12) .. controls (\bx+4.05,2.15) and (\bx+4.00,1.40) .. (o5.north);
 \node[anchor=north, align=center, inner sep=1pt] at (\bx+1.90,0.68)
   {block $b$ learns only from documents that\\annotate it; ``O'' counts against its classes};
 \end{tikzpicture}
-\caption{\textbf{The background conflict on one receipt line.} A receipt stored in session~1 labels the total ``O''; a current receipt of session~5 labels the item price ``O''. (a) With one shared softmax both ``O'' labels train the same background logit, against every class. (b) With one background per session, an ``O'' is evidence only against the classes its annotator could see.}
+\caption{\textbf{The background conflict on one pair of price tokens.} A receipt stored in session~1 labels its total ``O''; a current receipt of session~5 labels its item price ``O''. (a) With one shared softmax both ``O'' labels train the same background logit, against every class. (b) With one background per session (blocks 1 and 5 shown, each with its session's tags), an ``O'' is evidence only against the classes its annotator could see.}
 \label{fig:conflict}
 \end{figure}

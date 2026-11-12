@@ -424,28 +424,54 @@ def write_delta():
     (OUT / "supp_delta.tex").write_text(t)
 
 
-DROPPED = (("EWC", "ewc"), ("L2P", "l2p"), ("DualPrompt", "dualprompt"), ("O-LoRA", "o_lora"),
-           ("ER + C-Flat++", "er_cflat"))  # fmt: skip
+# R10-H1: er_cflat ran with cflat_lambda = 0 (configs/method/er_cflat.yaml), i.e. ER + SAM; the
+# O-LoRA rows predate the fix of the port's orthogonality penalty (c974159), so they are left out.
+DROPPED = (("EWC", "ewc"), ("L2P", "l2p"), ("DualPrompt", "dualprompt"), ("ER with SAM", "er_cflat"))
 DROPPED_REF = (("Naive (reference)", "naive"), ("ER (kept)", "er"))
+UNLEARNED_F1 = 1.0  # a session whose own diagonal F1 stays below this was never learned
 
 
-def write_dropped():
-    """R9-H2: the first CIL-CORD grid (results/cil_cord_<m>_seed<s>, LayoutLMv3, legacy scoring)
-    for the methods dropped when the comparison set was fixed, per seed, beside naive and ER of
-    the same grid. The text says every dropped seed is below every naive seed: checked here."""
-    t = HDR + "\\begin{tabular}{lccc}\n\\toprule\nMethod & 42 & 7 & 123 \\\\\n\\midrule\n"
-    vals = {}
+def _sessions(u: list[int]) -> str:
+    """[4, 5] -> "4--5" (contiguous), [3] -> "3", [] -> "none"."""
+    if not u:
+        return "none"
+    if len(u) > 1 and u == list(range(u[0], u[-1] + 1)):
+        return f"{u[0]}--{u[-1]}"
+    return ",".join(map(str, u))
+
+
+def write_dropped() -> str:
+    """R9-H2 / R10-M3: the first CIL-CORD grid (results/cil_cord_<m>_seed<s>, LayoutLMv3, raw
+    scoring) for the methods dropped when the comparison set was fixed: AA per seed and the
+    sessions never learned (own diagonal below UNLEARNED_F1), beside naive and ER of the same grid.
+    Returns the macros the text uses, after checking what it says: EWC, L2P and DualPrompt leave
+    at least the last two sessions unlearned on every seed; ER with SAM stays within
+    \\nSamErGapMax AA of ER on every seed."""
+    t = HDR + "\\begin{tabular}{lcccc}\n\\toprule\n"
+    t += " & \\multicolumn{3}{c}{AA, seed} & Unlearned sessions \\\\\n\\cmidrule(lr){2-4}\n"
+    t += "Method & 42 & 7 & 123 & (seeds 42 / 7 / 123) \\\\\n\\midrule\n"
+    vals, unl = {}, {}
     for label, key in DROPPED_REF + DROPPED:
         vals[key] = load_seeds("results", f"cil_cord_{key}", suffix="")
+        mats = {sd: np.load(f) for sd in SEEDS
+                if (f := _run_file("results", f"cil_cord_{key}", sd, "", "matrix.npy"))}  # fmt: skip
+        unl[key] = {sd: [j + 1 for j in range(m.shape[0]) if m[j, j] < UNLEARNED_F1]
+                    for sd, m in mats.items()}  # fmt: skip
+        cell = " / ".join(_sessions(unl[key][sd]) if sd in unl[key] else "--" for sd in SEEDS)
         t += f"{label} & " + " & ".join(
-            f"{vals[key][s]:.1f}" if s in vals[key] else "--" for s in SEEDS) + " \\\\\n"  # fmt: skip
+            f"{vals[key][s]:.1f}" if s in vals[key] else "--" for s in SEEDS) + f" & {cell} \\\\\n"  # fmt: skip
         if key == "er":
             t += "\\midrule\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_dropped.tex").write_text(t)
-    drop = [x for _, k in DROPPED for x in vals[k].values()]
-    if not vals["naive"] or not drop or max(drop) >= min(vals["naive"].values()):
-        _warn("a dropped method reaches a naive seed on the first CIL-CORD grid (H2 disclosure)")
+    for k in ("ewc", "l2p", "dualprompt"):
+        if len(unl[k]) < len(SEEDS) or any(not {4, 5} <= set(u) for u in unl[k].values()):
+            _warn(f"{k} learns one of the last two sessions on some seed (dropped-methods sentence)")
+    sam, er = vals["er_cflat"], vals["er"]
+    gaps = [abs(sam[s] - er[s]) for s in SEEDS if s in sam and s in er]
+    if len(gaps) < len(SEEDS):
+        _warn("ER with SAM or ER lacks a seed (dropped-methods sentence)")
+    return _defs({"nSamErGapMax": up1(max(gaps)) if gaps else "--"})
 
 
 def write_supp_vals():
@@ -497,7 +523,6 @@ def write_supp():
     write_agree()
     write_slot()
     write_delta()
-    write_dropped()
 
 
 def _clean(k, key="AA"):
@@ -779,39 +804,52 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
 
 
 def _gap_share(a: dict, lo: dict, hi: dict) -> list[float]:
-    """Per seed (seeds in all three): share of the lo -> hi gap that ``a`` covers."""
-    return [(a[s] - lo[s]) / (hi[s] - lo[s]) for s in SEEDS if s in a and s in lo and s in hi]
+    """Per seed: share of the lo -> hi gap that ``a`` covers. Raises KeyError when any of the
+    three lacks a seed, so a verdict check can never pass on missing data (R10-L6)."""
+    return [(a[s] - lo[s]) / (hi[s] - lo[s]) for s in SEEDS]
+
+
+def _every(conds: list[bool], n: int) -> bool:
+    """True only when exactly ``n`` conditions were evaluated and all hold (no vacuous all([]))."""
+    return len(conds) == n and all(conds)
 
 
 def verdict_ok(key: str, verdict: str) -> bool | None:
     """R9-L7: the per-seed condition behind every typed verdict word (None: no check exists).
-    Every condition must hold on every seed, under both metrics where both exist."""
+    Every condition must hold on every seed, under both metrics where both exist; a missing seed
+    or value fails the check (R10-L6). ``open`` claims nothing, so its check is True by design."""
     m2 = ("AA", "full_label_f1")
     c = {k: [_clean(k, m) for m in m2] for k in ("naive", "colar", "sbr", "nobank", "recall", "joint")}
     orc = [load_seeds(*ORACLE_CLEAN[:2], key=m, suffix="*") for m in m2]
     mix = {k: load_seeds(*s[:2], suffix=s[2]).get(42) for k, s in
            (("nomem", MIX_RECALL_NOMEM), ("mem", MIX_RECALL_MEM))}  # fmt: skip
-    i = (0, 1)
+    i, n3 = (0, 1), 2 * len(SEEDS)  # two metrics x three seeds
     checks = {
-        ("colar", "refutes"): lambda: all(x < 0.5 for j in i for x in
-                                          _gap_share(c["colar"][j], c["naive"][j], c["joint"][j])),
+        ("colar", "refutes"): lambda: _every([x < 0.5 for j in i for x in
+                                              _gap_share(c["colar"][j], c["naive"][j], c["joint"][j])], n3),
         ("er", "refutes"): lambda: max(pick(C["er"])[0]) < min(pick(C["colar"])[0]),
-        ("oracle", "partly"): lambda: bool(orc[0]) and all(
-            c["colar"][j][s] < orc[j][s] < c["joint"][j][s] for j in i for s in orc[j]),
-        ("sliced2", "open"): lambda: True,  # legacy, cross-protocol: no verdict is claimed
-        ("sbr", "supports"): lambda: all(x >= 0.5 for j in i for x in
-                                         _gap_share(c["sbr"][j], c["colar"][j], c["joint"][j]))
-        and all(min(c["sbr"][j].values()) > max(orc[j].values(), default=-1) for j in i),
-        ("nobank", "supports"): lambda: all(x < 0.5 for j in i for x in
-                                            _gap_share(c["nobank"][j], c["naive"][j], c["joint"][j])),
-        ("recall", "supports"): lambda: all(abs(c["recall"][j][s] - c["joint"][j][s]) < 3
-                                            for j in i for s in c["recall"][j] if s in c["joint"][j]),
+        ("oracle", "partly"): lambda: _every(
+            [c["colar"][j][s] < orc[j][s] < c["joint"][j][s] for j in i for s in orc[j]],
+            len(orc[0]) + len(orc[1])) and bool(orc[0]) and bool(orc[1]),
+        ("sliced2", "open"): lambda: True,  # legacy, cross-protocol: "open" claims no outcome
+        ("sbr", "supports"): lambda: _every([x >= 0.5 for j in i for x in
+                                             _gap_share(c["sbr"][j], c["colar"][j], c["joint"][j])], n3)
+        and all(orc[j] and min(c["sbr"][j].values()) > max(orc[j].values()) for j in i),
+        ("nobank", "supports"): lambda: _every([x < 0.5 for j in i for x in
+                                                _gap_share(c["nobank"][j], c["naive"][j], c["joint"][j])], n3),
+        ("recall", "supports"): lambda: _every([abs(c["recall"][j][s] - c["joint"][j][s]) < 3
+                                                for j in i for s in SEEDS], n3),
         ("mix_nomem", "supports"): lambda: mix["nomem"] < mix["mem"]
         and mix["nomem"] < min(pick(M["sbr"])[0]),
         ("mix_mem", "supports"): lambda: mix["mem"] > mix["nomem"],
     }  # fmt: skip
     f = checks.get((key, verdict))
-    return None if f is None else bool(f())
+    if f is None:
+        return None
+    try:
+        return bool(f())
+    except (KeyError, ValueError, TypeError):  # a missing seed / value: the verdict is not shown
+        return False
 
 
 def write_ladder() -> None:
@@ -924,11 +962,15 @@ def write_mechanism() -> str:
         if s is None:
             continue
         st[method] = s
+        # FP a lower bound (per-class reports): precision an upper bound, rounded up; the caption
+        # states it for the shared-softmax columns (every one of them has p_upper)
         p = _rng(s["precision"], upper=s["p_upper"])
-        if s["p_upper"] and p:  # FP a lower bound (per-class reports): precision an upper bound
-            p = "$\\le$" + p
+        if s["p_upper"] != (readout == "shared"):
+            _warn(f"{method}: precision bound status differs from the Table 2 caption")
         cols.append((label, readout, [f"${s['n']}$", _rng(s["recall"]), p,
-                     _rng(s["indicator"], True), _rng(s.get("owner", []), True),
+                     # R10-L2: the indicator only where no per-token split exists (else clipped 0)
+                     "" if "share_to_O" in s else _rng(s["indicator"], True),
+                     _rng(s.get("owner", []), True),
                      _rng(s.get("share_to_O", []), True),
                      _rng(s.get("share_to_same_session", []), True),
                      _rng(s.get("share_to_other_session", []), True),
@@ -940,10 +982,11 @@ def write_mechanism() -> str:
           f"\\multicolumn{{{n_bl}}}{{c}}{{Blocked readout}} \\\\\n"
           f"\\cmidrule(lr){{2-{1 + n_sh}}}\\cmidrule(l){{{2 + n_sh}-{1 + len(cols)}}}\n")  # fmt: skip
     t += " & " + " & ".join(c[0] for c in cols) + " \\\\\n\\midrule\n"
-    names = ("seeds $n$", "spans: R", "\\quad P", "\\quad missed at O$^{i}$", "tokens: owner",
-             "\\quad wrong $\\to$ O", "\\quad $\\to$ same session", "\\quad $\\to$ other session",
-             "false claims")  # fmt: skip
+    names = ("$n$", "R", "P", "O$^{i}$", "owner", "$\\to$O", "$\\to$same", "$\\to$other",
+             "false")  # fmt: skip
     for i, name in enumerate(names):
+        if i in (1, 4):  # spans block (R, P, O^i), then tokens block (owner ... false)
+            t += "\\midrule\n"
         t += name + " & " + " & ".join(c[2][i] for c in cols) + " \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_mech.tex").write_text(t)
@@ -1036,6 +1079,16 @@ def gap_macros() -> str:
     er, co = pick(C["er"])[0], pick(C["colar"])[0]
     if er and co and max(er) >= min(co):
         _warn("an ER seed reaches a CoLaR seed (H0 'raw is no better')")
+    # R10-L1: DIL "within X of joint training on every seed", seed-matched, from the DIL sources
+    jd = load_seeds(*chosen_source(D["joint"])[:2], suffix=chosen_source(D["joint"])[2])
+    for k, nm in (("colar", "nColarDilGapMax"), ("er", "nErDilGapMax")):
+        sd = load_seeds(*chosen_source(D[k])[:2], suffix=chosen_source(D[k])[2])
+        g = [jd[x] - sd[x] for x in SEEDS if x in sd and x in jd]
+        v[nm] = up1(max(g)) if len(g) == len(SEEDS) else "--"
+    # R10-M2: the blocked readout shares CoLaR's freeze map (layers 1..4 and embeddings) with and
+    # without the memory; its smallest diagonal over both runs and all seeds
+    diag = [np.diag(m).min() for k in ("sbr", "nobank") for m in matrices(C[k])]
+    v["nSbrDiagMin"] = down1(min(diag)) if diag else "--"
     return _defs(v)
 
 
@@ -1114,7 +1167,7 @@ def main():
     er_src = chosen_source(C["er"])  # the CIL-CORD ER buffer the \nEr cell was trained with
     v += f"\\newcommand{{\\nErCilBuf}}{{{250 if er_src and er_src[0] == CLEAN else 200}}}\n"
     v += recall_macros() + oracle_macros() + conflict_macros() + agree_macros()
-    v += baseline_macros() + gap_macros() + write_mechanism()
+    v += baseline_macros() + gap_macros() + write_mechanism() + write_dropped()
     (OUT / "vals.tex").write_text(v)
     write_ladder()
     write_beyond()
@@ -1157,7 +1210,10 @@ def main():
         mm = pick(src(f"mixed_{key}", (RESC, f"mixed_{key}", "")), drop_zero=dz)
         dd = pick(src(f"dil_{key}", ("results", f"dil_{key}", "")))
         ff = pick_clean_only(src(f"cil_cord_{key}"), "full_label_f1")
-        t += row(label, fmt(*cc), fmt(*ff, show_n=True), fmt(*mm), fmt(*dd))
+        # R10-H1: the first-grid DIL CL-LoRA runs (06-18/19) predate the fix of the port's
+        # orthogonality penalty (c974159, 06-24): mark p
+        t += row(label, fmt(*cc), fmt(*ff, show_n=True), fmt(*mm),
+                 fmt(*dd, mark="p" if key == "cl_lora" and not dd[1] else ""))
     t += "\\midrule\n"
     t += row("CoLaR", fmt(*cell["colar"]), fl("colar"), fmt(*mix["colar"]), fmt(*dil["colar"]))
     t += row(
