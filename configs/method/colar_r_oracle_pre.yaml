@@ -1,0 +1,16 @@
+name: colar_r
+run_alias: colar_r_oracle_pre
+# CoLaR + ORACLE label refresh applied BEFORE each session as well (D17): while session t
+# trains, every stored document carries its true labels for all classes of sessions 0..t.
+# Otherwise identical to colar_r_oracle.yaml ("refreshed at the boundary"). Headline recipe
+# k=4 / d=50 / r=128 via CLI override.
+refresh: oracle
+refresh_before_task: true
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64

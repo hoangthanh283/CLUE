@@ -195,3 +195,59 @@ def test_sliced_pseudo_slices_loss_and_refreshes_with_candidate_count():
     with patch.object(CoLaR, "_replay_forward", lambda self, r: out):
         got = m._replay_forward({"labels": torch.tensor([[0]]), "n_labels": torch.tensor([2])})
     assert abs(got.loss.item() - torch.log(torch.tensor(2.0)).item()) < 1e-5
+
+
+def _labels_during_each_session(pre: bool) -> list[list[list[int]]]:
+    """3 CIL sessions introducing classes 1, 2, 3; every page holds one entity of each. Returns,
+    per session t, the labels every stored document carries WHILE session t trains."""
+
+    def fake_init(method, _model, _config):
+        method.store = []
+        method.model = type("M", (), {"label_to_id": {}})()
+
+    with patch.object(CoLaR, "__init__", fake_init):
+        m = CoLaRRefresh(None, {"refresh": "oracle", "refresh_before_task": pre})
+    seen = []
+
+    def fake_after(self, task, _loader):  # capture: this session's CIL-masked labels
+        s = task.task_id
+        self.store.append(
+            {
+                "labels": torch.tensor([s + 1 if c == s + 1 else 0 for c in (1, 2, 3, 0)]),
+                "labels_full": torch.tensor([1, 2, 3, 0], dtype=torch.int16),
+                "n_labels": torch.tensor(len(self.model.label_to_id)),
+            }
+        )
+
+    with (
+        patch.object(CoLaR, "before_task", lambda self, _t, _l: None),
+        patch.object(CoLaR, "after_task", fake_after),
+    ):
+        for t in range(3):
+            task = type("T", (), {"task_id": t})()
+            m.model.label_to_id = {i: i for i in range(t + 2)}  # head after expansion
+            m.before_task(task, None)
+            seen.append([d["labels"].tolist() for d in m.store])  # = what session t replays
+            m.after_task(task, None)
+    return seen
+
+
+def test_boundary_refresh_leaves_the_newest_bank_and_the_current_classes_stale():
+    seen = _labels_during_each_session(pre=False)
+    assert seen[1] == [[1, 0, 0, 0]]  # session-1 class O on the session-0 page
+    # session 2: page 0 refreshed at the end of session 1 (classes 1, 2); page 1 never refreshed
+    assert seen[2] == [[1, 2, 0, 0], [0, 2, 0, 0]]
+
+
+def test_pre_session_refresh_gives_every_stored_page_all_classes_up_to_the_current_session():
+    seen = _labels_during_each_session(pre=True)
+    assert seen[0] == []
+    assert seen[1] == [[1, 2, 0, 0]]
+    assert seen[2] == [[1, 2, 3, 0], [1, 2, 3, 0]]
+
+
+def test_pre_session_refresh_requires_oracle():
+    import pytest
+
+    with patch.object(CoLaR, "__init__", lambda m, _a, _b: None), pytest.raises(ValueError):
+        CoLaRRefresh(None, {"refresh": "pseudo", "refresh_before_task": True})
