@@ -1,4 +1,4 @@
-\begin{thebibliography}{62}
+\begin{thebibliography}{63}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -257,6 +257,15 @@ Michael McCloskey and Neal~J. Cohen.
   learning problem.
 \newblock \emph{Psychology of Learning and Motivation}, 24:\penalty0 109--165,
   1989.
+
+\bibitem[McDonnell et~al.(2023)McDonnell, Gong, Parvaneh, Abbasnejad, and
+  van~den Hengel]{mcdonnell2023ranpac}
+Mark~D. McDonnell, Dong Gong, Amin Parvaneh, Ehsan Abbasnejad, and Anton
+  van~den Hengel.
+\newblock {RanPAC}: Random projections and pre-trained models for continual
+  learning.
+\newblock In \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, 2023.
 
 \bibitem[Minouei et~al.(2022)Minouei, Hashmi, Soheili, Afzal, and
   Stricker]{minouei2022table}

@@ -33,7 +33,7 @@ ROWS = [
     ("RanPAC (2023)", "{sc}_ranpac_seed{sd}_vit", "base"),
     ("LCA (2026)", "{sc}_lca_seed{sd}_vit", "base"),
     (
-        "\\textbf{Latent memory, 500/class (ours, uncompressed)}",
+        "\\textbf{Latent memory, 500/session (ours, uncompressed)}",
         "{sc}_bank500_seed{sd}_vit_k4_d500",
         "ours",
     ),
@@ -97,8 +97,8 @@ OUT_PROBE = ROOT / "paper_cvpr" / "tab_probe_decomp.tex"
 # ponytail: the *_lexslot_seed42 probes exist too but were taken on the buffer-free LexSlot run,
 # not the `_off` run behind the LexSlot row in tab:main, so they are left out of the paper.
 PROBE_CELLS = [  # (label, run dir) -- Pass 2b, seed 42
-    ("CIFAR-100, latent memory", "cil_cifar100_rcaBank_seed42_vit"),
-    ("ImageNet-R, latent memory", "cil_imagenet_r_colar_pp_seed42_vit"),
+    ("CIFAR-100, latent-memory run$^{v}$", "cil_cifar100_rcaBank_seed42_vit"),
+    ("ImageNet-R, CoLaR run$^{v}$", "cil_imagenet_r_colar_pp_seed42_vit"),
     ("DIL, CoLaR", "dil_colar_pp_seed42"),
     ("CIL-CORD, CoLaR", "cil_cord_colar_pp_seed42"),
     ("Mixed, CoLaR", "mixed_colar_pp_seed42"),
@@ -237,6 +237,20 @@ def write_vals() -> None:
         t += f"\\newcommand{{\\img{k}MB}}{{{max(b) / 1e6:,.0f}}}\n".replace(",", "{,}")
         if len(b) > 1:
             _warn(f"{k}: replay_memory_bytes differs across runs")
+    # R13-M2: ER's buffer as implemented (doccl/methods/buffer.py stores each batch tensor; the
+    # vision transform yields float32 pixel_values at the Resize size of doccl/data/vision.py, plus
+    # one int64 label): bytes = buffer_size x (3 x H x W x 4 + 8), with buffer_size as recorded.
+    import re
+
+    size = re.search(r"Resize\(\((\d+), (\d+)\)\)", (ROOT / "doccl/data/vision.py").read_text())
+    h, w = int(size.group(1)), int(size.group(2))
+    bufs = {(json.loads((RES / VAL_RUNS["ErTwoK"].format(sc=sc, sd=sd) / "metrics.json").read_text())
+             ["method_hparams"]["buffer_size"]) for sc in SCEN for sd in SEEDS}  # fmt: skip
+    if len(bufs) != 1:
+        _warn("ER-2000 runs record different buffer sizes")
+    er_mb = bufs.pop() * (3 * h * w * 4 + 8) / 1e6
+    t += f"\\newcommand{{\\imgErTwoKMB}}{{{er_mb:,.0f}}}\n".replace(",", "{,}")
+    t += f"\\newcommand{{\\imgSide}}{{{h}}}\n"
     OUT_VALS.write_text(t)
 
 
@@ -261,7 +275,7 @@ def main() -> None:
         lines.append(f"{label} & " + " & ".join(cell(tm[sc], sc) for sc in SCEN) + " \\\\")
         if group == "ours" and label.startswith("\\textbf{CoLaR"):
             lines.append(
-                "Ridge readout on the latent-memory trunk (probe, seed 42) & "
+                "Ridge readout on a seed-42 variant run$^{v}$ (probe) & "
                 + " & ".join(probe_cell(sc) for sc in SCEN)
                 + " \\\\"
             )
