@@ -587,6 +587,12 @@ def selfcheck(cells, cols, pts, means, dots, traj, counts, spans, perclass) -> N
                 for k in ("to_O", "to_same_session", "to_other_session"):
                     assert abs(fr[k][i] / wrong - s[f"share_{k}"][i]) < 1e-9, (c["method"], k)
     CHECKS.append(f"F2(b): {len(cols)} columns = mechanism_analysis.json (tab:mech)")
+    # P14b: the seed-42 dump re-runs feed only the per-class figure, never a cell, range or mean
+    assert not any(c["method"].endswith("_dump") for c in cols)
+    assert not any(r[1].endswith("_dump") for r in MECH_ROWS)
+    for k in set(STAB_KEYS) | set(HEAT_KEYS) | set(DOT_KEYS) | set(TRAJ_KEYS):
+        assert not any("dump" in s[1] for s in _sources(k)), k
+    CHECKS.append("dump re-runs: absent from every table-backed figure")
     by_run = {(r["method"], r["seed"]): r["aa_vs_full"] for r in res["runs"].values()}
     meth = {"naive": "naive", "nobank": "colar_sbr_noreplay", "colar": "colar",
             "oracle": "colar_r_oracle", "sbr": "colar_sbr", "recall": "colar_sbr_recall_r64",
