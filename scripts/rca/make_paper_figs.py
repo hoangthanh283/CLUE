@@ -730,7 +730,7 @@ IMG_STYLE = {  # key of make_image_table.VAL_RUNS -> (label, colour); one colour
     "ErTwoK": ("ER, 2,000", "#F0E442"), "DerTwoK": ("DER++, 2,000", "#DDCC77"),
     "Coda": ("CODA-Prompt", "#AA4499"), "Cllora": ("CL-LoRA", "#882255"),
     "Slca": ("SLCA", "#332288"), "Ranpac": ("RanPAC", "#88CCEE"), "Lca": ("LCA", "#44AA99"),
-    "Bank": ("Latent memory", "#CC6677"), "Colar": ("CoLaR", "#D55E00"),
+    "Bank": ("Latent memory", "#999933"), "Colar": ("CoLaR", "#D55E00"),
     "ErTwoH": ("ER, 200", "#F0E442"), "DerTwoH": ("DER++, 200", "#DDCC77"),
     "Joint": ("Joint training", "#000000"),
 }  # fmt: skip
