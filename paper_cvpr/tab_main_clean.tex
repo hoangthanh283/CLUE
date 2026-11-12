@@ -14,12 +14,12 @@ Replay & ER (2019) & 200 raw documents & shared & -- & $24.3{\pm}2.4^{\dagger}$ 
  & DER++ (2020) & 200 raw documents + logits & shared & -- & $20.4{\pm}1.4^{\dagger}$ & $75.1/74.0^{\dagger}$ & $88.0{\pm}0.9^{\dagger}$ \\
 \midrule
 Prompt, LoRA & CODA-Prompt (2023) & none (prompt pool) & shared & -- & $14.0/15.9^{\dagger}$ & $12.1/10.6^{\dagger}$ & $32.5{\pm}1.2^{\dagger}$ \\
- & CL-LoRA (2025) & none (one shared adapter) & shared & -- & $18.7/18.6^{\dagger}$ & $45.7/43.9^{\dagger}$ & $41.1{\pm}0.3^{\dagger,p}$ \\
+ & CL-LoRA (2025) & previous model, past adapter matrices & shared & -- & $18.7/18.6^{\dagger}$ & $45.7/43.9^{\dagger}$ & $41.1{\pm}0.3^{\dagger,p}$ \\
 \midrule
 Continual NER & CPFD (2023) & previous model & shared & -- & $2.7/0.0^{\dagger}$ & $0.3/15.1^{\dagger}$ & $6.1{\pm}7.3^{\dagger}$ \\
  & IS3 (2024) & previous model, class prototypes & shared & -- & $5.6/7.7^{\dagger}$ & $0.0/40.6^{\dagger}$ & $38.3^{\dagger}$ \\
 \midrule
-Merging & LCA (2026) & per-session backbones, class Gaussians & shared & -- & $13.7/7.0^{\dagger}$ & $38.0/36.4^{\dagger}$ & $43.9{\pm}2.5^{\dagger}$ \\
+Merging & LCA (2026) & base and per-session backbones, class Gaussians & shared & -- & $13.7/7.0^{\dagger}$ & $38.0/36.4^{\dagger}$ & $43.9{\pm}2.5^{\dagger}$ \\
 \midrule
 This paper & CoLaR & 50 docs/session, rank-128 layer-4 latents (100.7\,MB) & shared & $30.7{\pm}1.5$ & $33.5{\pm}1.0$ & $75.6/74.6^{\dagger}$ & $87.8{\pm}0.5^{\dagger}$ \\
  & \textbf{CoLaR-SBR} & 50 docs/session, rank-128 layer-4 latents (100.7\,MB) & blocked & $89.1{\pm}2.0$ & $88.4{\pm}2.6$ & $\mathbf{89.8/89.6}^{\dagger}$ & $86.2{\pm}1.3^{\dagger}$ \\

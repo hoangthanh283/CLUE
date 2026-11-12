@@ -591,18 +591,19 @@ ER with SAM & $88.4\pm0.1$ & $-1.8\pm0.6$ & $78.3\pm0.4$ & $-2.2\pm0.1$ \\
 \setlength{\tabcolsep}{6pt}
 \caption{\textbf{Settings of the legacy-protocol ($\dagger$) cells.} Every row early-stops on the session's test split, except joint training on Mixed, which holds out $10\%$ of its pooled training set. Precision ``fp32/fp16'': seed 42 on CIL-CORD ran in fp32 (mixed precision was added to these training loops only afterwards) and every other seed in fp16 mixed precision. Seeds are given per scenario in the order of the second column. The clean protocol replaces all of this with fp32, a $10$-epoch cap ($100$ for joint training) and early stopping on $10\%$ held out from each session's training data. $^{\ddagger}$LwF: the one fp16 seed per scenario that collapsed to zero is excluded (CIL-CORD seed 123, Mixed seed 7), leaving $2$ and $1$ seeds. $^{*}$The first DIL grid (naive, EWC, LwF, ER, DER++, CODA-Prompt, CL-LoRA, joint training; all four backbones) saved no configuration; the values are the grid script's defaults and could not be confirmed per run (that script's default batch size was $16$, against $2$ for every later run), and joint training early-stopped on the pooled test sets. $^{\S}$On CIL-CORD these gate runs feed only the LexSlot comparison (\cref{tab:slot}) and the delta-capacity table (\cref{tab:delta}); the main-table cells are clean. $^{\|}$LCA trains with its published optimiser, SGD at learning rate $0.01$ (realignment: $5{\times}10^{-3}$), not AdamW at $5{\times}10^{-5}$ (\cref{app:baselines}).}
 \label{tab:legacyprotocol}
-\footnotesize\setlength{\tabcolsep}{4.5pt}
+\footnotesize\setlength{\tabcolsep}{3.5pt}
 \begin{tabular}{llcccc}
 \toprule
 Row & Scenarios & Epoch cap & Precision & Memory & Seeds \\
 \midrule
 Naive, joint training & Mixed & $100$ & fp16 & none & $2$ \\
 ER, DER++ & CIL-CORD, Mixed & $100$ & fp32/fp16 & $200$ samples (reservoir) & $3$, $2$ \\
-LwF & CIL-CORD, Mixed & $100$ & fp32/fp16 & none & $3$, $2^{\ddagger}$ \\
-CPFD & CIL-CORD, Mixed & $100$ & fp32/fp16 & none & $2$, $2$ \\
-IS3 & CIL-CORD, Mixed & $100$ & fp32 & none & $2$, $2$ \\
-CODA-Prompt, CL-LoRA & CIL-CORD, Mixed & $30$ & fp32/fp16 & none & $2$, $2$ \\
-LCA$^{\|}$ & CIL-CORD, Mixed & $10$ & fp32 & class Gaussians & $2$, $2$ \\
+LwF & CIL-CORD, Mixed & $100$ & fp32/fp16 & previous model & $3$, $2^{\ddagger}$ \\
+CPFD & CIL-CORD, Mixed & $100$ & fp32/fp16 & previous model & $2$, $2$ \\
+IS3 & CIL-CORD, Mixed & $100$ & fp32 & previous model, prototypes & $2$, $2$ \\
+CODA-Prompt & CIL-CORD, Mixed & $30$ & fp32/fp16 & none & $2$, $2$ \\
+CL-LoRA & CIL-CORD, Mixed & $30$ & fp32/fp16 & previous model, past adapters & $2$, $2$ \\
+LCA$^{\|}$ & CIL-CORD, Mixed & $10$ & fp32 & backbones, class Gaussians & $2$, $2$ \\
 CoLaR & Mixed & $10$ & fp16 & $50$ docs/session & $2$ \\
 CoLaR-SBR$^{\S}$ & CIL-CORD & $10$ & fp32 & $50$ docs/session & $3$ \\
 CoLaR-SBR & Mixed & $10$ & fp16 & $50$ docs/session & $2$ \\
@@ -720,7 +721,7 @@ Every chart in this section is drawn by our figure generator from the same run f
 \caption{\textbf{Per-class full-label F1} of the prediction-dump re-runs on disk (CIL-CORD, final model on the unmasked test set; seed 42, one run each; the legend names each run with its full-label F1). Classes grouped by the session that introduces them; n/a (grey): the class does not occur in the test set.}
 \label{fig:perclass}\end{figure*}
 
-\paragraph{Per class (\cref{fig:perclass}).} The dump re-runs repeat a clean run with its per-token outputs saved; they are not table cells. In the CoLaR re-run the session-5 classes are almost never found (the suppressed newest session of rung H0) and most session-1 classes, which hold most of the test entities, are missed, while several session-2 and session-3 classes are kept. Re-runs still in the queue join the figure when they land.
+\paragraph{Per class (\cref{fig:perclass}).} The dump re-runs repeat a clean run with its per-token outputs saved; they are not table cells. In the CoLaR re-run the session-5 classes are almost never found (the suppressed newest session of rung H0) and most session-1 classes, which hold most of the test entities, are missed, while several session-2 and session-3 classes are kept. The naive re-run finds only the total price, a class of its last session, and the joint-training re-run finds almost every class that occurs in the test set. Re-runs still in the queue join the figure when they land.
 
 %% ============================================================================ J
 \section{Further related work, and comparators we did not run}

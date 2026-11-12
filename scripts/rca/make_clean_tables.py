@@ -1157,14 +1157,14 @@ def _mb(name: str) -> str:
     return f"{max(b) / 1e6:.1f}\\,MB" if b else ""
 
 
-BASE_INFO = {  # family, what is stored (descriptive; supp.tex App. G)
+BASE_INFO = {  # family, what is kept across sessions (read from doccl/methods/*.py)
     "lwf": ("Regularisation", "previous model"),
     "der_pp": ("Replay", "raw documents + logits"),
     "coda_prompt": ("Prompt, LoRA", "none (prompt pool)"),
-    "cl_lora": ("Prompt, LoRA", "none (one shared adapter)"),
+    "cl_lora": ("Prompt, LoRA", "previous model, past adapter matrices"),
     "cpfd": ("Continual NER", "previous model"),
     "is3": ("Continual NER", "previous model, class prototypes"),
-    "lca": ("Merging", "per-session backbones, class Gaussians"),
+    "lca": ("Merging", "base and per-session backbones, class Gaussians"),
 }
 FAMILY_ORDER = ("Reference", "Regularisation", "Replay", "Prompt, LoRA", "Continual NER",
                 "Merging", "This paper")  # fmt: skip
