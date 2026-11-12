@@ -21,6 +21,24 @@ refresh: sliced_pseudo — sliced loss during the task, pseudo refresh after it.
                    model "O" on exactly the memory tokens it is later asked to relabel;
                    slicing removes that self-defeating signal so candidates survive.
 refresh: none    — plain CoLaR (control).
+
+When the oracle refresh runs (AGENT IMPL 2026-11-12, D17). Capture and refresh both sit in
+``after_task``; a document banked at session s holds that session's CIL-masked labels.
+``refresh_before_task: false`` (default, "refreshed at the boundary", the colar_r_oracle runs):
+  the refresh runs after each session's capture, over documents whose capture-time head is
+  smaller than the current one. While session t trains, documents banked at sessions <= t-2
+  carry the true labels of every class of sessions 0..t-1 (session-t classes are O); the
+  documents banked at session t-1 were never refreshed and carry ONLY session t-1's classes
+  (everything else O, exactly like current data).
+``refresh_before_task: true`` (oracle only, "refreshed before the session", colar_r_oracle_pre):
+  additionally, ``before_task`` re-applies the oracle to EVERY stored document using the head
+  as expanded for session t. While session t trains, every stored document (sessions 0..t-1)
+  carries the true labels of all classes of sessions 0..t; only classes not yet in the head are
+  O. What still differs from a perfect-label memory: the current session's own documents still
+  label old entities O (that conflict is the point of the control); the memory holds only
+  ``docs_per_task`` documents per past session and none of session t; stored latents are the
+  rank-``rank_r`` per-document SVD reconstruction, not the exact layer-k activations; labels
+  exist on first subwords only (as everywhere).
 """
 
 from __future__ import annotations
@@ -109,6 +127,9 @@ class CoLaRRefresh(CoLaR):
         self.entropy_floor = float(config.get("refresh_entropy_floor", 1e-3))
         self.refresh_quantile = float(config.get("refresh_quantile", 0.5))
         self.refresh_log: list[dict] = []
+        self.refresh_before_task = bool(config.get("refresh_before_task", False))
+        if self.refresh_before_task and self.refresh != "oracle":
+            raise ValueError("colar_r.refresh_before_task needs refresh: oracle")
 
     # ------------------------------------------------------------- capture
     def _capture_task(self, train_loader: DataLoader) -> None:
@@ -147,14 +168,21 @@ class CoLaRRefresh(CoLaR):
             )
         return out
 
+    def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
+        super().before_task(task, train_loader)
+        if self.refresh_before_task:
+            self._refresh_memory(task.task_id, all_docs=True)
+
     def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         super().after_task(task, train_loader)
         if self.refresh in ("oracle", "pseudo", "sliced_pseudo"):
             self._refresh_memory(task.task_id)
 
-    def _refresh_memory(self, task_id: int) -> None:
+    def _refresh_memory(self, task_id: int, all_docs: bool = False) -> None:
         n_cur = self._head_size()
-        stale = [d for d in self.store if int(d["n_labels"]) < n_cur]
+        # all_docs: also the newest bank, whose capture-time head equals the current one but whose
+        # labels are still CIL-masked (oracle only; idempotent on already-true labels)
+        stale = [d for d in self.store if all_docs or int(d["n_labels"]) < n_cur]
         if not stale:
             return
         entry = {"task_id": task_id, "docs": len(stale)}

@@ -108,9 +108,11 @@ def types_of(ids, i2l) -> set[str]:
 
 # ------------------------------------------------------------------ blocked readout (eval_dump)
 def routing(e, tag, gold, owner, session: int, thr: float) -> dict:
-    """Per split: on gold entity tokens, does the owning block claim? On gold-O tokens, does the
-    split's OWN block claim (a clean false positive) / ANY block claim (NOT clean on masked splits:
-    a gold-O token may be another session's masked entity)."""
+    """On gold entity tokens: does the owning block claim? On gold-O tokens: does block ``session``
+    claim (on a masked split = the split's own block, a clean false positive). Deliberately NO
+    "any block claims a gold-O token" rate: on a masked split a gold-O token may be another
+    session's entity, so that rate is meaningless there; it is computed only from
+    full_label_dump.pt (``background`` in analyse_full_dump)."""
     _, best_b, claimed = blocked_pred(e, tag, thr)
     g = gold.long()
     ent = g > 0
@@ -126,7 +128,6 @@ def routing(e, tag, gold, owner, session: int, thr: float) -> dict:
         "owner_block_fires": int((ent & (owner_e > thr)).sum()),
         "n_gold_O_tokens": int(bg.sum()),
         "gold_O_claimed_by_own_block": int((bg & claimed & (best_b == session)).sum()),
-        "gold_O_claimed_by_any_block_masked_split": int((bg & claimed).sum()),
     }
 
 
@@ -234,11 +235,12 @@ def analyse_full_dump(path: Path, session_ids: list[list[int]]) -> dict:
     d = torch.load(path, map_location="cpu", weights_only=False)
     i2l = {int(k): v for k, v in d["id_to_label"].items()}
     gold = d["gold"].long()
-    if "logits" in d:
+    blocked = "logits" not in d
+    if blocked:
+        pred, _, claimed = blocked_pred(d["e"], d["tag"], d["threshold"])
+    else:
         pred = d["logits"].float().argmax(-1)
         claimed = pred > 0
-    else:
-        pred, _, claimed = blocked_pred(d["e"], d["tag"], d["threshold"])
     owner = owner_map(session_ids)
     n_sess = len(session_ids)
     sessions = []
@@ -256,18 +258,25 @@ def analyse_full_dump(path: Path, session_ids: list[list[int]]) -> dict:
     out = {"source": "full_label_dump.pt", "sessions": sessions, **_pool(sessions, n_sess)}
     allc = span_counts(pred, gold, i2l, set().union(*[types_of(i, i2l) for i in session_ids]))
     out["full_label_f1_repro"] = prf(allc)["f1"]
-    out["background"] = {
+    out["background"] = {  # clean here: the unmasked gold has every entity
         "n_gold_O_tokens": int(bg.sum()),
         "claimed_non_O": int((bg & claimed).sum()),
     }
+    if blocked:
+        ro = routing(d["e"], d["tag"], gold, owner, -1, d["threshold"])
+        ro.pop("gold_O_claimed_by_own_block")  # no "own" block on the full set
+        out["routing"] = ro
     return out
 
 
 # ------------------------------------------------------------------ driver
 def session_layout() -> tuple[list[list[int]], dict[int, str], list[int]]:
-    """Session head ids and the id->label map, read from any saved blocked-readout dump (the
-    CIL-CORD layout is a dataset property, identical across runs)."""
+    """Session head ids and the id->label map, read from a saved blocked-readout dump of a run in
+    the canonical cil_cord order (the layout is a dataset property; o2/o3 orders differ)."""
     for f in sorted(glob(f"{ROOT}/cil_cord_*/eval_dump.pt")):
+        mf = Path(f).parent / "metrics.json"
+        if not mf.exists() or json.loads(mf.read_text()).get("scenario") != "cil_cord":
+            continue
         d = torch.load(f, map_location="cpu", weights_only=False)
         i2l = {int(k): v for k, v in d[0]["id_to_label"].items()}
         ids = [d[t]["allowed"] for t in range(len(d))]
@@ -323,6 +332,7 @@ def run_all() -> dict:
             "spans": "seqeval BIO entities (default mode) over one flat sequence per split",
             "errors_unrestricted": "final model's decision before the per-session restriction",
             "spans_restricted": "the per-session scorer (out-of-session predictions -> O), = matrix",
+            "background_claim_rate": "full_label_dump.pt only; never from masked splits",
         },
         "gold_spans_per_session_test_split": span_w,
         "session_types": [sorted(t) for t in types],
@@ -377,6 +387,21 @@ def print_table(res: dict) -> None:
             f" {_pct(oe and oe['share_to_other_session'])} {_pct(route)} |"
             f" {last.get('spans', {}).get('precision', float('nan')):5.1f} {last.get('spans', {}).get('recall', float('nan')):5.1f}"
         )
+        fl_res = r.get("full_label")
+        if fl_res:  # the same measurements on the UNMASKED test set (v9+ runs)
+            fe, bgr = fl_res["old"]["errors"], fl_res["background"]
+            ro = fl_res.get("routing")
+            print(
+                f"{'  ^ full-label set':44s} repro F1 {fl_res['full_label_f1_repro']:5.1f} |"
+                f" old wrong {fe['n_wrong']}/{fe['n_gold_tokens']} O {_pct(fe['share_to_O'])}"
+                f" same {_pct(fe['share_to_same_session'])} oth {_pct(fe['share_to_other_session'])}"
+                f" | gold-O claimed {_pct(bgr['claimed_non_O'] / max(bgr['n_gold_O_tokens'], 1))}"
+                + (
+                    f" | routed {_pct(ro['routed_to_owner'] / max(ro['n_entity_tokens'], 1))}"
+                    if ro
+                    else ""
+                )
+            )
 
 
 # ------------------------------------------------------------------ self-check
@@ -421,6 +446,18 @@ def selfcheck() -> None:
         logits = torch.nn.functional.one_hot(pred, 5).half()
         torch.save({"gold": gold.short(), "logits": logits, "id_to_label": i2l}, f)
         fd = analyse_full_dump(f, [[0, 1, 2, 3], [0, 4]])
+        blk = {"gold": g.short(), "e": e.half(), "tag": tag.short(), "threshold": 0.5}
+        torch.save({**blk, "id_to_label": i2l}, f)
+        fb = analyse_full_dump(f, [[0, 1, 2, 3], [0, 4]])
+    assert fb["background"] == {"n_gold_O_tokens": 1, "claimed_non_O": 1}
+    assert fb["routing"]["routed_to_owner"] == 1 and fb["routing"]["unclaimed"] == 1
+    assert not any("any_block" in k for k in r)  # never a background-claim rate on masked splits
+    print_table(
+        {
+            "gold_spans_per_session_test_split": [3, 1],
+            "runs": {"x": {"aa_vs_full": w, "full_label": fb}},
+        }
+    )
     assert fd["old"]["errors"]["to_O"] == 1 and fd["last"]["errors"]["to_O"] == 1
     assert fd["background"] == {"n_gold_O_tokens": 2, "claimed_non_O": 1}
     print("selfcheck OK")
