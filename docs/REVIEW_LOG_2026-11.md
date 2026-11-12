@@ -3162,3 +3162,83 @@ What is still missing:
 - `colar_mib` and the relabel-before control at three seeds;
 - clean ER (and DER++) on CIL-CORD with full-label F1;
 - CoLaR-SBR on a second backbone on CIL-CORD.
+
+## R11b (2026-11-12): confirmation of P15 (`2ec05b1`) against R11
+
+Scope: `git diff 964049f..2ec05b1 -- paper_cvpr scripts/rca` (worktree = `2ec05b1` for these paths).
+- **Generator re-run.** I re-ran the `2ec05b1` `make_clean_tables.py` with `OUT` in my scratchpad. Every generated
+  `.tex` (including the new `supp_baselines_hp.tex`) is byte-identical to the committed one, with no warning.
+- **Builds.** I built both PDFs from `git archive 2ec05b1 paper_cvpr` and rendered main p. 5, main p. 6 (crop), supp
+  p. 3 (crop), supp p. 17 and supp p. 23.
+- **Card against code.** I checked every card and Memory cell against `doccl/methods/*.py`, the recorded `method_hparams`
+  and `CL4IE/raw/CL_LoRA_*.md`.
+- **New dump.** I recomputed `cil_cord_joint_dump_seed42` (landed 13:28).
+
+### Verdict: **BLOCK** (one HIGH, one cell in a generator dict, about 5 minutes)
+
+Every R11 finding is fixed and none of the fixes adds anything false. Checking the Memory column against the code, as the PM
+asked, turns up one false cell. It was already there in R11 and I missed it then. It is the same class of error as R11-H2.
+
+| R11 | Status and evidence |
+|---|---|
+| H1 | **Fixed.** `\nOracleLast` = "3.9 to 14.7" (`_span` over the three seeds; per seed 14.7 / 3.9 / 3.9). Rendered p. 5 l. 295: "ends at 3.9 to 14.7". Holds per seed. Same in supp.tex:357. |
+| H2 | **Fixed.** LCA card: "one growing token head (published: per-task heads); Gaussians per token class, ``O'' excluded" (`lca.py:21-25`, `ca_skip_O: true`). Keeps: "per-session fine-tuning (SGD), TIES backbone merge, Gaussian classifier realignment" ✓. App. G prose says the same. Memory "per-session backbones, class Gaussians": `lca.py:103-130,229-232` stashes each session's backbone and merges them ✓. |
+| M1 | **Fixed.** The `$` around the range macros is gone. Rendered "72 to 79% and 48 to 56%", and "(means, three seeds)" now labels the mean values ✓. Same in App. E. |
+| M2 | **Fixed.** "eight methods from five families (\cref{tab:main})" in main.tex:106 and App. G ✓ (ER, DER++, LwF, CODA-Prompt, CL-LoRA, CPFD, IS3, LCA; five families). |
+| M3 | **Fixed.** Fig. 2(a) renders no slot (7 bars: CoLaR, ER, relabelled, sliced losses, CoLaR-SBR, SBR no mem., SBR-Recall). The caption's "queued" clause is removed. |
+| M4 | **Fixed.** H2 cites "App. B, Tab. 3" (= `tab:mech`, supp label 3 ✓). Sec. 5.1 cites "App. B, Tab. 3; App. I, Fig. 12" (= `fig:routing`, supp label 12 ✓). |
+| L1–L5 | **Fixed** ("rests on three seeds"; the 3.7× clause dropped; "LCA: \cref{app:baselines}"; ER-ACE, Ramasesh and Kalb now cited directly; "Without the refresh, the shared-softmax curves ..."). |
+| L6 | **Fixed.** The base box reads "layers 5..12". The θ₀ note now sits with SBR-Recall ("layers 5..12 frozen as θ₀"). Rendered without collision. |
+| L7 | **Fixed.** Absent classes are marked "n/a" in grey (`menu.sub.unitprice`, `menu.vatyn`, `sub_total.othersvc_price`, `sub.*`, `void_menu.*`), and the caption says so. |
+| L8 | **Acceptable** (question a). With semi-transparent markers the two clusters still overlap. The caption makes claims only about CoLaR / relabelled (left) and naive (bottom right), and those stay distinguishable. No change needed. |
+| L9 | **Fixed.** The card is split into two tables at natural width (`\scriptsize`, no `\resizebox`), legible at 90 dpi. CL-LoRA, question (c): **confirmed.** `cl_lora.py:132` multiplies the KD term by `shared_grad_scale`, and both CIL-CORD rescore runs record `shared_grad_scale: 1.0`. So "at scale 1, i.e. off" and App. G's "leaves the distillation gradient unchanged" are literally true. The published design per `CL4IE/raw/CL_LoRA_*.md` ("random orthogonal down-projection ... early-exit knowledge distillation with gradient reassignment"; "block-wise weights under orthogonal constraints") matches the card's parenthesis. "Keeps orthogonality penalty" is fair (the task-specific adapters carry orthogonal constraints). |
+| L10 | **Fixed.** The span labels sit on a white box above the dashed line. |
+| L11 | **Fixed** ("It has not run yet"; no `colar_mib` on disk). |
+| L12 | **Fixed.** H0 reads "(and, with the memory, the same replay)". `abs(...)` sits in the DIL "within" gap (make_clean_tables.py:1087). `\nColarDilGapMax` and `\nErDilGapMax` are unchanged (2.2, 3.5; ER's −1.13 seed is smaller in magnitude). |
+
+The other card cells check against the code:
+- CPFD: confidence pseudo-labels, logit KL and three-view attention MSE, adaptive CE factor, and `sample_weights` simplified
+  to 1 (`cpfd.py:1-40`) ✓.
+- IS3: O-token KD, head-row gradient surgery at 0.6, prototype replay (`is3.py:15-37`). Memory "previous model, class
+  prototypes" ✓.
+- CODA-Prompt, question (b): the attention-weighted components and orthogonality penalty, the frozen encoder, and the
+  "AAAI-Lite input-prepend variant" (`coda_prompt.py:9-16`) ✓. **Acceptable** with no claim about the published design.
+  Optional: "(published: prefix prompts in several layers)".
+- ER and DER++ ✓.
+
+Fig. 13 now carries the joint-training dump:
+- Recomputed with seqeval by document, full-label F1 91.70 (= clean joint s42 91.70; AA 91.13 = 91.13).
+- Per class: s1 96/70/0/89/84/98; s2 92/81/92/94; s3 100/69/100/93/97; s4 92/92/83/33/76/33; s5 0/94. The bars match.
+- The App. I paragraph still describes only the CoLaR re-run, which stays true.
+- "Re-runs still in the queue" is true: `cil_cord_colar_sbr_dump_seed42` started 13:28.
+
+**Invariants** (archive build):
+- `latexmk -pdf`: main 0, supp 0.
+- 0 undefined references or citations, 0 "??".
+- Main 11 pp.: the Conclusion is on p. 8 and References start at the top of p. 9. Supp 25 pp.
+- 0 `---` in any .tex.
+
+### Remaining findings
+
+**HIGH**
+
+- **R11b-H1. CL-LoRA's Memory cell says "none (one shared adapter)"; the port keeps the previous model and the past adapter
+  matrices.**
+  - Where: `tab:main` (main p. 8) and the card's Memory column, from generator `BASE_INFO["cl_lora"]`.
+  - Evidence:
+    - `cl_lora.py:54` and `:17-20` keep a frozen copy of the model after the previous task as the KD teacher.
+    - `o_lora.py:69,203` appends every session's LoRA A matrices to `past_A_matrices` for the orthogonality penalty.
+    - LwF, CPFD and IS3, which keep the same teacher, are listed as "previous model". "none" is therefore false, and
+      inconsistent within the column.
+    - This was already in `964049f`; R11 missed it.
+  - Fix: `"cl_lora": ("Prompt, LoRA", "previous model, past adapter matrices")`, then regenerate.
+
+**LOW (optional)**
+
+- R11b-L1. App. I "Per class" describes only the CoLaR bars. One clause on the other two would help a reader:
+  - naive training finds only `total.total_price` (95);
+  - joint training misses only rare classes (0 on `menu.itemsubtotal` and `total.total_etc`, test support 6 and 3).
+- R11b-L2 (code only, not the paper). The `is3.py` docstring names the authors "Chen, Cao, Li"; the paper (arXiv
+  2402.10447) is Qiu, Zheng, Liu, Luo and Ma, as the bibliography has it. A Dev nit.
+
+The referee score is unchanged at **3 (+0.25)**. P15 is presentation and accuracy, not new evidence (see R11 §D).
