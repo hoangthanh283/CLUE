@@ -8,7 +8,7 @@ Rung & Hypothesis & Prediction if true & Intervention (CIL-CORD unless stated) &
 H0 & Only drift: forgetting is just harder & a memory that retains under domain shift retains here; raw beats compressed & whole-document memory (CoLaR), shared softmax & $30.7{\pm}1.5$ & $33.5{\pm}1.0$ & refutes \\
  &  &  & raw-document memory (ER), shared softmax$^{e}$ & -- & $24.3{\pm}2.4^{\dagger}$ & refutes \\
 \midrule
-H1 & Stale labels in the memory & true labels in the stored documents close the gap & older stored documents relabelled at each boundary$^{r}$ & $79.1/74.9^{n=2}$ & $65.8/62.8^{n=2}$ & partly \\
+H1 & Stale labels in the memory & true labels in the stored documents close the gap & older stored documents relabelled at each boundary$^{r}$ & $76.5{\pm}2.3$ & $63.6{\pm}1.9$ & partly \\
 \midrule
 H2 & Current documents mislabel old entities & a loss that lets ``O'' mean ``O or an old class'' closes the gap & replay and current losses sliced to their classes & -- & $60.5{\pm}10.1^{\dagger}$ & open \\
 \midrule

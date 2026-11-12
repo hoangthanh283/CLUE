@@ -1131,6 +1131,201 @@ def write_beyond() -> None:
     (OUT / "tab_beyond.tex").write_text(t)
 
 
+# ---------------------------------------------------------------------------- P14: exhibits
+def _hparams(sources) -> dict:
+    """``method_hparams`` of the first seed of the source a cell is read from ({} if none).
+    Warns when the seeds of that source were not run with the same hyper-parameters."""
+    s = chosen_source(sources)
+    if s is None:
+        return {}
+    hp = []
+    for sd in SEEDS:
+        f = _run_file(s[0], s[1], sd, s[2], "metrics.json")
+        if f:
+            hp.append(json.loads(f.read_text()).get("method_hparams") or {})
+    if any(h != hp[0] for h in hp[1:]):
+        _warn(f"{s[1]}: seeds differ in method_hparams (baseline card shows the first)")
+    return hp[0] if hp else {}
+
+
+def _mb(name: str) -> str:
+    """Memory of a clean CIL-CORD run as recorded (``replay_memory_bytes``, 1 MB = 1e6 bytes)."""
+    b = set(load_seeds(CLEAN, name, "replay_memory_bytes").values())
+    if len(b) > 1:
+        _warn(f"{name}: replay_memory_bytes differs across seeds")
+    return f"{max(b) / 1e6:.1f}\\,MB" if b else ""
+
+
+BASE_INFO = {  # family, what is stored (descriptive; supp.tex App. G)
+    "lwf": ("Regularisation", "previous model"),
+    "der_pp": ("Replay", "raw documents + logits"),
+    "coda_prompt": ("Prompt, LoRA", "none (prompt pool)"),
+    "cl_lora": ("Prompt, LoRA", "none (one shared adapter)"),
+    "cpfd": ("Continual NER", "previous model"),
+    "is3": ("Continual NER", "previous model"),
+    "lca": ("Merging", "class Gaussians"),
+}
+FAMILY_ORDER = ("Reference", "Regularisation", "Replay", "Prompt, LoRA", "Continual NER",
+                "Merging", "This paper")  # fmt: skip
+
+
+def _base_cells(key: str, dz: bool) -> tuple:
+    """(full-label F1, CIL-CORD AA, Mixed AA, DIL AA) of a baseline, by the one selection rule."""
+    cc = pick(src(f"cil_cord_{key}", (RESC, f"cil_cord_{key}", "")), drop_zero=dz)
+    mm = pick(src(f"mixed_{key}", (RESC, f"mixed_{key}", "")), drop_zero=dz)
+    dd = pick(src(f"dil_{key}", ("results", f"dil_{key}", "")))
+    ff = pick_clean_only(src(f"cil_cord_{key}"), "full_label_f1")
+    # R10-H1: the first-grid DIL CL-LoRA runs (06-18/19) predate the fix of the port's
+    # orthogonality penalty (c974159, 06-24): mark p
+    return (fmt(*ff, show_n=True), fmt(*cc), fmt(*mm),
+            fmt(*dd, mark="p" if key == "cl_lora" and not dd[1] else ""))  # fmt: skip
+
+
+def write_main(cell, mix, dil, full) -> None:
+    """tab_main_clean.tex: the comparison, full width, grouped by family, with what each method
+    stores and how it reads out (P14). Cells are the same picks as before."""
+
+    def fl(k, **kw):  # full-label F1 cell: clean seeds only, n marked when < 3
+        return fmt(*full[k], show_n=True, **kw)
+
+    buf = _hparams(C["er"]).get("buffer_size", "")
+    buf_dpp = _hparams(src("cil_cord_der_pp", (RESC, "cil_cord_der_pp", ""))).get("buffer_size", "")
+    colar_mem = "50 docs/session, rank-128 layer-4 latents"
+    rows = [  # (family, label, memory, readout, (full, cil AA, mixed, dil), bold)
+        ("Reference", "Naive fine-tuning", "none", "shared",
+         (fl("naive"), fmt(*cell["naive"]), fmt(*mix["naive"]), fmt(*dil["naive"])), False),
+        ("Reference", "Joint training", "all data, all sessions", "shared",
+         (fl("joint"), fmt(*cell["joint"]), fmt(*mix["joint"]), fmt(*dil["joint"])), False),
+        ("Replay", "ER (2019)", f"{buf} raw documents", "shared",
+         (fl("er"), fmt(*cell["er"]), fmt(*mix["er"]), fmt(*dil["er"])), False),
+    ]
+    for label, key, dz in BASE:
+        fam, mem = BASE_INFO[key]
+        if key == "der_pp":
+            mem = f"{buf_dpp} {mem}"
+        lab = {"LwF": "LwF (2016)", "DER++": "DER++ (2020)",
+               "CODA-Prompt": "CODA-Prompt (2023)"}.get(label, label)  # fmt: skip
+        rows.append((fam, lab, mem, "shared", _base_cells(key, dz), False))
+    rows += [
+        ("This paper", "CoLaR", f"{colar_mem} ({_mb('cil_cord_colar')})", "shared",
+         (fl("colar"), fmt(*cell["colar"]), fmt(*mix["colar"]), fmt(*dil["colar"])), False),
+        ("This paper", "CoLaR-SBR", f"{colar_mem} ({_mb('cil_cord_colar_sbr')})", "blocked",
+         (fl("sbr"), fmt(*cell["sbr"]), fmt(*mix["sbr"], bold=True), fmt(*dil["sbr"])), True),
+        ("This paper", "\\quad + LexSlot head slots", "+ head slots, token ids", "blocked",
+         ("--", fmt(*cell["slot"]), fmt(*mix["slot"]), fmt(*dil["slot"])), False),
+        ("This paper", "SBR-Recall",
+         f"one rank-64 trunk delta per session ({_mb('cil_cord_colar_sbr_recall_r64')})",
+         "blocked, per delta",
+         (fl("recall", bold=True), fmt(*cell["recall"], bold=True), fmt(*mix["recall"], mark="b"),
+          "--"), True),
+    ]  # fmt: skip
+    rows.sort(key=lambda r: FAMILY_ORDER.index(r[0]))  # stable: keeps order inside a family
+    t = HDR + "\\begin{tabular}{@{}llllcccc@{}}\n\\toprule\n"
+    t += (" & & & & \\multicolumn{2}{c}{\\textbf{CIL-CORD}} & \\textbf{Mixed} & \\textbf{DIL} \\\\\n"
+          "\\cmidrule(lr){5-6}\\cmidrule(lr){7-7}\\cmidrule(l){8-8}\n"
+          "\\textbf{Family} & \\textbf{Method} & \\textbf{Memory (what is stored)} & "
+          "\\textbf{Readout} & full-label F1 & AA & AA & AA \\\\\n")  # fmt: skip
+    prev = None
+    for fam, label, mem, readout, cells, bold in rows:
+        if fam != prev:
+            t += "\\midrule\n"
+        lab = f"\\textbf{{{label}}}" if bold else label
+        t += f"{fam if fam != prev else ''} & {lab} & {mem} & {readout} & " + " & ".join(cells)
+        t += " \\\\\n"
+        prev = fam
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "tab_main_clean.tex").write_text(t)
+
+
+# Static dataset facts of the benchmark settings (supp.tex App. A: Datasets, tab:cilsessions,
+# tab:mixsessions, DIL unified schema; CIL-FUNSD: doccl/data/scenarios.py build_cil_funsd and the
+# tab:beyond caption). Typed once here, never in the paper.
+BENCH_ROWS = ("Datasets", "Sessions", "Label space", "Classes (BIO tags)",
+              "At a boundary", "Reported")  # fmt: skip
+BENCH = {
+    "CIL-CORD": ("CORD", "5", "grows, 6 per session", "30 (61)", "new classes",
+                 "full-label F1, AA"),
+    "DIL": ("FUNSD, SROIE, CORD in turn", "3", "fixed, unified", "4 (9)", "new domain", "AA"),
+    "Mixed": ("FUNSD, SROIE, CORD", "6", "grows, 3 schemas", "12 (25)",
+              "new classes, domain or schema", "AA"),
+    "CIL-FUNSD": ("FUNSD", "2", "grows", "3 (7)", "new classes", "full-label F1, AA"),
+}  # fmt: skip
+
+
+def write_bench() -> None:
+    """tab_bench.tex: one column per stream. CIL-FUNSD joins once its tab:beyond rows render."""
+    funsd = any(len(load(CLEAN, n, "AA")) >= k for s, _, n, k in BEYOND if s == "CIL-FUNSD")
+    cols = [s for s in BENCH if s != "CIL-FUNSD" or funsd]
+    w = f"{(8.2 - 1.75 - 0.14 * (len(cols) + 1)) / len(cols):.2f}cm"  # fill one CVPR column
+    t = HDR + "\\begin{tabular}{@{}>{\\raggedright\\arraybackslash}p{1.75cm}"
+    t += f">{{\\centering\\arraybackslash}}p{{{w}}}" * len(cols)
+    t += "@{}}\n\\toprule\n"
+    t += " & " + " & ".join(f"\\textbf{{{c}}}" for c in cols) + " \\\\\n\\midrule\n"
+    for i, name in enumerate(BENCH_ROWS):
+        t += f"{name} & " + " & ".join(BENCH[c][i] for c in cols) + " \\\\\n"
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "tab_bench.tex").write_text(t)
+
+
+# Baseline card (supp tab:baselines): venue from refs_precompiled.bbl; port notes from supp.tex
+# App. G; hyper-parameters as RECORDED by the CIL-CORD run the main table reads (method_hparams).
+CARD = (  # (label, key, venue, what our port keeps, what it changes, hparam keys shown)
+    ("ER", "er", "NeurIPS 2019", "reservoir of raw documents replayed in each step", "--",
+     ("buffer_size", "replay_batch_size")),
+    ("DER++", "der_pp", "NeurIPS 2020", "replay of documents and their stored logits", "--",
+     ("buffer_size", "alpha", "beta")),
+    ("LwF", "lwf", "ECCV 2016", "distillation towards the previous model", "--",
+     ("alpha", "temperature")),
+    ("CODA-Prompt", "coda_prompt", "CVPR 2023", "prompt-component pool on a frozen encoder",
+     "one growing token head", ("n_components", "prompt_length", "lambda_ortho")),
+    ("CL-LoRA", "cl_lora", "CVPR 2025", "orthogonality penalty, distillation",
+     "one shared adapter (published: shared + task-specific)",
+     ("lora_rank", "lora_alpha", "lambda_ortho", "kd_alpha", "temperature")),
+    ("CPFD", "cpfd", "EMNLP 2023", "pseudo-labels, attention and logit distillation",
+     "one growing token head (published: per-task classifiers)",
+     ("distill_weight", "threshold")),
+    ("IS3", "is3", "Findings ACL 2024", "distillation on ``O'' tokens",
+     "one growing token head (published: per-task classifiers)",
+     ("kd_weight", "proto_weight", "grad_weight")),
+    ("LCA", "lca", "ICLR 2026", "TIES merge, Gaussian classifier realignment", "--",
+     ("lr", "merge_method", "merge_topk", "ca_epochs", "ca_samples_per_cls")),
+)  # fmt: skip
+
+
+def _proto(sources, dz=False) -> str:
+    """'clean, 3' or 'legacy$^\\dagger$, 2' for the source a cell is read from."""
+    vs, clean, _ = pick(sources, drop_zero=dz)
+    if not vs:
+        return "--"
+    tag = "clean" if clean else "legacy$^{\\dagger}$"
+    return f"{tag}, {len(vs)}"
+
+
+def write_baselines() -> None:
+    """supp_baselines.tex: one row per baseline of the comparison set."""
+    dzs = {k: dz for _, k, dz in BASE}
+    t = HDR + "\\begin{tabular}{@{}lll" + ">{\\raggedright\\arraybackslash}p{3.0cm}" * 2 + "l"
+    t += ">{\\raggedright\\arraybackslash}p{3.6cm}ccc@{}}\n\\toprule\n"
+    t += (" & & & & & & & \\multicolumn{3}{c}{Protocol, seeds} \\\\\n\\cmidrule(l){8-10}\n"
+          "Method & Venue & Family & Our port keeps & Our port changes & Memory & "
+          "Hyper-parameters (recorded, CIL-CORD) & CIL-CORD & Mixed & DIL \\\\\n\\midrule\n")  # fmt: skip
+    for label, key, venue, keeps, changes, hkeys in CARD:
+        cil = C["er"] if key == "er" else src(f"cil_cord_{key}", (RESC, f"cil_cord_{key}", ""))
+        mixs = M["er"] if key == "er" else src(f"mixed_{key}", (RESC, f"mixed_{key}", ""))
+        dils = D["er"] if key == "er" else src(f"dil_{key}", ("results", f"dil_{key}", ""))
+        hp = _hparams(cil)
+        shown = [k.replace("_", "\\_") + f" {hp[k]}" for k in (*hkeys, "epochs") if k in hp]
+        fam, mem = ("Replay", "raw documents") if key == "er" else BASE_INFO[key]
+        if "buffer_size" in hp:
+            mem = f"{hp['buffer_size']} {mem}"
+        dz = dzs.get(key, False)
+        t += (f"{label} & {venue} & {fam} & {keeps} & {changes} & {mem} & "
+              f"{', '.join(shown) or '--'} & {_proto(cil, dz)} & {_proto(mixs, dz)} & "
+              f"{_proto(dils)} \\\\\n")  # fmt: skip
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "supp_baselines.tex").write_text(t)
+
+
 def main():
     cell = {k: pick(v) for k, v in C.items()}
     mix = {k: pick(v) for k, v in M.items()}
@@ -1190,66 +1385,9 @@ def main():
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_2x2.tex").write_text(t)
 
-    # ---- tab_main_clean.tex
-    def fl(k, **kw):  # full-label F1 cell: clean seeds only, n marked when < 3
-        return fmt(*full[k], show_n=True, **kw)
-
-    def row(label, c, f, m, d, bold=False):
-        lab = f"\\textbf{{{label}}}" if bold else label
-        return f"{lab} & {f} & {c} & {m} & {d} \\\\\n"
-
-    t = "% AUTO-GENERATED by scripts/rca/make_clean_tables.py -- do not edit.\n"
-    t += "\\begin{tabular}{lcccc}\n\\toprule\n"
-    t += " & \\multicolumn{2}{c}{\\textbf{CIL-CORD}} & \\textbf{Mixed} & \\textbf{DIL} \\\\\n"
-    t += "\\textbf{Method} & full-label F1 & AA & AA & AA \\\\\n\\midrule\n"
-    t += row("Naive", fmt(*cell["naive"]), fl("naive"), fmt(*mix["naive"]), fmt(*dil["naive"]))
-    t += row("ER", fmt(*cell["er"]), fl("er"), fmt(*mix["er"]), fmt(*dil["er"]))
-    for label, key, dz in BASE:
-        # Clean source first (same names the queue writes), so this row and the 2x2 agree.
-        cc = pick(src(f"cil_cord_{key}", (RESC, f"cil_cord_{key}", "")), drop_zero=dz)
-        mm = pick(src(f"mixed_{key}", (RESC, f"mixed_{key}", "")), drop_zero=dz)
-        dd = pick(src(f"dil_{key}", ("results", f"dil_{key}", "")))
-        ff = pick_clean_only(src(f"cil_cord_{key}"), "full_label_f1")
-        # R10-H1: the first-grid DIL CL-LoRA runs (06-18/19) predate the fix of the port's
-        # orthogonality penalty (c974159, 06-24): mark p
-        t += row(label, fmt(*cc), fmt(*ff, show_n=True), fmt(*mm),
-                 fmt(*dd, mark="p" if key == "cl_lora" and not dd[1] else ""))
-    t += "\\midrule\n"
-    t += row("CoLaR", fmt(*cell["colar"]), fl("colar"), fmt(*mix["colar"]), fmt(*dil["colar"]))
-    t += row(
-        "CoLaR-SBR",
-        fmt(*cell["sbr"]),
-        fl("sbr"),
-        fmt(*mix["sbr"], bold=True),
-        fmt(*dil["sbr"]),
-        bold=True,
-    )
-    t += row(
-        "\\quad + LexSlot head slots",
-        fmt(*cell["slot"]),
-        "--",
-        fmt(*mix["slot"]),
-        fmt(*dil["slot"]),
-    )
-    t += row(
-        "SBR-Recall",
-        fmt(*cell["recall"], bold=True),
-        fl("recall", bold=True),
-        fmt(*mix["recall"], mark="b"),
-        "--",
-        bold=True,
-    )
-    t += "\\midrule\n"
-    t += row(
-        "Joint training (reference)",
-        fmt(*cell["joint"]),
-        fl("joint"),
-        fmt(*mix["joint"]),
-        fmt(*dil["joint"]),
-    )
-    t += "\\bottomrule\n\\end{tabular}\n"
-    (OUT / "tab_main_clean.tex").write_text(t)
-
+    write_main(cell, mix, dil, full)
+    write_bench()
+    write_baselines()
     write_dil_grid()
     write_supp()
 
