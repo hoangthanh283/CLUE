@@ -2924,3 +2924,48 @@ landing `colar_mib` and the never-stale `colar_r_oracle_pre` with three seeds ea
   (74), "below CoLaR-SBR on every seed" and the group order of App. B still hold. `\nOracleLast` becomes three values.
 - When `colar_dump` / `naive_dump` land: the indicator sentences (R10-M1, third bullet) can become per-token statements
   or must be withdrawn.
+
+## R10b (2026-11-12): confirmation of P13 (`fdd4713`) against R10
+
+Scope: `git diff 0df6972..fdd4713 -- paper_cvpr scripts/rca/make_clean_tables.py`.
+- I re-ran the `fdd4713` generator with `OUT` pointed at my scratchpad. Every generated file is byte-identical to the
+  committed one, with no warning.
+- I recomputed the new cells from `matrix.npy` / `metrics.json`.
+- I tested the verdict checks by deleting seeds in memory.
+- I built from `git archive fdd4713 paper_cvpr` and rendered page 1.
+
+### Verdict: **PASS**
+
+Every R10 finding is fixed except the optional L10 (three bibliography entries without pages, as before). No remaining
+finding is above LOW.
+
+| R10 | Status and evidence |
+|---|---|
+| H1 | **Fixed.** "ER with SAM" is used in main.tex, App. G prose, `tab:prompt_lora` and the generator label `DROPPED`. No "C-Flat" is left outside the one explanatory clause in App. G. O-LoRA is out of the dropped list and table, and App. G says why. The ᵖ marks are correct against the git dates (fix `c974159`, 2026-06-24 07:35): DIL `dil_cl_lora`/`dil_o_lora` runs are from 06-18/19, `mixed_cl_lora` from 06-23, `cil_cord_cl_lora` s42/s7 from 06-19 and s123 from 10-22. So `tab_main_core` ("DIL and Mixed cells and two of its CIL-CORD seeds") is right. In `tab:main` only the DIL cell is marked (`results/dil_cl_lora`, June). Its CIL-CORD and Mixed CL-LoRA cells come from `results/rescore` (11-04 to 11-08, after the fix) and are correctly left unmarked. `tab:prompt_lora` marks the LayoutLMv3 O-LoRA/CL-LoRA rows; its BERT runs are 07-29, after the fix. |
+| M1 | **Fixed.** "What discriminates what" now says "shows drift only within the blocked readout ... under neither readout does it separate drift from conflict". The Conclusion now says "appears only with a memory and a shared softmax". "By a span-level indicator" is added in contribution 1, "What discriminates what" and the Conclusion. |
+| M2 | **Fixed.** H0, the preamble ("H0's memory rows change several") and App. D now name the freezing. Logs: "freeze map: layers <4 + embeddings frozen" in `colar`, `colar_sbr` and `colar_sbr_noreplay`, i.e. four layers, so "layers 1..4" is right. `replay_batch_size: 4`. `\nSbrDiagMin` 81.1: diagonal minima are CoLaR-SBR 81.58 / 88.71 / 90.46 and no-memory SBR 81.17 / 86.67 / 92.18; 81.167 floors to 81.1. ✓ |
+| M3 | **Fixed.** The body sentence and the App. G paragraph state the raw-scoring caveat and the two batches. Unlearned sessions (own diagonal < 1): EWC 3–5 / 4–5 / 4–5; L2P 3–5 / 2–5 / 2–5; DualPrompt 3–5 / 2–5 / 2–5. All exact zeros, so "at least sessions 4 and 5 on every seed" holds. `\nSamErGapMax`: ER with SAM vs ER is 2.77 / 2.22 / 0.38, ceil 2.8 ✓. Rule 7 holds per seed. |
+| M4 | **Fixed** ("the never-stale memory and the MiB-style loss decide together"). |
+| L1 | **Fixed.** `\nColarDilGapMax` 2.2: joint − CoLaR on DIL is 2.10 / 0.73 / 0.10, rounded up (conservative). `\nErDilGapMax` 3.5: 3.47 / 0.30 / −1.13. Intro and H0 now give per-seed bounds. The abstract's "comes close to joint training on average" is explicitly a mean claim and uses none of rule 7's listed words. ✓ |
+| L2 | **Fixed** (the indicator is blank where per-token outputs exist; the clipping is explained in App. B). |
+| L3 | **Fixed** (H0 cites App. B for the lower bound). |
+| L4 | **Fixed.** Rendered page 1: the dashed arrow now leaves the current document's "O" (row 4.50) and curves to the shared O in (a) and to O₅ in (b). The stored arrow lands on O₁. The blocks read "s1 tags" / "s5 tags", and the caption says "one pair of price tokens". It is legible, and the caption is true. |
+| L5 | **Fixed** (`\scriptsize` at its natural width, no `\resizebox`, no overfull box; the caption is 4 lines; definitions are in a new App. B paragraph, which is accurate). |
+| L6 | **Fixed and tested.** With joint s7 removed in memory, the `colar`, `sbr`, `nobank`, `recall` and `oracle` checks all return False. With the oracle runs removed, `sbr` and `oracle` return False. A missing seed now fails the check and aborts the build through `SystemExit`. |
+| L7, L8 | **Fixed.** |
+| L9 | n/a (commit message). Slack now: References at line 603, column ends near 623, so about 20 lines (≈ 0.4 column). |
+
+**Invariants** (archive build):
+- `latexmk -pdf`: main 0, supp 0.
+- 0 undefined references or citations, 0 "??".
+- Main 11 pp.: the body ends in the right column of p. 8 (Conclusion from line 583) and References start at line 603.
+  Supp 19 pp.
+- 0 `---` in any .tex, 0 em-dashes in the PDF, Author field empty.
+- Cross-references resolve.
+
+**LOW (new, optional)**
+- R10b-L1: H0 says "with the same freezing and replay, the blocked readouts with and without the memory learn every
+  session to at least 81.1". The no-memory run has the freezing but no replay. Write "with the same freezing (and, with
+  the memory, the same replay)".
+- R10b-L2: `gap_macros` takes the max of the signed gap joint − method for a "within" claim. Use `abs(...)`. The value is
+  the same today.
