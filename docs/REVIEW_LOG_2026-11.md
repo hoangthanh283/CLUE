@@ -2691,3 +2691,236 @@ then `er_sbr`; everything else is optional.
   sessions 3 and 4 rise at the next boundary on s7 (the generator warns otherwise), `\nOracleN` = "two seeds", and that
   `mechanism_analysis.json` is regenerated before `tab_mech` (the oracle row is n = 1 until then).
 - When any ladder slot lands: its verdict must be written by hand (L7); re-audit the rung's prose against the per-seed numbers.
+
+## R10 (2026-11-12): audit of P12 (`e7835b7`): R9 fixes, transposed mechanism table, dropped-methods table, first-page figure
+
+Snapshot: paper files at `e7835b7`. Scope: `git diff 6217ed5..e7835b7 -- paper_cvpr scripts/rca/make_clean_tables.py`, the
+new figure, the changed `supp.tex` sections, and the run files. Method: I re-ran the generator with `OUT` redirected to my
+scratchpad (it reads only `metrics.json` / `matrix.npy` / `mechanism_analysis.json`): **every generated file is
+byte-identical to the committed one, no warning, no verdict abort**. I then recomputed the new cells independently from
+`per_class_f1.json` + `metrics.json` (implied full-label FP) and from `mechanism_analysis.json`, and read the first-grid run
+files, logs and git history behind the new App. G table. Builds from `git archive e7835b7 paper_cvpr` in my scratchpad.
+No model, dataset or pytest was run. GPU at audit time (08:49): oracle s123 running (queue: START 08:30); s7 landed.
+
+### Verdict: **BLOCK** (one HIGH, text-only, about 15 minutes)
+
+R9's two HIGH findings are fixed in substance: contribution 1, the abstract, the intro and H0 no longer claim that error
+type tells the causes apart, the naive column is in the table, and the selection paragraph now gives the true order. Every
+number recomputes. What blocks is new and sits in the R9-H2 fix itself: the disclosure names two dropped methods that the
+runs behind it are not. "ER with C-Flat++" is ER + SAM (curvature weight 0 in every run), and the O-LoRA row comes from
+runs made before the port's orthogonality penalty was repaired. Same standard as R9-H2: a disclosure paragraph must be
+literally true. Four MEDIUM and eleven LOW follow.
+
+### A. Numbers recomputed (per seed 42 / 7 / 123)
+
+| Cell / macro | Recomputed | Rendered | OK |
+|---|---|---|---|
+| Naive column: R; P; "missed at O" indicator | 0.0 ×3; no predicted old span (TP = FP = 0, 8 / 9 / 21 FP spans on the full test set); 0.9934 / 0.9926 / 0.9827 | 0.0; blank; 98.2–99.4 | ✓ (outward rounding) |
+| CoLaR indicator | 0.8964 / 0.9069 / 0.9421 | 89.6–94.3; macros 89–95 | ✓ |
+| Relab. (oracle, s42 / s7): R; P (upper bound); indicator | 77.22 / 71.58; 88.17 / 87.01; 0.642 / 0.682 | 71.5–77.3; ≤87.1–88.2; 64.2–68.2 | ✓ |
+| No mem. indicator | 0.0 / 0.818 / 0.0 | 0.0–81.9 (body: "81%") | ✓ (L2) |
+| `\mColarOldPLb` (TP_old / (TP_old + FP_implied,all)) | 71.77 / 71.68 / 78.47 → floor 71.6 | 71.6 | ✓ (conservative) |
+| `\nOracle*` two-seed cells | AA 65.8 / 62.8, full 79.1 / 74.9; CoLaR 33.6 / 32.4, 32.4 / 30.5; joint 91.1 / 90.5, 91.7 / 91.8; SBR 87.8 / 91.3, 88.8 / 91.2 | same | ✓ |
+| `\nOracleShare` / `Full` | AA 56.0 / 52.3; full 78.8 / 72.4 | 56/52, 79/72 | ✓ |
+| Oracle diagonals sessions 3–5 | s42 6.8 / 2.2 / 14.7; s7 13.8 / 13.9 / 3.9 → "2 to 15" | 2–15 | ✓ |
+| Oracle next-boundary rise R[4,3], R[5,4] | s42 83.0, 74.6; s7 87.5, 81.6 → "74 to 88" | 74–88 | ✓ every seed rises |
+| `\nOracleLast` | 14.7 / 3.9 | 14.7/3.9 | ✓ |
+| Relabel counts in prose | s42 105/1019/1394 + 1239 (s7 log: 67/859/1349 + 1273); prose says "(seed 42)" | | ✓ |
+| `\nSlicedBothGate` | gate sliced2 s42 62.9 vs sliced replay 39.4 (both fp32 gate); log `current_sliced: true` = O tokens only | 62.9 | ✓ |
+| H0: CoLaR newest session R[5,5] vs naive diagonals | CoLaR 2.0 / 9.5 / 15.9 (R[4,4] 2.2 / 6.3 / 16.8; R[3,3] 14.0 / 8.9 / **54.6**); naive diagonal min 78.7 / 90.4 / 88.9 | 2.0–16.0 vs ≥78.6 | ✓ |
+| Abstract "barely learns the last sessions it is trained on, which naive training learns well" | true per seed for sessions 4 and 5 (≤ 16.8 vs ≥ 78.7); session 3 only on s42 and s7 | | ✓ (read as the last two) |
+| H3 "above the relabelled memory on every seed both have" | SBR 88.8 / 91.2 vs 79.1 / 74.9 full; 87.8 / 91.3 vs 65.8 / 62.8 AA | | ✓ |
+| `\nRecallJointGap` 2.1, `\nSbrGapFullMax` 5.3 | 0.3 / 2.1 / 0.2 (AA), 0.2 / 1.7 / 0.2 (full); 2.87 / 0.61 / 5.25 | | ✓ |
+| `supp_dropped.tex` | naive 18.79 / 19.08 / 19.08; ER 16.94 / 14.43 / 16.58; EWC 1.11 / 0.00 / 0.28; L2P 0.00 / 2.09 / 1.30; DualPrompt 0.00 / 2.03 / 3.31; O-LoRA 0.00 / 0.00 / 14.22; er_cflat 14.17 / 16.65 / 16.96 | same | ✓ values (H1, M3 on what they are) |
+| `supp_agree` s7 oracle row | 62.8 / 74.9 / +12.1; group order holds on s7 | | ✓ |
+
+### B. Findings
+
+**HIGH**
+
+- **R10-H1. Two of the five dropped methods in the new disclosure are not what the runs are.**
+  - Where: main.tex:102 (Sec. 3, "the methods it dropped then (EWC, L2P, DualPrompt, O-LoRA, ER with C-Flat++) stayed
+    below naive training"); `supp_dropped.tex` row "ER + C-Flat++" and row "O-LoRA" (generator `DROPPED`); App. G
+    "How the comparison set was fixed". The same mislabel pre-exists in App. G `tab:prompt_lora` (caption
+    "Prompt/LoRA/C-Flat++ baselines") and its prose ("ER with C-Flat++ sharpness-aware optimisation ... its sharpness term
+    adds nothing over plain ER").
+  - Evidence, C-Flat++: `configs/method/er_cflat.yaml:17` `cflat_lambda: 0.0`; `doccl/methods/sam_step.py:98-112`: with
+    `cflat_lambda == 0` the step is exactly SAM (the curvature term is added only when λ > 0). No run overrode it (the
+    `_bert` runs record `cflat_lambda: 0.0` in `method_hparams`; the June runs predate hparam logging). Every `er_cflat`
+    row in the paper is ER + SAM.
+  - Evidence, O-LoRA: `results/cil_cord_o_lora_seed*` (and `dil_o_lora_seed*` LayoutLMv3) are dated 2026-06-18; the
+    orthogonality penalty of the port computed `A_curr.T @ A_past` instead of `A_curr @ A_past.T` until commit `c974159`
+    (2026-06-24, "repair O-LoRA/CL-LoRA ortho penalty"). These rows were trained without the constraint that defines O-LoRA.
+    (Their diagonals, 0.0 on sessions 2 and 3 on every seed, may be the bug.)
+  - Fix (15 min): rename everywhere to "ER with SAM" (App. G may add "our C-Flat++ port with its curvature weight at 0");
+    generator label `("ER + SAM", "er_cflat")`. For O-LoRA, either drop it from the list and the table (the conclusion
+    holds on EWC, L2P, DualPrompt), or keep it with a note "(run before the fix of the port's orthogonality penalty,
+    2026-06-24)". Mark the DIL O-LoRA / CL-LoRA LayoutLMv3 rows of `tab:prompt_lora` the same way (06-18/19 runs).
+
+**MEDIUM**
+
+- **R10-M1. Residue of R9-H1 in three sentences.**
+  - main.tex:153 ("What discriminates what"): "The error type separates drift from conflict only within the blocked
+    readout, memory against no memory". Within the blocked readout neither run has the conflict (H3 removes it by design);
+    the table shows drift (no memory: 84–94% to another session, 17–24% false claims) against reduced drift (memory). Write:
+    "The error type shows drift only within the blocked readout (memory against no memory); under neither readout does it
+    separate drift from conflict: ...".
+  - main.tex Conclusion: "what separates the conflict from drift is a suppressed current session that the memory does not
+    cure". Naive training has no suppressed session; the memory brings it (with a shared softmax). Write "a suppressed
+    current session, which appears only with a memory and a shared softmax".
+  - Contribution 1 and the Conclusion state "old entities are missed at 'O' with or without a memory" as a measurement.
+    For naive it is safe (recall 0, 8–21 FP spans in total). For CoLaR it is the span indicator the paper itself calls
+    "not a bound", which read 82% on a run whose per-token truth is 0%. Add "by a span-level indicator" in both places
+    (H0 already hedges it; Limitations already says so).
+- **R10-M2. H0's naive-vs-memory contrast has an unnamed confound, and the paper already holds the control.**
+  CoLaR differs from naive in more than the memory. Embeddings and layers 1–4 are frozen after session 1 (logs: "freeze
+  map — layers <4 + embeddings frozen"), and four stored documents are replayed per step. A reader can blame the
+  suppressed current session on lost plasticity. The Sec. 4 preamble says only "H0's raw-memory row changes several"
+  things, but the CoLaR row does too. The controls exist and refute that reading. CoLaR-SBR has the same freeze map,
+  memory and replay batch and learns every session to ≥ 81.6 on the diagonal (92.6/92.1/81.6/88.8/93.4,
+  95.0/92.9/93.8/88.7/92.7, 94.1/92.0/93.1/90.5/95.4). No-memory SBR has the same freeze map and learns every session to
+  ≥ 81.2. Fix (one clause in H0 and in "What discriminates what", and widen the preamble's "unless stated"): "the memory
+  run also freezes layers 1–4; with the same freezing, memory and replay, the per-session background learns every session
+  to at least 81 (App. D), so lost plasticity does not explain it."
+- **R10-M3. The dropped-methods comparison is weaker than the sentence reads, and "one protocol" cannot be verified.**
+  - The first grid uses raw scoring (joint reads 33). Under it, a model that keeps old classes is charged on every other
+    session's split, so "below naive" does not mean "weak". ER, which was kept, is also below naive on every seed
+    (16.9 / 14.4 / 16.6 vs 18.8 / 19.1 / 19.1). ER + SAM tracks ER (diagonals 55–97, final last-session 65–80) and is
+    below naive for the same reason.
+  - What actually separates the other dropped methods is that they learn no later session. EWC is 0.0 on sessions 4–5,
+    and L2P and DualPrompt 0.0 on sessions 3–5, every seed. O-LoRA is 0.0 on sessions 2–3 every seed (see H1).
+  - Protocol: the `metrics.json` files predate hparam logging (`c974159`), and the rows come in two batches. Naive, ER,
+    EWC, L2P and DualPrompt ran 06-16/17 with a recorded peak of 10.5–27 GB, so not on the 6 GB box. O-LoRA and ER + SAM
+    ran 06-18/19 with a peak of 3.7–5.6 GB. The 06-12 autonomous log also shows 3-epoch runs under the same run names
+    (overwritten later). "Same grid" holds by directory; same recipe is not shown.
+  - Fix: body "...the methods it dropped then (EWC, L2P, DualPrompt, O-LoRA, ER with SAM) either learned no later session
+    on some seed or tracked ER, which was kept (App. G)". Caption of `tab:dropped`: add "this scoring puts every method,
+    ER included, below naive; two batches of runs, hyper-parameters not recorded".
+- **R10-M4. "What discriminates what": the MiB-style loss alone does not separate H2 from H3.** The control described
+  in H2 applies MiB "in both directions", so it also marginalises the stale labels of replayed documents (the H1 side).
+  It separates "label content" (H1 + H2) from "normalisation" (H3). Separating the current side needs the never-stale
+  memory too, as H2's own last sentence says. Write "which the never-stale memory and the MiB-style loss decide".
+
+**LOW**
+
+- **R10-L1 (rule 7, pre-existing, touched).** main.tex:121 "within a point of joint training on DIL on average": CoLaR
+  87.6 / 88.3 / 87.4 vs joint 89.7 / 89.0 / 87.5, so seed 42 is 2.1 below. The abstract's "nearly matches" for ER on DIL:
+  86.2 / 88.7 / 88.6 vs 89.7 / 89.0 / 87.5 (3.5 on seed 42). Rule 7 asks per seed. Write "within about two points on
+  every seed" / "comes within 3.5 points of joint training on every seed".
+- **R10-L2.** The indicator row prints 0.0 for CoLaR-SBR and SBR-Recall, a negative value (implied FP > misses) clipped
+  at 0. It sits next to their per-token "wrong → O" of 4.9–6.2 / 4.4–28.4. Blank it where per-token outputs exist, or add
+  "clipped at 0" to the caption. The body says the indicator "reads 81%" (`\mNoBankBoundMax`, floor); the table says
+  81.9. Use one rounding.
+- **R10-L3.** H0 cites Tab. 2 for the old-span precision lower bound (71.6%); the table shows only the upper bound
+  (≤72.8–80.8). Cite App. B.
+- **R10-L4. Figure 1.**
+  - What works: legible at 110 dpi (scriptsize, about 7 pt), colour-blind-safe, and correct on who labels what
+    (session 1 stores `menu.price` on 4.50 and "O" on 9.00; session 5 labels 4.50 "O" and 9.00 `total_price`, which is in
+    session 5 per `session_types`). It is consistent with the SBR supervision rule (stored → block 1, current → block 5),
+    and the caption is true.
+  - Nits:
+    - In (a) the dashed current-document arrow starts under "total_price" (row 9.00), not under that document's "O"
+      (row 4.50), so it reads as "total_price trains O". Start it at the 4.50 row's "O".
+    - In (b) the arrows land on the class cells, not on O₁ / O₅.
+    - "total.∗" for block 5 suggests all total fields are there; block 4 holds six other total.* classes. Write
+      "total_price, ...".
+    - "One receipt line" shows two receipts. Call it "one pair of price tokens".
+- **R10-L5. Table 2.** It is set at about 6.5–7 pt after `\resizebox`, and its caption (11 lines) is longer than the
+  table. It is readable but dense. Move the definitions of "missed at O" and "false claims" to App. B and drop
+  `\resizebox` with `\footnotesize`.
+- **R10-L6. Generator verdict checks can pass vacuously.**
+  - `_gap_share` returns [] when a seed is missing in any of the three dicts, and `all([])` is True. `_clean` returns {}
+    when a cell's first source is not clean. The `recall` check iterates over an empty dict, and the `sbr` check uses
+    `max(..., default=-1)` for the oracle.
+  - Add `assert len(shares) == len(SEEDS)` (or require non-empty) in every check.
+  - `("sliced2","open")` is `True` by construction; that is acceptable because "open" claims nothing, but say so in the
+    docstring.
+  - Each check tests its verdict's main prediction. Minor gaps: `nobank supports` does not test "fails the way drift
+    does", and `oracle partly` does not test "below SBR". The `sbr` check covers the latter.
+- **R10-L7.** App. E "The legacy gate run of the same seed" is ambiguous now that two clean seeds exist: "of seed 42".
+- **R10-L8.** "Fixed after a first grid": the kept CPFD, IS3, LCA and CODA-Prompt also ran on CIL-CORD (10-16 to 10-21)
+  before the 10-21 freeze. App. G's "methods that fail on the scenario (CPFD, IS3) were kept" covers it. Optional:
+  "after a first grid and first runs of the kept methods".
+- **R10-L9.** Slack: References start at line 593 in the right column of p. 8. The column runs from line 565 to about
+  line 617, so the slack is about 24 lines, **≈ 0.45 column**, not 0.6. That figure is in the commit message only.
+- **R10-L10.** R9-L4 remainder (optional): `kalb2023principles`, `liu2023abr` and `chen2023star` still have no pages.
+- **R10-L11.** `\mNaiveIndMax` = 100 (ceil of 99.34) is unused; the table's 99.4 is the right print. Harmless.
+
+### C. R9 items
+
+| R9 | Status |
+|---|---|
+| H1 | **Fixed** in abstract, intro, contribution 1 ("reduced"), H0 and the naive column; three residual sentences (R10-M1) |
+| H2 | **Fixed** (true order, App. G table, SD-LoRA correctly "never run on CIL-CORD", no `results/*sd_lora*` exists); new mislabels (R10-H1) |
+| M1 | **Fixed** ("not a bound", App. B rewritten, old-span lower bound 71.6 added) |
+| M2 | **Fixed** (caption + prose "another tag of its own session, a B/I swap of the right type included") |
+| M3 | **Fixed** ("open", seed-42 increment 39.4 → 62.9, "prior work is mixed", "the current pull and the stale labels ... both remain") |
+| M4 | **Fixed** (footnote e, preamble scope, "does not isolate memory fidelity"); see R10-M2 for the CoLaR row |
+| M5 | **Fixed** (MORE: HAT masks on adapters of a frozen pre-trained transformer, OOD output from saved samples; SBR-Recall difference stated) |
+| M6 | **Fixed**. `caccia2022erace` exists (ICLR 2022; authors and title match). The description fits the code: `latent_replay.py:_current_ce`, `current_sliced: true` masks old classes only for current "O" tokens; `"all"` would be full ER-ACE. Gate logs show `true`. |
+| M7 | **Fixed** ("in our one run") |
+| L1 | **Fixed** (n=1 on the two Mixed legacy cells) |
+| L2 | **Fixed** ("closes most of the gap") |
+| L3 | **Fixed** (`zhai2023investigating` re-cited; 62 `\bibcite` = 62 cited keys, 0 orphans) |
+| L4 | **Partly** (`mo2024bpf`, `sassioui2026documents` fixed; three page fields remain, R10-L10) |
+| L5 | **Fixed** (caption: P overstates on the full test set) |
+| L6 | **Fixed** (both DIL cells †) |
+| L7 | **Fixed** with the vacuity caveat (R10-L6) |
+| L8 | **Fixed** (upper bounds round up at both ends) |
+| L9 | Dev item, not in the paper; unchanged |
+| L10 | **Fixed** (ladder on p. 3, before H0 on p. 4) |
+| L11 | **Fixed** |
+| L12 | **Fixed** ("is what stale stored labels predict (two seeds so far)") |
+
+### D. Question by question (brief)
+
+1. **Recomputation:** section A. The dropped table compares against `results/cil_cord_naive_seed*`, the June grid
+   (raw scoring), not the clean naive (18.8 / 18.3 / 17.8). Within that directory family the comparison is internally
+   consistent, but one recipe is not demonstrable (R10-M3).
+2. **H0:**
+   - The argument is now sound in direction: suppression of the current session is not a drift effect, and the oracle's
+     own suppressed sessions 3–5 fit the stale-label account (the session being trained is "O" in every stored document).
+   - The other plausible explanations are the frozen embeddings and layers 1–4 and the replay weight. The paper should
+     name them and cite its own controls (R10-M2).
+   - The replay-loss scale is 1.0 (`replay_task_balance` off). Four replayed documents against two current ones enter
+     as two token-mean losses with equal weight, so the replay weight is not an extra factor beyond the stored labels.
+3. **"What discriminates what", item by item:**
+   - (i) "Session being trained": correct with "under a shared softmax" added (R10-M2).
+   - (ii) "Within 5.3 points on every seed once the background is not shared": ✓.
+   - (iii) "Relabelled memory measures part of the stored side": ✓.
+   - (iv) H2 vs H3 "the MiB-style loss decides": partly (R10-M4).
+   - (v) Error type: R10-M1.
+4. **Rule 6/7:** every new number comes from a macro or a generated table. The two-seed oracle statements hold per seed,
+   and every joint comparison is per seed. Exception: the pre-existing DIL "within a point on average" / "nearly matches"
+   (R10-L1). No "upper bound"/"oracle" for joint training.
+5. **Figure:** R10-L4. Table 2: R10-L5.
+6. **Invariants** (archive build):
+
+   | Check | Result |
+   |---|---|
+   | `latexmk -pdf` | main 0, supp 0 |
+   | Undefined references/citations and "??" | 0 in both |
+   | Pages | main 11 pp.; body ends on p. 8, right column, line 592; References at 593; slack ≈ 24 lines (R10-L9). supp 18 pp. |
+   | `---` in tracked .tex and em-dashes in the PDF | 0 |
+   | Anonymity | "Anonymous CVPR submission"; Author field empty |
+   | Cross-references | "Tab. 1/2/3 of the main paper" = ladder / mech / main; Sec. 4.1 = H0; App. A–H letters unchanged; `tab:dil` and `tab:dropped` resolve |
+
+   **Moved, not deleted:** protocol details (App. A), pooling gap (App. B), rank-8 adoption (App. D, new sentence), DIL
+   table (App. F), the "reuse a delta" rule (App. C "Which delta a session trains"), the LexSlot detail (App. D), the
+   ER/DER++/LwF/CL-LoRA settings (App. G). The CL-LoRA single-adapter disclosure stays in the body (Sec. 5.3). Nothing
+   true and needed was lost.
+
+### E. Score
+
+As it stands the referee score stays at **3 (Borderline Reject)**, perhaps +0.25 over R9. The figure fixes the dense
+opening, the scoping of error types removes the R9-H1 overclaim, and the H2 "open" verdict is honest. But the
+discriminating rungs are still slots, and the only H2 evidence is legacy. The single change that would move it most is
+landing `colar_mib` and the never-stale `colar_r_oracle_pre` with three seeds each. They turn the ladder from "listed" to
+"tested", decide H2 against H3, and with the rest unchanged make a 4 realistic. Text fixes cannot substitute for them.
+
+### OPEN (not counted)
+
+- When oracle s123 lands: regenerate. "two seeds" becomes three. Check that `\nOracleLateMax` (2 to 15), `\nOracleNextMin`
+  (74), "below CoLaR-SBR on every seed" and the group order of App. B still hold. `\nOracleLast` becomes three values.
+- When `colar_dump` / `naive_dump` land: the indicator sentences (R10-M1, third bullet) can become per-token statements
+  or must be withdrawn.
