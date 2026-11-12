@@ -43,6 +43,7 @@
 %% Headline numbers shared with the main paper (generated, never typed by hand).
 \input{vals}
 \input{supp_vals}
+\input{supp_perclass_vals}
 
 \begin{document}
 \maketitlesupplementary
@@ -611,8 +612,8 @@ CoLaR-R, sliced replay loss & CIL-CORD & $10$ & fp16 & $50$ docs/session & $2$ \
 CoLaR, true-label memory refresh & CIL-CORD & $10$ & fp32 & $50$ docs/session & $1$ \\
 Gate controls, \cref{tab:conflict} & CIL-CORD & $10$ & fp32 & $50$ docs/session & $1$ or $3$ \\
 SBR, layers $1..11$ frozen & CIL-CORD & $10$ & fp32 & none & $1$ \\
-SBR-Recall, rank $8$ & CIL-CORD & $10$ & fp32 & $50$ docs/session, none & $1$, $1$ \\
-SBR-Recall, rank $64^{\S}$ & CIL-CORD, Mixed & $10$ & fp32 & none, $50$ docs/session & $3$, $1$ \\
+SBR-Recall, rank $8$ & CIL-CORD & $10$ & fp32 & $50$ docs/session + deltas, deltas & $1$, $1$ \\
+SBR-Recall, rank $64^{\S}$ & CIL-CORD, Mixed & $10$ & fp32 & deltas, $50$ docs/session + deltas & $3$, $1$ \\
 CoLaR-SBR + LexSlot & CIL-CORD, Mixed, DIL & $10$ & fp32 & $50$ docs/session & $3$, $3$, $3$ \\
 CoLaR, CoLaR-SBR, CPFD, IS3, LCA$^{\|}$ & DIL & $10$ & fp32 & CoLaR rows: $50$ docs/task & $3$ (IS3: $1$) \\
 First-grid rows$^{*}$ & DIL & $100$ (CODA-Prompt $30$) & unknown & ER, DER++: $200$ samples & $3$ \\
@@ -718,10 +719,10 @@ Every chart in this section is drawn by our figure generator from the same run f
 
 \begin{figure*}[t]\centering
 \includegraphics[width=\linewidth]{figures/perclass.pdf}
-\caption{\textbf{Per-class full-label F1} of the prediction-dump re-runs on disk (CIL-CORD, final model on the unmasked test set; seed 42, one run each; the legend names each run with its full-label F1). Classes grouped by the session that introduces them; n/a (grey): the class does not occur in the test set.}
+\caption{\textbf{Per-class full-label F1} of the four prediction-dump re-runs (CIL-CORD, final model on the unmasked test set; seed 42 only, one run each, each reproducing its clean run; the legend gives each run's full-label F1). Classes grouped by the session that introduces them; n/a (grey): the class does not occur in the test set.}
 \label{fig:perclass}\end{figure*}
 
-\paragraph{Per class (\cref{fig:perclass}).} The dump re-runs repeat a clean run with its per-token outputs saved; they are not table cells. In the CoLaR re-run the session-5 classes are almost never found (the suppressed newest session of rung H0) and most session-1 classes, which hold most of the test entities, are missed, while several session-2 and session-3 classes are kept. The naive re-run finds only the total price, a class of its last session, and the joint-training re-run finds almost every class that occurs in the test set. Re-runs still in the queue join the figure when they land.
+\paragraph{Per class (\cref{fig:perclass}).} The four dump re-runs repeat clean runs of seed 42 with their per-token outputs saved, and each reproduces the full-label F1 of its clean run; they are not table cells, and every statement here is about seed 42 only. Of the \pcPresent{} classes that occur in the test set, the joint-training re-run finds \pcFoundJoint{} (F1 above 0), the CoLaR-SBR re-run \pcFoundSbr{}, the CoLaR re-run \pcFoundColar{} and the naive re-run \pcFoundNaive{}; \pcBothMissed{} of the classes the CoLaR-SBR re-run misses are missed by the joint-training re-run too. In the CoLaR re-run the session-5 classes are almost never found (the suppressed newest session of rung H0) and the session-1 classes, which hold most of the test entities, are found only in part or not at all, while several session-2 and session-3 classes are kept. The naive re-run finds only the total price, a class of its last session.
 
 %% ============================================================================ J
 \section{Further related work, and comparators we did not run}
