@@ -392,6 +392,66 @@ def cil_allowed(cfg, scenario, model, task) -> set[int] | None:
     return allowed
 
 
+class _LabelTap:
+    """Iterates a loader exactly as given and keeps each batch's labels (for the dump)."""
+
+    def __init__(self, loader):
+        self.loader, self.labels = loader, []
+
+    def __iter__(self):
+        for batch in self.loader:
+            self.labels.append(batch["labels"])
+            yield batch
+
+    def __len__(self):
+        return len(self.loader)
+
+
+def _evaluate_and_dump(out_dir: Path, method, tid: int, loader) -> float:
+    """AGENT IMPL (2026-11-12): the full-label evaluation, also saving the final model's per-token
+    outputs on the unmasked test set to ``full_label_dump.pt`` (opt-in ``training.full_label_dump``).
+    Shared softmax: classifier logits captured by a forward hook during ``method.evaluate``.
+    Blocked readout (``method.eval_dump``): the block scores that evaluate() records itself.
+    Tokens = labelled first subwords (labels != -100), in loader order; ``doc`` = receipt index."""
+    tap, logits = _LabelTap(loader), []
+    blocked = hasattr(method, "eval_dump")
+    hook = None
+    if not blocked:
+        hook = method.model.model.classifier.register_forward_hook(
+            lambda mod, _i, out: None if mod.training else logits.append(out.detach().half().cpu())
+        )
+    try:
+        f1 = float(method.evaluate({tid: tap})[tid].f1)
+    finally:
+        if hook is not None:
+            hook.remove()
+    labels = [lb.cpu() for lb in tap.labels]
+    masks = [lb != -100 for lb in labels]
+    doc_ids = torch.arange(sum(len(lb) for lb in labels))
+    docs = torch.cat(
+        [
+            d[:, None].expand_as(lb)[m]
+            for d, lb, m in zip(
+                doc_ids.split([len(lb) for lb in labels]), labels, masks, strict=True
+            )
+        ]
+    )
+    dump = {
+        "gold": torch.cat([lb[m] for lb, m in zip(labels, masks, strict=True)]).short(),
+        "doc": docs.int(),
+        "id_to_label": dict(getattr(method.model, "id_to_label", None) or {}),
+        "full_label_f1": f1,
+    }
+    if blocked:
+        dump |= {k: method.eval_dump[tid][k] for k in ("e", "tag", "threshold")}
+    elif len(logits) == len(labels):
+        dump["logits"] = torch.cat([lg[m] for lg, m in zip(logits, masks, strict=True)])
+    else:  # a method whose evaluate() runs the head more than once per batch: keep gold only
+        log.warning("full-label dump: %d head calls for %d batches", len(logits), len(labels))
+    torch.save(dump, out_dir / "full_label_dump.pt")
+    return f1
+
+
 def add_full_label_f1(out_dir: Path, cfg, scenario, method) -> float | None:
     """AGENT IMPL (2026-11-11): score the FINAL model on the unmasked, full-label test set
     (``scenario.full_eval_dataset``) with no session restriction and append ``full_label_f1``
@@ -408,7 +468,14 @@ def add_full_label_f1(out_dir: Path, cfg, scenario, method) -> float | None:
             pin_memory=True,
         )
         tid = len(scenario.tasks) - 1
-        f1 = float(method.evaluate({tid: loader})[tid].f1)
+        f1 = None
+        if cfg.training.get("full_label_dump", False):
+            try:  # a failed dump must not cost the full-label F1 itself
+                f1 = _evaluate_and_dump(out_dir, method, tid, loader)
+            except Exception as e:
+                log.warning("full-label dump skipped: %s", e)
+        if f1 is None:
+            f1 = float(method.evaluate({tid: loader})[tid].f1)
         path = out_dir / "metrics.json"
         metrics = json.loads(path.read_text())
         metrics["full_label_f1"] = f1
