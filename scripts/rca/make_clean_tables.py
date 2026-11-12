@@ -897,9 +897,8 @@ MECH_ROWS = (  # (column label, method alias in metrics.json, analysis section, 
     ("Naive", "naive", "masked_splits", "shared"),  # R9-H1: the shared-softmax signature, no memory
     ("CoLaR", "colar", "masked_splits", "shared"),
     ("Relab.$^{r}$", "colar_r_oracle", "masked_splits", "shared"),
-    # per-token outputs on the unmasked test set (seed-42 re-runs): render only once they exist
-    ("CoLaR$^{d}$", "colar_dump", "full_label", "shared"),
-    ("Naive$^{d}$", "naive_dump", "full_label", "shared"),
+    # P14b (PM): the seed-42 prediction-dump re-runs duplicate seed 42 of a clean cell, so they
+    # never enter a column, range or mean here; they feed only the per-class figure (App. I).
     ("No mem.", "colar_sbr_noreplay", "masked_splits", "blocked"),
     ("CoLaR-SBR", "colar_sbr", "masked_splits", "blocked"),
     ("SBR-Recall", "colar_sbr_recall_r64", "masked_splits", "blocked"),
