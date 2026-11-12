@@ -2231,3 +2231,463 @@ The single-seed scope of the oracle is kept (Limitations, abstract), and so is t
 
 - When oracle s7/s123 land: regenerate, re-check `\nOracleScope`, the shares (a range at n = 3), "below joint training on the same seed", the group-order warning, and the five typed "(one seed)" (L1).
 - If the PM queues a complete refresh (H1, optional), compare it with `oracle` on the same seeds before any wording claims a label-side upper bound.
+
+## R9 (2026-11-12): audit of P11 (`8ce5bb4`, `3db7321`): the investigation restructure, and a referee report
+
+Snapshot: paper files at HEAD = `3db7321`. Scope: `git diff 5cfef5b..3db7321 -- paper_cvpr
+scripts/rca/make_clean_tables.py`, a full read of the new `main.tex` and the changed parts of `supp.tex`,
+`scripts/rca/mechanism_analysis.py`, `doccl/methods/colar_r.py` / `latent_replay.py`, `doccl/data/cord.py`
+(split construction), and the v11 queue. Numbers were recomputed by my own CPU script
+(scratchpad `recompute.py`) straight from `eval_dump.pt` (map_location cpu), `per_class_f1.json`,
+`matrix.npy`, `metrics.json` and logs, not from `mechanism_analysis.json` (which I then checked against).
+No generator, model, dataset or pytest was run. Citations were checked at source (arXiv / PMLR / ACL
+Anthology / Crossref / OpenAlex).
+
+**Oracle seed 7 at audit time (07:52).** Still running, in session 4 (log: `T3 ep1`). No metrics yet.
+Partial rows from the log: R[1,1] 94.1; R[2,·] 75.5 / 75.3; R[3,·] 55.7 / 81.4 / **13.8**. Refreshes so
+far "50 docs, 67 tokens" and "100 docs, 859 tokens". Nothing in the paper is false against it: session 3's
+diagonal (13.8) lies inside "2 to 15", session 2 rises one boundary later (75.3 → 81.4), and the
+"(seed 42)" on the relabel counts is right (s7's counts differ). Every "one seed" is still current.
+
+### Verdict: **BLOCK** (two HIGH, both text-only, about 40 minutes together)
+
+Every generated number recomputes, every ladder and mechanism cell matches the run files, the R8 findings
+are all fixed, the build invariants hold and every new citation exists and is described correctly. What
+blocks: (H1) the paper's first contribution says its direct measurements "tell the causes apart" by error
+type, but the same measurement on naive training, which is in the generated JSON and not in the paper,
+shows that "old entities missed at O" is what any shared-softmax run does, memory or not; the error-type
+signatures are tied to the readout, not to the cause. (H2) The new selection-procedure paragraph says the
+comparison set "was fixed before the class-incremental runs"; it was frozen on 2026-10-21, after a full
+CIL-CORD grid that included the methods it excluded. The facts favour the paper in both cases (the dropped
+methods were all weak; the suppressed-current-session evidence survives), so the fixes are wording plus
+one table row. Seven MEDIUM and twelve LOW follow.
+
+### A. Numbers recomputed
+
+**Mechanism table (`tab_mech.tex`), my recomputation from `eval_dump.pt` / `per_class_f1.json` per seed (42 / 7 / 123):**
+
+| Row | R | P | owner | →O | same | other | false | Rendered | OK |
+|---|---|---|---|---|---|---|---|---|---|
+| CoLaR, shared | 22.5 / 20.5 / 18.7 | ≤72.7 / 74.0 / 80.7 (FP unknown for 7/7/3 classes) | | | | | | 18.7–22.6, ≤72.8–80.8 | ✓ (outward rounding) |
+| Oracle (s42) | 77.2 | ≤88.2 | | | | | | 77.2, ≤88.2 | ✓ |
+| SBR, no memory | 5.6 / 0.4 / 13.2 | 6.1 / 3.5 / 10.7 | 10.6 / 16.8 / 17.5 | 0.0 ×3 | 6.6 / 16.1 / 10.0 | 93.4 / 83.9 / 90.0 | 17.04 / 24.30 / 22.23 | as rendered | ✓ |
+| CoLaR-SBR | 89.6 / 92.5 / 88.5 | 88.0 / 90.4 / 84.9 | 96.8 / 98.3 / 95.5 | 5.6 / 6.2 / 4.9 | 58.0 / 71.5 / 56.7 | 36.4 / 22.3 / 38.4 | 1.03 / 0.68 / 1.68 | as rendered | ✓ (but M2) |
+| SBR-Recall | 92.7 / 94.0 / 93.2 | 90.5 / 93.2 / 92.1 | 97.8 / 98.3 / 97.1 | 4.4 / 17.0 / 28.3 | 65.2 / 63.0 / 51.2 | 30.4 / 20.0 / 20.5 | 0.79 / 0.44 / 0.50 | as rendered | ✓ |
+
+Denominators: old entity tokens = 2,137 first-subword gold tokens of sessions 1–4 on their own splits; "→O / same / other" are
+shares of the wrong ones (they sum to 100); "false" = claims by block t, as the arg-max block above 0.5, on the non-session-t
+tokens of split t. Restricted span F1 from the dumps reproduces `matrix.npy` on 58 of 60 cells; the two exceptions are no-memory
+SBR s123 session 1 (13.1 vs 11.7) and SBR-Recall s7 session 4 (91.2 vs 91.7) (L9).
+
+**Macros in the new prose:**
+
+| Macro / claim | Recomputed | Rendered | OK |
+|---|---|---|---|
+| `\mColarImpPMin/Max` (implied precision, all sessions) | 71.8 / 72.1 / 79.1 | 71.8–79.2 | ✓ |
+| `\mColarMissedOMin` | (FN − FP_implied)/FN = 0.896 / 0.907 / 0.942 | 89 | ✓ value (M1 on the word "bound") |
+| `\mColarLastMin/Max` | R[5,5] 2.0 / 9.5 / 15.9 | 2.0–16.0 | ✓ |
+| `\mSessOneShare`, `\mTestSpans` | 744 of 744+140+143+180+99 = 1,306 → 57% | 57, 1,306 | ✓ |
+| `\mPoolGapMax` / `\mPoolGapNoBankMax` | max |pooled − full| over the rest: SBR s7 0.35 → 0.4; no-memory 3.67 / 0.58 / 3.67 → 3.8 | 0.4 / 3.8 | ✓ |
+| `\mNoBankBoundMax` | s7 0.818 → 81 (per-token: 0 O errors) | 81 | ✓ |
+| `\nSbrGapFullMin/Max` | joint − SBR full: 2.87 / 0.61 / 5.25 | 0.6–5.3 | ✓ |
+| `\nOracleNextMin/Max` (R8-L3) | R[4,3] 83.007, R[5,4] 74.644, floor/ceil | 74 / 84 | ✓ |
+| `\nOracleRelabelTrain/After` | s42 log 105/1019/1394, then 1239 after the last session | same | ✓ |
+| `\nRecallMixNoMem/Mem`, `\nSbrFrozen` | gate s42 44.66 / 85.94 / 14.77 (fp32) | 44.7 / 85.9 / 14.8 | ✓ |
+| "raw documents do no better (ER ... below every CoLaR seed)" | ER 26.9 / 22.0 / 24.0 vs clean CoLaR 33.6 / 32.4 / 34.4 | | ✓ (cross-protocol; M4) |
+| "on DIL CoLaR-SBR is below CoLaR" | SBR 86.76 / 84.77 / 87.08 vs CoLaR 87.58 / 88.30 / 87.38 | | ✓ per seed (L6) |
+| "Mixed without a memory ... blocks of the other schemas fall silent until their domain returns" | r64b matrix: FUNSD 87.6/90.8 → 0 at SROIE → 87.3/85.6 at the FUNSD revisit; SROIE and CORD end at 0.3 / 8.1 / 0.0 | | ✓ |
+| H3 "above the relabelled memory on every seed both have" | SBR s42 88.8/87.8 vs oracle 79.1/65.8 | | ✓ |
+
+**Ladder (`tab_ladder.tex`)**: every value is the existing clean or legacy cell already audited in R8 (naive, CoLaR, ER†,
+oracle n=1, sliced2† 62.86 / 69.23 / 49.45 → 60.5 ± 10.1, CoLaR-SBR, no-memory SBR, SBR-Recall, joint) plus the two
+Mixed gate values above. ✓. Rule 6: legacy cells carry †, the oracle carries n=1, no ratio mixes protocols. The two Mixed
+rows are single legacy seeds with no n mark (L1).
+
+### B. Findings
+
+**HIGH**
+
+- **R9-H1. The error-type "signatures" are the readout's, not the cause's; the naive run that shows it is omitted.**
+  - Where: contribution 1 (main.tex:70: "direct measurements that tell the causes apart (drift sends old entities to
+    another session's class through over-claiming blocks; the conflict leaves them missed ...)"); H0 (main.tex:121: "The
+    errors do not look like naive forgetting ... With a memory the model mostly misses old entities rather than confusing
+    them"); intro (main.tex:64: "misses most old entities and suppresses the session being trained, which drift does not
+    do"); abstract ("Forgetting is not simply harder: ... the old entities it still predicts are mostly right, but most are
+    missed").
+  - Evidence (`mechanism_analysis.json`, same indicator the paper uses for CoLaR):
+    - naive fine-tuning, shared softmax, no memory: old-span recall 0.0 on all three seeds; the whole final model makes only
+      8 / 9 / 21 false-positive spans on the full test set; the "missed entirely at O" indicator is **0.99 / 0.99 / 0.98**,
+      against CoLaR's 0.90 / 0.91 / 0.94. With so few FP spans the overlap proviso is far safer for naive than for CoLaR.
+    - So "old entities missed at O" is what a shared softmax does whether or not a memory is present, and "old entities sent
+      to another session's class by over-claiming blocks" was measured only on the blocked readout without memory. Each
+      signature is observed in one readout only; the measurements do not separate drift from conflict within one readout.
+    - Under the paper's own account naive CIL training also carries the current-document pull, so naive is not a
+      drift-only control either. The only clean drift-only setting is DIL, where no error decomposition was run.
+    - What does separate CoLaR from naive is real and should carry the argument: the session being trained is suppressed
+      (newest session 2.0–16.0 vs naive's every diagonal ≥ 78.6), and CoLaR keeps 19–23% of old spans with high precision
+      where naive keeps none.
+  - Fix (text + one generated row, about 30 min):
+    - add naive to `MECH_ROWS` (its R 0.0, and the indicator in a new column or in the prose);
+    - H0: drop "rather than confusing them" as the contrast with naive; say naive also misses old entities at "O" (≥ 98% by
+      the same indicator), and that what differs is the suppressed current session and the retained high-precision 20%;
+    - contribution 1: "direct measurements of where the errors go under each readout (with a blocked readout and no memory
+      drift sends old entities to another session's class through over-claiming blocks; with a shared softmax old entities
+      are missed at 'O' with or without a memory, and a memory adds a suppressed current session)";
+    - intro: "suppresses the session being trained, which naive training does not";
+    - abstract: keep "mostly right, most missed", add nothing, or replace by the suppressed-session fact.
+    - Contribution 1 also says the relabelled memory "removed" the stored-label side; per R8-H1 it removes part of it.
+      Write "reduced".
+
+- **R9-H2. "The comparison set was fixed before the class-incremental runs" (main.tex:95) is false.**
+  - Evidence: `results/cil_cord_ewc_seed42` dates from 2026-06-17; the June grid ran EWC, L2P, DualPrompt, O-LoRA,
+    ER + C-Flat++, CPFD, IS3, LCA and others on CIL-CORD (legacy scoring). The set was frozen on 2026-10-21 (project memory
+    "fixed-12 baselines"), and that decision explicitly settled "CPFD/IS3/CODA nulls on CIL-CORD", i.e. with CIL-CORD
+    results in hand. EWC, L2P, DualPrompt, O-LoRA, SD-LoRA and ER + C-Flat++ were excluded then.
+  - Why it is HIGH although it does not help the paper: the paragraph exists to disclose researcher degrees of freedom, and
+    a reviewer or reader who learns the date will discount everything else in it.
+  - The facts are benign: every excluded method stayed at or below ER on that grid (EWC 0.0 / 1.1 / 0.3, L2P 2.1 / 1.3 /
+    0.0, DualPrompt 0.0 / 2.0 / 3.3, O-LoRA 0.0 / 0.0 / 14.2, ER + C-Flat++ 16.6 / 14.2 / 17.0, against ER 16.9 / 16.6 / 14.4,
+    legacy scoring), and methods known to fail (CPFD, IS3) were kept.
+  - Fix (5 min): "The comparison set (one published method per family) was fixed after a first class-incremental grid
+    and before the runs reported here; the methods dropped then (EWC, L2P, DualPrompt, O-LoRA, SD-LoRA, ER with C-Flat++)
+    stayed at or below ER on that grid (App. G)." Put the grid numbers in App. G.
+
+**MEDIUM**
+
+- **R9-M1. The span-level indicator is called a bound in the body, and it fails in the anti-conservative direction.**
+  main.tex:121 "a span-level bound puts at least 89% of its missed spans entirely at 'O' (an indicator ...)". On no-memory
+  SBR s7 it reads 81.8% where the per-token truth is 0%: it can overstate by 80 points. App. B handles it honestly; the body
+  should not say "bound" or "at least". Write "an indicator (not a bound: on one blocked run it reads 81% where the per-token
+  count is 0; App. B) puts about 90% ...". Also: the paper can give a real lower bound on old-span precision instead of the
+  all-session one: TP_old / (TP_old + FP_implied,all) = **71.7 / 71.8 / 78.5%**, which is what "the old entities it still
+  predicts are mostly right" needs (an under-claim).
+- **R9-M2. The "same" column counts B/I swaps of the right type as confusions with "another class of their session".**
+  `decompose()` puts B-x→I-x and I-x→B-x into `to_same_session` (its docstring says so; the caption does not). For
+  CoLaR-SBR they are 17.3 / 12.3 / 12.5 points of the 58.0 / 71.5 / 56.7; without them within-session class confusions are
+  40.7 / 59.2 / 44.2%, so "most remaining errors ... are confusions inside a session" (main.tex:155) holds on 1 of 3 seeds.
+  Fix: caption "another tag of their session (including a B/I swap of the right type)"; prose "most remaining errors give the
+  token another tag of its own session". Better: add a "B/I" column or subtract it.
+- **R9-M3. H2's verdict word and its "remaining suspect".**
+  - The H2 cell "partly" rests on legacy, test-split-stopped runs (s.d. 10.1) compared across protocols with clean CoLaR,
+    and the sliced2 run changes both sides (sliced replay = the stored side, H1; sliced current = H2). The only
+    same-protocol, H2-specific number is seed 42's increment from slicing the current loss (gate 39.4 → 62.9).
+  - Fix: verdict cell "partly$^\dagger$" (or "open"), and one clause in the prose: "on seed 42 slicing the current loss adds
+    23.5 points to the sliced replay (both gate runs)".
+  - main.tex:149 "the current documents' pull is the remaining suspect": per H1's own description, the relabelled memory
+    still leaves the newest bank stale on earlier classes and every stored document stale on the session being trained.
+    Write "the current documents' pull and the stale labels the refresh cannot reach remain; the pre-session refresh and the
+    MiB-style loss separate them."
+  - main.tex:145 "prior work gives no reason to expect a separated readout to do better than it" overstates: offline,
+    Greenberg et al. found marginalisation at least as good as per-dataset outputs, but in segmentation SSUL's separated
+    sigmoids beat MiB (with other changes). Write "prior work is mixed: ...".
+- **R9-M4. "changes one thing against the run it is compared with" (main.tex:107) does not hold for H0's raw-memory row.**
+  ER vs CoLaR changes the memory format, the frozen layers 1..4, the replay path (whole network vs upper layers), the
+  buffer (200 vs 250), the replay batch, and the protocol (legacy, two fp16 seeds). So "Memory fidelity is not the
+  bottleneck, since raw documents do no better" (main.tex:123) is weaker than it reads. No uncompressed latent memory was
+  run on CIL-CORD (only on DIL). Fix: "(ER differs in more than the memory format; the raw-memory control with the same
+  readout, `er_sbr`, is queued)" and scope the preamble sentence to "unless stated".
+- **R9-M5. MORE's parameter isolation is omitted, and SBR-Recall's real difference from MORE is not stated.**
+  Related Work describes MORE as "a head per task with an out-of-distribution output on saved samples", but MORE also isolates
+  per-task parameters (HAT-masked adapters on a pre-trained transformer, per Lit A, B12), which is the SBR-Recall pattern. The
+  difference the paper can truthfully claim is that MORE needs saved samples to train each head's "none of mine" output,
+  whereas SBR-Recall's background logits are trained on each session's own negatives with no memory (Lit A threat 2). Add both
+  halves in one sentence.
+- **R9-M6. The sliced-current-loss control is ER-ACE-style masking and is not named so.**
+  `latent_replay.py:_current_ce` (`current_sliced: true`) masks old classes out of the softmax of current "O" tokens; its own
+  docstring cites ER-ACE. Lit A (threat 9) asks to say so and cite `caccia2022erace`. Naming it turns a reviewer question into
+  a reported control (an under-claim). Note also that it is not the "separated softmax with one shared background" listed
+  as not run in Limitations, so that line stays correct.
+- **R9-M7. Mixed SBR-Recall carries a boundary-condition claim on one legacy seed in the abstract.**
+  Abstract: "across schemas they cannot". Evidence: one fp32 gate seed (44.7†). Contribution 3 and Sec. 5.3 say "(one seed)";
+  the abstract does not. Add "(one seed)" or "did not in our run".
+
+**LOW**
+
+- **R9-L1.** Ladder rows "the same on Mixed" show 44.7† / 85.9† with no seed count; the caption's n=k mark covers clean seeds
+  only. Print n=1 on legacy single seeds too, or say "(seed 42)" in the row.
+- **R9-L2.** Abstract "What removes it is to stop sharing the background class": CoLaR-SBR is 0.6 to 5.3 points below joint
+  per seed. "What closes most of it" is the wording the body uses.
+- **R9-L3.** `refs_precompiled.bbl` has 61 entries, but `main.tex` cites 60: `zhai2023investigating` lost its citation in P11
+  and still prints as [54] with no back-reference. Re-cite it (GDI-Bench's sentence fits) or regenerate the `.bbl`.
+- **R9-L4.** Bibliography fields (all entries exist and match their records): `mo2024bpf` lacks LNCS 15074, pp. 463–480;
+  `sassioui2026documents` lacks pp. 1124–1129 and abbreviates four given names (Crossref: Mohamed El Kamili, El Mehdi
+  Benyoussef, Meriyem Chergui, Mohamed Ouzzif); `kalb2023principles`, `liu2023abr` and `chen2023star` have no pages.
+  Optional.
+- **R9-L5.** For blocked runs, the "P" column is precision on the splits, which omit receipts without that session's
+  entities, so it is an upper bound on the full test set as well (it matters only for no-memory SBR, whose pooled F1
+  overstates full-label F1 by 3.7). Add the ≤ there, or one caption clause.
+- **R9-L6.** main.tex:159 marks only CoLaR's DIL cell † ("$\nColarDil$$^\dagger$"); the CoLaR-SBR DIL cell is a legacy gate run
+  too.
+- **R9-L7.** Generator: the verdicts of "cell" rows (refutes / supports / partly) are typed, with checks only for the oracle
+  (between CoLaR and joint) and ER < CoLaR. A slot row that lands renders with an empty verdict cell and only a warning.
+  Make an empty slot verdict print "pending", and add one check per typed verdict (e.g. SBR above every oracle and CoLaR seed;
+  SBR-Recall within the gap).
+- **R9-L8.** `write_mechanism` macros use `down1` for `m*PMin` even when precision is an upper bound (72.7 vs the table's
+  72.8). Unused in the text; harmless.
+- **R9-L9.** `mechanism_analysis.py` labels `spans_restricted` "= matrix", but it reproduces the matrix on 58 of 60 cells
+  (exceptions in A). Not in the paper. Dev may want to log `repro_minus_matrix` in the table.
+- **R9-L10.** Layout: the ladder (`table*`, Tab. 1) floats to p. 5, after the H0–H2 text on p. 4, so a reader meets the rungs
+  before the ladder. Move the `table*` source before Sec. 3, so it lands at the top of p. 4.
+- **R9-L11.** Sassioui et al.'s abstract says no method "consistently" preserves prior knowledge under label-space shift, and
+  that domain transfer forgets the most for the (non-replay) methods they test. The paper drops "consistently". One clause
+  ("for the non-replay methods they test, domain transfer forgets most") would pre-empt a reviewer who reads it against the
+  paper's hook.
+- **R9-L12.** Sec. 4.2 "a session suppressed while current and recovered one boundary later is the stale-label mechanism seen
+  directly" sits next to App. E's "the run does not separate these two contributions". Both explanations are stored-label
+  effects, so the sentence is defensible; "seen directly" is still stronger than one seed allows.
+
+### C. Question-by-question (brief)
+
+1. **`mechanism_analysis.py`.** The definitions match the headers. Units: first-subword gold-labelled tokens; seqeval
+   spans per flat split; "old sessions" = splits 1–4 of the final model, pooled; "owner" = arg-max block above the
+   threshold is the gold class's session (the block index is the session index on CIL-CORD, checked: 5 blocks, `allowed` ids
+   0/13/25/37/49 + 12); "false claims" = claims by block t on the non-session-t tokens of split t. Precision for
+   shared-softmax rows is correctly an upper bound, since seqeval gives P = 0 when TP = 0. The exceptions are M2 (B/I in
+   "same") and L5. **The own-split false-claim column is meaningful**, because every such claim is an error whatever the
+   token truly is. It is the only precision-side token measure (17–24% without memory vs 0.4–1.7% with), so keep it. Its
+   denominator mixes true background with other sessions' entities, on receipts selected by containing a session-t entity
+   (`cord.py:_filter_by_labels`). Say that once in the caption. **The indicator is handled honestly in App. B, not in the
+   body** (M1).
+2. **Rungs.** The predictions are stated before the results in every subsection, as paragraphs titled "Prediction". The
+   one-word verdicts follow per seed under both metrics for H0, H1 (s42), H3 and H4 (CIL-CORD). For Mixed, see M7. H2 is
+   M3; "open" is defensible, "partly†" is the minimum. Evidence against the story: DIL SBR < CoLaR is reported, and so is the
+   oracle being partly true. The omitted contrary evidence is naive's error pattern (H1). Legacy cells are marked and never
+   share a ratio with clean ones. For the fixed label space, nothing is claimed beyond "follows from the design and was not
+   run" (✓). The plan's "predicted failures presented as confirmed predictions" was correctly not done for it.
+3. **Boundary refresh (R8-H1).** The code (`colar_r.py:after_task` → `_refresh_memory`, `n_labels < n_cur`;
+   `latent_replay.py:335` banks first) and both logs match every description. The descriptions are in the abstract, the
+   intro, the contributions ("relabelled memory", but see H1's "removed"), Sec. 4.2 ("documents stored before it ... the
+   session just finished keep their own labels ... no refresh can cover the session trained next"), the receipt paragraph,
+   the Conclusion, the ladder footnote ʳ and App. E. **Fixed.** `refresh_before_task` (`colar_r_oracle_pre`) is the
+   never-stale control. It is queued, and its ladder slot is in place. Oracle s7: see the header; nothing false yet.
+4. **Attribution, verified at source.**
+   - **ICE-O** (full text): frozen feature extractor; per-session `Softmax([δ; o_{t+1}])` on D_{t+1} only; inference by
+     arg-max over `[δ; o_1..o_{t+1}]`, Other iff max < δ; no stored samples. The paper's description is exact. The stated
+     SBR differences (learned per-session background; trainable trunk and old blocks from memory) are true.
+   - **MORE**: PMLR 199:548–563; the author order Kim, Liu, Ke matches PMLR (arXiv lists Kim, Ke, Liu). Head per task, OOD
+     trained with saved samples: ✓. Isolation omitted: M5.
+   - **ABR** (abstract): foreground shift = replayed images' background contains current objects, "the main reason" image
+     replay failed in IOD ✓.
+   - **BPF** (ECCV 2024): co-occurring past / present / future objects make the stage objectives conflict ✓.
+   - **SS-IL**: ✓.
+   - **MiB / PLOP / SSUL**: verified in R7 ✓.
+   - **Greenberg**: EMNLP 2018, 2824–2829; marginal likelihood over disjoint tag sets ✓.
+   - **Beryozkin**: ACL 2019, 140–150, tag hierarchy ✓.
+   - **Kalb & Beyerer** (full text, App. D): "freezing layers ... shifts the initial representation shift to later layers" ✓.
+     The mirror-image phrasing is right.
+   - **ShadowKV**: PMLR 267:57355–57373 ✓; per-sequence SVD of keys ✓.
+   - **STAR**: NeurIPS 2023, class prototypes replayed in CISS ✓ ("rivals" is modest).
+   - **Ma et al.**: ACL 2023, 5959–5979, DOI ✓.
+   - **Cha & Cho**: TMLR 2025, tuning and evaluating on the same scenario overstates CL methods ✓.
+   - **The two 2026 LayoutLM papers exist.**
+     - IWCMC 2026, pp. 1124–1129, DOI 10.1109/IWCMC69287.2026.11579834. Its abstract (OpenAlex) has the three regimes, four
+       layout models, SROIE / FUNSD / CORD / BuDDIE, and "none ... consistently preserve prior knowledge under semantic or
+       label-space shifts" (L11).
+     - Technologies 14(5):250, 2026. The abstract matches "gradient projection against a memory of task subspaces" on the
+       four datasets ✓.
+   - **Nothing marked KNOWN ALREADY is claimed as new.** The intro's "None of the ingredients is new" paragraph and
+     contribution 2's "not a new mechanism" follow Lit A §7 exactly. The forbidden phrases are all gone: "SSUL is the
+     closest", "real negatives at no extra cost", "one background class per model", "new format".
+   - **Under-claims:** the old-span precision lower bound (M1), the ER-ACE-style masking control (M6), and SBR-Recall
+     needing no replay to train its "none of mine" outputs, unlike MORE (M5).
+   - **Bibliography:** 61 `\bibitem`s = R8's 56 − 8 no longer cited (aljundi2018mas, bian2024cflat, farajtabar2020ogd,
+     kornblith2019similarity, mcdonnell2023ranpac, wang2022dualprompt, yoon2018den, zenke2017si) + 13 new. All 13 match
+     their publisher records; field gaps are in L4, and the orphan in L3.
+5. **R8 items.**
+
+   | R8 | Status |
+   |---|---|
+   | H1 | **Fixed** (see 3) |
+   | M1 | **Fixed** (the abstract no longer compares with the blocked readout; intro and Conclusion name CoLaR-SBR) |
+   | L1 | **Fixed** (`\nOracleN` everywhere) |
+   | L2 | **Fixed** (`_dump` skipped) |
+   | L3 | **Fixed** (floor / ceil) |
+   | L4 | **Fixed** (warning) |
+   | L5 | **Fixed** ("AA" named) |
+   | L6 | **Fixed** (App. G and the `tab:perseed` caption) |
+   | L7 | **Fixed** ("different runs") |
+   | L8 | **Fixed** (`tab:dil`) |
+   | L9 | **Fixed** (contribution 1 scope) |
+
+   - **Disclosures:** the 2×2, the teaser, the drift figure, the memory-content ladder and the Pareto figure moved to App. E
+     and F rather than being deleted. Precision, test-split stopping, the CL-LoRA port, port fidelity, "no privacy claim",
+     single-seed scopes, the LwF fp16 exclusion and cost are all still in the body. Nothing true and needed was deleted.
+   - **Cross-references:** supp "Tab. 1 / 2 / 3 / 4 of the main paper" = ladder / mech / DIL / comparison ✓; "Sec. 4.1" = H0 ✓;
+     App. letters unchanged ✓.
+6. **Invariants**, from `git archive 3db7321 paper_cvpr` in my scratchpad:
+
+   | Check | Result |
+   |---|---|
+   | Builds | `latexmk -pdf` main 0, supp 0 |
+   | References and citations | 0 undefined; 0 "??" |
+   | Pages | main 11 pp. The Conclusion ends and References begin in the **right column of p. 8** (line 632). pp. 9–11 hold only references, with no body text or float after p. 8. The body has essentially zero slack. supp 18 pp. |
+   | `---` and em-dashes | 0 in every tracked .tex; 0 em-dashes in either PDF |
+   | Anonymity | 0 hits; Author field empty |
+   | Empty slots | `tab_beyond.tex` is the header comment only and is never referenced (`tab:beyond` has no `\cref`). Slot rows absent, dump rows absent; no empty float or dangling reference. |
+
+   **Generator diff:**
+   - Slot logic: renders at `min_n` = 3 clean seeds, else nothing.
+   - Three-seed rule: `pick` for cells, `pick_clean_only` for full-label F1.
+   - Exclusions: `_dump` in `write_agree` and in the gap loop; smoke runs by directory name, and glob patterns cannot match
+     `cil_cord_smoke_*`. The o2/o3 runs are filtered by scenario name.
+   - Verdicts: see L7.
+   - Oracle "between CoLaR and joint" warning added; correct.
+
+### Part B. Referee report (advice; does not decide PASS/BLOCK)
+
+I read the rebuilt `main.pdf` once through as a CVPR reviewer new to the project.
+
+**Claims in my words.**
+- Replay that works under domain shift for token-level KIE fails under class-incremental label growth.
+- The authors test four explanations on CORD split into five sessions:
+  - harder drift: rejected, because a memory that works on DIL gives 31 full-label F1 here, and raw replay is no better;
+  - stale labels in stored documents: partly, because relabelling older stored documents lifts 32 → 79 on one seed;
+  - current documents mislabelling old entities: partly, from legacy loss-slicing runs, with the decisive MiB control
+    pending;
+  - the shared background normalisation: supported, because one background per session with the same memory reaches 89 vs
+    joint 92.
+- Per-token measurements on the blocked readouts show where the errors go.
+- Given the separated readout, per-session LoRA deltas replace the memory on one schema (93) but not across schemas (one
+  seed).
+- The readout itself is attributed to ICE-O and MORE.
+
+**Strengths.**
+1. It now reads as an argument. Each rung has a prediction paragraph, a result and "what it rules out", and the relabelled
+   memory being *partly* right is reported as such. This is rarer than it should be, and reviewers who check will reward it.
+2. Prior art is conceded up front ("None of the ingredients is new"), accurately (I verified ICE-O's training and inference
+   rule at source). That removes the R7 novelty landmine.
+3. The relabelled-memory control and the suppressed-current-session pattern (sessions 3–5 learned to 2–15 on their own
+   diagonal, recovering one boundary later) are genuinely informative, and they are the paper's best evidence.
+4. Selection procedure and dropped families are disclosed (once H2 is fixed); protocol accounting is meticulous.
+5. Effect size and stability are large: SBR-Recall's flat retention, and CoLaR-SBR's 89 under the mask-free metric.
+
+**Weaknesses, ranked by how much they lower the score.**
+1. **The decisive rungs are empty.** For an investigation paper, the experiments that discriminate between the hypotheses
+   have not been run:
+   - the MiB-style loss (H2);
+   - the never-stale memory (does a shared softmax with fully correct stored labels close the gap?);
+   - faithful ICE-O and SBR with a constant background (is SBR's learned background or its trainable trunk what matters?);
+   - raw memory with the blocked readout.
+
+   Today the ladder's discriminating evidence is one oracle seed and a legacy sliced-loss run with s.d. 10. A reviewer will
+   say the hypotheses are listed rather than tested.
+2. **The mechanism table measures only the blocked readouts.** The shared-softmax rows have recall and a precision bound
+   only. The one cross-readout signature claim is confounded (H1 above): the "conflict signature" is also what naive
+   training shows. The diagnosis of *why* the shared softmax fails is therefore still inferred from which remedy works, which
+   is R7's weakness 1.
+3. **One class-incremental dataset, one partition, one order, one backbone for every rung.** CORD's test split is 100
+   receipts, and a second CIL stream is not in the paper. "Evidence beyond one stream" holds Mixed and DIL legacy cells.
+4. **Contribution size.** With the mechanism conceded, the contribution is an analysis of one benchmark plus "a known
+   readout works well here". A CVPR reviewer weighs that against the CV-centric venue. Document AI is in scope, but the
+   insight has to be general to carry an analysis-only paper.
+5. **No figure until p. 8.** The mechanism, the conflict on one receipt, and the readout itself (the SBR schematic moved to
+   the appendix) are all text only. The first five pages are dense prose with tables.
+6. **Residual protocol heterogeneity:** † cells in H0 (ER), H2 and H4 (Mixed), and the whole DIL table.
+
+**Three rebuttal questions.**
+1. With every stored document carrying true labels *before* each session (`colar_r_oracle_pre`) and a MiB-style unbiased CE on
+   current documents, all with a shared softmax, how far below CoLaR-SBR does the model stay on each seed? If it reaches
+   ~85, what is left of H3?
+2. A faithful ICE-O (frozen encoder, constant Other, no memory) on CIL-CORD: how close is it to SBR-Recall? If close, what does
+   SBR-Recall add beyond ICE-O plus LoRA?
+3. With a shared softmax, what fraction of old-entity *tokens* are predicted "O", for naive, CoLaR and the relabelled memory
+   (per-token dumps, not the span indicator)? Does it differ between naive and CoLaR at all?
+
+**Score (CVPR six-point scale).**
+- **As it stands: 3, Borderline Reject**, spread 2–4. The expected score is up about a quarter point on R7's 3, not a full point.
+- **Why it rose:**
+  - CISS / continual-NER reviewers no longer have a missed-prior-art reject: the attributions are correct and upfront;
+  - the hypothesis structure and the honest "partly" verdicts read as research;
+  - the selection-procedure paragraph pre-empts the hyperparameter critique (after H2 is fixed).
+- **Why not more:**
+  - an investigation is judged by its discriminating experiments, and the discriminating rungs are slots;
+  - conceding the mechanism removes the effect-size "method" carrot that earned R7's document-AI reviewer's 4;
+  - evidence is one dataset.
+- **If `colar_mib`, `colar_r_oracle_pre`, ICE-O and the const-background SBR land with three seeds each before the freeze**,
+  and the ladder's verdicts stay as they are: **4 (Borderline Accept)** is realistic. It needs a figure and H1-type
+  overclaims removed. If MiB comes close to SBR, the paper stays a 3, but an honest one ("background shift transfers to
+  documents; here is which part each fix removes").
+
+**(a) Research or a table with captions?** Mostly research now. H1 and H3 are convincing on their own: H1 because it
+reports the partial success and its mechanism, H3 because it shows both signatures across memory on / off within one readout.
+H0 is weaker than it reads (ER confound, naive shares the signature). H2 is a placeholder with legacy evidence. H4 is
+convincing on CIL-CORD, anecdotal on Mixed. The ladder table itself is the weak spot: five of its future rows are slots, and
+the verdict column currently reads like captions on known numbers.
+
+**(b) Pitch.** Not "a method" and not "we found background shift". Pitch it as *"where the label conflict lives in replay
+under label growth, measured, on token-labelled documents"*. The deliverable is the decomposition:
+- the stored side, removed by relabelling and the never-stale memory;
+- the current side, removed by the MiB loss;
+- the shared normalisation, removed by the readout with no true labels, plus the error accounting.
+
+Plus a practical finding for document AI: a known per-session background readout plus whole-document replay closes 90–100% of
+the gap where every published continual method in the comparison stays at the naive level. The title should follow, e.g.
+*"Why Replay Fails When the Schema Grows: Taking Apart the Background Conflict in Continual Document Understanding"*; "Memory
+Is Not Enough" is fine if the never-stale memory confirms it.
+
+**(c) The single figure (about 0.35 column, top of the right column of p. 1 or p. 2).** The one-receipt conflict
+instance as a two-panel schematic:
+- left: a stored receipt (item prices = `menu.price`, total = O) and a current one (total = `total.total_price`, item
+  prices = O) both pushing one shared O logit on look-alike price strings, with arrows for the stored pull and the current
+  pull;
+- right: the same two receipts each training only their own block's O.
+
+It replaces the receipt paragraph (about 8 lines), states H1 / H2 / H3 visually, and brings back the readout picture the body
+lost. The error-decomposition bar chart is the better figure *once* per-token shared-softmax dumps exist (naive / CoLaR /
+oracle / no-memory SBR / SBR as stacked →O / same / other bars). Today two of its five bars would be bounds, so do not build
+it yet. The ladder as a diagram duplicates Tab. 1; skip it.
+
+**(d) What to cut (the body has zero slack; five ladder rows plus a figure need about 0.5 column).**
+- `tab:dil` and its paragraph in H0 go to App. F (about 0.3 column). Keep one sentence: "replay retains under domain shift
+  on four encoders (App. F)".
+- The memory paragraph (Sec. 5.2) goes to 4 lines: CoLaR is a component.
+- Related Work "Latent and compressed replay" and "Where forgetting lives" merge into one 6-line paragraph.
+- The receipt paragraph becomes the figure.
+- Ablations: drop the LexSlot sentence and the rank-8 detail (App. D has both).
+- "Cost" goes to two lines.
+- `tab:main`: drop the DIL column (it duplicates `tab:dil` / App. F) or the four sub-naive baseline rows' Mixed cells.
+
+**(e) Queued runs by value now (each CIL-CORD seed ≈ 1.5–2 h; about 90 GPU-hours remain before the freeze).**
+1. **`colar_r_oracle_pre` ×3 and `colar_mib` ×3, interleaved by seed** (s42 of both first). Together they *are* the
+   investigation (H1 complete, H2 decided). With only one of them the ladder still has a hole.
+2. **Per-token full-label dumps of the shared-softmax runs** (`colar_dump`, `naive_dump`, and an oracle dump if cheap; s42).
+   Cheap, and they fix weakness 2 and rebuttal question 3. Already queued: keep them before ICE-O.
+3. **Faithful ICE-O ×3** (cheap: frozen encoder, head-only) and **SBR with constant background ×3**. These are the two
+   comparators that define what SBR / SBR-Recall add over the prior readout. ICE-O first, since it is minutes per seed if
+   head-only.
+4. **`er_sbr` ×3**: fixes the H0 confound and answers "is CoLaR needed".
+5. **Oracle s7 / s123** (running / queued): needed for the H1 row to stop being n = 1. s123 can wait behind 1–3 if time is
+   short; s7 is nearly done.
+6. **BROS CoLaR-SBR ×3**: a second backbone for H3. Moderate.
+7. **CIL-FUNSD**: thin (3 types, 50 forms); a referee will still say "one dataset". Run it only if the above are done.
+8. **Mixed** SBR / joint clean: low for the story now; Mixed is a boundary-condition anecdote either way.
+
+Still missing, not queued:
+- a token-level shared-softmax error split on DIL (the only drift-only setting), which would give the drift signature
+  under a shared softmax and repair H1 properly; two seed-42 dump runs;
+- a weight-tied-background SBR (SS-IL with shared O; Lit A §9.3a), which isolates "separate normalisation" from "separate
+  background";
+- an uncompressed latent memory on CIL-CORD (one seed) for H0's "fidelity is not the bottleneck".
+
+**Changes in order of value per hour.**
+
+*Text only:*
+1. R9-H2 (5 min).
+2. R9-H1 plus the naive row in `tab_mech` (30 min).
+3. R9-M1 (both halves) and R9-M2 (15 min).
+4. R9-M3, M4 and M7 (20 min).
+5. R9-M5 and M6 (MORE isolation, the ER-ACE naming plus citation; 15 min, including the bib entry).
+6. Move the ladder `table*` earlier (R9-L10) and the cuts in (d) (45 min).
+7. The receipt figure (2–3 h of TikZ; the highest-value single addition to the reading experience).
+8. The LOW items (30 min).
+9. After `colar_mib` lands, apply the plan's H2 decision rule *before* touching the title.
+
+*GPU:* as in (e). Interleave `oracle_pre` and `colar_mib` by seed; keep the dumps; run ICE-O before constant-background SBR;
+then `er_sbr`; everything else is optional.
+
+### OPEN (not counted)
+
+- When oracle s7 lands: regenerate; check that `\nOracleLateMax` ("2 to 15") still holds (s7 session 3 = 13.8 so far), that
+  sessions 3 and 4 rise at the next boundary on s7 (the generator warns otherwise), `\nOracleN` = "two seeds", and that
+  `mechanism_analysis.json` is regenerated before `tab_mech` (the oracle row is n = 1 until then).
+- When any ladder slot lands: its verdict must be written by hand (L7); re-audit the rung's prose against the per-seed numbers.
