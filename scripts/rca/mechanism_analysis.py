@@ -292,6 +292,28 @@ def aa_vs_full(matrix: np.ndarray, metrics: dict, span_w: list[int]) -> dict:
     }
 
 
+def implied_full_fp(pooled: dict, full_f1: float | None) -> dict | None:
+    """Every gold span sits, complete, in exactly one session split, so the pooled own-class TP
+    and FN are the full-label TP and FN (same final model, same receipts). Then the full-label F1
+    fixes the full-label FP: FP = 2TP/F1 - 2TP - FN. A missed gold span that received ANY wrong
+    predicted span costs at least one FP, so (FN - FP) / FN lower-bounds the share of missed gold
+    spans the model labelled entirely O (a span-level background error). Approximate: assumes
+    the seqeval spans of the flat split sequences equal those of the full test sequence AND that
+    a wrong predicted span overlaps at most one missed gold span. The second assumption fails
+    when wrong tags run together into long spans (no-memory SBR seed 7: bound 0.82, token-level
+    dump 0 O errors), so this is an indicator; full_label_dump.pt settles it per token."""
+    if not full_f1:
+        return None
+    tp, fn = pooled["tp"], pooled["fn"]
+    fp = 2 * tp / (full_f1 / 100) - 2 * tp - fn
+    return {
+        "full_tp": tp,
+        "full_fn_missed_gold_spans": fn,
+        "full_fp_implied": fp,
+        "min_share_missed_spans_all_O": max(0.0, (fn - fp) / fn) if fn else None,
+    }
+
+
 def run_all() -> dict:
     ids, i2l, span_w = session_layout()
     types = [types_of(i, i2l) for i in ids]
@@ -324,6 +346,7 @@ def run_all() -> dict:
         pooled = (r.get("masked_splits") or {}).get("pooled_all_sessions_spans")
         if pooled:
             r["aa_vs_full"]["pooled_own_class_f1_from_splits"] = pooled["f1"]
+            r["aa_vs_full"]["implied"] = implied_full_fp(pooled, m.get("full_label_f1"))
         out["runs"][rd.name] = r
     return out
 
