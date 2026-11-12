@@ -3265,3 +3265,62 @@ Scope: `git diff 2ec05b1..642048c -- paper_cvpr scripts/rca` (worktree = `642048
 - R11b-L2 (the `is3.py` docstring authors) is still open. It is code only.
 
 The referee score is unchanged at **3 (+0.25)**.
+
+## R12 (2026-11-12): audit of P17 (`11f87d4`): CoLaR-SBR dump in the per-class figure, SBR-Recall Memory cells
+
+Scope: `git diff 49fd09b..11f87d4 -- paper_cvpr scripts/rca` (worktree = `11f87d4` for these paths).
+- **Independent recomputation.** I recomputed from `results/clean_2026-11/*/full_label_dump.pt` and `metrics.json` with my
+  own script (seqeval by document; blocked readout decoded from `e`/`tag`/`threshold`). It does not import either
+  generator.
+- **Generator re-run.** I re-ran the `11f87d4` table generator with `OUT` in my scratchpad, against the
+  `mechanism_analysis.json` of 17:57 that holds the four dump runs. Every generated `.tex` is byte-identical to the
+  committed one, with no warning.
+- **Builds.** I built both PDFs from `git archive 11f87d4 paper_cvpr` and rendered supp p. 20 (paragraph) and p. 23
+  (Fig. 13, also cropped at 160 dpi).
+
+### Verdict: **PASS**
+
+1. **Dump = clean run, and no cell.**
+   - `cil_cord_colar_sbr_dump_seed42` has full-label F1 88.830 and AA 87.757, equal to `cil_cord_colar_sbr_seed42`
+     (88.830 / 87.757). My blocked-readout decoding of the dump also gives 88.83.
+   - The other three dumps match their clean seed-42 runs as before (CoLaR 32.38 / 33.59, joint 91.70 / 91.13, naive
+     13.22 / 18.79).
+   - The run's `method` is `colar_sbr_dump`. `_mech_runs` matches on exact method name, `MECH_ROWS` has no `_dump` entry,
+     and make_clean_tables.py:331 and :1025 skip `_dump`.
+   - The table re-run is byte-identical, so `tab:mech`, `vals.tex` and every clean cell are untouched by the dump.
+2. **Per-class paragraph and caption** (seed 42, recomputed; "found" = F1 > 0 on a class with test support):
+   - 23 classes occur ✓.
+   - Found: joint 21, CoLaR-SBR 20, CoLaR 15, naive 1 ✓ (= `supp_perclass_vals.tex`).
+   - CoLaR-SBR misses `menu.itemsubtotal` (support 6), `total.emoneyprice` (2) and `total.total_etc` (3). Joint misses
+     `menu.itemsubtotal` and `total.total_etc`, so "2 of the classes the CoLaR-SBR re-run misses are missed by joint
+     too" ✓.
+   - CoLaR session 5: `total.total_etc` 0, `total.total_price` 2, so "almost never found" ✓.
+   - CoLaR session 1: 31 / 0 / 0 / 19 / 0 / 17, so "found only in part or not at all" ✓ (no stronger than the data).
+   - CoLaR session 2 is kept at 75 / 56 / 87 / 84; session 3 at 42 / 50 / 45 on three of five classes. "Several kept" ✓.
+   - Naive: only `total.total_price` (95), a session-5 class ✓.
+   - "Seed 42 only" is stated in both the caption and the paragraph ✓.
+   - Rule 7: no at / within / matches / above sentence. "Each reproduces its clean run" is true for both metrics.
+3. **`tab:legacyprotocol`, SBR-Recall Memory** (checked against each run's recorded `docs_per_task`):
+   - Rank 8, CIL-CORD: `cil_cord_colar_sbr_recall_seed42` (`docs_per_task` 50, AA 80.5) and `..._d0_seed42` (0, AA 82.5).
+     "50 docs/session + deltas, deltas", seeds 1, 1 ✓.
+   - Rank 64: the CIL-CORD gate runs `..._r64_seed{42,7,123}` (`docs_per_task` 0) = "deltas", 3 ✓. Mixed
+     `mixed_..._r64c_seed42` (`docs_per_task` 50, AA 85.9) = "50 docs/session + deltas", 1 ✓.
+   - See L1 for the Mixed no-memory runs.
+4. **Invariants:**
+   - `latexmk -pdf`: main 0, supp 0. 0 undefined references or citations, 0 "??", 0 overfull.
+   - Main 11 pp.: Conclusion on p. 8, References at the top of p. 9. Supp 25 pp. 0 `---` in any .tex.
+   - Fig. 13 is legible:
+     - The four-entry legend sits clear of the session labels.
+     - Colours are the same as in the other figures (CoLaR orange, CoLaR-SBR blue, joint black, naive grey).
+     - Absent classes are marked "n/a".
+
+**LOW (optional)**
+- R12-L1. `tab:legacyprotocol`'s rank-64 row covers on Mixed only the run with the memory (`r64c`). The paper also uses the
+  Mixed no-memory gate run `mixed_colar_sbr_recall_r64b_seed42` (`docs_per_task` 0, AA 44.7; `tab:ladder` H4 and
+  `\nRecallMixNoMem`). App. D describes the first Mixed run `..._r64_seed42` (AA 62.1). Neither appears in the table.
+  Fix: for Mixed, write "deltas, 50 docs/session + deltas" with seeds "1, 1", or add a row. This was already missing
+  before this round.
+- R11b-L2 (the `is3.py` docstring authors) is still open. It is code only.
+
+The referee score is unchanged at **3 (+0.25)**. Clean DER++-250 with full-label F1 (queue v12, `36f1db8`) is one of the
+items listed for a 4.
