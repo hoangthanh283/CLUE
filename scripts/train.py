@@ -68,6 +68,7 @@ from doccl.methods.frozen_ptm import RanPAC, SimpleCIL
 from doccl.methods.gauss_replay import GaussReplay
 from doccl.methods.hgt import HGT
 from doccl.methods.hybrid_routed_prompt import HybridRoutedPrompt
+from doccl.methods.ice_o import ICEO
 from doccl.methods.is3 import IS3
 from doccl.methods.l2p import L2P
 from doccl.methods.larm import LARM
@@ -306,6 +307,7 @@ METHOD_REGISTRY = {
     # the plastic bucket, composed with replay. Falsification-risk track (EWC precedent).
     "colar_meta": CoLaRMeta,
     "colar_mib": CoLaRMiB,  # D14b control: CoLaR + shared softmax + MiB-style unbiased CE
+    "ice_o": ICEO,  # D18 comparator: ICE-O (Liu & Huang 2023), frozen encoder, constant Other
     # LARM: CoLaR replay fused with a lexically-routed additive feature-rewrite memory (replay
     # writes the memory values, OCR-cosine routing reads them). Targets BWT×FWT Pareto-dominance.
     "larm": LARM,
@@ -1246,6 +1248,7 @@ def main(cfg: DictConfig) -> None:
         "colar_knn",
         "colar_meta",
         "colar_mib",
+        "ice_o",  # standard forward: its head hook swaps in the ICE-O logits
         "larm",
         "nullspace_analytic",
         "fisher_mask",

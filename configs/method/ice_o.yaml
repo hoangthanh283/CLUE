@@ -1,0 +1,9 @@
+name: ice_o
+# ICE-O (Liu & Huang, Findings ACL 2023, arXiv 2305.16559): encoder frozen at pre-trained
+# weights, one linear head per session trained on softmax([Other=0; session tags]), no memory;
+# inference = largest tag logit across heads if > 0, else O. See doccl/methods/ice_o.py.
+other_logit: 0.0
+lr: 1.0e-4  # the paper's detection learning rate
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0

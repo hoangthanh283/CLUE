@@ -27,7 +27,7 @@ import logging
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 from torch.utils.data import DataLoader
 
 from doccl.eval.metrics import compute_eval_metrics
@@ -134,6 +134,10 @@ class CoLaRSBR(CoLaR):
         self._dump: dict | None = None  # filled only inside evaluate()
         self.eval_dump: dict[int, dict] = {}  # latest per-task block scores; saved by train.py
         self.neg_weight = float(config.get("sbr_neg_weight", 1.0))
+        # AGENT IMPL (2026-11-12, D18): sbr_const_o fixes every block's background logit at 0
+        # (ICE-O's constant Other) instead of learning it; supervision, memory and routing are
+        # unchanged. The sbr_o heads are still created (state_dict shape) but never used.
+        self.const_o = bool(config.get("sbr_const_o", False))
         self.blocks: list[torch.Tensor] = []
         self.block_domains: list[str] = []
         self.sessions: list[tuple[set[int], str]] = []  # (annotated head ids, schema domain)
@@ -199,7 +203,10 @@ class CoLaRSBR(CoLaR):
         )
 
     def _block_logits(self, logits: torch.Tensor, feat: torch.Tensor, b: int) -> torch.Tensor:
-        o = self.model.sbr_o[b](feat.to(self.model.sbr_o[b].weight.dtype))
+        if self.const_o:
+            o = torch.zeros_like(logits[..., :1])
+        else:
+            o = self.model.sbr_o[b](feat.to(self.model.sbr_o[b].weight.dtype))
         return torch.cat([o.to(logits.dtype), logits[..., self.blocks[b]]], dim=-1)
 
     def _block_ce(self, logits, feat, labels, b: int, mode: str = "full") -> torch.Tensor:

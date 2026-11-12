@@ -1,0 +1,14 @@
+name: colar_sbr
+run_alias: colar_sbr_const_o
+# CoLaR-SBR with every block's background logit fixed at 0 (ICE-O's constant Other) instead of
+# learned (D18). Everything else identical to colar_sbr.yaml.
+sbr_const_o: true
+sbr_threshold: 0.5
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 8
+docs_per_task: 5
+replay_batch_size: 4
+rank_r: 64
