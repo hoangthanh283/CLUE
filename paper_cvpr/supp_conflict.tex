@@ -3,17 +3,18 @@
 \toprule
 Row & Source & 42 & 7 & 123 & h/run \\
 \midrule
-CoLaR, shared softmax & rescore$^{\dagger}$ & 28.8 & 31.9 & -- & 1.4 \\
+CoLaR, shared softmax & clean & 33.6 & 32.4 & 34.4 & 1.6 \\
 CoLaR, shared softmax (gate run) & gate$^{\dagger}$ & 34.1 & -- & -- & 2.0 \\
 Replay loss sliced to classes alive at storage & rescore$^{\dagger}$ & 44.2 & 39.8 & -- & 1.4 \\
 Replay loss sliced (gate run) & gate$^{\dagger}$ & 39.4 & -- & -- & 1.9 \\
 Replay and current losses sliced & gate$^{\dagger}$ & 62.9 & 69.2 & 49.4 & 2.3 \\
 \quad + model pseudo-labels written into the memory & gate$^{\dagger}$ & 48.0 & -- & -- & 2.1 \\
 \quad + pseudo-labels in both directions & gate$^{\dagger}$ & 44.1 & -- & -- & 2.4 \\
-True-label memory refresh (not deployable) & gate$^{\dagger}$ & 61.2 & -- & -- & 2.1 \\
+True-label memory refresh (not deployable) & clean & 65.8 & -- & -- & 1.8 \\
+True-label memory refresh (gate run) & gate$^{\dagger}$ & 61.2 & -- & -- & 2.1 \\
 SBR, no memory & clean & 21.2 & 19.6 & 24.0 & 1.2 \\
 SBR, no memory, layers 1..11 frozen & gate$^{\dagger}$ & 14.8 & -- & -- & 1.0 \\
 CoLaR-SBR & clean & 87.8 & 91.3 & 86.2 & 2.1 \\
-Joint training (reference) & rescore$^{\dagger}$ & 92.8 & 90.5 & 92.4 & 0.4 \\
+Joint training (reference) & clean & 91.1 & 90.5 & 92.1 & 0.3 \\
 \bottomrule
 \end{tabular}
