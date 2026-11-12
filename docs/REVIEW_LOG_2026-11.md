@@ -3470,3 +3470,63 @@ What still blocks a 4 is unchanged:
 - a second backbone for H3 on CIL-CORD.
 
 **Score: 3 (Borderline Reject), now +0.5 over R10.**
+
+## R13b (2026-11-12): confirmation of P19 (`06c1a0b`) against R13
+
+Scope: `git diff 0d95f7f..06c1a0b -- paper_cvpr scripts` (worktree = `06c1a0b`). I built both PDFs from
+`git archive 06c1a0b paper_cvpr` and rendered main p. 8 and supp pp. 23–24.
+
+### Verdict: **PASS**
+
+| R13 | Status and evidence |
+|---|---|
+| H1 | **Fixed.** `make_image_table.py:36` and both tables read "Latent memory, 500/session". `grep "/class"` over every `.tex` of the archive returns nothing. |
+| M1 | **Fixed, and true for every row.** Caption: "All rows but naive and joint freeze at least the embeddings and layers 1..4 after session 1". Run logs: CoLaR, CoLaR-SBR, no-memory SBR and the relabelled memory print "freeze map — layers <4 + embeddings frozen". SBR-Recall prints "base frozen after task 0" (`colar_sbr_recall.py:102-109`, `freeze_backbone()`: the whole trunk, so "at least" holds). Naive and joint print no freeze. |
+| M2 | **Fixed.** `\imgErTwoKMB` = 1,204: 2,000 × (3·224·224·4 + 8) B = 1,204.24 MB. This is what the code stores. `er.py:87` adds every training batch, `buffer.py:42` clones every tensor of each example, and the vision items are `{pixel_values: float32 (3,224,224), labels: int64 0-d}` (`vision.py:22-24,51`). The buffer size of 2,000 is read from the recorded hparams. The heading is now "competitive with raw replay at 2.5× the items". |
+| M3 | **Fixed.** Contribution 3: "the latent memory is competitive with raw replay and the head-locus reading recurs (one-seed probe), while SLCA and RanPAC lead (App. L)". True. The body sentence keeps "SLCA and RanPAC lead, and SBR is not run". |
+| M4 | **Fixed** on both sides. |
+| M5 | **Fixed** ("seed 42; \cref{tab:matrices}": the 2.03 gain is on clean seed 42). |
+| L1 | **Fixed.** RanPAC is cited in the body and in App. L. |
+| L2 | **Fixed** ("CoLaR reaches 79.5 / 55.3"). |
+| L3 | **Fixed** ("among the continual methods"). |
+| L4 | **Fixed.** Caps 100 vs 20 are stated; my log check gives early stops by epoch 8 (no CA) and 12 (SLCA), before either cap. |
+| L5 | **Fixed** (latent memory `#999933`). |
+
+M4 in detail:
+- **Image probes.** `cil_cifar100_rcaBank_seed42_vit` against `bank500_seed42`: the recorded hparams differ only by keys
+  that newer code logs at their defaults (`rank_r` 0, `analytic_head` none, …) plus the dump flags. So "a second run of
+  the uncompressed latent memory" is true. `cil_imagenet_r_colar_pp_seed42_vit` has `rank_r` 128 and `epochs` 20, so
+  "a CoLaR run (rank 128, 20-epoch cap)" is true.
+- **Document probes.** `{dil,cil_cord,mixed}_colar_pp_seed42` record `epochs` 5 and `rank_r` 128, so "CoLaR runs with a
+  5-epoch cap" is true.
+- **Labels and prose.** The table rows are labelled with ^v and "variant run". The prose says "on seed-42 probe runs
+  (a second run …, a CoLaR run …)" and "This rests on one seed".
+
+**Bibliography.**
+- `refs_precompiled.bbl` differs from `0d95f7f` only by `{62}` → `{63}` and the `mcdonnell2023ranpac` entry.
+- The `\nocite` only names keys that the old .bbl already held, so a BibTeX regeneration keeps them. It cannot change
+  the printed list, which is the whole .bbl.
+- Main's list is 63 entries (62 + RanPAC), and 63 `\bibcite` in `main.aux`. The only change to the list is the new [34];
+  the rest renumber by one.
+- Main is still 11 pp.
+
+**Shortened sentences.** Nothing needed elsewhere was lost.
+- The ablation caption dropped the per-tick definitions. "True" no longer says "every document for joint training";
+  the body still says so ("true labels in the memory"), and the table makes it obvious.
+- The ablation intro dropped "the ladder asks which hypothesis".
+- The comparison-set sentence dropped "the memory and the head-locus diagnosis carry over", which contribution 3 and
+  App. L now carry, correctly.
+
+**Invariants.**
+- `latexmk -pdf`: main 0, supp 0. 0 undefined references or citations, 0 "??", 0 overfull, 0 `---`.
+- Main 11 pp.: the Conclusion ends p. 8, References at the top of p. 9. Supp 27 pp.
+- Tabs. 23–25 and Fig. 18 render legibly.
+
+**LOW (optional)**
+- R13b-L1. supp.tex:733 (App. L Setup) still says "We test the memory and the drift diagnosis". App. L tests the
+  head-locus reading. Write "the memory and the head-locus reading".
+- R13b-L2. App. L "What transfers": "… against 2,000 raw images, which take 1,204 MB as our buffer stores them (float32
+  at 224×224), and no pixel" reads as if "no pixel" belongs to the raw images. Move it: "… as latents, no pixel
+  (5,000 …)".
+
+The referee score is unchanged at **3 (Borderline Reject), +0.5 over R10.**
