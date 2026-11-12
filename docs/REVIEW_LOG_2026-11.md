@@ -2969,3 +2969,196 @@ finding is above LOW.
   the memory, the same replay)".
 - R10b-L2: `gap_macros` takes the max of the signed gap joint − method for a "within" claim. Use `abs(...)`. The value is
   the same today.
+
+## R11 (2026-11-12): audit of P14 (`dffff14`) and P14b (`964049f`): new exhibits, oracle at three seeds, LCA optimiser
+
+Scope: `git diff b644525..964049f -- paper_cvpr scripts/rca` (worktree = `964049f` for these paths).
+- **Independent recomputation.** A throwaway script in my scratchpad reads `results/clean_2026-11/*/metrics.json`,
+  `matrix.npy`, `per_class_f1.json`, `eval_dump.pt` and `full_label_dump.pt` on CPU. It imports neither generator.
+- **Generator re-run.** I re-ran `make_clean_tables.py` with `OUT` redirected to the scratchpad. Every generated `.tex` is
+  byte-identical to the committed one, with no warning.
+- **Builds.** I built both PDFs from `git archive 964049f paper_cvpr` and rendered every page that carries a new exhibit
+  (90 dpi, with 200–250 dpi crops).
+- No GPU, dataset or pytest was used. The queue was running `cil_cord_joint_dump_seed42` (START 13:04).
+
+### Verdict: **BLOCK** (two HIGH, text and one table cell, about 15 minutes)
+
+Every number in the new exhibits recomputes, and the legacy cells are unchanged from `b644525`. The dump re-runs enter no
+mean, range or table. The move to the appendix lost nothing, and the build invariants hold. Two things block:
+- P14b turned a per-seed macro into a mean inside an "ends at" sentence (rule 7).
+- The new baseline card says our LCA port changes nothing, which our own port contradicts.
+
+### A. Numbers recomputed (seeds 42 / 7 / 123)
+
+| Exhibit / cell | Recomputed | Rendered | OK |
+|---|---|---|---|
+| Clean cells, `tab:ladder` / `tab:main` / F2(a) bars (mean ± s.d., ddof 1) | naive AA 18.79/18.27/17.78 → 18.3±0.5, full 13.0±0.2; joint 91.3±0.8 / 92.0±0.4; CoLaR 33.5±1.0 / 30.7±1.5; **relabelled 65.81/62.76/62.37 → 63.6±1.9, full 79.09/74.91/75.45 → 76.5±2.3**; no-mem SBR 21.6±2.2 / 11.4±2.3; CoLaR-SBR 88.4±2.6 / 89.1±2.0; SBR-Recall 91.9±0.6 / 92.6±1.0 | same; F2(a) bars and dots match by eye at 200 dpi; reference lines 92.0 / 13.0 | ✓ |
+| H2 legacy bar | 62.9 / 69.2 / 49.4 → 60.5±10.1, hatched | same | ✓ |
+| Legacy (†) cells of `tab:main` | cell-by-cell against `b644525`: unchanged | | ✓ |
+| Memory column | `replay_memory_bytes`: CoLaR 100,672,000; CoLaR-SBR 100,672,250; SBR-Recall 56,623,104 (identical over seeds) | 100.7 / 100.7 / 56.6 MB | ✓ |
+| `\nOracleShare(Full)` | AA 56.0 / 52.2 / 48.4; full 78.7 / 72.4 / 73.1 | "48 to 56", "72 to 79" | ✓ |
+| Oracle below joint **and** CoLaR-SBR, both metrics, per seed | 65.8<87.8, 62.8<91.3, 62.4<86.2; 79.1<88.8, 74.9<91.2, 75.4<87.1 | "partly"; H3 "above the relabelled memory on every seed" | ✓ |
+| Oracle diagonals, sessions 3–5 | s42 6.8/2.2/14.7; s7 13.8/13.9/3.9; **s123 36.3/6.2/3.9** | "2 to 37" (outward) | ✓ |
+| Oracle next-boundary rise R[4,3], R[5,4] | 83.0, 74.6; 87.5, 81.6; 75.8, 77.2 (every one rises) | "74 to 88" | ✓ |
+| `\nOracleLast` | 14.7 / 3.9 / 3.9 | **7.5 (mean)** | ✗ H1 |
+| `\nOracleLastShare` | 99 / 1306 = 7.6% | 8 | ✓ |
+| `tab:mech` relabelled R / P (`per_class_f1.json`) | R 77.22/71.58/72.91; P 88.17/87.01/86.27 | 71.5–77.3; 86.3–88.2 (P bound rounded up) | ✓ |
+| F2(b) (mean over seeds) | span R: naive 0, CoLaR 20.6, relab. 73.9. Per-token "correct" from `eval_dump.pt`: no-mem 4.5, SBR 92.0, Recall 94.4. Wrong-token shares (→O / same / other): SBR 5.6/58.0/36.4, 6.2/71.5/22.3, 4.9/56.7/38.4; Recall 4.4/65.2/30.4, 17.0/63.0/20.0, 28.3/51.2/20.5; no-mem 0/6.6/93.4, 0/16.1/83.9, 0/10.0/90.0 | bars; `tab:mech` ranges (outward) | ✓ |
+| F2(c) (newest R[5,5], old mean) | naive (93.9,0.0)(91.4,0.0)(88.9,0.0); CoLaR (2.0,41.5)(9.5,38.2)(15.9,39.0); relab. (14.7,78.6)(3.9,77.5)(3.9,77.0); no-mem (92.9,3.3)(92.8,1.3)(92.4,6.8); SBR (93.4,86.3)(92.7,91.0)(95.4,83.9); Recall (94.8,90.5)(94.3,92.2)(94.4,91.2); joint (92.5,90.8)(91.5,90.3)(94.5,91.5) | plotted | ✓; caption holds per seed |
+| Heatmaps (mean matrices) | naive diagonal 93.9/91.9/93.2/86.1/91.4, final row 0 except 91.4; CoLaR final 20.9/59.2/43.3/34.8/9.2; relab. final 82.3/76.8/73.8/77.8/7.5; no-mem 4.0/8.8/1.1/1.4/92.7; SBR 90.8/83.4/87.9/86.2/93.8; Recall 94.1/89.7/92.3/89.1/94.5; joint 93.6/90.3/93.2/86.4/92.8 | same | ✓ |
+| Trajectory (mean of R[i,:i+1]) | CoLaR 93.9/71.6/47.2/41.2/33.5; relab. 93.9/71.6/50.6/56.0/63.6; no-mem …/21.6; SBR 93.9/93.0/89.8/89.3/88.4; Recall …/91.9; end points = AA | plotted | ✓ |
+| Routing (pooled, % of row) | no-mem rows 6/61/33/0/0/0, 7/60/33/0/0/0, 32/33/33/0/1/0, 19/45/31/5/0/0, 2/3/1/0/94/0; SBR row 2 21/78/0/0/0/1, others ≥ 96 on the diagonal | same | ✓ |
+| Spans per session | 744/140/143/180/99 = 1,306; 57% | same | ✓ |
+| Per-class F1 (Fig. 13, `full_label_dump.pt`, seqeval by document) | CoLaR dump 32.38 (= clean s42 32.38, AA 33.59 = 33.59); naive dump 13.22 (= clean s42). CoLaR: s1 31/0/0/19/0/17, s2 75/56/87/84, s3 0/0/42/50/45, s4 35/31/9/0/9/0, s5 0/2; naive: only total_price 95 | same | ✓ App. I prose holds |
+
+The dumps also give the per-token picture the span indicator stands in for, on seed 42 only. Of the old-session gold tokens
+that are wrong, CoLaR puts 97.7% at "O" and naive training 99.6%. That supports the indicator sentences on that seed. It
+is not a cell, and I do not ask for it to become one.
+
+### B. Findings
+
+**HIGH**
+
+- **R11-H1 (rule 7). "the last session ... ends at 7.5" is a mean that no seed reaches.**
+  - Where: main.tex:141 (H1 Result: "ends at $\nOracleLast$") and supp.tex:357.
+  - Evidence: `\nOracleLast` comes from `_per_seed` (make_clean_tables.py:642), which prints the mean once n = 3. The
+    per-seed values are 14.7 / 3.9 / 3.9. Rule 7 asks that every "at" sentence hold per seed. P14b introduced this
+    (it read "14.7/3.9" before).
+  - Fix: print the range, e.g. `v["nOracleLast"] = _span([m[-1,-1] for m in mats.values()], "{:.1f}")`, which renders
+    "3.9 to 14.7". Or keep the per-seed list.
+- **R11-H2. The baseline card says our LCA port changes nothing; our own port says otherwise.**
+  - Where: `supp_baselines.tex` LCA row, "Our port changes" = "--" (generator `CARD`, make_clean_tables.py:1289).
+  - Evidence: `doccl/methods/lca.py:21-25` lists the differences. A single growing head replaces LCA's per-task heads.
+    The class Gaussians are per BIO token class, and "O" is excluded from sampling (`ca_skip_O: true`,
+    `configs/method/lca.yaml`). The card discloses the same head change for CPFD and IS3 ("one growing token head
+    (published: per-task classifiers)"). Hiding it for LCA makes the card wrong and inconsistent.
+  - Fix: "one growing token head (published: per-task heads); per-token-class Gaussians, O excluded".
+  - The optimiser disclosure itself is correct. `lca.py:141-150` is SGD (momentum 0.9, weight decay 5e-4, cosine, lr
+    0.01). `lca.py:268-271` is the realignment SGD at 5e-3. Every LCA run records lr 0.01 / ca_lr 0.005 / wd 5e-4 (CIL-CORD
+    and Mixed rescore; DIL s42/7/123).
+  - No other baseline departs from the stated protocol undisclosed. Recorded hparams: AdamW 5e-5 and wd 0.01 for ER,
+    DER++, LwF, CODA-Prompt, CL-LoRA, CPFD and IS3 (code: `er.py`, `der.py`, `lwf.py`, `prompt_base.py`, `cl_lora.py`,
+    `cpfd.py`, `is3.py`). The epoch caps (100, or 30 for CODA-Prompt and CL-LoRA) and the rescore precision are legacy
+    settings already disclosed in `tab:legacyprotocol`.
+
+**MEDIUM**
+
+- **R11-M1. "72to79%" and "48to56%" are typeset in math italics.** P14b changed `\nOracleShare(Full)` to "48 to 56" /
+  "72 to 79", but they are used inside `$...\%$`. Rendered p. 5, lines 284–285 read "72*to*79%". The same happens at
+  supp.tex:355. Fix: drop the `$` around them (`\nOracleShareFull\%`), or have the generator emit `\text{ to }`.
+- **R11-M2. "one published method per family" contradicts the new grouped `tab:main`.** main.tex:106. The table now shows
+  Replay (ER, DER++), Prompt/LoRA (CODA-Prompt, CL-LoRA) and Continual NER (CPFD, IS3), so two methods in three of the five
+  families. Fix: "eight published methods from five families (\cref{tab:main})".
+- **R11-M3. Fig. 2(a) shows five "queued" placeholders** (raw mem. + SBR, relabel before, MiB loss, const. bg, ICE-O).
+  These are experiments not run, and Tab. 1, which the caption says panel (a) draws, does not have these rows. In a
+  submission this reads as unfinished work and points straight at the missing H2 control.
+  - Fix: render a slot only once its runs exist, the rule `tab_ladder.tex` already follows (make_paper_figs.py:149-152,
+    skip `c["slot"]`). Keep the "queued" text in H2's prose only.
+  - If the PM wants the slots shown, the caption must say "(not in Tab. 1)".
+- **R11-M4. Fig. 2(b) is cited for things it does not show.**
+  - main.tex:151 cites `fig:findings`b for "old-session recall stays at 71.5 to 77.3%, against 88.4 to 92.6% for
+    CoLaR-SBR". Panel (b) draws span recall only for the shared-softmax runs. For CoLaR-SBR it draws the per-token
+    "correct" share, 92.0 on the mean, a different quantity from the 88.4–92.6 span recall.
+  - main.tex:184 says "we measure the routing directly (\cref{fig:findings}b; App. B)". Panel (b) shows tag
+    correctness, not which block claims a token.
+  - Fix: cite "App. B, Tab. 3" for the recall comparison. For routing, cite "App. B, Tab. 3; App. I, Fig. 12".
+
+**LOW**
+
+- R11-L1. main.tex:73 (contribution 1): "rests on \nOracleN{} so far" → "rests on three seeds".
+- R11-L2. supp.tex:240 says "... 3.7 encoder-layer equivalents ..., which is the figure in the main paper". The body
+  dropped the Cost paragraph, so delete the clause.
+- R11-L3. supp.tex:676: "every method but LCA, below". Nothing below describes LCA. Write "(LCA: App. G)".
+- R11-L4. supp.tex:359 and 387 say "(cited in the main paper)". The supplement now has its own bibliography (App. J),
+  so cite `caccia2022erace` and `ramasesh2021anatomy` directly.
+- R11-L5. supp.tex:708: "With a shared softmax the curves fall at every boundary ...; the relabelled memory rises again
+  after session 3". The relabelled memory is itself a shared softmax. Write "Without the refresh, the shared-softmax
+  curves fall at every boundary".
+- R11-L6. `fig/method.tex`.
+  - The diagram is faithful to Sec. 5 and `colar_sbr.py`: freeze map below layer 4, rank-128 layer-4 SVD with boxes,
+    labels and session, Δ₂..Δ₅ with Δ₁ = 0, claim e_b = 1 − p_b(O_b) > 0.5.
+  - One label is off: "layers 5..12, base θ₀" is true only of SBR-Recall. Under CoLaR and CoLaR-SBR these layers keep
+    training. Write "layers 5..12 (SBR-Recall: frozen base θ₀)".
+- R11-L7. Fig. 13: a class absent from the test set (NaN, e.g. `menu.vatyn`, `void_menu.*`) looks the same as F1 = 0.
+  Grey its tick label or print "n/a".
+- R11-L8. Fig. 2(c): joint training, CoLaR-SBR and SBR-Recall overlap top right, and naive and no-memory SBR overlap
+  bottom right. The caption claims nothing about them, so this is acceptable. An inset or jitter is optional.
+- R11-L9. The baseline card renders at about 5 pt after `\resizebox`. It is legible zoomed, small in print. Consider
+  splitting the hyper-parameter column.
+  - Also, CL-LoRA "keeps: orthogonality penalty, distillation" should be checked against He et al. 2025.
+  - The port also keeps gradient reassignment (`shared_grad_scale`), which the card omits.
+- R11-L10. In `figures/spans.pdf`, the "180 (14%)" label touches the dashed equal-share line.
+- R11-L11 (pre-existing). main.tex:149: "Its seeds are not complete". No `cil_cord_colar_mib` run exists on disk; write
+  "It has not run yet".
+- R11-L12. R10b-L1 ("same freezing and replay", H0) and R10b-L2 (signed max in `gap_macros`, make_clean_tables.py:1071)
+  are still open. Both are optional.
+
+### C. Checks by question
+
+1. **Numbers:** section A. All match, except the rule-7 print of `\nOracleLast` (H1). The `tab:mech`, F2(b) and routing
+   per-token values match my recomputation from `eval_dump.pt` to the outward rounding.
+2. **Rule 6/7:** the bars, dots and cells are clean only with three clean seeds. Legacy is hatched or dashed with †.
+   - `MECH_ROWS` holds no `_dump` run. The dumps appear only in Fig. 13, labelled "seed 42, one run", and they reproduce
+     the clean seed-42 runs exactly.
+   - Relabelled-memory sentences at three seeds:
+     - "partly" is justified: 48–56% (AA) and 72–79% (full) of the gap, below joint and CoLaR-SBR on every seed under
+       both metrics.
+     - "recovers much of the gap" ✓; "below joint training" ✓.
+     - "learned **only** to 2 to 37": still fair. All nine values are ≤ 36.3 against naive diagonals ≥ 78.7 on every
+       seed. Note that the 37 is session 3 on s123, which CoLaR without the refresh learned to 54.6 on that seed; the
+       paper claims nothing about that comparison.
+     - "rise to 74 to 88 one session later" ✓ (all six rise).
+     - "ends at 7.5" ✗ (H1).
+3. **`tab:bench` and the card.**
+   - `tab:bench` against `scenarios.py`, App. A and `dil_remapping.py`:
+     - 30 classes / 61 tags, 6 per session ✓.
+     - DIL 4 classes / 9 tags ✓.
+     - Mixed: 6 sessions, 3 + 4 + 5 = 12 classes, 25 tags, 3 schemas ✓.
+     - 149/50, 626/347, 800/100 ✓.
+   - Card venues against `refs_precompiled.bbl`: NeurIPS 2019 / 2020, ECCV 2016, CVPR 2023 / 2025, EMNLP 2023, Findings
+     ACL 2024, ICLR 2026 ✓.
+   - Card hyper-parameters equal the recorded `method_hparams` of the first seed ✓. Seed counts ✓.
+   - LCA: H2.
+4. **Moved content:** nothing was lost, and nothing was strengthened.
+   - Related work → App. J.
+   - Comparator list → App. J.
+   - Sliced-both 3-seed mean ("about 60 ... 20-point spread", true: 62.9/69.2/49.4) and the pseudo-label rows → App. E.
+   - Conflict-on-one-receipt paragraph → App. E.
+   - Ablations (`\nSbrFrozen`, calibration ≤ 0.6) → App. E.
+   - Cost (100.7 MB, 57 MB, 3.7×) → App. C.
+   - Dropped-methods detail → App. G.
+   - `tab:mech` → App. B.
+   - Body pointers resolve (App. B, C–E, G, I, J). The supplement's "Tab. 3 / Fig. 2b / Fig. 2 and 4 / Fig. 1 of the main
+     paper" match the new numbering. One stale pointer remains (L2).
+5. **Figures:**
+   - Legible at print size (6.5–7 pt), axes labelled, one colour per method (Okabe-Ito) in F2(a), F2(c), Figs. 10, 11
+     and 13.
+   - Captions are self-contained and true, except the M4 citations and L5.
+   - `fig:method` is faithful (L6).
+6. **Build/form:**
+   - `latexmk -pdf`: main 0, supp 0. 0 undefined references or citations, 0 "??".
+   - Main is 11 pp.; the body ends on p. 8 (Conclusion, right column), and References start at the top of p. 9.
+     Supp is 25 pp.
+   - 0 `---` in any .tex; Author empty; no names in the figure PDF metadata.
+   - Every new float is referenced.
+
+### D. Referee view
+
+The paper now shows its evidence.
+- Fig. 2 lets a reader see the ladder, the error destinations and the suppressed newest session in one place.
+- `tab:main` with Memory and Readout columns makes the comparison legible.
+- App. I gives the matrices, spreads, routing and trajectories a reviewer would ask for.
+
+What is still missing:
+1. **H2 has no picture because it has no data.** The MiB-loss and never-stale controls are not run, and Fig. 2(a) now
+   advertises that (M3).
+2. **The comparison is almost entirely legacy.** No baseline has a clean cell or a full-label F1, which is the paper's
+   headline metric.
+3. **H3 on CIL-CORD has one backbone.** The B+ plan's multi-backbone requirement is unmet for the central claim.
+4. **The shared-softmax error split rests on an indicator.** The seed-42 dumps support it but are not reported.
+
+**Score: 3 (Borderline Reject), +0.25 over R10.** Presentation improved, and the evidence did not. What would move it to
+4:
+- `colar_mib` and the relabel-before control at three seeds;
+- clean ER (and DER++) on CIL-CORD with full-label F1;
+- CoLaR-SBR on a second backbone on CIL-CORD.
