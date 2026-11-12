@@ -7,9 +7,9 @@ ER & NeurIPS 2019 & Replay & reservoir buffer replayed in every step & -- & 200 
 DER++ & NeurIPS 2020 & Replay & replay of documents with labels and stored logits & -- & 200 raw documents + logits \\
 LwF & ECCV 2016 & Regularisation & distillation of the old logits towards the previous model & -- & previous model \\
 CODA-Prompt & CVPR 2023 & Prompt, LoRA & attention-weighted prompt components with an orthogonality penalty, frozen encoder & prompts prepended to the input sequence (an input-prepend variant) & none (prompt pool) \\
-CL-LoRA & CVPR 2025 & Prompt, LoRA & orthogonality penalty, distillation towards the previous model & one shared rank-8 adapter retrained each session (published: random-orthogonal shared and block-wise task-specific adapters, early-exit distillation); gradient reassignment at scale 1, i.e.\ off & none (one shared adapter) \\
+CL-LoRA & CVPR 2025 & Prompt, LoRA & orthogonality penalty, distillation towards the previous model & one shared rank-8 adapter retrained each session (published: random-orthogonal shared and block-wise task-specific adapters, early-exit distillation); gradient reassignment at scale 1, i.e.\ off & previous model, past adapter matrices \\
 CPFD & EMNLP 2023 & Continual NER & confidence pseudo-labels, logit and attention-map distillation, adaptive CE factor & one growing token head (published: per-task classifiers); sample weights set to 1 & previous model \\
 IS3 & Findings ACL 2024 & Continual NER & distillation on ``O'' tokens, head-row gradient surgery, prototype replay & one growing token head (published: per-task classifiers) & previous model, class prototypes \\
-LCA & ICLR 2026 & Merging & per-session fine-tuning (SGD), TIES backbone merge, Gaussian classifier realignment & one growing token head (published: per-task heads); Gaussians per token class, ``O'' excluded & per-session backbones, class Gaussians \\
+LCA & ICLR 2026 & Merging & per-session fine-tuning (SGD), TIES backbone merge, Gaussian classifier realignment & one growing token head (published: per-task heads); Gaussians per token class, ``O'' excluded & base and per-session backbones, class Gaussians \\
 \bottomrule
 \end{tabular}
