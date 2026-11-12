@@ -60,6 +60,12 @@ STYLE = {
     "sbr": ("CoLaR-SBR", "#0072B2"),
     "recall": ("SBR-Recall", "#009E73"),
     "joint": ("Joint training", "#000000"),
+    # ladder controls not run yet: drawn only once their three clean seeds exist (Tol muted)
+    "er_sbr": ("Raw memory + SBR", "#DDCC77"),
+    "oracle_pre": ("Relabel before each session", "#882255"),
+    "colar_mib": ("MiB-style loss", "#AA4499"),
+    "sbr_constbg": ("Constant background", "#44AA99"),
+    "ice_o": ("ICE-O", "#332288"),
 }
 SEED_MARK = {42: "o", 7: "s", 123: "^"}
 HATCH = "////"
@@ -116,16 +122,15 @@ def ladder_cells() -> list[dict]:
             continue
         if kind == "slot":
             aa = pick_clean_only(aa_s, "AA")
-            if len(aa[0]) < min_n:
-                out.append({"key": key, "rung": rung, "slot": True, "interv": interv})
-                continue
+            if len(aa[0]) < min_n:  # R11-M3: a slot appears only with its three clean seeds,
+                continue  # the rule tab_ladder.tex follows (no placeholder bar)
             full = pick_clean_only(full_s, "full_label_f1")
         elif kind == "clean":
             aa, full = pick_clean_only(aa_s, "AA"), pick_clean_only(full_s, "full_label_f1")
         else:
             aa = pick(aa_s)
             full = pick_clean_only(full_s, "full_label_f1") if full_s else ([], True, False)
-        out.append({"key": key, "rung": rung, "slot": False, "interv": interv,
+        out.append({"key": key, "rung": rung, "interv": interv,
                     "aa": aa[0], "aa_clean": aa[1], "full": full[0]})  # fmt: skip
     return out
 
@@ -146,10 +151,6 @@ def fig_findings_a() -> list[dict]:
     fig, ax = plt.subplots(figsize=(3.45, 1.8))
     w = 0.38
     for i, c in enumerate(cells):
-        if c["slot"]:
-            ax.text(i, 2, "queued", rotation=90, ha="center", va="bottom", fontsize=6.5,
-                    color="#777777", style="italic")  # fmt: skip
-            continue
         col = STYLE[c["key"]][1]
         _bar(ax, i - w / 2, c["full"], True, col, False, w)
         _bar(ax, i + w / 2, c["aa"], c["aa_clean"], col, True, w)
@@ -164,12 +165,8 @@ def fig_findings_a() -> list[dict]:
         ax.axhline(v, color=STYLE[key][1], lw=0.7, ls=ls, zorder=0)
         refs.append((plt.Line2D([], [], color=STYLE[key][1], lw=0.7, ls=ls),
                      f"{STYLE[key][0].split()[0].lower()} {v:.1f}"))  # fmt: skip
-    labels = [SLOT_LABEL[c["key"]] if c["slot"] else SHORT[c["key"]] for c in cells]
+    labels = [SHORT.get(c["key"], SLOT_LABEL.get(c["key"], c["key"])) for c in cells]
     ax.set_xticks(range(len(cells)), labels, rotation=50, ha="right", rotation_mode="anchor")
-    for t, c in zip(ax.get_xticklabels(), cells, strict=True):
-        if c["slot"]:
-            t.set_color("#777777")
-            t.set_style("italic")
     rung_x = {}
     for i, c in enumerate(cells):
         rung_x.setdefault(c["rung"] or list(rung_x)[-1], []).append(i)
@@ -286,7 +283,7 @@ def fig_findings_c() -> dict:
     for k, (by_seed, clean) in pts.items():
         lab, col = STYLE[k]
         for s, (x, y) in by_seed.items():
-            ax.scatter(x, y, s=12, marker=SEED_MARK[s], color=col, ec="black", lw=0.3, zorder=3,
+            ax.scatter(x, y, s=12, marker=SEED_MARK[s], color=col, ec="black", lw=0.3, zorder=3, alpha=0.75,
                        label=SHORT_C[k] + tag(len(by_seed), clean)
                        if s == next(iter(by_seed)) else None)  # fmt: skip
     ax.plot([0, 100], [0, 100], color="#CCCCCC", lw=0.4, zorder=0)
@@ -478,8 +475,9 @@ def fig_spans() -> list[int]:
     ax.bar(x, spans, 0.6, color="#8C8C8C", ec="black", lw=0.4)
     for xi, v in zip(x, spans, strict=True):
         ax.text(xi, v + 15, f"{v} ({100 * v / sum(spans):.0f}%)", ha="center", va="bottom",
+                bbox={"fc": "white", "ec": "none", "pad": 0.6}, zorder=3,
                 fontsize=6.5)  # fmt: skip
-    ax.axhline(sum(spans) / len(spans), color="black", lw=0.5, ls="--")
+    ax.axhline(sum(spans) / len(spans), color="black", lw=0.5, ls="--", zorder=1)
     ax.text(1.45, sum(spans) / len(spans) + 12, "equal share (AA's weight)",
             ha="left", va="bottom", fontsize=6.5)  # fmt: skip
     ax.set_xticks(x)
@@ -524,10 +522,15 @@ def fig_perclass() -> dict:
     x = np.arange(len(order))
     w = 0.8 / max(len(found), 1)
     for i, (k, v) in enumerate(found.items()):
-        ax.bar(x - 0.4 + w * (i + 0.5), v["f1"], w, color=STYLE.get(k, ("", "#999999"))[1],
-               ec="black", lw=0.3,
-               label=f"{STYLE.get(k, (k,))[0]} (seed {v['seed']}, one run; "
-                     f"full-label F1 {v['dump_f1']:.1f})")  # fmt: skip
+        ax.bar(
+            x - 0.4 + w * (i + 0.5),
+            v["f1"],
+            w,
+            color=STYLE.get(k, ("", "#999999"))[1],
+            ec="black",
+            lw=0.3,
+            label=f"{STYLE.get(k, (k,))[0]} (seed {v['seed']}; {v['dump_f1']:.1f})",
+        )
     edges = np.cumsum([len(s) for s in res["session_types"]])[:-1] - 0.5
     for e in edges:
         ax.axvline(e, color="#999999", lw=0.5)
@@ -536,11 +539,16 @@ def fig_perclass() -> dict:
         ax.text(lo + (len(sess) - 1) / 2, 103, f"session {t + 1}", ha="center", va="bottom",
                 fontsize=6.5)  # fmt: skip
     ax.set_xticks(x, order, rotation=50, ha="right", rotation_mode="anchor", fontsize=6.5)
+    # R11-L7: a class absent from the test set has no F1 (n/a), not F1 = 0
+    absent = [i for i in range(len(order)) if all(np.isnan(v["f1"][i]) for v in found.values())]
+    for i in absent:
+        ax.text(i, 1.5, "n/a", ha="center", va="bottom", rotation=90, fontsize=6.5, color="#777777")
+        ax.get_xticklabels()[i].set_color("#999999")
     ax.set_xlim(-0.6, len(order) - 0.4)
     ax.set_ylim(0, 112)
     ax.set_ylabel("full-label F1", labelpad=1)
     ax.tick_params(length=1.5, pad=1)
-    ax.legend(loc="lower right", bbox_to_anchor=(1.0, 1.0), frameon=False, ncol=4,
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), frameon=False, ncol=4,
               borderaxespad=0.1)  # fmt: skip
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
@@ -565,8 +573,6 @@ def selfcheck(cells, cols, pts, means, dots, traj, counts, spans, perclass) -> N
     vals = (OUT / "vals.tex").read_text()
     lad = (OUT / "tab_ladder.tex").read_text().splitlines()
     for c in cells:  # F2(a): every bar (or dot set) is the cell tab_ladder.tex prints
-        if c["slot"]:
-            continue
         line = next(x for x in lad if c["interv"] in x)
         for vs in (c["aa"], c["full"]):
             if vs:
@@ -574,7 +580,7 @@ def selfcheck(cells, cols, pts, means, dots, traj, counts, spans, perclass) -> N
     for key in ("joint", "naive"):  # F2(a) reference lines
         v = np.mean(pick_clean_only(C[key], "full_label_f1")[0])
         assert f"{v:.1f}" == _macro(vals, f"n{key.capitalize()}Full"), key
-    CHECKS.append(f"F2(a): {sum(not c['slot'] for c in cells)} ladder cells = tab_ladder.tex")
+    CHECKS.append(f"F2(a): {len(cells)} ladder cells = tab_ladder.tex")
     res = json.loads(MECH_JSON.read_text())
     for c in cols:  # F2(b): token fractions reproduce the shares of tab:mech; recall = R
         s = mech_stats(res, c["method"], next(r[2] for r in MECH_ROWS if r[1] == c["method"]))

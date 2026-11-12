@@ -10,7 +10,7 @@
 \node[box, minimum width=2.4cm] (in) at (1.2,0) {tokens, boxes, page image};
 \node[box, minimum width=2.4cm, draw=black!45, pattern=north east lines, pattern color=black!12]
   (low) at (1.2,0.78) {layers $1..4$\\frozen after session 1};
-\node[box, minimum width=2.4cm, draw=ourteal, thick] (up) at (1.2,1.75) {layers $5..12$, base $\theta_0$};
+\node[box, minimum width=2.4cm, draw=ourteal, thick] (up) at (1.2,1.75) {layers $5..12$};
 \draw[->] (in) -- (low);
 \draw[->] (low) -- (up);
 % ==== memory, injected between layer 4 and layer 5
@@ -23,7 +23,7 @@
   \node[box, draw=ourteal, densely dashed, minimum width=0.5cm, minimum height=0.36cm] (d\b) at (\x,1.75) {$\Delta_{\b}$};
 }
 \node at (4.58,1.75) {$\cdots$};
-\node[anchor=west, align=left, text=ourteal, inner sep=1pt] at (5.42,1.75) {SBR-Recall: block $b$\\read under $\theta_0{+}\Delta_b$};
+\node[anchor=north west, align=left, text=ourteal, inner sep=1pt] at (5.42,1.97) {SBR-Recall: layers $5..12$\\frozen as $\theta_0$; block $b$\\read under $\theta_0{+}\Delta_b$};
 % ==== (a) shared softmax
 \node[anchor=west, font=\scriptsize\bfseries, inner sep=1pt] at (0,3.1) {(a) shared softmax};
 \node[bgc] (sa) at (0,2.65) {\makebox[0.3cm]{O}};
