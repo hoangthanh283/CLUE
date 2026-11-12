@@ -18,6 +18,8 @@
 \usepackage{cuted}   % two-column teaser (kit preamble.tex)
 \usepackage{caption}
 \usepackage{microtype}  % kit preamble.tex: tighter layout
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \definecolor{ourteal}{HTML}{0D5C63}
 \definecolor{memgreen}{HTML}{2F8F83}
 \definecolor{lexorange}{HTML}{C4841D}
@@ -47,6 +49,10 @@
 
 %% Headline numbers: generated from the result files (never typed by hand).
 \input{vals}
+%% Merged view: the appendix (supp_body.tex) follows the references in this PDF.
+%% For the CVPR submission (supplement is a separate upload) set \withappendixfalse and build supp.tex.
+\newif\ifwithappendix \withappendixtrue
+\ifwithappendix\input{supp_vals}\input{supp_perclass_vals}\input{image_vals}\fi
 
 \begin{document}
 \maketitle
@@ -251,4 +257,5 @@ Every term of \cref{eq:sbr} is computed under the delta its block is read under,
       {\bibliographystyle{ieeenat_fullname}\bibliography{refs}}
 }
 
+\ifwithappendix\clearpage\maketitlesupplementary\appendix\input{supp_body}\fi
 \end{document}
