@@ -1312,6 +1312,78 @@ def _proto(sources, dz=False) -> str:
     return f"{tag}, {len(vs)}"
 
 
+def _card_sources(key):
+    """(CIL-CORD, Mixed, DIL) sources of a baseline-card row, the cells the main table reads."""
+    if key == "er":
+        return C["er"], M["er"], D["er"]
+    return (src(f"cil_cord_{key}", (RESC, f"cil_cord_{key}", "")),
+            src(f"mixed_{key}", (RESC, f"mixed_{key}", "")),
+            src(f"dil_{key}", ("results", f"dil_{key}", "")))  # fmt: skip
+
+
+def write_baseline_card_short() -> None:
+    """supp_baselines_short.tex (P20 appendix): the card's family, port changes and memory, plus
+    the seed count per cell ("3" clean, "2$^\\dagger$" legacy) from the source the cell reads."""
+    dzs = {k: dz for _, k, dz in BASE}
+
+    def seeds(sources, dz=False):
+        vs, clean, _ = pick(sources, drop_zero=dz)
+        return "--" if not vs else f"{len(vs)}" + ("" if clean else "$^{\\dagger}$")
+
+    rag = ">{\\raggedright\\arraybackslash}p"
+    t = HDR + f"\\begin{{tabular}}{{@{{}}l{rag}{{1.9cm}}{rag}{{7.4cm}}{rag}{{3.1cm}}ccc@{{}}}}\n"
+    t += ("\\toprule\n & & & & \\multicolumn{3}{c}{Seeds} \\\\\n\\cmidrule(l){5-7}\n"
+          "Method & Family & What our port changes & Memory & CIL-CORD & Mixed & DIL \\\\\n"
+          "\\midrule\n")  # fmt: skip
+    for label, key, _venue, _keeps, changes, _hkeys in CARD:
+        cil, mixs, dils = _card_sources(key)
+        hp = _hparams(cil)
+        fam, mem = ("Replay", "raw documents") if key == "er" else BASE_INFO[key]
+        if "buffer_size" in hp:
+            mem = f"{hp['buffer_size']} {mem}"
+        dz = dzs.get(key, False)
+        t += (f"{label} & {fam} & {changes} & {mem} & {seeds(cil, dz)} & {seeds(mixs, dz)} & "
+              f"{seeds(dils)} \\\\\n")  # fmt: skip
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "supp_baselines_short.tex").write_text(t)
+
+
+# P20: the design-choice ablations in one table (all fp32 gate runs, legacy protocol): SBR-Recall's
+# delta capacity (DELTA_RUNS), its memory across schemas (Mixed), and LexSlot stacked on CoLaR-SBR.
+ABL_EXT = (  # (group heading or None, row label, source)
+    ("SBR-Recall delta capacity, CIL-CORD", "rank 8, Q/K/V, with memory",
+     (GATE, DELTA_RUNS[0][1], DELTA_RUNS[0][2])),
+    (None, "rank 8, Q/K/V, no memory", (GATE, DELTA_RUNS[1][1], DELTA_RUNS[1][2])),
+    (None, "rank 64, Q/K/V + dense, no memory", (GATE, DELTA_RUNS[2][1], DELTA_RUNS[2][2])),
+    ("SBR-Recall across schemas, Mixed (rank 64)", "no memory", MIX_RECALL_NOMEM),
+    (None, "$50$-document memory", MIX_RECALL_MEM),
+    ("Head slots on CoLaR-SBR, CIL-CORD", "CoLaR-SBR", SLOT_PAIRS[0][1]),
+    (None, "+ LexSlot", SLOT_PAIRS[0][2]),
+)  # fmt: skip
+
+
+def write_ablation_ext() -> None:
+    """supp_ablation_ext.tex: AA (mean $\\pm$ s.d., or per seed when n < 3), the lowest diagonal
+    entry R[j,j] and the lowest final-row entry R[T,j] over every session and seed of the row."""
+    t = HDR + "\\begin{tabular}{@{}lccc@{}}\n\\toprule\n"
+    t += "Variant & AA & min $R[j,j]$ & min $R[T,j]$ \\\\\n\\midrule\n"
+    for i, (group, label, s) in enumerate(ABL_EXT):
+        if group:
+            head = f"\\multicolumn{{4}}{{@{{}}l}}{{\\emph{{{group}}}}} \\\\\n"
+            t += ("\\midrule\n" if i else "") + head
+        vals = load_seeds(s[0], s[1], suffix=s[2])
+        mats = matrices_by_seed([s])
+        if not vals or not mats:
+            _warn(f"ablation_ext: no run for {s[1]}")
+            continue
+        dg = min(float(np.min(np.diag(m))) for m in mats.values())
+        fr = min(float(np.min(m[-1])) for m in mats.values())
+        t += (f"\\quad {label} & {fmt(list(vals.values()), s[0] == CLEAN)} & {dg:.1f} & {fr:.1f}"
+              " \\\\\n")  # fmt: skip
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "supp_ablation_ext.tex").write_text(t)
+
+
 def write_baselines() -> None:
     """supp_baselines.tex (what each port keeps, changes and stores) and supp_baselines_hp.tex
     (recorded hyper-parameters, protocol and seeds per cell): two tables at natural width."""
@@ -1325,9 +1397,7 @@ def write_baselines() -> None:
           "Method & Hyper-parameters (recorded, CIL-CORD) & CIL-CORD & Mixed & DIL \\\\\n"
           "\\midrule\n")  # fmt: skip
     for label, key, venue, keeps, changes, hkeys in CARD:
-        cil = C["er"] if key == "er" else src(f"cil_cord_{key}", (RESC, f"cil_cord_{key}", ""))
-        mixs = M["er"] if key == "er" else src(f"mixed_{key}", (RESC, f"mixed_{key}", ""))
-        dils = D["er"] if key == "er" else src(f"dil_{key}", ("results", f"dil_{key}", ""))
+        cil, mixs, dils = _card_sources(key)
         hp = _hparams(cil)
         shown = [k.replace("_", "\\_") + f" {hp[k]}" for k in (*hkeys, "epochs") if k in hp]
         fam, mem = ("Replay", "raw documents") if key == "er" else BASE_INFO[key]
@@ -1475,6 +1545,8 @@ def main():
     write_ablation()
     write_bench()
     write_baselines()
+    write_baseline_card_short()
+    write_ablation_ext()
     write_dil_grid()
     write_supp()
 

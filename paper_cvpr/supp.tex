@@ -45,6 +45,10 @@
 \input{supp_vals}
 \input{supp_perclass_vals}
 \input{image_vals}
+\newcommand{\bodyref}[2]{#2}  % appendix -> body pointer: plain text in the standalone supplement
+
+%% Local heading without the paper title (cvpr.sty untouched).
+\renewcommand{\maketitlesupplementary}{\newpage\twocolumn[\centering\Large\textbf{Supplementary Material}\vspace{1.0em}]}
 
 \begin{document}
 \maketitlesupplementary
@@ -53,7 +57,7 @@
 
 {
     \small
-    %% The same precompiled bibliography as the main paper (no BibTeX pass), for App. J.
+    %% The same precompiled bibliography as the main paper (no BibTeX pass).
     \input{refs_precompiled.bbl}
 }
 
