@@ -3688,3 +3688,150 @@ The cut costs transparency, not support for the headline claims. Those still res
 ablation) and per-seed dots. The lost ledger and freezing experiment only backed secondary sentences, which are now
 reworded. **Score unchanged at 3 (Borderline Reject)**. Integrating the landed never-stale-memory and MiB runs (R14-M3)
 may move it either way, because they decide H2 and H3.
+
+## R14b (2026-11-13): confirmation of P21 (`0c28564`) against R14, and audit of the new controls
+
+Scope: `git diff ec63d9a 0c28564 -- paper_cvpr scripts`.
+- Both PDFs built from `git archive 0c28564 paper_cvpr` in a scratch dir.
+- Both generators run with output redirected to scratch.
+- Every new number recomputed per seed from `results/clean_2026-11/*/metrics.json` and `matrix.npy`, plus the run logs.
+
+### Verdict: **BLOCK** (one HIGH, text-only fix)
+
+### R14 items
+
+| R14 | Status |
+|---|---|
+| H1 | **Fixed.** main.tex:142 puts "on a fixed label space" on the `tab:dil` part only, and the depth profile is "under naive fine-tuning". supp_body.tex names the pilot stream ("FUNSD->CORD->SROIE, where each dataset brings its own labels"), and the `fig:cka` caption says "FUNSD->CORD, each dataset with its own labels". |
+| M1 | **Fixed.** App. A states the per-seed order, and the body points to `\cref{app:setup}`. My recomputation of the order holds on every seed under both metrics: no memory < CoLaR < relabelled at the boundaries < {CoLaR-SBR, SBR-Recall, pre-session relabel, joint}, with MiB and ICE-O in between. Only MiB and the boundary relabel swap places between the metrics (AA: ICE < boundary < MiB; F1: ICE < MiB < boundary, all three seeds). |
+| M2 | **Fixed.** "pseudo-label variants included" is gone; "averages 60.5 AA over three seeds (\cref{fig:findings}a)". |
+| M3 | **Fixed.** Verdicts are set and H1 to H3 rewritten (audited below). Both generators exit 0. |
+| L1-L8 | **Fixed** as specified. L4: `sbrLossMin` 1.5 (true 1.57, rounded down), `sbrLossMax` 9.0. L5: "(per-seed minimum; mean in \cref{fig:heatmaps})". L8: the image figure is dropped and the appendix is 5 pp. |
+
+### New controls, recomputed (seeds 42 / 7 / 123; AA, full-label F1)
+
+**The runs**
+
+| Run | AA | Full-label F1 |
+|---|---|---|
+| Never-stale memory (`colar_r_oracle_pre`) | 91.86 / 92.26 / 89.78 | 92.52 / 93.13 / 90.72 |
+| Joint training | 91.13 / 90.54 / 92.12 | 91.70 / 91.80 / 92.38 |
+| MiB-style loss | 73.77 / 69.98 / 72.56 | 61.36 / 59.07 / 59.63 |
+| ICE-O | 34.38 / 35.30 / 35.83 | 56.31 / 57.00 / 57.67 |
+
+- Never-stale memory against joint training: +0.73 / +1.72 / -2.34 (AA) and +0.82 / +1.33 / -1.67 (F1). `\nOraclePreJointGap` = 2.4 is correct.
+- Never-stale memory against CoLaR-SBR: above on every seed under both metrics.
+- MiB-style loss: diagonals at least 90.1; session 1 ends at most 35.5.
+- ICE-O: the final row is within 0.23 of the diagonal; R[3,3] = 0.0 on every seed.
+
+**Macros and verdicts**
+- All new macros are correct:
+  - `vOraclePre` 91.3±1.3 / 92.1±1.3.
+  - `vMib` 72.1±1.9 / 60.0±1.2.
+  - `vIceO` 35.2±0.7 / 57.0±0.7.
+  - `nMibShare` "64 to 70" (true 64.6 to 69.8).
+  - `nMibShareFull` "46 to 49" (true 46.6 to 48.8).
+  - `nMibDiagMin` 90.1, `nMibFirstMax` 35.5, `nIceODevMax` 0.3, `nIceOThirdMax` 0.0.
+- Each verdict rule (`verdict_ok`) holds per seed:
+  - `oracle_pre` "supports": |gap to joint| < 3 on every seed, both metrics.
+  - `colar_mib` "partly": CoLaR < MiB < joint on every seed, both metrics.
+  - `ice_o` "partly": below SBR-Recall on every seed, and final row within 1 point of the diagonal.
+
+**Generated files**
+- `make_clean_tables.py` exits 0 with no WARNING, and every `.tex` it writes is byte-identical to HEAD, including `tab_ladder`, `tab_ablation`, `vals` and `supp_vals`.
+- `make_paper_figs.py` exits 0 and its self-check passes (ablation: 8 rows = `tab_ablation.tex`). The renders of `findings_a.pdf` and `ablation.pdf` are pixel-identical to the committed files.
+- `make_image_table.py` exits 0.
+- `mPoolGapMax` moved 0.4 -> 1.2 but is not used in any paper file.
+
+**Pre-session refresh implementation**
+- `colar_r.py:171-174` (`before_task`, `refresh_before_task: true`) runs after the head is expanded. So the description "true labels of all classes in the head as grown for that session" is accurate.
+- The run otherwise matches the boundary relabel (k4, d50, r128), and records 100.9 MB.
+
+### HIGH
+
+- **R14b-H1. ICE-O's weak score is attributed to the method and its frozen trunk; the logs show under-training under our recipe.**
+  - main.tex:218: "ICE-O as published (frozen encoder, one head per session over a constant Other logit, no memory) forgets
+    nothing ... but learns little on a frozen trunk: session~3 is never learned (at most 0.0 F1)".
+  - The run logs `results/clean_2026-11/cil_cord_ice_o_seed{42,7,123}.log` show two things on every seed:
+    - Sessions 1, 2, 4 and 5 are still improving at the 10-epoch cap (`ep10 ... bad=0`). For example, seed 42 session 2 val
+      F1 reads 1.9 -> 41.8 and session 5 reads 1.9 -> 29.4, rising at the last epoch.
+    - Session 3 is stopped by early stopping (`T2 ep3 val_f1=0.0000 bad=2 -> STOP`) after three epochs at 0.0. It never
+      gets the epochs that sessions 2, 4 and 5 needed to leave 0.
+  - The run uses our recipe (lr 1e-4, 10-epoch cap, patience 2), not the published one. So "as published" is false, and
+    "learns little on a frozen trunk" / "session 3 is never learned" describe our stopping rule as much as the method.
+  - The verdict "partly" and "below SBR-Recall on every seed" stay true. The causal reading does not.
+  - Fix (main.tex:218), replacing the ICE-O sentence: "Our port of ICE-O (frozen encoder, one head per session over a constant
+    Other logit, no memory; our clean recipe) forgets nothing (its final row is within $\nIceODevMax$ points of its diagonal
+    on every seed) and reaches $\vIceOFull$ full-label F1 ($\vIceO$ AA), below SBR-Recall on every seed under both metrics;
+    under our $10$-epoch cap its heads were still improving when training stopped, and session~3 early-stopped at $0$ F1, so
+    this is a lower bound for ICE-O, not its published accuracy."
+  - Add to Limitations (main.tex:242): "ICE-O ran under our recipe and was still improving at the epoch cap."
+
+### MEDIUM
+
+- **R14b-M1. The never-stale control is not marked as an oracle in the Conclusion or in "What discriminates what".**
+  - Abstract, intro and H1 mark it ("an oracle no continual learner has", "The control is an oracle").
+  - main.tex:244 (Conclusion): "that suffices to explain the failure, since giving every stored document its true labels
+    before each session brings a shared softmax to within 2.4 points" reads as a deployable remedy.
+  - main.tex:170: "the never-stale memory decides".
+  - Fix: "... since an oracle that gives every stored document its true labels before each session brings ..." (Conclusion),
+    and "the never-stale memory (an oracle) decides" (:170).
+- **R14b-M2. A mechanism is stated as fact where a queued control is meant to test it.**
+  - main.tex:170: "The shared normalisation (H3) is how stale stored labels act, as negatives for every class; the blocked
+    readout stops that action without true labels."
+  - SBR also stops current documents' "O" from training old blocks, so its success does not isolate the stored side.
+  - The constant-background SBR control, which App. D lists as queued, is exactly the test of this reading.
+  - Fix: "We read the shared normalisation (H3) as the channel through which stale labels act, as negatives for every class;
+    the blocked readout closes most of the gap without true labels, and the constant-background control (queued) tests
+    this reading."
+- **R14b-M3. The ladder still marks H2 "open", while the text says it is decided.**
+  - `tab:ladder`: the H2 sliced row says "open" (caption: "only preliminary ... so far"), and MiB says "partly".
+  - main.tex:160 / :170 say H2 is "not needed", and that is decided by the H1 pre-session row (true stored labels, stale current documents).
+  - A reader of Tab. 1 alone sees H2 unresolved.
+  - Fix (caption, main.tex:90): add "The pre-session row of H1 also tests H2: it leaves every current document stale." The
+    sliced row can keep "open", since its own evidence is still cross-protocol.
+- **R14b-M4. The comparison-set sentence is now contradicted by the paper's own MiB row.**
+  - main.tex:233: "On CIL-CORD every continual method with a shared softmax stays at or below CoLaR in AA".
+  - The MiB-style loss is a continual method with a shared softmax at 72.1 AA, above CoLaR on every seed (Tab. 1).
+  - Fix: "every method of \cref{tab:main} with a shared softmax stays at or below CoLaR in AA".
+
+### LOW
+
+- R14b-L1. main.tex:82 (contribution 1): "of which the one that is never stale closes the gap under a shared softmax". Seed
+  123 is 2.3 AA / 1.7 F1 below joint training. Write "closes the gap to within $\nOraclePreJointGap$ points of joint training
+  (an oracle)".
+- R14b-L2. "Suffice" (abstract, intro, :152, Conclusion) is acceptable given "within 2.4 points on every seed" and the
+  oracle marking, since the residual is within seed spread (joint s.d. 0.8, oracle s.d. 1.3). "Suffice to explain nearly all
+  of the failure" would be the safer form.
+- R14b-L3. "H2 not needed" is a valid inference: fixing only the stored side closes the gap while every current document
+  stays stale. But it says nothing about the current side's size under stale stored labels. The MiB port acts on both
+  directions (current "O" -> "O or earlier", replayed "O" -> "O or later") and is described that way in the Test
+  paragraph. Its "about half" therefore measures a two-sided loss repair, not the current side. Optional: say so in one clause.
+- R14b-L4. Title "Memory Is Not Enough" now has to be read as "a memory with stale labels is not enough". It is not false,
+  but given H1 the PM may want "Stale Labels, Not Memory, ..." framing. Editorial; no change required.
+
+### Checks that pass
+
+- **Rule 7 per seed.**
+  - CoLaR-SBR is above the boundary relabel (F1 79.1 max < 87.1 min; AA 65.8 < 86.2) and below the pre-session relabel on
+    every seed, both metrics.
+  - The MiB-style loss is above CoLaR, below joint training and below CoLaR-SBR on every seed, both metrics.
+  - "Within $\nSbrGapFullMax$ (5.3) ... once its labels are true or its background is not shared" holds: the oracle's
+    largest full-label gap is 1.67.
+  - Ablations: "below CoLaR-SBR when refreshed at the boundaries and above it when refreshed before each session" holds.
+- **The coordinator's checks.**
+  - No sentence says the blocked readout is necessary or beats the oracle: "It is neither the only repair nor the best one".
+  - Abstract, intro, H1-H3 and Conclusion agree with each other and with Tabs. 1 and 4, apart from M1 and M3.
+- **Build** (`latexmk -pdf`, no `-C`).
+  - main and supp both exit 0. 0 undefined, 0 multiply-defined, 0 overfull, 0 "??".
+  - main 15 pp.: the Conclusion ends on p. 8, the References start on p. 9, and the appendix is pp. 11-15 (5 pp.). supp 7 pp.
+  - p. 11 and supp p. 1 do not show the title. No `---` in main.tex, supp_body.tex or supp.tex.
+- **Legibility.** `tab:ladder` (p. 3), Fig. 2a with the new bars (p. 5), `tab:ablation` (p. 8) and the ablation grid
+  (p. 14) are legible.
+
+### Referee view
+
+**Score: 3 -> 3.5 (Borderline, leaning accept once R14b-H1/M1-M3 land).** The never-stale oracle gives the paper a decisive,
+per-seed, three-seed answer to "which side of the conflict". The MiB and ICE-O controls answer the two most likely reviewer
+comparators. The weak point is the ICE-O port's under-training, which a reviewer would catch and which the paper must
+present as a lower bound.
