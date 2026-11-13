@@ -689,7 +689,8 @@ def write_perclass_vals(perclass: dict) -> None:
 
 # ---------------------------------------------------------------- P18: ablation grid (App. K)
 ABL_COLOR = {"naive": "naive", "colar": "colar", "nobank": "nobank", "sbr": "sbr",
-             "recall": "recall", "oracle": "oracle", "joint": "joint"}  # fmt: skip
+             "recall": "recall", "oracle": "oracle", "oracle_pre": "oracle_pre",
+             "joint": "joint"}  # fmt: skip
 
 
 def fig_ablation() -> dict:
