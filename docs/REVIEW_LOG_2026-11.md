@@ -3835,3 +3835,53 @@ Scope: `git diff ec63d9a 0c28564 -- paper_cvpr scripts`.
 per-seed, three-seed answer to "which side of the conflict". The MiB and ICE-O controls answer the two most likely reviewer
 comparators. The weak point is the ICE-O port's under-training, which a reviewer would catch and which the paper must
 present as a lower bound.
+
+## R14c (2026-11-13): confirmation of P22 (`70465fd`) against R14b
+
+Scope: `git diff 0c28564 70465fd -- paper_cvpr scripts/rca`. I built from `git archive 70465fd paper_cvpr` in a scratch
+dir and ran both generators into scratch.
+
+### Verdict: **BLOCK** (one HIGH: the body runs onto p. 9)
+
+| R14b | Status |
+|---|---|
+| H1 | **Fixed, and the new wording is true.** main.tex:218 now reads "Our port of ICE-O (...; our clean recipe) ... below SBR-Recall on every seed under both metrics; under our 10-epoch cap sessions 4 and 5 were still improving when training stopped and session 3 early-stopped at 0.0 F1, on every seed, so this is a lower bound". The logs back each part on every seed: `T3 ep10 ... bad=0` and `T4 ep10 ... bad=0` mean epoch 10 was a new best for sessions 4 and 5 on seeds 42, 7 and 123, and every seed has `T2 ep3 val_f1=0.0000 bad=2 -> STOP`. "Sessions 4 and 5" is the correct narrowing: on seeds 7 and 123 session 1 also ends on a new best, while session 2 does not on seed 42. Limitations (:242) adds "ICE-O ran under our recipe and was still improving at the epoch cap" (true). The ladder row and the generator both say "ICE-O (our port)". |
+| M1 | **Fixed.** "the never-stale memory (an oracle) decides" (:170); Conclusion "since an oracle that gives every stored document ...". |
+| M2 | **Fixed.** "We read the shared normalisation (H3) as the channel ...; ... the constant-background control (queued) tests this reading." |
+| M3 | **Fixed.** The ladder caption ends "The pre-session row of H1 also tests H2: it leaves every current document stale." |
+| M4 | **Fixed.** "every method of \cref{tab:main} with a shared softmax stays at or below CoLaR in AA". |
+| L1 | **Fixed.** "closes the gap under a shared softmax to within 2.4 points of joint training (an oracle)". |
+| L2 | **Fixed.** "nearly all of the failure" in the abstract, intro, H1, "What discriminates what" and Conclusion. |
+
+**The four cuts remove no needed support.**
+1. Intro: the sentence "forgetting in the output-facing layers is known from image classifiers~\citep{ramasesh2021anatomy}"
+   is gone. The citation and the claim remain in H0 (:142).
+2. Related work: SSUL's details are cut (frozen backbone, tiny memory, per-class sigmoids). SSUL is still cited, and nothing
+   in the body now relies on those details. Limitations names "per-class sigmoid heads" as not run, which stays true.
+3. H0: "a lower bound from the exact full-label false positives" became "a lower bound; \cref{app:setup}". App. A
+   "Scoring" holds the derivation.
+4. H3: "\Cref{fig:conflict} draws the conflict on one receipt" is cut. The figure is still referenced from the intro (:76).
+
+**Other checks.**
+- The bibliography is unchanged: 44 `\bibcite` = 44 `\bibitem`.
+- `make_clean_tables.py` exits 0 with no warning, and every generated `.tex` is byte-identical to `70465fd`.
+- `make_paper_figs.py` exits 0 and its self-check passes.
+- Both PDFs build, exit 0, with 0 undefined, multiply-defined or overfull warnings and 0 "??".
+- The appendix is pp. 11-15 (5 pp.). Neither p. 11 nor supp p. 1 shows the title. No `---` in main.tex, supp_body.tex or
+  supp.tex.
+
+### HIGH
+
+- **R14c-H1. The body is longer than 8 pages.** The last line of the Conclusion (line 547, "label space, with a mask-free
+  metric.") is the first line of p. 9, above "References" (line 548). Both my build and the committed `main.pdf` (pdftotext
+  p. 9, rendered PNG) show it. Rule 8 / CVPR: body <= 8 pages.
+  - Fix: save one line in the right column of p. 8. The cheapest option is to delete "Drift is answered by a whole-document
+    memory." from the Conclusion (:244); "a memory repairs only one" already says it. Rebuild, and confirm with
+    `pdftotext -f 9 -l 9 main.pdf - | head` that p. 9 starts with "References".
+
+No MEDIUM or LOW findings.
+
+### Referee view
+
+**Score unchanged at 3.5 (Borderline, leaning accept).** The R14b content fixes are correct and honest, and the ICE-O port
+is now presented as a lower bound. What remains is mechanical: the one-line overflow.
