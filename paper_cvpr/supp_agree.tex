@@ -6,10 +6,15 @@ Scenario & Method & Seed & AA & Full-label F1 & Difference \\
 CIL-CORD & CoLaR & 42 & 33.6 & 32.4 & $-1.2$ \\
 CIL-CORD & CoLaR & 7 & 32.4 & 30.5 & $-1.9$ \\
 CIL-CORD & CoLaR & 123 & 34.4 & 29.3 & $-5.1$ \\
+CIL-CORD & CoLaR + MiB-style unbiased CE (shared softmax) & 42 & 73.8 & 61.4 & $-12.4$ \\
+CIL-CORD & CoLaR + MiB-style unbiased CE (shared softmax) & 7 & 70.0 & 59.1 & $-10.9$ \\
+CIL-CORD & CoLaR + MiB-style unbiased CE (shared softmax) & 123 & 72.6 & 59.6 & $-12.9$ \\
 CIL-CORD & Older stored documents relabelled at each boundary (not deployable) & 42 & 65.8 & 79.1 & $+13.3$ \\
 CIL-CORD & Older stored documents relabelled at each boundary (not deployable) & 7 & 62.8 & 74.9 & $+12.1$ \\
 CIL-CORD & Older stored documents relabelled at each boundary (not deployable) & 123 & 62.4 & 75.4 & $+13.1$ \\
 CIL-CORD & True-label refresh before each session (not deployable) & 42 & 91.9 & 92.5 & $+0.7$ \\
+CIL-CORD & True-label refresh before each session (not deployable) & 7 & 92.3 & 93.1 & $+0.9$ \\
+CIL-CORD & True-label refresh before each session (not deployable) & 123 & 89.8 & 90.7 & $+0.9$ \\
 CIL-CORD & CoLaR-SBR & 42 & 87.8 & 88.8 & $+1.1$ \\
 CIL-CORD & CoLaR-SBR & 7 & 91.3 & 91.2 & $-0.1$ \\
 CIL-CORD & CoLaR-SBR & 123 & 86.2 & 87.1 & $+1.0$ \\
@@ -19,6 +24,9 @@ CIL-CORD & SBR, no memory & 123 & 24.0 & 13.6 & $-10.3$ \\
 CIL-CORD & SBR-Recall & 42 & 91.4 & 91.5 & $+0.2$ \\
 CIL-CORD & SBR-Recall & 7 & 92.6 & 93.5 & $+0.9$ \\
 CIL-CORD & SBR-Recall & 123 & 91.9 & 92.6 & $+0.8$ \\
+CIL-CORD & ICE-O (our port) & 42 & 34.4 & 56.3 & $+21.9$ \\
+CIL-CORD & ICE-O (our port) & 7 & 35.3 & 57.0 & $+21.7$ \\
+CIL-CORD & ICE-O (our port) & 123 & 35.8 & 57.7 & $+21.8$ \\
 CIL-CORD & Joint training & 42 & 91.1 & 91.7 & $+0.6$ \\
 CIL-CORD & Joint training & 7 & 90.5 & 91.8 & $+1.3$ \\
 CIL-CORD & Joint training & 123 & 92.1 & 92.4 & $+0.3$ \\

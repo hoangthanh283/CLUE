@@ -498,7 +498,7 @@ def write_supp_vals():
         t += m("colarMaxRise", f"{max(rises):.0f}")
     if sb is not None:
         loss = np.diag(sb)[:-1] - sb[-1, :-1]
-        t += m("sbrLossMin", f"{loss.min():.0f}") + m("sbrLossMax", f"{loss.max():.0f}")
+        t += m("sbrLossMin", down1(loss.min())) + m("sbrLossMax", up1(loss.max()))
         t += m("sbrLossMaxSession", str(int(loss.argmax()) + 1))
     if rc is not None:
         t += m("recallDevMax", up1(np.abs(np.diag(rc) - rc[-1]).max()))
@@ -757,8 +757,13 @@ ORACLE_PRE_NAME = "cil_cord_colar_r_oracle_pre"  # PM 2026-11-12: colar_r_oracle
 # Lit review A comparators (PM 2026-11-12; run names not reported yet: set them when Dev does)
 SBR_CONSTBG_NAME = "cil_cord_colar_sbr_const_o"  # CoLaR-SBR, every background logit fixed at 0
 ICE_O_NAME = "cil_cord_ice_o"  # ICE-O port: frozen encoder, head per session, constant Other = 0
-SLOT_VERDICT = {"er_sbr": "", "oracle_pre": "", "colar_mib": "", "sbr_constbg": "",
-                "ice_o": ""}  # set after reading the runs  # fmt: skip
+# P21 (2026-11-13), read per seed from the three clean runs each:
+#   oracle_pre "supports": within 3 points of joint training on every seed, both metrics.
+#   colar_mib "partly": above CoLaR and below joint training on every seed, both metrics.
+#   ice_o "partly": final row within 1 point of its diagonal (nothing forgotten), but below
+#     SBR-Recall on every seed, both metrics (the frozen encoder does not learn the sessions).
+SLOT_VERDICT = {"er_sbr": "", "oracle_pre": "supports", "colar_mib": "partly", "sbr_constbg": "",
+                "ice_o": "partly"}  # fmt: skip
 MIX_RECALL_NOMEM = (GATE, "mixed_colar_sbr_recall_r64b", "*")  # seed 42, fp32 gate, legacy
 MIX_RECALL_MEM = (GATE, "mixed_colar_sbr_recall_r64c", "*")
 LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, verdict, min_n)
@@ -775,13 +780,13 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
      "true labels in the stored documents close the gap",
      "older stored documents relabelled at each boundary$^{r}$", "oracle",
      [ORACLE_CLEAN], [ORACLE_CLEAN], "clean", "partly", 0),
-    ("", "", "", "every stored document relabelled before each session", "oracle_pre",
+    ("", "", "", "every stored document relabelled before each session$^{r}$", "oracle_pre",
      src(ORACLE_PRE_NAME), src(ORACLE_PRE_NAME), "slot", "", 3),
     ("H2", "Current documents mislabel old entities",
      "a loss that lets ``O'' mean ``O or an old class'' closes the gap",
      "replay and current losses sliced to their classes", "sliced2",
      src(None, (GATE, "cil_cord_colar_r_sliced2", "_k4_d50_r128")), [], "cell", "open", 0),
-    ("", "", "", "MiB-style unbiased cross-entropy, both directions", "colar_mib",
+    ("", "", "", "MiB-style unbiased CE, both directions", "colar_mib",
      src("cil_cord_colar_mib"), src("cil_cord_colar_mib"), "slot", "", 3),
     ("H3", "The shared background normalisation",
      "one background per session closes the gap without true labels, given a memory",
@@ -795,7 +800,7 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
      "per-session deltas need no memory on one schema, and fail across schemas",
      "per-session deltas, blocked readout, no memory (SBR-Recall)", "recall", C["recall"],
      C["recall"], "cell", "supports", 0),
-    ("", "", "", "frozen encoder, one head per session, constant Other logit, no memory (ICE-O)",
+    ("", "", "", "ICE-O: frozen encoder, head per session, no memory",
      "ice_o", src(ICE_O_NAME), src(ICE_O_NAME), "slot", "", 3),
     ("", "", "", "the same on Mixed (AA), no memory", "mix_nomem", [MIX_RECALL_NOMEM], [],
      "cell", "supports", 0),
@@ -814,6 +819,11 @@ def _gap_share(a: dict, lo: dict, hi: dict) -> list[float]:
 def _every(conds: list[bool], n: int) -> bool:
     """True only when exactly ``n`` conditions were evaluated and all hold (no vacuous all([]))."""
     return len(conds) == n and all(conds)
+
+
+def _ctrl(name: str) -> list[dict]:
+    """[AA, full-label F1] per seed of a clean control run (a ladder slot)."""
+    return [load_seeds(CLEAN, name, m, "*") for m in ("AA", "full_label_f1")]
 
 
 def verdict_ok(key: str, verdict: str) -> bool | None:
@@ -844,6 +854,14 @@ def verdict_ok(key: str, verdict: str) -> bool | None:
         ("mix_nomem", "supports"): lambda: mix["nomem"] < mix["mem"]
         and mix["nomem"] < min(pick(M["sbr"])[0]),
         ("mix_mem", "supports"): lambda: mix["mem"] > mix["nomem"],
+        ("oracle_pre", "supports"): lambda: _every([abs(x[s] - c["joint"][j][s]) < 3 for j, x in
+                                                    enumerate(_ctrl(ORACLE_PRE_NAME)) for s in SEEDS], n3),
+        ("colar_mib", "partly"): lambda: _every([c["colar"][j][s] < x[s] < c["joint"][j][s] for j, x in
+                                                 enumerate(_ctrl("cil_cord_colar_mib")) for s in SEEDS], n3),
+        ("ice_o", "partly"): lambda: _every([x[s] < c["recall"][j][s] for j, x in
+                                             enumerate(_ctrl(ICE_O_NAME)) for s in SEEDS], n3)
+        and _every([float(np.max(np.abs(m[-1] - np.diag(m)))) < 1.0
+                    for m in matrices_by_seed(src(ICE_O_NAME)).values()], len(SEEDS)),
     }  # fmt: skip
     f = checks.get((key, verdict))
     if f is None:
@@ -1422,12 +1440,15 @@ ABLATION = (  # (label, key, memory, blocked, deltas, true labels)
     ("+ blocked readout", "nobank", 0, 1, 0, 0),
     ("+ both (CoLaR-SBR)", "sbr", 1, 1, 0, 0),
     ("SBR-Recall", "recall", 0, 1, 1, 0),
-    ("Relabelled memory$^{r}$", "oracle", 1, 0, 0, 1),
+    ("Relabel, boundary$^{r}$", "oracle", 1, 0, 0, 1),
+    ("Relabel, pre-session$^{r}$", "oracle_pre", 1, 0, 0, 1),
     ("Joint (reference)", "joint", 0, 0, 0, 1),
 )
 
 
 def _abl_sources(key):
+    if key == "oracle_pre":
+        return [(CLEAN, ORACLE_PRE_NAME, "*")]
     return [ORACLE_CLEAN] if key == "oracle" else [C[key][0]]
 
 
@@ -1481,6 +1502,39 @@ def ablation_macros() -> str:
     return _defs(v)
 
 
+def control_macros() -> str:
+    """P21: the three clean controls of the ladder (never-stale memory, MiB-style loss, ICE-O),
+    with every per-seed condition the prose states checked here (rule 7)."""
+    m2 = ("AA", "full_label_f1")
+    c = {k: [_clean(k, m) for m in m2] for k in ("colar", "sbr", "recall", "joint")}
+    pre, mib, ice = _ctrl(ORACLE_PRE_NAME), _ctrl("cil_cord_colar_mib"), _ctrl(ICE_O_NAME)
+    if not all(len(d) == len(SEEDS) for d in (*pre, *mib, *ice)):
+        return _defs(dict.fromkeys(("nOraclePreJointGap", "nMibShare", "nMibShareFull",
+                                    "nMibDiagMin", "nMibFirstMax", "nIceODevMax",
+                                    "nIceOThirdMax"), "--"))  # fmt: skip
+    t = ""
+    for name, d in (("OraclePre", pre), ("Mib", mib), ("IceO", ice)):
+        t += macro(name, list(d[0].values())) + macro(f"{name}Full", list(d[1].values()))
+    v = {}
+    v["nOraclePreJointGap"] = up1(max(abs(pre[j][s] - c["joint"][j][s]) for j in (0, 1) for s in SEEDS))
+    if any(pre[j][s] <= c["sbr"][j][s] for j in (0, 1) for s in SEEDS):
+        _warn("the never-stale memory is not above CoLaR-SBR on every seed under both metrics")
+    for j, nm in ((0, "nMibShare"), (1, "nMibShareFull")):
+        sh = _gap_share(mib[j], c["colar"][j], c["joint"][j])
+        v[nm] = f"{math.floor(100 * min(sh))} to {math.ceil(100 * max(sh))}"
+    if any(mib[j][s] >= c["sbr"][j][s] for j in (0, 1) for s in SEEDS):
+        _warn("the MiB-style loss is not below CoLaR-SBR on every seed under both metrics")
+    mm = matrices_by_seed(src("cil_cord_colar_mib"))
+    v["nMibDiagMin"] = down1(min(float(np.min(np.diag(m))) for m in mm.values()))
+    v["nMibFirstMax"] = up1(max(float(m[-1, 0]) for m in mm.values()))
+    im = matrices_by_seed(src(ICE_O_NAME))
+    v["nIceODevMax"] = up1(max(float(np.max(np.abs(m[-1] - np.diag(m)))) for m in im.values()))
+    v["nIceOThirdMax"] = up1(max(float(m[2, 2]) for m in im.values()))
+    if any(ice[j][s] >= c["recall"][j][s] for j in (0, 1) for s in SEEDS):
+        _warn("ICE-O is not below SBR-Recall on every seed under both metrics")
+    return t + _defs(v)
+
+
 def main():
     cell = {k: pick(v) for k, v in C.items()}
     mix = {k: pick(v) for k, v in M.items()}
@@ -1518,7 +1572,7 @@ def main():
     v += f"\\newcommand{{\\nErCilBuf}}{{{250 if er_src and er_src[0] == CLEAN else 200}}}\n"
     v += recall_macros() + oracle_macros() + conflict_macros() + agree_macros()
     v += baseline_macros() + gap_macros() + write_mechanism() + write_dropped()
-    v += ablation_macros()
+    v += ablation_macros() + control_macros()
     (OUT / "vals.tex").write_text(v)
     write_ladder()
     write_beyond()
