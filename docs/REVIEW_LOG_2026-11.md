@@ -3530,3 +3530,161 @@ M4 in detail:
   (5,000 …)".
 
 The referee score is unchanged at **3 (Borderline Reject), +0.5 over R10.**
+
+## R14 (2026-11-13): audit of P20 (`ec63d9a`, appendix 24 pp. to 6, sections A-F)
+
+Scope: `git diff ec63d9a~1 ec63d9a -- paper_cvpr scripts`. I built both PDFs from `git archive ec63d9a paper_cvpr`
+in a scratch dir (the shared checkout was not touched), regenerated every table and macro into a scratch `OUT`
+(generator imported with `OUT` redirected and the ladder `SystemExit` caught), and recomputed the appendix
+numbers from `metrics.json` / `matrix.npy`.
+
+### Verdict: **BLOCK** (one HIGH, a one-phrase fix)
+
+**HIGH**
+
+- **R14-H1. The drift-by-depth evidence is attributed to a fixed label space; it comes from a growing one.**
+  - main.tex:142 (H0, "What it rules out"): "on a fixed label space the representation drifts most near the output
+    on all four encoders ... (\cref{app:drift})". supp_body.tex:128: "Under naive fine-tuning on a fixed label space
+    every encoder forgets its earlier domains (\cref{tab:dil}), and the representation drift grows with depth on all
+    four ... (\cref{fig:cka})".
+  - `fig:cka` (`figures/backbone_cka_gradient.pdf`, `scripts/build_backbone_figures.py`) reads `results/pilot/*_seed*.json`,
+    boundary `0_to_1`: the pilot stream FUNSD->CORD->SROIE (`doccl/data/scenarios.py:build_pilot`, "Each task uses
+    the FULL label set of its respective dataset"; `run_pilot.py:198-200` expands the head with CORD's 60 new tags).
+    The figure's own title says "FUNSD->CORD". It is not the DIL stream and not a fixed label space.
+  - The data themselves hold (CKA, mean of 3 seeds, embeddings / L0 / L6 / L11 / head): LayoutLMv3 1.00/0.96/0.65/0.25/0.16,
+    BERT 1.00/0.99/0.76/0.29/0.20, LiLT 1.00/0.96/0.45/0.17/0.13, BROS 0.99/0.94/0.64/0.18/0.14; monotone and lowest at
+    the head on every encoder and every seed. Only the label-space qualifier is false. The long appendix named the
+    stream ("Under naive fine-tuning on FUNSD->CORD->SROIE"); the cut removed it.
+  - The qualifier is load-bearing: H0 separates drift from the label conflict, so drift measured while labels grow
+    cannot be offered as drift "on a fixed label space".
+  - Fix (three edits):
+    - main.tex:142: "Drift is still real: naive training keeps nothing of the old sessions; on a fixed label space every
+      encoder forgets its earlier domains and replay repairs it where EWC and LwF do not, and under naive fine-tuning the
+      representation drifts most near the output on all four encoders, as known for image classifiers~\citep{ramasesh2021anatomy}
+      (\cref{app:drift})."
+    - supp_body.tex:128: "... forgets its earlier domains (\cref{tab:dil}). On our pilot stream FUNSD$\rightarrow$CORD$\rightarrow$SROIE,
+      where each dataset brings its own labels, the representation drift grows with depth on all four encoders, ...
+      (\cref{fig:cka})."
+    - supp_body.tex:125 (`fig:cka` caption): "... before and after the second task (FUNSD$\rightarrow$CORD, each dataset
+      with its own labels) under naive fine-tuning ...".
+
+**MEDIUM**
+
+- **R14-M1. The scoring sentence points at an exhibit that shows only part of the claim.** main.tex:119: "on every seed
+  both metrics order the groups of clean runs the same way (\cref{fig:findings}a)". The claim is true: my recomputation
+  gives non-overlapping ranges in both metrics (no memory AA <= 24.0 < CoLaR >= 32.4; CoLaR <= 34.4 < relabelled >= 62.4;
+  relabelled <= 65.8 AA / 79.1 F1 < SBR, SBR-Recall, joint >= 86.2 / 87.1), and `agree_macros` raises no warning. But
+  Fig. 2a draws naive and joint only as full-label lines, with no AA and no seeds, and the per-seed agreement table was cut.
+  Fix: add one sentence to App. A "Scoring": "On every seed the order no memory < CoLaR < relabelled memory < \{CoLaR-SBR,
+  SBR-Recall, joint training\} holds under both metrics." Point the body at `\cref{app:setup}` as well.
+- **R14-M2. The H2 numbers have no exhibit for the pseudo-label variants.** main.tex:160: "over three seeds it averages
+  60.5, and no repair, pseudo-label variants included, exceeds 69.3 AA on any seed, below every seed of CoLaR-SBR".
+  - Recomputed: sliced both sides, gate 62.86 / 69.23 / 49.45, mean 60.5. Repairs (sliced rescore 44.2/39.9, sliced gate
+    39.4, sliced2, sliced2+pseudo 48.0, bilc 44.1, relabelled gate 61.2, relabelled clean 65.8/62.8/62.4): max 69.23,
+    printed 69.3. CoLaR-SBR clean minimum 86.16. True.
+  - The sliced-both bar with its three seed dots is visible in Fig. 2a ("sliced losses", hatched); the pseudo-label rows
+    (old `tab:conflict`) are gone.
+  - Fix: append `(\cref{fig:findings}a)` after "60.5". Either add a two-row group "Label-side repairs (H2)" to
+    `ABL_EXT` (sliced2_pseudo, bilc) or drop "pseudo-label variants included".
+- **R14-M3. New results now contradict untouched body text (the known generator failure).**
+  `make_clean_tables.py` exits 1 only on `SLOT_VERDICT` for `oracle_pre`, `colar_mib`, `ice_o`. No `WARNING` lines appear,
+  and every other generated file reproduces byte for byte: vals, supp_vals, tab_main_clean, tab_ablation, tab_dil_grid,
+  supp_ablation_ext, supp_baselines_short, tab_image_core, image_vals, supp_perclass_vals. The exception is
+  `supp_agree.tex`, which gains these rows but is no longer compiled. `make_paper_figs.py` also stops, in its `selfcheck`,
+  because the ladder cells include rows that the committed `tab_ladder.tex` lacks. Same cause; the figures did not change
+  in P20. The landed runs matter for the prose:
+  - "True-label refresh before each session" (clean, 3 seeds): AA 91.9 / 92.3 / 89.8 and full-label F1 92.5 / 93.1 / 90.7,
+    above CoLaR-SBR's full-label F1 (88.8 / 91.2 / 87.1) on every seed.
+  - CoLaR + MiB-style CE: AA 73.8 / 70.0 / 72.6, full-label 61.4 / 59.1 / 59.6. ICE-O: AA 34.4-35.8, full-label 56.3-57.7.
+  - main.tex:158 "It has not run yet" (the MiB control) is now false in fact. The H1 "What it rules out" text, H2 "Evidence
+    so far: open", the "What discriminates" paragraph and the Conclusion ("whether the current documents' labels are the
+    rest is open") all predate these results.
+  - P20 is not the cause, but P21 must set the verdicts and rewrite H1 to H3 before the next upload. The never-stale
+    memory reaching joint level under a shared softmax bears directly on H3.
+
+**LOW**
+
+- R14-L1. supp_body.tex:49 "The implementation's record is about 1% larger": the *recorded* `replay_memory_bytes` is exactly
+  the counted 100,672,250 (250 x (2·128·1477 + 24,576 + 1)), and `tab:ablation` says "MB: as recorded". Write "The record
+  the implementation holds in memory is about 1% larger (406,800 against 402,689 bytes per document)".
+- R14-L2. supp_body.tex:43 "Every reported document run ran one at a time on one 6 GB RTX 2060; some rows of the first DIL
+  grid ran on a rented GPU" contradicts itself. Write "The clean, gate and rescore runs ran one at a time on one 6 GB RTX 2060;
+  some rows of the first DIL grid ran on a rented GPU."
+- R14-L3. supp_body.tex:130 "in single-seed diagnostics at their own operating points: ... LCA ... halves backward
+  transfer". LCA on DIL is three seeds (BWT -27.1 / -35.2 / -30.8 against naive -75.0 / -71.0 / -73.3, so "halves" holds),
+  and `tab:main` shows no BWT. Write "mostly single-seed diagnostics" and drop the `tab:main` pointer for the BWT.
+- R14-L4. supp_body.tex:87 "a column loses 2 to 9 points": the mean-matrix losses are 3.1 / 9.0 / 1.6 / 3.1, so the lower
+  end is 1.6 rounded to an integer. Print one decimal (`sbrLossMin`). `recallDevMax` prints 1.4 against a true 1.30;
+  "within" stays true.
+- R14-L5. main.tex:140 "learn every session to at least \nSbrDiagMin (\cref{fig:heatmaps})": the heatmap is the seed mean,
+  but the claim is a per-seed minimum (81.17, true). The same applies to the recall ranges against Fig. 2b (means). Both are
+  consistent but not shown per seed. Optional: "(per-seed minimum; mean in \cref{fig:heatmaps})".
+- R14-L6. main.tex:97 "answered by distillation on ``O'' tokens~\citep{...}, and pseudo-labels~\citep{...}": drop the comma.
+  main.tex:119 "...delta capacity; \Cref{app:baselines,app:results} give": lower-case `\cref` after a semicolon.
+- R14-L7. Standalone supp.pdf reads "the comparison set of the comparison table of the main paper" (`tab:baselinecard`
+  caption). Use `\bodyref{tab:main}{Tab.~3 of the main paper}`.
+- R14-L8. main.pdf p. 16 holds only Fig. 8, which repeats `tab:image`. Drop it or place it `[h]` to save the page (optional).
+
+### Checks that pass
+
+- **Build.** I built from `git archive ec63d9a`, without `-C`.
+  - `latexmk -pdf main.tex` and `supp.tex` both exit 0.
+  - 0 undefined, 0 multiply-defined, 0 citation warnings, 0 overfull, 0 "??" in either PDF.
+  - main 16 pp.: the Conclusion and the start of the References are on p. 8, the appendix is pp. 11-16 (6 pp.). supp 7 pp.
+  - p. 11 reads "Appendix" and supp p. 1 reads "Supplementary Material". Neither page shows the paper title (pdftotext).
+  - No `---` in main.tex, supp_body.tex or supp.tex. `refs_precompiled.bbl` (44 entries) is byte-identical to a fresh
+    BibTeX run from `refs.bib`, and main.aux has 44 `\bibcite`.
+- **Pointers.** No hard-coded "App. X" is left in main.tex, `fig/*.tex` or `tab_*.tex`. Every `\cref` resolves to an exhibit
+  that exists.
+- **New generated tables, recomputed from run files.**
+  - `supp_ablation_ext`:
+    - rank 8 with memory: 80.49, min diagonal 61.5, min final 63.2.
+    - rank 8 without memory: 82.50, 64.9, 66.4.
+    - rank 64: 92.69 / 93.37 / 92.44 = 92.8±0.5, 88.8, 88.6.
+    - Mixed, no memory: 44.66, 82.0, 0.0. Mixed, memory: 85.94, 81.2, 75.0.
+    - CoLaR-SBR gate: 87.62 / 86.27 / 90.15 = 88.0±2.0, 85.9, 72.8.
+    - +LexSlot: 90.15 / 89.72 / 89.23 = 89.7±0.5, 89.8, 80.6.
+  - `supp_baselines_short`: every seed count matches the cell source. LwF 2/1/3 after dropping the fp16 zeros; IS3 Mixed
+    keeps its genuine fp32 zero (2); IS3 DIL 1.
+  - Caption epoch caps match the recorded hparams: 100 for ER, DER++, LwF, CPFD and IS3; 30 for CODA and CL-LoRA; 10 for LCA.
+  - Ports-paragraph hparams match the record: buffer 200, alpha = beta = 0.5, T = 2, rank 8, lambda_ortho 0.5, LCA SGD 0.01,
+    wd 5e-4, realignment lr 5e-3.
+- **Appendix macros and constants.**
+  - Scoring gaps: 1.3 / 4.8-12.3 / 1.2-5.2 recomputed per seed.
+  - Byte formula reproduces the recorded 100,672,250. The delta parameter count is 8 x 884,736 = 7,077,888. "About 3.7
+    layer-equivalents" = (12 + 4·8)/12.
+  - nRecallMaxLoss 0.55 -> 0.6. nSbrDiagMin 81.17. nNaiveDiagMin 78.67.
+  - Heatmap statements (CoLaR diagonal low from s3; relabelled s3/s4 rise; last stays low) are true.
+  - The `tab:dil` caption "on average" claims are true on the means.
+  - Session table unchanged from the audited long version.
+  - No literal result number in supp_body.tex: the rest are settings or constants.
+- **Rule 6 / 7.** Every legacy number in the new tables carries a dagger, and no cell mixes protocols. The "within / above /
+  every seed" sentences of the appendix hold per seed; the mean-only ones say "on average" or "mean".
+- **Image section.**
+  - Framing: "competitive with raw replay at 2.5x the items"; "SLCA and RanPAC lead ... on every seed"; "we make no
+    state-of-the-art claim".
+  - The probe is marked: ^v "seed-42 variant runs" in the table, and "on the one-seed variant runs ... this rests on one
+    seed" in the prose.
+  - `make_image_table.py` regenerates `tab_image_core` / `image_vals` identically and raises no per-seed warning.
+- **Legibility (pp. 11-16 at 80-110 dpi).** Session table, baseline card, heatmaps (relabelled memory included), per-class
+  figure, ablation grid, `tab:ablext`, `tab:dil`, CKA, `tab:image` and Fig. 8 are all legible.
+
+### Evidence lost from the PDF (archived, not compiled)
+
+- Per-seed values table and per-session matrices with seeds.
+- `tab:conflict`: sliced and pseudo-label rows per seed, and the frozen SBR.
+- Agreement table, legacy-protocol settings table (now one caption sentence), falsification ledger (now one prose sentence
+  per family).
+- Fisher displacement by depth.
+- The freezing / conservation experiment and the Kalb mirror.
+- Calibration probe, stale-label token counts, EWC sign-flip, `tab:probe`, image supplementary tables.
+- Related-work App. J.
+
+All remain reproducible from the generators and the archive file.
+
+### Referee view
+
+The cut costs transparency, not support for the headline claims. Those still rest on generated tables (ladder, main,
+ablation) and per-seed dots. The lost ledger and freezing experiment only backed secondary sentences, which are now
+reworded. **Score unchanged at 3 (Borderline Reject)**. Integrating the landed never-stale-memory and MiB runs (R14-M3)
+may move it either way, because they decide H2 and H3.
