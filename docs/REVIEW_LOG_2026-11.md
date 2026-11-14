@@ -4330,3 +4330,276 @@ Scope:
 - The format matches the 2027 kit.
 - What a referee would notice is the absolute "no prior work" and, if unfixed, the dropped single-backbone caveat in
   Limitations.
+
+## R17 (2026-11-14): loop iteration 1, hard critical review and three-persona self-review of HEAD `9d695c4`
+
+Scope:
+- `submission/main_paper.pdf` (10 pp.) and `submission/supplementary.pdf` (6 pp.), read as a referee receives them.
+- Sources `main.tex`, `supp_body.tex`.
+- Queue state from `results/clean_2026-11/queue.log` and `scripts/rca/clean_protocol_v13_2026-11.sh`.
+- Changes since R16: intro paragraph 2 has no numbers (6e117f8), four packages dropped, the Fig. 2c legend moved, "46 to
+  49%" spacing, LLM statement (author's wording).
+  - The LLM statement exists, is unnumbered, and sits after the Conclusion and before the References. Its content is not
+    reviewed.
+- Required sections: Abstract, Introduction, Method (§5), Experiments (§4, §6, §7) and Conclusion (§8) are all present.
+
+Tags: [W] = the rewrite alone fixes it; [G] = a generator or figure change from existing run files; [E] = needs new runs.
+The rewrite loop cannot close [E] items.
+
+### Part 1. Hard review (scientific-critical-thinking)
+
+#### Claim by claim
+
+| # | Headline claim (where) | Supported? | Proportionate / scoped? |
+|---|---|---|---|
+| C1 | With a memory and a shared softmax the newest sessions are suppressed, unlike naive training (abstract, §4.1) | Yes: newest-session F1 against naive diagonal >= `\nNaiveDiagMin`, every seed. The blocked-readout runs with the same freezing and replay learn every session, which rules out lost plasticity. | Yes. One alternative is not ruled out: replay ratio (W4). |
+| C2 | "Stale stored labels suffice to explain nearly all of it" (abstract, intro, §4.2, Conclusion "lies almost entirely in stale stored labels") | The oracle number is solid: pre-session relabel within 2.4 of joint on every seed. | **Overstated in mechanism (W1).** The oracle does two things at once: it removes the false "O" negatives, and it *adds positive labels* for the current session's classes to all older stored documents. The paper's own controls that remove only the negatives in a shared softmax recover about half (MiB-style: 60.0 F1 / 72.1 AA; legacy "sliced": 60.5 AA). So the evidence does not show that the false negatives explain the failure. It shows that true labels (negatives and positives) do. The principle sentence and §5 attribute the effect to negatives. |
+| C3 | H2 "not needed" (§4.3) | Valid as a sufficiency statement: true stored labels close the gap while current documents stay stale. | It does not measure the current side's own effect. The ladder says "open"/"partly", so the table is consistent. Fine. |
+| C4 | Separate background per session closes most of the gap without true labels (H3) | Yes, every seed, both metrics. The constant-background control "partly". | Yes (CIL-CORD, LayoutLMv3 only; stated in §7 and Limitations). |
+| C5 | Latent vs raw memory (§5.2, §6) | Yes: within 1.7 F1 on every seed, with the confound disclosed. | Yes after R15. |
+| C6 | SBR-Recall replaces the memory on one schema, fails across schemas (§5.3) | CIL-CORD: three clean seeds. Mixed: one legacy seed. | Scoped ("one seed", "in one run"). Rank 64 was chosen on CIL-CORD (disclosed). Inference costs five passes; that is in App. B only (W9). |
+| C7 | Comparison methods do not close the gap (intro, §7) | Every comparison cell is legacy (†), and four ports end below naive. | Proportionate as "none of our ports"; weak as evidence about the methods (W6, E3). |
+| C8 | "state the prediction of each in advance" (abstract, §1) | The paper cannot show it: there is no dated record. | Reads as preregistration; a HARKing-risk phrase (W3). |
+
+#### Validity
+
+- **Internal.**
+  - Rung-to-rung comparisons change one factor, except H0's memory rows, which are disclosed (footnotes e, w).
+  - The headline comparison set mixes protocols. The CoLaR family is clean. Every baseline is legacy (test-split early
+    stopping, which favours them), and some are fp16.
+  - Replay ratio is a confound for the size of C1: each step mixes 4 replayed documents with a current batch of 2, so
+    stored, stale labels outweigh current ones 2:1. This is never stated in the body (W4).
+- **External.**
+  - All controls (H1-H3, memory comparison, constant background) ran on one stream: CORD, one class partition and order,
+    100 test receipts. They ran on one backbone: LayoutLMv3.
+  - DIL drift evidence spans four encoders, but legacy.
+  - The queue adds CIL-FUNSD (CoLaR, CoLaR-SBR, SBR-Recall, joint, naive) and CoLaR-SBR on BROS. It does **not** add any
+    *control* (oracle-pre, MiB, constant background) on a second stream or backbone (E1).
+- **Construct.**
+  - Full-label F1 measures the final model on all 30 classes; that is the right headline.
+  - AA is session-restricted and ignores cross-session false positives (coverage gap, App. A). Disclosed.
+  - "Suppression" is read from diagonal F1; good.
+  - "Claims" are not calibrated across blocks (stated).
+- **Statistical.**
+  - Three training seeds and one fixed test set of 100 receipts. No confidence interval, and no test-set resampling.
+  - "On every seed" is a sign-consistency statement: with n=3 a symmetric null gives it 1/8 of the time.
+  - It carries the large effects (30.7 vs 89.1; 2.4 to joint) well. It cannot carry the sub-2-point statements: raw vs
+    latent, constant background vs SBR on seed 123, oracle above CoLaR-SBR (92.1 vs 89.1 with s.d. 1.3 / 2.0).
+  - The paper never says what "on every seed" licenses (W5).
+
+#### Fallacies and alternative explanations
+
+- **Oracle as explanation (C2).** "If true labels fix it, stale labels caused it" holds for labels as a whole. It cannot
+  attribute the cause to the false negatives, because the intervention also adds positives. This is the most attackable
+  logical step (W1, E2).
+- **Hasty generalisation.** The title ("Continual Document Understanding") and the principle are stated generally. The
+  diagnosis rests on one CORD partition and one backbone. Limitations now states the scope, but the title and abstract
+  do not (W7).
+- **Post hoc.**
+  - §5 "From diagnosis to design" narrates SBR as derived from the ladder.
+  - The H3 prediction and SBR were in fact run before the oracle controls existed (queue dates: CoLaR-SBR clean 11-11,
+    oracle-pre 11-13). Narrative order is acceptable; "the rungs point at" is fine.
+  - The abstract's "First ... Then ... Finally" is presentation order. Acceptable if C8 is reworded.
+- **Not ruled out.**
+  1. Positive-label gain vs negative removal (above).
+  2. Replay weight (4:2).
+  3. Ports, not methods, failing (four baselines below naive).
+  4. Class order: SBR-Recall's o2/o3 orders are queued for one seed; the controls were never run on another order.
+
+#### Presentation
+
+- §4 is precise but dense: every paragraph carries five to ten generated numbers and coined terms ("seed-matched gap",
+  "session-restricted", "claim", "owning block", "blocked readout").
+- A CVPR referee outside continual NER can follow the ladder table (Tab. 1) and Fig. 2a, but not the H1/H3 Result
+  paragraphs, in one read (W8).
+- Tab. 1 and Tab. 3 are legible.
+- Fig. 2 panels (b) and (c) are 0.25 text width. Tick labels print at about 5 pt.
+- Fig. 2a labels are inconsistent: "relabelled" vs "relabel before", and "raw mem. + SBR" sits under H0 although it uses
+  H3's readout (G1).
+- The abstract delivers what it promises, apart from C8.
+- The title "Memory Is Not Enough" is in tension with the paper's strongest result: a memory with true labels *is*
+  nearly enough. The point is that "a memory with stale labels is not enough" (W7; the user's decision).
+
+### Part 2. Three-persona self-review (NeurIPS form, reflection to convergence)
+
+**R1: harsh but fair** (good experiments that lead to insight). Round 1 Overall 5. Round 2 lowered Clarity to 2 after
+re-reading §4.2-4.4. Round 3: I am done.
+```json
+{"Summary": "Diagnoses why replay fails for continual KIE under label growth with a pre-stated hypothesis ladder on CIL-CORD (LayoutLMv3): a memory with a shared softmax suppresses the newest sessions; true stored labels (oracle) close the gap to within 2.4 points of joint training; a per-session background readout without true labels closes most of it, with latent or raw memory; per-session deltas replace the memory on one schema.",
+ "Strengths": ["Careful one-factor ladder with per-seed verdicts and a clean protocol (held-out early stopping, fp32)", "Decisive oracle and negative controls (no-memory SBR, constant background, MiB-style loss, ICE-O)", "Honest reporting: legacy cells marked, cost exhibit concedes no byte saving, confounds disclosed"],
+ "Weaknesses": ["All controls on one CORD partition and one backbone; 100 test receipts, three seeds, no intervals", "Oracle relabelling adds positives as well as removing false negatives, so the negative-evidence principle is not isolated", "Baselines are legacy ports, four below naive", "Section 4 is number-dense and hard to read"],
+ "Originality": 2, "Quality": 3, "Clarity": 2, "Significance": 2,
+ "Questions": ["What does an oracle that only ignores stale stored tokens (no added positives) reach?", "Does the H1/H3 pattern hold on CIL-FUNSD or another class order?", "How sensitive is the suppression to the 4:2 replay ratio?"],
+ "Limitations": ["Adequately listed, except the statistical scope of 'on every seed'"],
+ "Ethical Concerns": false, "Soundness": 3, "Presentation": 2, "Contribution": 2, "Overall": 5, "Confidence": 4, "Decision": "Accept"}
+```
+**R2: harsh and critical** (impact). Round 1 Overall 3. Round 2 reconsidered Soundness after crediting the
+clean protocol and kept it at 2 and Overall at 3, since the impact objection stands. Round 3: I am done.
+```json
+{"Summary": "An analysis paper on one receipt dataset showing that stale labels in replay memory and a shared background softmax explain replay's failure under label growth; the remedy combines known per-session readouts (ICE-O, MORE) with latent replay.",
+ "Strengths": ["Clear negative results and an oracle that bounds what memory can do", "Thorough disclosure of protocol differences"],
+ "Weaknesses": ["Narrow scope for CVPR: one dataset (CORD, 100 test docs), one backbone for every control; title claims 'document understanding'", "'None of the ingredients is new': contribution is a decomposition whose generality is untested", "Comparison set weak: legacy ports, CPFD/IS3 near zero, so 'methods built for O-shift do no better' is not credible as stated", "Mechanism claim (false negatives) not isolated from added positives", "No statistical test; several conclusions rest on sub-2-point, three-seed differences"],
+ "Originality": 1, "Quality": 2, "Clarity": 2, "Significance": 1,
+ "Questions": ["Why should a CV audience care beyond receipts? Any second dataset or backbone for the controls?", "Are CPFD/IS3 ports faithful (published NER numbers reproduced)?"],
+ "Limitations": ["Listed, but the title and abstract generalise beyond them"],
+ "Ethical Concerns": false, "Soundness": 2, "Presentation": 2, "Contribution": 2, "Overall": 3, "Confidence": 4, "Decision": "Reject"}
+```
+**R3: open-minded** (new ideas). Round 1 Overall 6. Round 2 re-checked Significance and Clarity against Sec. 4 and kept both at 3. Round
+3: I am done.
+```json
+{"Summary": "Separates drift from background conflict in continual document KIE with a hypothesis ladder, states an annotation principle ('O' is evidence only against classes its annotator saw), and shows a per-session readout realises it with a latent whole-document memory or, on one schema, per-session deltas.",
+ "Strengths": ["New decomposition for token-labelled documents; the principle unifies MiB, SS-IL, ICE-O and partial-annotation training", "Error-routing analysis (where old entities go) is a useful diagnostic others can reuse", "Memory-cost exhibit is unusually candid"],
+ "Weaknesses": ["Generality untested beyond CIL-CORD", "Dense prose; terminology needs a glossary or a figure", "Principle is argued, not tested in isolation"],
+ "Originality": 3, "Quality": 3, "Clarity": 3, "Significance": 3,
+ "Questions": ["Would the principle predict results on segmentation benchmarks where MiB was developed?"],
+ "Limitations": ["Adequate"],
+ "Ethical Concerns": false, "Soundness": 3, "Presentation": 3, "Contribution": 3, "Overall": 6, "Confidence": 3, "Decision": "Accept"}
+```
+
+### Review Summary
+
+- **Overall Score**: 5/10 (mean 4.67). Weighted: **5.4/10**.
+  - Weights: Overall 1.0, Contribution 0.4, Presentation 0.2, others 0.1 each; each score normalised by its scale.
+  - Computation: (0.467 + 0.4*0.583 + 0.2*0.583 + 0.1*(0.667+0.733+0.5+0.5+0.583+0.667)) / 2.2.
+- **Decision**: **Reject**. The weighted score is below the ~5.9 bar; the persona decisions are 2 Accept, 1 Reject.
+- **Confidence**: 4/5 (mean 3.67).
+
+| Dimension | R1 | R2 | R3 | Avg |
+|---|---|---|---|---|
+| Overall (/10) | 5 | 3 | 6 | 4.67 |
+| Contribution (/4) | 2 | 2 | 3 | 2.33 |
+| Presentation (/4) | 2 | 2 | 3 | 2.33 |
+| Soundness (/4) | 3 | 2 | 3 | 2.67 |
+| Originality (/4) | 2 | 1 | 3 | 2.00 |
+| Quality (/4) | 3 | 2 | 3 | 2.67 |
+| Clarity (/4) | 2 | 2 | 3 | 2.33 |
+| Significance (/4) | 2 | 1 | 3 | 2.00 |
+| Confidence (/5) | 4 | 4 | 3 | 3.67 |
+
+**Strengths (consensus)**
+1. A one-factor ladder with per-seed verdicts under a clean protocol.
+2. The oracle and the negative controls bound the problem decisively.
+3. Candid reporting: legacy marks, confounds, and a memory cost that concedes no byte saving.
+
+**Weaknesses (consensus)**
+1. Every control ran on one stream and one backbone. The test set is small, there are three seeds and no intervals.
+2. The mechanism (false negatives) is not isolated from the oracle's added positives.
+3. The comparison set is legacy ports, four of them below naive.
+4. §4 is too dense for a non-specialist.
+
+**Questions for the authors**
+1. What does a mask-only oracle reach?
+2. Do the controls hold on CIL-FUNSD, on another class order, and on BROS?
+3. How sensitive is the suppression to the replay ratio?
+4. Are the CPFD/IS3 ports faithful?
+
+### Weakness list with severity, location and class
+
+**[W] fixable by writing**
+
+- **W1 (HIGH)** abstract :59, intro :71, §4.2 :140, §5 :162, Conclusion :235. Say what the oracle changes: it removes the
+  stored false negatives *and* gives older stored documents positive labels for the current classes.
+  - Prescribed rewrite:
+    - §4.2: "As a result, true stored labels suffice to explain nearly all of the failure ... The refresh both removes the
+      stored documents' false ``O'' negatives and adds positive labels for the current classes. Repairs that only remove
+      the false negatives within a shared softmax recover about half (H2, MiB-style; the legacy sliced loss), so we do
+      not separate the two effects."
+    - Abstract and intro: "stale stored labels suffice" -> "true stored labels suffice ... (an oracle)". Keep "nearly
+      all", and drop the implication that the negatives alone explain it.
+    - §5 principle: present the principle as what the per-session readout implements (supported by H3), not as what the
+      oracle proved.
+    - Conclusion: "the other, the background conflict, is removed almost entirely by true stored labels (an oracle) and
+      mostly by a per-session readout".
+  - All rule-6/7 compatible: no new numbers. The MiB and sliced values already exist as macros or the ladder.
+- **W2 (MEDIUM)** Limitations :233. Add the statistical scope.
+  - Text: "Three training seeds and one test set of $100$ CORD receipts; 'on every seed' states sign consistency, not
+    significance, and differences under about two points (raw vs latent memory, constant background vs learned on
+    seed 123, the oracle above CoLaR-SBR) are not resolved."
+- **W3 (MEDIUM)** abstract :59, intro :71. Change "state the prediction of each in advance" / "we state a prediction
+  before its test" to "state what each hypothesis predicts before reporting its test". Exception: a dated record exists
+  for every rung, which can then be cited in App. A.
+- **W4 (MEDIUM)** Setup :105 and H0 :130. State the replay ratio, "each step adds four stored documents to a current
+  batch of two", and add it to Limitations as an untested factor of the size of the suppression.
+- **W5 (MEDIUM)** §4 intro :113. One sentence on what a verdict word licenses (sign on every seed of three), pointing to
+  W2.
+- **W6 (MEDIUM)** intro :67, §7 :224.
+  - The intro sentence "distillation, prompts, low-rank adapters and the continual-NER methods ... do no better" should
+    read "our ports of ... (legacy protocol) do no better".
+  - §7 should say once that four ports end below naive and none was checked against its published numbers (already in
+    App. C). This keeps the comparison's role as "none of our ports closes the gap", not a ranking of methods.
+- **W7 (MEDIUM, the user's decision)** title :44 and abstract scope.
+  - The title says "Memory Is Not Enough ... Continual Document Understanding". The study is KIE on one receipt stream,
+    and its strongest result is that a memory with true labels nearly suffices.
+  - Options:
+    - Keep the title and add "(on receipts)" scope in the abstract's first sentence.
+    - Retitle, e.g. "Stale Labels, Not Drift: Why Replay Fails Under Label Growth in Continual Document KIE".
+- **W8 (MEDIUM)** §4.2-4.4 :140, :154, :158 (presentation).
+  - Keep one headline number per Result paragraph (the ladder carries the rest).
+  - Move the per-session diagonal ranges (`\nOracleLateMin` ... `\nOracleLastShare`) and the error-routing percentages
+    to App. D, and keep one sentence each.
+  - Define "blocked readout", "claim" and "owning block" once, in §3 or in the Fig. 1 caption.
+  - Freed space should go to W1/W2.
+- **W9 (LOW)** §5.3 :205. Add "at inference SBR-Recall runs one pass per session (five on CIL-CORD; App. B)", so the
+  replace-the-memory claim carries its compute price.
+- **W10 (LOW)** intro :67.
+  - "(\cref{tab:main}; legacy-protocol runs, which favours replay, ...)" -> "(\cref{tab:main}; legacy protocol, which
+    favours replay; \cref{sec:setup})".
+  - The DIL statement "keeps LayoutLMv3 close to joint training on every seed" also rests on legacy cells
+    (ER 86.2/88.7/88.6 against joint 89.7/89.0/87.5). Add "(legacy protocol)".
+
+**[G] fixable from existing run files**
+
+- **G1 (LOW)** Fig. 2a (`make_paper_figs.py`).
+  - Make the labels consistent: "relabel, boundary" / "relabel, pre-session" as in Tab. 7.
+  - Mark "raw mem. + SBR" as the H0 row it is, or use the ladder's footnote w.
+  - Raise tick labels in (b) and (c) to at least 6 pt.
+- **G2 (LOW, optional)** a per-seed dot plot of the four sub-2-point comparisons (raw vs latent, constant background vs
+  SBR, oracle vs SBR, Recall vs joint) in App. D, so a reader sees the spread behind W2.
+  - Source: existing `metrics.json`.
+
+**[E] needs new runs (cannot be closed by the rewrite loop)**
+
+- **E1 (HIGH for acceptance).** No control (H1-H3) has been run on a second stream or backbone.
+  - Smallest settling run: oracle-pre relabel (`colar_r_oracle_pre`) and the constant-background SBR on **CIL-FUNSD**, x3
+    seeds (FUNSD is small; about 20-30 min per run).
+  - The queue already has CIL-FUNSD CoLaR (d10), CoLaR-SBR (d10), SBR-Recall, joint and naive x3 (v13 block 6), so these
+    controls need only two more method lines.
+  - **Not queued.**
+  - The BROS CoLaR-SBR x3 is queued (v13 block 7). It extends the method claim, not the controls.
+- **E2 (HIGH for the mechanism claim).** A mask-only oracle that separates removing negatives from adding positives.
+  - Run: CoLaR, shared softmax; before each session every stored token whose true class the storing session did not
+    annotate gets the ignore label (-100) instead of its true label. x3 seeds on CIL-CORD, about 2 h each.
+  - Needs a small `colar_r` refresh mode (Dev).
+  - **Not queued.**
+  - Without it, W1's rewrite is the honest fallback, and it is sufficient for soundness.
+- **E3 (MEDIUM).** Clean comparison cells.
+  - Queued (v13): ER-250 x3, DER++-250 x3, LwF x3, CL-LoRA x3 (CIL-CORD), and the DIL clean cells.
+  - Not queued: CPFD, IS3, CODA, LCA clean re-runs. Those four stay legacy.
+- **E4 (LOW).** Second class order for the controls. Only SBR-Recall o2/o3 at seed 42 is queued.
+- **E5 (LOW).** Replay-ratio sweep (replay batch 2 or loss weight 0.5) for CoLaR shared softmax. Not queued; W4 covers it
+  in writing.
+- **E6 (LOW).** Rank 32/64 CoLaR-SBR (queued, running); Mixed joint seeds 7/123 (queued). Both only update cells.
+
+### Stopping judgement
+
+**With every [W] and [G] item fixed, the personas move to:**
+- R1 Overall 5, Presentation 3, Clarity 3.
+- R2 Overall 4, Soundness 3, Presentation 3, Clarity 3.
+- R3 Overall 6.
+
+**The weighted aggregate becomes about 5.8/10.**
+- Computation: (0.5 + 0.4*0.583 + 0.2*0.75 + 0.1*(0.75+0.733+0.5+0.5+0.75+0.75)) / 2.2 = 0.582.
+- That is just below the ~5.9 bar. **The aggregate decision stays Reject (marginal).** The persona decisions would be
+  2 Accept, 1 Reject.
+
+**What stands between the paper and Accept is [E], not writing.**
+- **E1** (controls on a second stream; the cheapest is CIL-FUNSD oracle-pre and constant-background x3, not queued) and
+  **E2** (mask-only oracle x3 on CIL-CORD, not queued, needs a small refresh mode).
+- If both come back consistent with the current reading, R1 moves to 6 and R2 to 4-5. That gives a weighted score of
+  about 6.1 to 6.2 and an aggregate Accept.
+- E3 (queued) helps R2's comparison objection but does not by itself flip the decision.
+- **The loop should therefore stop once W1-W10 and G1-G2 are fixed. What remains is a PM / user decision:** schedule E1
+  (and, if Dev can add the refresh mode, E2) ahead of the lower-value tail of the queue, the DIL legacy-replacement cells.
+  - Freeze is Nov 17 07:00.
+  - E1 costs about 2-3 h of GPU time, E2 about 6 h.
+  - Otherwise submit with the W-fixes as a borderline paper.
