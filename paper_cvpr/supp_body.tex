@@ -111,7 +111,7 @@ b^\star=\arg\max_b e_b.
 \resizebox{\linewidth}{!}{\input{supp_funsd}}
 \end{table}
 
-\paragraph{CIL-FUNSD (\cref{tab:funsd}).} FUNSD's question, answer and header types arrive in two sessions, and session-2 forms also contain questions, labelled ``O''. The seed-$\nFunsdJointEarlySeeds$ joint run stopped at its first epoch under the same early-stopping rule, so the joint mean is undertrained. More stored forms, the MiB-style loss and the blocked readout without memory are not yet run there.
+\paragraph{CIL-FUNSD (\cref{tab:funsd}).} FUNSD's question, answer and header types arrive in two sessions, and session-2 forms also contain questions, labelled ``O''. The seed-$\nFunsdJointEarlySeeds$ joint run stopped at its first epoch under the same early-stopping rule, so the joint mean is undertrained. With fifty stored forms the oracle keeps session~1 in part on one seed only; slicing both losses closes most of the gap on every seed.
 
 \paragraph{Per class (\cref{fig:perclass}).} It is noted that the dump re-runs are not table cells, and every statement here is about seed 42 only. Of the $\pcPresent$ classes that occur in the test set, the joint-training re-run finds $\pcFoundJoint$ (F1 above $0$), the CoLaR-SBR re-run $\pcFoundSbr$, the CoLaR re-run $\pcFoundColar$ and the naive re-run $\pcFoundNaive$; $\pcBothMissed$ of the classes the CoLaR-SBR re-run misses are missed by joint training too. In the CoLaR re-run the session-5 classes are almost never found (the suppressed newest session) and the session-1 classes, which hold most test entities, are found only in part, while several session-2 and session-3 classes are kept.
 
