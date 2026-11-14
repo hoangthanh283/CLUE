@@ -5104,3 +5104,127 @@ blocked readout". This is true: max gaps 5.25 / 4.38 / 0.17, and rank 32 is excl
   `colar_r_oracle_mask_pre` lands (queued, v16). Rewrite that sentence from the generated `\vOracleMask*` macros when all
   three seeds exist, and give the ladder a row for it.
 - **R19b-L2.** R18 L2/L3 are still open.
+
+## R20 (2026-11-14): audit of the CIL-FUNSD block (E1): is the failed oracle a pipeline fault?
+
+Scope: `results/clean_2026-11/cil_funsd_*`, three seeds per cell. I read `metrics.json`, `matrix.npy`, `per_class_f1.json`
+and the run logs, plus `doccl/data/scenarios.py` (commit `a5e25dd`) and `doccl/methods/colar_r.py`. All read-only; no
+dataset was built. The v16 driver (PID 1985917) was running the mask-only smoke and was left alone.
+
+### Verdict: **no pipeline fault.** The oracle result on CIL-FUNSD is real. Every cell is valid; joint seed 42 needs a caveat.
+
+### 1. Does the FUNSD oracle train on relabelled replay? Yes.
+
+- `a5e25dd` changes only `build_cil_funsd`: `_wrap(split, full_head)` now passes `full_head=snapshots[-1]` to
+  `CIL_LabelRemapper` for the train sets, as `build_cil_cord` does. Nothing after it slices or remaps the labels.
+  `colar_r_oracle_pre.yaml` sets neither `replay_sliced` nor `current_sliced`, so the replay CE runs over the full head.
+- The oracle stores `labels_full`:
+  - `replay_memory_bytes` is 8,074,240 against 8,053,760 for plain CoLaR.
+  - The difference, 20,480, is 20 documents x 512 tokens x 2 bytes of int16 `labels_full`.
+- The log shows the refresh before session 2 on every seed: "colar_r[oracle]: refreshed 10 docs, 580 / 594 / 583 tokens
+  relabelled" (seeds 42 / 7 / 123).
+- What the stored session-1 documents carry:
+  - Before the refresh: HEADER and QUESTION (their own session), with ANSWER as "O".
+  - After it: the true ANSWER tags as well, so every class is true.
+- The session-2 replay loss does see session-1 classes. It starts at 2.42 (seed 42, first step of session 2) and falls to
+  about 0.001-0.04 by epoch 3-5.
+- So the model **fits the ten true-label stored documents almost perfectly**. Yet on the test set it predicts no
+  session-1 entity:
+  - Per-class F1 after session 2 (seed 42): QUESTION 0.0 (1,077 test entities), HEADER 0.0 (119).
+  - R[2,1] = 0.0 on every seed.
+
+### 2. Why does the oracle equal plain CoLaR while SBR with the same ten documents reaches 87?
+
+The measured facts (seeds 42 / 7 / 123):
+
+| Run | Full-label F1 | R[2,1] |
+|---|---|---|
+| Oracle | 52.1 / 52.5 / 52.1 | 0.0 / 0.0 / 0.0 |
+| Plain CoLaR | 51.8 / 53.0 / 51.9 | 1.0 / 0.0 / 0.0 |
+| Naive | 50.7 / 51.0 / 50.8 | 0 / 0 / 0 |
+| CoLaR-SBR (d10) | 87.6 / 86.4 / 87.5 | 86.6 / 85.0 / 86.3 |
+| Constant background | 87.6 / 87.2 / 86.9 | 86.0 / 85.5 / 85.5 |
+
+- Oracle minus CoLaR: +0.28 / -0.45 / +0.24. Oracle minus naive: +1.37 / +1.46 / +1.36.
+- Constant background minus SBR: 0.0 / +0.8 / -0.5.
+
+**What the data support.**
+- Under a shared softmax on this stream, a memory of ten true-label documents per session does not keep session 1
+  at all. The replay signal is fitted (loss about 0.001) but does not transfer to unseen forms.
+- Two structural differences from CIL-CORD fit this, and **the data cannot tell them apart**:
+  - (a) **Memory size.** FUNSD stores 10 documents per session against CORD's 50. Each stored FUNSD form is replayed
+    about 150 times per session (about 6 epochs x 66 steps x 4 / 10), so it can be memorised. The replay loss near zero
+    alongside zero test recall is the signature of that.
+  - (b) **A dense current-side conflict.** All session-2 training forms are kept because they contain ANSWER, and FUNSD
+    forms pair every answer with questions. So every current batch labels QUESTION and HEADER entities "O"; the test
+    split alone has 1,077 QUESTION entities in 50 forms. On CORD a receipt carries a few classes of other sessions. This
+    is H2's side of the conflict, which the CORD oracle showed was "not needed" there.
+- The blocked readout removes (b) by construction: a session-2 document has mask m=0 for block 1, so it never trains
+  that block towards "O". That is consistent with SBR and the constant background keeping session 1.
+
+**What the data do not support.**
+- They do not show whether the memory helps SBR on FUNSD. There is no no-memory SBR run on CIL-FUNSD, and with two
+  sessions and a frozen trunk below layer 4, block 1 might survive on isolation alone.
+- They do not separate (a) from (b).
+- Smallest settling runs, none queued:
+  - FUNSD oracle with more stored documents (`method.docs_per_task=50`, or as many as the session-1 pool allows), which
+    tests (a).
+  - FUNSD MiB-style loss, or `colar_r_sliced2` (current side sliced), which tests (b).
+  - FUNSD SBR with `docs_per_task=0`, which tests the memory's role under SBR.
+
+### 3. Joint seed 42
+
+The log reads: "T0 ep1 val_f1=81.43 (best), ep2 78.94, ep3 77.76 -> STOP". Patience is 2, and the best (epoch-1) weights
+are restored, so the final model is the one-epoch model. That is why its AA (77.39) and full-label F1 (77.80) are
+identical to the one-epoch smoke run, and why the wall time is 95 s.
+- This is valid under the clean protocol: the early-stopping rule is the same for every run, and the validation set is
+  10% of the pooled FUNSD training set, about 15 forms, which makes it noisy.
+- But it is an **undertrained reference**. Seeds 7 and 123 train 11+ and 9 epochs and reach 87.6.
+- A rerun with the same seed reproduces the run exactly, and a different patience would break the protocol. So flag it;
+  do not rerun.
+
+### 4. Per-cell verdicts
+
+| Cell | Verdict |
+|---|---|
+| naive | Valid. |
+| CoLaR (d10) | Valid. |
+| Oracle-pre (d10) | **Valid**, with caveat: ten stored documents per session, and the replay is fitted to near-zero loss. |
+| CoLaR-SBR (d10) | Valid, with caveat: no FUNSD no-memory control, so the memory's share is unknown. |
+| Constant background (d10) | Valid, same caveat. |
+| Joint | Valid, with caveat: seed 42 is early-stopped at its first epoch (77.8 against 87.6 / 87.6). |
+
+### Strongest per-seed sentences the paper may write (rule 7)
+
+- "On CIL-FUNSD (two sessions, ten stored forms per session), the never-stale memory does not rescue the shared softmax:
+  it ends within 0.5 full-label points of plain CoLaR on every seed and forgets session 1 entirely (R[2,1]=0 on every
+  seed), although its stored documents carry true labels."
+- "With the same memory, the blocked readout keeps session 1 (R[2,1] at least 85.0 on every seed) and reaches 86.4 to
+  87.6 full-label F1. That is within 1.2 points of joint training on seeds 7 and 123, and above it on seed 42, whose joint
+  run stopped at its first epoch."
+  - Do not write "within X of joint on every seed" without the seed-42 caveat.
+- "A constant background logit does as well as the learned one there (within 0.8 points on every seed)."
+
+### What this does to the paper
+
+- **The H1 claim "true stored labels suffice to explain nearly all of the failure" holds on CIL-CORD only.**
+  - The abstract is already scoped to "one class-incremental stream of receipts", so it is not false as written. But once
+    FUNSD is reported, the scope has to be explicit in the abstract, H1 and the Conclusion.
+    - Wording: "on CIL-CORD, true stored labels suffice ...; on CIL-FUNSD, with ten stored forms per session, they do
+      not, while the per-session readout keeps the old session on both streams."
+  - Likewise "the current side (H2) is not needed" becomes CORD-only. FUNSD is consistent with the current side
+    mattering, but does not prove it.
+- **The readout result (H3) is now the cross-stream finding:** the blocked readout rescues on both streams on every seed.
+  It is the strongest claim the paper can make on two streams, and the abstract and contributions should lead with it.
+- **Title tension.** R17 noted that the CORD oracle nearly contradicts "Memory Is Not Enough". FUNSD supports the title:
+  a memory with true labels is not enough there. "A memory, even with true labels, is not always enough; the readout
+  is" is now a defensible reading.
+- **Limitations** must add:
+  - The oracle result does not transfer to CIL-FUNSD.
+  - Memory size and the dense current-side conflict are untested explanations.
+  - The joint seed-42 caveat.
+- **Self-review effect.**
+  - FUNSD answers E1's generality question, but in the opposite direction for H1. The paper's mechanism story becomes
+    stream-dependent, which hurts R1 and R2 on soundness, while the readout transfer helps contribution.
+  - Net, about unchanged (weighted around 5.8), and up if the paper is reframed around the readout as the transferring
+    result.
