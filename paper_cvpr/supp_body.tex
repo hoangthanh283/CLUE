@@ -62,12 +62,12 @@ b^\star=\arg\max_b e_b.
 \begin{table*}[t]
 \centering\scriptsize
 \setlength{\tabcolsep}{4pt}
-\caption{\textbf{Memory accounting} (CIL-CORD: $250$ stored documents, or four deltas; $1$\,MB $=10^6$ bytes). Computed: the size of an encoding no run used, from the counts in the text. Trainable: parameters trained after session~1; peak GPU memory and hours per run from the clean runs ($^{n=k}$: only $k$ uninterrupted runs timed). Generated.}
+\caption{\textbf{Memory accounting} (CIL-CORD: $250$ stored documents, or four deltas; $1$\,MB $=10^6$ bytes). Computed: the size of an encoding no run used, from the counts in the text. Trainable: parameters trained at once after session~1 (SBR-Recall: one delta at a time, four over the run); peak GPU memory and hours per run from the clean runs ($^{n=k}$: only $k$ uninterrupted runs timed). Generated.}
 \label{tab:memory}
 \input{supp_memory}
 \end{table*}
 
-\paragraph{Memory accounting (\cref{tab:memory}).} The raw-replay row counts a document as our code holds it: $3\cdot224^2$ pixels at four bytes (one byte in the 8-bit row, which no run used) and $512\cdot7{+}1$ int64 values (per token its id, four box coordinates, mask and label; one for the session). The uncompressed latent is $709\cdot768$ fp16 values plus the $24{,}576$ bytes of the CoLaR record. Raw replay with the blocked readout trains the whole network; CoLaR and SBR-Recall train only what lies above layer~$4$ after session~1, and CoLaR replays a document through the upper eight layers only. Wall-clock is reported for completeness: only one CoLaR-SBR run ran uninterrupted, so we do not compare run times.
+\paragraph{Memory accounting (\cref{tab:memory}).} The raw-replay row counts a document as our code holds it: $3\cdot224^2$ pixels at four bytes (one byte in the 8-bit row, which no run used) and $512\cdot7{+}1$ int64 values (per token its id, four box coordinates, mask and label; one for the session). The uncompressed latent is $709\cdot768$ fp16 values plus the $24{,}576$ bytes of the CoLaR record. Raw replay with the blocked readout trains the whole network (a raw memory could freeze the same layers; ours does not); CoLaR and SBR-Recall train only what lies above layer~$4$ after session~1, and CoLaR replays a document through the upper eight layers only. Wall-clock is reported for completeness: only one CoLaR-SBR run ran uninterrupted, so we do not compare run times.
 
 %% ============================================================================ C
 \section{Baselines}
@@ -106,7 +106,7 @@ b^\star=\arg\max_b e_b.
 \begin{table}[t]
 \centering\scriptsize
 \setlength{\tabcolsep}{2pt}
-\caption{\textbf{Component ablations on CIL-CORD}, the runs of \bodyref{tab:ladder}{the ladder table of the main paper} (clean protocol, LayoutLMv3, mean $\pm$ s.d. over three seeds). Ticks: latent memory (Mem.), blocked readout (Blk.), per-session deltas ($\Delta$), true labels (True). All rows but naive, joint and the raw memory freeze at least the embeddings and layers $1..4$ after session~1. MB: bytes kept across sessions (\bodyref{sec:cost}{the main paper's memory-cost section}); SBR-Recall's deltas at two bytes per parameter, a reporting choice ($\nMemRecallFpMB$ as trained in fp32). $^{r}$Stored documents given their true labels (H1): the older ones at each boundary, or all of them before each session (pre-session).}
+\caption{\textbf{Component ablations on CIL-CORD}, the runs of \bodyref{tab:ladder}{the ladder table of the main paper} (clean protocol, LayoutLMv3, mean $\pm$ s.d. over three seeds). Ticks: memory (Mem.; latent unless marked raw), blocked readout (Blk.), per-session deltas ($\Delta$), true labels (True). All rows but naive, joint and the raw memory freeze at least the embeddings and layers $1..4$ after session~1. MB: bytes kept across sessions (\bodyref{sec:cost}{the main paper's memory-cost section}); SBR-Recall's deltas at two bytes per parameter, a reporting choice ($\nMemRecallFpMB$ as trained in fp32). $^{r}$Stored documents given their true labels (H1): the older ones at each boundary, or all of them before each session (pre-session).}
 \label{tab:ablation}
 \input{tab_ablation}
 \end{table}

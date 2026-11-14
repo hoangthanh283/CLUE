@@ -766,12 +766,14 @@ ICE_O_NAME = "cil_cord_ice_o"  # ICE-O port: frozen encoder, head per session, c
 #   ice_o "partly": final row within 1 point of its diagonal (nothing forgotten), but below
 #     SBR-Recall on every seed, both metrics (the frozen encoder does not learn the sessions).
 # D (2026-11-14), three clean seeds each:
-#   er_sbr "refutes" (H0's "raw beats compressed"): under the same blocked readout the raw
-#     memory is within 3 points of CoLaR-SBR on every seed and not above it on every seed, both
-#     metrics.
+#   er_sbr "does not support" (H0's "raw beats compressed"; P24, R15-M1: raw is above CoLaR-SBR
+#     on seed 123, so "refutes" overstated it): under the same blocked readout the raw memory is
+#     within 3 points of CoLaR-SBR on every seed and not above it on every seed, both metrics.
+#     The raw run trains every layer (er_sbr has no freeze map), hence footnote w in the ladder.
 #   sbr_constbg "partly": above CoLaR (shared softmax) and below joint training on every seed,
-#     both metrics, but below CoLaR-SBR on seeds 42/7 and above on 123 (no per-seed order).
-SLOT_VERDICT = {"er_sbr": "refutes", "oracle_pre": "supports", "colar_mib": "partly",
+#     both metrics, but below CoLaR-SBR on seeds 42/7 and above on 123 (R15-L7: the check now
+#     also guards this per-seed order, which main.tex states).
+SLOT_VERDICT = {"er_sbr": "does not support", "oracle_pre": "supports", "colar_mib": "partly",
                 "sbr_constbg": "partly", "ice_o": "partly"}  # fmt: skip
 MIX_RECALL_NOMEM = (GATE, "mixed_colar_sbr_recall_r64b", "*")  # seed 42, fp32 gate, legacy
 MIX_RECALL_MEM = (GATE, "mixed_colar_sbr_recall_r64c", "*")
@@ -783,7 +785,7 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
      "refutes", 0),
     ("", "", "", "raw-document memory (ER), shared softmax$^{e}$", "er", C["er"], C["er"], "cell",
      "refutes", 0),
-    ("", "", "", "raw-document memory, blocked readout", "er_sbr", src("cil_cord_er_sbr"),
+    ("", "", "", "raw-document memory, blocked readout$^{w}$", "er_sbr", src("cil_cord_er_sbr"),
      src("cil_cord_er_sbr"), "slot", "", 3),
     ("H1", "Stale labels in the memory",
      "true labels in the stored documents close the gap",
@@ -871,11 +873,13 @@ def verdict_ok(key: str, verdict: str) -> bool | None:
                                              enumerate(_ctrl(ICE_O_NAME)) for s in SEEDS], n3)
         and _every([float(np.max(np.abs(m[-1] - np.diag(m)))) < 1.0
                     for m in matrices_by_seed(src(ICE_O_NAME)).values()], len(SEEDS)),
-        ("er_sbr", "refutes"): lambda: _every([abs(x[s] - c["sbr"][j][s]) < 3 for j, x in
+        ("er_sbr", "does not support"): lambda: _every([abs(x[s] - c["sbr"][j][s]) < 3 for j, x in
                                                enumerate(_ctrl("cil_cord_er_sbr")) for s in SEEDS], n3)
         and all(any(x[s] <= c["sbr"][j][s] for s in SEEDS) for j, x in enumerate(_ctrl("cil_cord_er_sbr"))),
         ("sbr_constbg", "partly"): lambda: _every([c["colar"][j][s] < x[s] < c["joint"][j][s] for j, x in
-                                                   enumerate(_ctrl(SBR_CONSTBG_NAME)) for s in SEEDS], n3),
+                                                   enumerate(_ctrl(SBR_CONSTBG_NAME)) for s in SEEDS], n3)
+        and _every([(x[s] < c["sbr"][j][s]) == (s != 123) for j, x in  # R15-L7: main.tex H3 wording
+                    enumerate(_ctrl(SBR_CONSTBG_NAME)) for s in SEEDS], n3),
     }  # fmt: skip
     f = checks.get((key, verdict))
     if f is None:
@@ -888,7 +892,7 @@ def verdict_ok(key: str, verdict: str) -> bool | None:
 
 def write_ladder() -> None:
     errors = []
-    t = HDR + "\\begin{tabular}{@{}l p{2.6cm} p{3.6cm} p{4.1cm} c c l@{}}\n\\toprule\n"
+    t = HDR + "\\begin{tabular}{@{}l p{2.5cm} p{3.6cm} p{4.1cm} c c l@{}}\n\\toprule\n"
     t += ("Rung & Hypothesis & Prediction if true & Intervention (CIL-CORD unless stated) & "
           "Full-label F1 & AA & Verdict \\\\\n\\midrule\n")  # fmt: skip
     for rung, hyp, pred, interv, key, aa_s, full_s, kind, verdict, min_n in LADDER:
@@ -1790,6 +1794,8 @@ def write_memory() -> str:
         dd = [e[x] - s[x] for x in SEEDS if x in e and x in s]
         v[f"nErSbrDiff{nm}Min"] = _signed(min(dd), True) if dd else "--"
         v[f"nErSbrDiff{nm}Max"] = _signed(max(dd), False) if dd else "--"
+        # P24 (R15-H1): |raw - latent| bound, rounded up so "within" holds on every seed
+        v[f"nErSbrAbs{nm}Max"] = f"{math.ceil(10 * max(abs(d) for d in dd)) / 10:.1f}" if dd else "--"
     for r, nm in zip(MEM_RANKS, ("ThirtyTwo", "SixtyFour"), strict=True):  # rule 6: 3 seeds or --
         for key, suf in (("AA", ""), ("full_label_f1", "Full")):
             vs = load_seeds(CLEAN, f"{SBR_NAME}_r{r}", key)
