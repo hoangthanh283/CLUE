@@ -295,11 +295,13 @@ def fig_findings_c() -> dict:
     ax.set_xlabel("newest session F1", labelpad=1)
     ax.set_ylabel("mean F1, old sessions", labelpad=1)
     ax.tick_params(length=1.5, pad=1)
-    ax.legend(loc="lower left", bbox_to_anchor=(0.12, 0.08), frameon=False, handletextpad=0.1,
-              borderaxespad=0.1, labelspacing=0.12, fontsize=6.5, markerscale=0.8)  # fmt: skip
+    # legend above the axes (as in panels a and b): inside, it sat on the diagonal and the points
+    fig.legend(*ax.get_legend_handles_labels(), loc="upper center", bbox_to_anchor=(0.56, 1.0), ncol=2,
+               frameon=False, handletextpad=0.1, borderaxespad=0.1, labelspacing=0.15, columnspacing=0.5,
+               fontsize=6, markerscale=0.8)  # fmt: skip
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
-    fig.subplots_adjust(left=0.2, right=0.98, top=0.97, bottom=0.18)
+    fig.subplots_adjust(left=0.2, right=0.98, top=0.76, bottom=0.18)
     save(fig, "findings_c.pdf")
     return pts
 
