@@ -1583,6 +1583,97 @@ def mask_macros() -> str:
     return t + _defs(v)
 
 
+# ---------------------------------------------------------------------------- CIL-FUNSD (R20)
+# (macro stem, row label, run name, suffix, settling): a settling row (R20's three queued blocks)
+# stays silent ("--", no table row) until its three clean seeds exist.
+FUNSD = (
+    ("Naive", "Naive fine-tuning", "cil_funsd_naive", "", False),
+    ("Colar", "CoLaR, shared softmax", "cil_funsd_colar", "_k4_d10*", False),
+    ("Oracle", "CoLaR, true labels before each session$^{r}$", "cil_funsd_colar_r_oracle_pre", "_k4_d10*", False),
+    ("Sbr", "CoLaR-SBR", "cil_funsd_colar_sbr_d10", "", False),
+    ("ConstO", "CoLaR-SBR, constant background logit", "cil_funsd_colar_sbr_const_o", "", False),
+    ("Joint", "Joint training (reference)", "cil_funsd_joint", "", False),
+    ("OracleFifty", "true labels before each session, 50 forms$^{r}$", "cil_funsd_colar_r_oracle_pre", "_k4_d50*", True),
+    ("Mib", "CoLaR + MiB-style unbiased CE", "cil_funsd_colar_mib", "", True),
+    ("SlicedTwo", "CoLaR, replay and current losses sliced", "cil_funsd_colar_r_sliced2", "*", True),
+    ("NoBank", "SBR, no memory", "cil_funsd_colar_sbr_noreplay", "", True),
+)  # fmt: skip
+
+
+def _best_epoch(name: str, seed: int) -> int | None:
+    """Epoch whose weights the early stopper kept (single-task run: the last epoch with bad=0)."""
+    f = Path(CLEAN) / f"{name}_seed{seed}.log"
+    if not f.exists():
+        return None
+    eps = re.findall(r"T0 ep(\d+) val_f1=[\d.]+ best=[\d.]+ bad=(\d+)", f.read_text(errors="ignore"))
+    good = [int(e) for e, b in eps if b == "0"]
+    return good[-1] if good else None
+
+
+def write_funsd() -> str:
+    """supp_funsd.tex (CIL-FUNSD, clean protocol, ten stored forms per session unless stated) and
+    its macros: \\vFunsd<X>[Full] mean (+-sd), \\nFunsd<X>[Full]Min/Max per-seed bounds rounded
+    outward, plus the R20 per-seed facts. Joint seeds whose kept weights are epoch 1 carry s."""
+    d = {}
+    for stem, _lab, name, sfx, _settle in FUNSD:
+        d[stem] = [load_seeds(CLEAN, name, m, sfx) for m in ("AA", "full_label_f1")]
+        d[stem].append({s: m[-1, 0] for s, m in matrices_by_seed([(CLEAN, name, sfx)]).items()})
+    full3 = {k: all(len(x) == len(SEEDS) for x in v[:2]) for k, v in d.items()}
+    early = [s for s in SEEDS if _best_epoch("cil_funsd_joint", s) == 1]
+    t = HDR + "\\begin{tabular}{@{}lcccccc@{}}\n\\toprule\n"
+    t += (" & & & \\multicolumn{3}{c}{Full-label F1, seed} \\\\\n\\cmidrule(l){4-6}\n"
+          "Method & Full-label F1 & AA & 42 & 7 & 123 & $R[2,1]$ \\\\\n\\midrule\n")  # fmt: skip
+    out, v = "", {}
+    for stem, lab, _name, _sfx, settle in FUNSD:
+        aa, fl, r21 = d[stem]
+        ok = full3[stem]
+        for nm, x in (("", aa), ("Full", fl)):
+            out += macro(f"Funsd{stem}{nm}", list(x.values()) if ok else [])
+            v[f"nFunsd{stem}{nm}Min"] = down1(min(x.values())) if ok else "--"
+            v[f"nFunsd{stem}{nm}Max"] = up1(max(x.values())) if ok else "--"
+        if not ok:
+            if aa and not settle:
+                _warn(f"CIL-FUNSD {stem}: {len(aa)} clean seed(s) only")
+            continue
+        if settle and stem == "OracleFifty":
+            t += "\\midrule\n"
+        cells = []
+        for sd in SEEDS:
+            mark = "^{s}" if stem == "Joint" and sd in early else ""
+            cells.append(f"${fl[sd]:.1f}{mark}$")
+        rr = (f"{min(r21.values()):.1f}--{max(r21.values()):.1f}" if len(r21) == len(SEEDS)
+              and stem != "Joint" else "--")  # fmt: skip
+        t += (f"{lab} & {fmt(list(fl.values()), True)} & {fmt(list(aa.values()), True)} & "
+              + " & ".join(cells) + f" & {rr} \\\\\n")  # fmt: skip
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "supp_funsd.tex").write_text(t)
+
+    def signed_range(a, b, key):  # per-seed a - b, rounded outward
+        x = [d[a][key][s] - d[b][key][s] for s in SEEDS]
+        return _signed(min(x), True), _signed(max(x), False)
+
+    core = all(full3[k] for k in ("Colar", "Oracle", "Sbr", "ConstO", "Joint"))
+    names = ("nFunsdOracleMinusColarFullMin", "nFunsdOracleMinusColarFullMax", "nFunsdOracleMinusColarMin",
+             "nFunsdOracleMinusColarMax", "nFunsdOracleSessOneMax", "nFunsdSbrSessOneMin",
+             "nFunsdConstOSessOneMin", "nFunsdConstOSbrGapFullMax", "nFunsdConstOSbrGapMax",
+             "nFunsdSbrMinusJointFullSeeds", "nFunsdSbrMinusJointSeeds")  # fmt: skip
+    if not core:
+        v.update(dict.fromkeys(names, "--"))
+    else:
+        v["nFunsdOracleMinusColarFullMin"], v["nFunsdOracleMinusColarFullMax"] = signed_range("Oracle", "Colar", 1)
+        v["nFunsdOracleMinusColarMin"], v["nFunsdOracleMinusColarMax"] = signed_range("Oracle", "Colar", 0)
+        v["nFunsdOracleSessOneMax"] = up1(max(d["Oracle"][2].values()))  # R[2,1], any seed
+        v["nFunsdSbrSessOneMin"] = down1(min(d["Sbr"][2].values()))
+        v["nFunsdConstOSessOneMin"] = down1(min(d["ConstO"][2].values()))
+        for i, nm in ((1, "Full"), (0, "")):
+            v[f"nFunsdConstOSbrGap{nm}Max"] = up1(max(abs(d["ConstO"][i][s] - d["Sbr"][i][s]) for s in SEEDS))
+            v[f"nFunsdSbrMinusJoint{nm}Seeds"] = "/".join(
+                f"{d['Sbr'][i][s] - d['Joint'][i][s]:+.1f}".replace("-", "$-$") for s in SEEDS)
+    v["nFunsdJointEarlySeeds"] = "/".join(map(str, early)) if early else "none"
+    v["nFunsdJointEarlyN"] = str(len(early))
+    return out + _defs(v)
+
+
 def sliced_macros() -> str:
     """R18 E2a, the clean sliced-replay control (three clean seeds or "--"): mean (\\v, \\n) and
     per-seed values (seeds 42/7/123) of AA and full-label F1, its seed-matched share of the CoLaR
@@ -1928,6 +2019,7 @@ def main():
     v += recall_macros() + oracle_macros() + conflict_macros() + agree_macros()
     v += baseline_macros() + gap_macros() + write_mechanism() + write_dropped()
     v += ablation_macros() + control_macros() + sliced_macros() + mask_macros() + write_memory()
+    v += write_funsd()
     (OUT / "vals.tex").write_text(v)
     write_ladder()
     write_beyond()
