@@ -776,8 +776,9 @@ ICE_O_NAME = "cil_cord_ice_o"  # ICE-O port: frozen encoder, head per session, c
 #   sbr_constbg "partly": above CoLaR (shared softmax) and below joint training on every seed,
 #     both metrics, but below CoLaR-SBR on seeds 42/7 and above on 123 (R15-L7: the check now
 #     also guards this per-seed order, which main.tex states).
-#   sliced "partly" (R18 E2a): above CoLaR and below joint training on every seed, both metrics,
-#     and below the pre-session refresh on every seed (removing the stale "O" alone is not it).
+#   sliced "partly" (R18 E2a; R19-M1: an H2 row, a label-free loss repair): above CoLaR and below
+#     joint training and the pre-session refresh on every seed, both metrics. The softmax slice
+#     keeps the stale "O" targets (they still train the shared O logit), so it bounds the slice only.
 SLOT_VERDICT = {"er_sbr": "does not support", "oracle_pre": "supports", "colar_mib": "partly",
                 "sbr_constbg": "partly", "ice_o": "partly", "sliced": "partly"}  # fmt: skip
 MIX_RECALL_NOMEM = (GATE, "mixed_colar_sbr_recall_r64b", "*")  # seed 42, fp32 gate, legacy
@@ -798,14 +799,14 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
      [ORACLE_CLEAN], [ORACLE_CLEAN], "clean", "partly", 0),
     ("", "", "", "every stored document relabelled before each session$^{r}$", "oracle_pre",
      src(ORACLE_PRE_NAME), src(ORACLE_PRE_NAME), "slot", "", 3),
-    ("", "", "", "replay loss sliced, no relabelling",
-     "sliced", src(SLICED_NAME), src(SLICED_NAME), "slot", "", 3),
     ("H2", "Current documents mislabel old entities",
      "a loss that lets ``O'' mean ``O or an old class'' closes the gap",
      "replay and current losses sliced to their classes", "sliced2",
      src(None, (GATE, "cil_cord_colar_r_sliced2", "_k4_d50_r128")), [], "cell", "open", 0),
     ("", "", "", "MiB-style unbiased CE, both directions", "colar_mib",
      src("cil_cord_colar_mib"), src("cil_cord_colar_mib"), "slot", "", 3),
+    ("", "", "", "replay softmax sliced, stale ``O'' kept", "sliced", src(SLICED_NAME),
+     src(SLICED_NAME), "slot", "", 3),
     ("H3", "The shared background normalisation",
      "one background per session closes the gap without true labels, given a memory",
      "CoLaR memory, session-blocked readout (CoLaR-SBR)", "sbr", C["sbr"], C["sbr"], "cell",
