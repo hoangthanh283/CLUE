@@ -4829,3 +4829,181 @@ Same procedure as R17: NeurIPS form, up to three reflection rounds, all three pe
 ### Referee view
 
 **Score 3.5, steady.** Self-review weighted score 5.8/10.
+
+## R19 (2026-11-14): confirmation of P29 (`e9ed0b1`) on Dev `c03c0d2`: sliced-replay control and rank 32
+
+Scope:
+- `git show c03c0d2 e9ed0b1`, with a word-diff of main.tex and supp_body.tex.
+- HEAD built from `git archive` in a scratch dir (`latexmk -pdf`, no `-C`) and split with `make_submission.sh`. Both
+  outputs are text-identical to the committed `submission/*.pdf`.
+- Both generators re-run.
+- Per seed I read `results/clean_2026-11/{cil_cord_colar_r_sliced_seed*_k4_d50_r128, cil_cord_colar_sbr_r32_seed*}`:
+  `metrics.json`, `matrix.npy` and the run logs. I compared them against CoLaR, MiB-style, pre-session refresh, joint and
+  CoLaR-SBR.
+
+### Verdict: **BLOCK** (two HIGH, both text-only)
+
+### Recomputed (seeds 42 / 7 / 123)
+
+| Run | AA | Full-label F1 |
+|---|---|---|
+| CoLaR (shared) | 33.59 / 32.44 / 34.42 | 32.38 / 30.54 / 29.32 |
+| Sliced replay loss | 58.01 / 42.25 / 46.19 | 44.06 / 46.30 / 47.25 |
+| MiB-style | 73.77 / 69.98 / 72.56 | 61.36 / 59.07 / 59.63 |
+| Pre-session refresh | 91.86 / 92.26 / 89.78 | 92.52 / 93.13 / 90.72 |
+| Joint | 91.13 / 90.54 / 92.12 | 91.70 / 91.80 / 92.38 |
+| CoLaR-SBR r128 | 87.76 / 91.32 / 86.16 | 88.83 / 91.19 / 87.13 |
+| CoLaR-SBR r32 | 33.91 / 35.20 / 30.30 | 28.29 / 29.38 / 24.59 |
+
+**Sliced replay loss.**
+- Above CoLaR and below the MiB-style loss on every seed under both metrics: true.
+- Below the pre-session refresh by 33.85 / 50.01 / 43.59 (AA) and 48.46 / 46.83 / 43.47 (F1). So "at least
+  `\nSlicedPreGapMin` = 33.8" is true; it is the AA minimum (seed 42).
+- Share of the seed-matched CoLaR->joint gap: F1 19.7 / 25.7 / 28.4% (macro "19 to 29") and AA 42.4 / 16.9 / 20.4%
+  ("16 to 43"). Both are correct, rounded outward.
+- `\vSliced` 48.8±8.2 and `\vSlicedFull` 45.9±1.6 are correct.
+- Verdict check `("sliced","partly")`: CoLaR < x < min(joint, pre) on every seed, both metrics. It holds.
+
+**Rank 32.**
+- Drop against rank 128 in full-label F1: 60.54 / 61.81 / 62.54, matching the macros 60.5 to 62.6.
+- "Below plain CoLaR on every seed" is true in full-label F1 (28.29 < 32.38, 29.38 < 30.54, 24.59 < 29.32).
+- It is **not true in AA** on seeds 42 and 7 (33.91 > 33.59, 35.20 > 32.44). See L1.
+
+### Point 3: sliced seed 42, AA 58.0 against full-label F1 44.1
+
+This is not a scoring fault. It is the span weighting plus a different failure on each seed.
+- Session 1 holds 744 of the 1,306 test spans (57%).
+- Seed 42 final row: 12.3 / 65.8 / 50.8 / 73.4 / 87.8. Session 1 was mostly lost and session 5 was learned, so the
+  equal-weight AA (58.0) sits far above the span-weighted value (36.4; full-label F1 44.1, which also counts unmasked
+  spans).
+- Seeds 7 and 123 end the other way round: session 1 at 42.9, the last session at 4.0 and 18.5. That puts AA and F1
+  within a few points.
+- MiB shows the same direction (AA 73.8 against F1 61.4 on seed 42).
+
+The logs show something the paper does not say: the sliced arm **does not train stably**.
+- Within a session, validation F1 collapses after its peak.
+  - Seed 42 T1: 97.1 -> 84.3 -> 49.0. T4: 87.6 -> 6.8.
+  - Early stopping restores the best epoch.
+- On seed 7, sessions 3 to 5 never exceed 8.4 validation F1.
+- On seed 123, sessions 4 and 5 never exceed 19.8.
+
+These match the oscillation noted in `configs/method/colar_r_sliced2.yaml`.
+
+### Point 4: rank 32 sanity
+
+No pipeline fault.
+- `method_hparams.rank_r` = 32, and the logs show "compressed 50 docs at rank-32 (bank now ~29.8 MB)".
+- `replay_memory_bytes` 29,776,250 = 250 x 119,105, the formula. The self-check now passes on 15 runs.
+- Trainable parameters 56,753,730 = CoLaR-SBR's, including the per-block background weights.
+- The log shows the SBR plan opening one block per session ("-> 5 blocks").
+- Every session is learned (diagonal 80 to 94), but the old sessions are lost (seed 42 final row 2.6 / 0 / 6.6 / 67.4 /
+  92.9).
+- So the rank-32 reconstruction does not hold the old blocks. This fits the known near-full-rank document features.
+- Stating it as an empirical property of rank 32 is fine. The paper does not claim a mechanism.
+
+### HIGH
+
+**R19-H1. The sliced control is described as removing the stale "O" pressure, and a mechanism conclusion is drawn from
+it. The run does neither.**
+- Text at main.tex:140: "slice each stored document's replay loss to the classes that existed when it was stored,
+  removing the stale ``O'' pressure without changing any label ... Hence most of the oracle's gain needs true
+  current-class labels, not only removing false negatives". The abstract (:59) says "only removing the stale ``O''
+  pressure from replay recovers 19 to 29% of the gap", and the Conclusion (:235) says "not by removing stale ``O''
+  labels alone".
+- What `sliced_replay_loss` does (colar_r.py): later classes' logits are set to -inf, and CE is taken against the
+  stored label. A stale token whose true class came later therefore **keeps its "O" target**, and the gradient still
+  raises the shared O logit on it.
+- So the slice removes the negative gradient on the later classes' logits only. It does not remove the stale "O"
+  supervision, which still acts through the shared O logit at inference. That is the channel H3 names.
+- The run is also unstable: later sessions are not learned on seeds 7 and 123 (point 3). Its result therefore bounds a
+  softmax slice under our recipe. It does not bound "removing false negatives".
+- The appended caveat ("the slice acts on the softmax, not as a token mask") is accurate but comes after a conclusion it
+  undercuts.
+- Fix (text only):
+  - main.tex:140, replace the sentence pair with: "Since the refresh also adds labels for the current classes, we also
+    slice each stored document's replay loss to the classes that existed when it was stored: later classes are no longer
+    pushed down, but its stale tokens still train the shared ``O'' logit. This reaches only $\vSlicedFull$ full-label F1
+    (\nSlicedShareFull\% of the seed-matched gap), above CoLaR and below the MiB-style loss on every seed under both
+    metrics, and trains unstably (\cref{app:results}). A softmax slice therefore does not recover the oracle's gain;
+    whether removing the stale tokens altogether would is untested (no mask-only oracle ran)."
+  - Abstract: "whereas a softmax slice of the replay loss, which leaves the stale ``O'' targets in place, recovers only
+    \nSlicedShareFull\% of the gap".
+  - Conclusion: "... by true stored labels (an oracle, ...), not by a softmax slice of the replay loss, and mostly by a
+    per-session readout ...".
+  - App. D H1 (supp_body.tex:104): add "later sessions stop learning on seeds 7 and 123 (validation F1 at most 8.4 and
+    19.8), and on seed 42 the first session, which holds 57\% of the test spans, ends at 12.3, which is why its AA lies
+    far above its full-label F1". The span share can come from `\mSessOneShare`.
+  - Optional: the reading supports H3's channel (the stale O acts through the shared O logit). Say so in one clause in
+    "What discriminates what" only if there is room.
+
+**R19-H2. Sec. 6 now contradicts itself and Fig. 4.**
+- main.tex:224: "Bytes do not separate the methods; the readout does: every store read through the learned-background
+  blocked readout (latent or raw documents, or deltas) ends within $\nSbrGapFullMax$ full-label points of joint training
+  on every seed".
+- Two sentences later the same paragraph, and Fig. 4's new solid line, show CoLaR-SBR at rank 32 (29.8 MB) through that
+  very readout at 27.4 full-label F1, about 64 points below joint.
+- So "every store" is false as written (rule 7), and at 29.8 MB bytes do separate the methods.
+- Fix: "Above a compression floor, bytes do not separate the methods; the readout does: every store we ran at full rank
+  (rank-128 latent or raw documents, or deltas) ends within $\nSbrGapFullMax$ full-label points of joint training on
+  every seed through the learned-background blocked readout, and the same latent bytes under a shared softmax stay at
+  $\vColarFull$." Keep the rank-32 sentence that follows.
+
+### MEDIUM
+
+**R19-M1. The sliced row sits under H1 with verdict "partly", which it cannot carry.**
+- `tab:ladder`: H1's prediction is "true labels in the stored documents close the gap". The sliced row uses no true
+  labels, so "partly" reads as "partly supports H1".
+- Its check (`verdict_ok`) only tests CoLaR < x < min(joint, pre).
+- It is a label-free loss repair, like the H2 rows (legacy "sliced", MiB-style).
+- Fix [G] (generator `LADDER`): move the row into the H2 group as "replay loss sliced to capture-time classes (stored
+  side)", next to the MiB row, with verdict "partly" against H2's prediction (the same per-seed check holds), and move the
+  Fig. 2a bar with it.
+- If it stays in H1, the verdict word must be one H1's prediction defines. Otherwise add a caption note: "the sliced row
+  uses no true labels; partly = closes part of the gap".
+
+### LOW
+
+- **R19-L1** main.tex:224, rank-32 sentence. Write "falls to $\vSbrRankThirtyTwoFull$ full-label F1, ..., below plain
+  CoLaR in full-label F1 on every seed". In AA it is above CoLaR on seeds 42 and 7.
+- **R19-L2** Fig. 4. The solid r32-r128 connector crosses the y-axis break, which reads as a single trend through 40-85.
+  A dashed or clipped connector would be clearer (generator).
+- **R19-L3** Limitations :233 now carries no line on rank 32. One clause would help: "CoLaR at rank 32, below the 8-bit
+  raw size, loses most of its accuracy".
+- **R19-L4** R18-L2 and R18-L3 are still not applied (space). They remain LOW.
+
+### What passes
+
+- **No caveat, citation or qualifier lost in the space cuts.**
+  - Abstract: "the current documents still call old entities O" moved to the intro (:71), which still has it. "where
+    label growth supplies the routing key" was cut, and "on one schema" remains.
+  - Related Work: "For instance / as another example" was cut (voice only).
+  - Contribution 3: "single-schema stream" became "one schema".
+  - H1: "(per-session values in ...)" became "(\cref{app:results})".
+  - Every per-seed qualifier, the oracle marking, the Limitations statistics sentence and every citation are present.
+- **Form.**
+  - Main text ends p. 8, References pp. 9-10, appendix pp. 11-16 (6 pp.).
+  - main and supp exit 0 with 0 undefined, 0 multiply-defined, 0 overfull, 0 "??". No `---`.
+  - The LLM Usage Statement is byte-identical to its earlier version.
+- **Generators.**
+  - `make_clean_tables.py` exits 0 ("memory self-check passed: 15 runs"); every generated `.tex` is unchanged.
+  - `make_paper_figs.py` exits 0. Its figure PDFs changed in metadata only (pixel-identical) and were restored.
+  - Queue v15 (E1 CIL-FUNSD runs) was running and left alone. Its new runs had not yet changed any generated file.
+
+### Self-review update
+
+E2a does not settle the mechanism question. It tests a softmax slice that leaves the stale "O" targets in place, and it
+trains unstably.
+- Read honestly, after the H1 fix: a deployable label-free slice of the replay loss is not enough, and the stale "O"
+  acts through the shared O logit. That sits better with H3 than with "positives are needed".
+- It adds one clean, honest negative control. That slightly helps R1's soundness. It does not supply the mask-only
+  oracle that R1 and R2 asked for.
+- The rank-32 collapse is useful and honest. It shows CoLaR cannot be compressed below the raw 8-bit size without
+  losing accuracy, which slightly lowers R2's view of the memory's practical value.
+
+Scores:
+- **With H1 and H2 fixed:** the personas stay at R1 5, R2 4, R3 6. The weighted score is still about **5.8** (marginal
+  Reject).
+- **As committed:** R2 would lower Soundness to 2, because of the mechanism overclaim and the self-contradiction in Sec.
+  6, giving about 5.6.
+- Moving to Accept still needs E1, which is landing now, and a true mask-only oracle (R18 E2b, about 6 h with Dev's
+  `oracle_mask` mode).
