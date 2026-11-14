@@ -303,7 +303,8 @@ ROW_LABEL = {"naive": "Naive", "nobank": "SBR, no memory", "colar": "CoLaR",
              "er_sbr": "Raw-document memory + SBR", "cl_lora": "CL-LoRA",
              "er250": "ER (250 documents)",
              "sbr_const_o": "CoLaR-SBR, constant background logit", "ice_o": "ICE-O (our port)",
-             "sbr_r32": "CoLaR-SBR, rank 32", "sbr_r64": "CoLaR-SBR, rank 64"}  # fmt: skip
+             "sbr_r32": "CoLaR-SBR, rank 32", "sbr_r64": "CoLaR-SBR, rank 64",
+             "colar_r_sliced": "CoLaR, replay loss sliced to capture-time classes"}  # fmt: skip
 
 
 def write_perseed():
@@ -376,7 +377,7 @@ def write_slot():
 CONFLICT_ROWS = (  # CIL-CORD, session-restricted: what separates readout from memory
     ("CoLaR, shared softmax", C["colar"]),
     ("CoLaR, shared softmax (gate run)", src(None, (GATE, "cil_cord_colar", "_k4_d50_r128"))),
-    ("Replay loss sliced to classes alive at storage", src(None, (RESC, "cil_cord_colar_r_sliced", ""))),
+    ("Replay loss sliced to classes alive at storage", src("cil_cord_colar_r_sliced", (RESC, "cil_cord_colar_r_sliced", ""))),
     ("Replay loss sliced (gate run)", src(None, (GATE, "cil_cord_colar_r_sliced", "_k4_d50_r128"))),
     ("Replay and current losses sliced", src(None, (GATE, "cil_cord_colar_r_sliced2", "_k4_d50_r128"))),
     ("\\quad + model pseudo-labels written into the memory",
@@ -577,6 +578,7 @@ LABEL_REPAIRS = (  # label-side repairs of the shared softmax (rows of tab:confl
     (GATE, "cil_cord_colar_r_sliced2", "_k4_d50_r128"),
     (GATE, "cil_cord_colar_r_sliced2_pseudo", "_k4_d50_r128"),
     (GATE, "cil_cord_colar_r_bilc", "_k4_d50_r128"), ORACLE_GATE, ORACLE_CLEAN,
+    (CLEAN, "cil_cord_colar_r_sliced", "*"),
 )  # fmt: skip
 _AVG_ROWS = ("micro avg", "macro avg", "weighted avg")
 
@@ -759,6 +761,7 @@ def baseline_macros() -> str:
 ORACLE_PRE_NAME = "cil_cord_colar_r_oracle_pre"  # PM 2026-11-12: colar_r_oracle_pre, _k4_d50_r128
 # Lit review A comparators (PM 2026-11-12; run names not reported yet: set them when Dev does)
 SBR_CONSTBG_NAME = "cil_cord_colar_sbr_const_o"  # CoLaR-SBR, every background logit fixed at 0
+SLICED_NAME = "cil_cord_colar_r_sliced"  # R18 E2a: replay CE over capture-time classes only
 ICE_O_NAME = "cil_cord_ice_o"  # ICE-O port: frozen encoder, head per session, constant Other = 0
 # P21 (2026-11-13), read per seed from the three clean runs each:
 #   oracle_pre "supports": within 3 points of joint training on every seed, both metrics.
@@ -773,8 +776,10 @@ ICE_O_NAME = "cil_cord_ice_o"  # ICE-O port: frozen encoder, head per session, c
 #   sbr_constbg "partly": above CoLaR (shared softmax) and below joint training on every seed,
 #     both metrics, but below CoLaR-SBR on seeds 42/7 and above on 123 (R15-L7: the check now
 #     also guards this per-seed order, which main.tex states).
+#   sliced "partly" (R18 E2a): above CoLaR and below joint training on every seed, both metrics,
+#     and below the pre-session refresh on every seed (removing the stale "O" alone is not it).
 SLOT_VERDICT = {"er_sbr": "does not support", "oracle_pre": "supports", "colar_mib": "partly",
-                "sbr_constbg": "partly", "ice_o": "partly"}  # fmt: skip
+                "sbr_constbg": "partly", "ice_o": "partly", "sliced": "partly"}  # fmt: skip
 MIX_RECALL_NOMEM = (GATE, "mixed_colar_sbr_recall_r64b", "*")  # seed 42, fp32 gate, legacy
 MIX_RECALL_MEM = (GATE, "mixed_colar_sbr_recall_r64c", "*")
 LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, verdict, min_n)
@@ -793,6 +798,8 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
      [ORACLE_CLEAN], [ORACLE_CLEAN], "clean", "partly", 0),
     ("", "", "", "every stored document relabelled before each session$^{r}$", "oracle_pre",
      src(ORACLE_PRE_NAME), src(ORACLE_PRE_NAME), "slot", "", 3),
+    ("", "", "", "replay loss sliced, no relabelling",
+     "sliced", src(SLICED_NAME), src(SLICED_NAME), "slot", "", 3),
     ("H2", "Current documents mislabel old entities",
      "a loss that lets ``O'' mean ``O or an old class'' closes the gap",
      "replay and current losses sliced to their classes", "sliced2",
@@ -886,6 +893,9 @@ def verdict_ok(key: str, verdict: str) -> bool | None:
         ("er_sbr", "does not support"): lambda: _every([abs(x[s] - c["sbr"][j][s]) < 3 for j, x in
                                                enumerate(_ctrl("cil_cord_er_sbr")) for s in SEEDS], n3)
         and all(any(x[s] <= c["sbr"][j][s] for s in SEEDS) for j, x in enumerate(_ctrl("cil_cord_er_sbr"))),
+        ("sliced", "partly"): lambda: _every([c["colar"][j][s] < x[s] < min(c["joint"][j][s], p[s])
+                                              for j, (x, p) in enumerate(zip(_ctrl(SLICED_NAME), _ctrl(ORACLE_PRE_NAME), strict=True))
+                                              for s in SEEDS], n3),
         ("sbr_constbg", "partly"): lambda: _every([c["colar"][j][s] < x[s] < c["joint"][j][s] for j, x in
                                                    enumerate(_ctrl(SBR_CONSTBG_NAME)) for s in SEEDS], n3)
         and _every([(x[s] < c["sbr"][j][s]) == (s != 123) for j, x in  # R15-L7: main.tex H3 wording
@@ -1534,6 +1544,27 @@ def ablation_macros() -> str:
     return _defs(v)
 
 
+def sliced_macros() -> str:
+    """R18 E2a, the clean sliced-replay control (three clean seeds or "--"): mean (\\v, \\n) and
+    per-seed values (seeds 42/7/123) of AA and full-label F1, its seed-matched share of the CoLaR
+    -> joint gap, and the smallest per-seed distance below the pre-session refresh."""
+    sl, c, j, pre = _ctrl(SLICED_NAME), _ctrl("cil_cord_colar"), [_clean("joint", m) for m in ("AA", "full_label_f1")], _ctrl(ORACLE_PRE_NAME)  # fmt: skip
+    names = ("nSlicedSeeds", "nSlicedFullSeeds", "nSlicedShare", "nSlicedShareFull", "nSlicedPreGapMin")
+    if not all(len(d) == len(SEEDS) for d in sl):
+        return macro("Sliced", []) + macro("SlicedFull", []) + _defs(dict.fromkeys(names, "--"))
+    t = macro("Sliced", list(sl[0].values())) + macro("SlicedFull", list(sl[1].values()))
+    v = {"nSlicedSeeds": "/".join(f"{sl[0][s]:.1f}" for s in SEEDS),
+         "nSlicedFullSeeds": "/".join(f"{sl[1][s]:.1f}" for s in SEEDS)}  # fmt: skip
+    for i, nm in ((0, "nSlicedShare"), (1, "nSlicedShareFull")):
+        sh = _gap_share(sl[i], c[i], j[i])
+        v[nm] = f"{math.floor(100 * min(sh))} to {math.ceil(100 * max(sh))}"
+    gaps = [pre[i][s] - sl[i][s] for i in (0, 1) for s in SEEDS if s in pre[i]]
+    v["nSlicedPreGapMin"] = down1(min(gaps)) if len(gaps) == 2 * len(SEEDS) else "--"
+    if any(sl[i][s] <= c[i][s] for i in (0, 1) for s in SEEDS):
+        _warn("the sliced replay loss is not above CoLaR on every seed under both metrics")
+    return t + _defs(v)
+
+
 def control_macros() -> str:
     """P21: the three clean controls of the ladder (never-stale memory, MiB-style loss, ICE-O),
     with every per-seed condition the prose states checked here (rule 7)."""
@@ -1753,15 +1784,16 @@ def write_memory() -> str:
     checked = memory_selfcheck()
     forms = memory_forms()
     yn = ("no", "yes")
-    t = HDR + "\\begin{tabular}{@{}lccccccc@{}}\n\\toprule\n"
-    t += ("Storage form & Per unit & Total MB & Pixels & Token ids & Trainable (M) & "
-          "Peak GPU MB & h/run \\\\\n\\midrule\n")  # fmt: skip
+    t = HDR + "\\begin{tabular}{@{}lcccccccc@{}}\n\\toprule\n"
+    t += ("Storage form & Per unit & Total MB & Pixels & Token ids & Full-label F1 & "
+          "Trainable (M) & Peak GPU MB & h/run \\\\\n\\midrule\n")  # fmt: skip
     for f in forms:
         unit = (f"{f['unit'] / 1e3:.1f}\\,KB/doc" if f["per"] == "doc"
                 else f"{f['unit'] / 1e6:.1f}\\,MB/session")  # fmt: skip
-        tr = pk = hr = "--"
+        tr = pk = hr = fl = "--"
         if f["run"]:
             ms = _metas(f["run"], "" if f["run"] == ER_SBR_NAME else "*")
+            fl = fmt([m["full_label_f1"] for m in ms.values()], True, show_n=True)  # measured
             tr = f"{max(m['trainable_params'] for m in ms.values()) / 1e6:.1f}"
             pk = f"{max(m['peak_gpu_mem_mb'] for m in ms.values()):.0f}"
             h = queue_hours(f["run"])
@@ -1769,7 +1801,7 @@ def write_memory() -> str:
                   if h else "--")  # fmt: skip
         lab = f["label"] + (" (computed)" if f["computed"] else "")
         t += (f"{lab} & {unit} & {f['total'] / 1e6:.1f} & {yn[f['pixels']]} & {yn[f['ids']]} & "
-              f"{tr} & {pk} & {hr} \\\\\n")  # fmt: skip
+              f"{fl} & {tr} & {pk} & {hr} \\\\\n")  # fmt: skip
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_memory.tex").write_text(t)
 
@@ -1811,6 +1843,10 @@ def write_memory() -> str:
         for key, suf in (("AA", ""), ("full_label_f1", "Full")):
             vs = load_seeds(CLEAN, f"{SBR_NAME}_r{r}", key)
             out += macro(f"SbrRank{nm}{suf}", list(vs.values()) if len(vs) == len(SEEDS) else [])
+        lo, hi = load_seeds(CLEAN, f"{SBR_NAME}_r{r}", "full_label_f1"), _clean("sbr", "full_label_f1")
+        drop = [hi[x] - lo[x] for x in SEEDS if x in lo and x in hi] if len(lo) == len(SEEDS) else []
+        v[f"nSbrRank{nm}DropMin"] = down1(min(drop)) if drop else "--"  # r128 minus rank r, F1
+        v[f"nSbrRank{nm}DropMax"] = up1(max(drop)) if drop else "--"
     print("memory self-check passed:", len(checked), "runs")
     return out + _defs(v)
 
@@ -1852,7 +1888,7 @@ def main():
     v += f"\\newcommand{{\\nErCilBuf}}{{{250 if er_src and er_src[0] == CLEAN else 200}}}\n"
     v += recall_macros() + oracle_macros() + conflict_macros() + agree_macros()
     v += baseline_macros() + gap_macros() + write_mechanism() + write_dropped()
-    v += ablation_macros() + control_macros() + write_memory()
+    v += ablation_macros() + control_macros() + sliced_macros() + write_memory()
     (OUT / "vals.tex").write_text(v)
     write_ladder()
     write_beyond()
