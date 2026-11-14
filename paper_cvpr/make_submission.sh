@@ -9,7 +9,10 @@ end=$(pg mainend); app=$(pg app:setup); total=$(pdfinfo main.pdf | awk '/^Pages:
 (( end <= 8 )) || { echo "FAIL: main text ends on page $end (> 8)" >&2; exit 1; }
 mkdir -p submission
 # gs stderr dropped: it only warns about outline links into the other half (gs still fails on errors)
-split() { gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -dFirstPage="$1" -dLastPage="$2" -sOutputFile="$3" main.pdf 2>/dev/null; }
+# Dates fixed in UTC (no local time-zone offset in Info or XMP).
+D="(D:20261116000000Z)"
+split() { gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -dFirstPage="$1" -dLastPage="$2" -sOutputFile="$3" main.pdf \
+  -c "[/CreationDate $D /ModDate $D /DOCINFO pdfmark" 2>/dev/null; }
 split 1 $((app - 1)) submission/main_paper.pdf
 split "$app" "$total" submission/supplementary.pdf
 pdftotext submission/main_paper.pdf - | grep -c "LLM Usage Statement" >/dev/null \
