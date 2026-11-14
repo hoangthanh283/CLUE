@@ -4131,3 +4131,202 @@ rewritten.
 
 **Score: 3.5 (Borderline, leaning accept).** The raw-vs-latent claim is now stated with its confound and a per-seed bound,
 the memory section claims no saving it lacks, and nothing in the paper overstates the cost exhibit.
+
+## R16 (2026-11-14): audit of P25 (`e393158`, voice pass) and P26 (`4cf759b`, CVPR 2027 kit conformance)
+
+Scope:
+- `git diff c92a08d e393158 --word-diff -- main.tex supp_body.tex`, read word by word, then the built PDF end to end.
+- `git show 4cf759b`.
+- Both PDFs built from `git archive 4cf759b paper_cvpr` in a scratch dir (`latexmk -pdf`, no `-C`).
+- `make_submission.sh` run on that scratch build. Its two outputs are text-identical to the committed `submission/*.pdf`.
+- Both generators re-run.
+
+### Verdict: **PASS** (three MEDIUM for the PM, no HIGH)
+
+### A. P25: is the meaning preserved?
+
+**What stayed fixed.**
+- No macro, citation, table input, caption or number changed.
+- Every changed sentence that carries a comparison has the same comparison and the same per-seed qualifier as at
+  `c92a08d`. R15/R15b verified those per seed, and they need no recomputation.
+- The appendix edits are connective and voice changes only ("we count", "we port", "It is noted that", "Hence,",
+  "In contrast,"). No number or scope moved.
+
+**(i) Connectives.**
+- None of these adds a claim the data contradict:
+  - "Hence, drift alone does not explain" (:136).
+  - "As a result, stale stored labels suffice" (:144). This is the old "What it rules out" sentence, and "However, the
+    control is an oracle" follows it at once.
+  - "hence the current side is not needed" (:152).
+  - "Hence the reading is partly supported" (:162).
+- Two read as motivation or history the record does not document (L1, L2).
+- "We first / next / then hypothesize ... Finally, we hypothesize" orders the predictions H0 to H3. It does not order the
+  experiments, so it is acceptable. But "Finally" on H3 is wrong because H4 follows (L2).
+
+**(ii) Abstract.**
+- "Then, stale stored labels suffice to explain nearly all of it" stays scoped as an oracle: "giving every stored document
+  its true labels before each session, an oracle no continual learner has".
+- "We argue that an O label is evidence only against the classes its annotator could see" is weaker than the old "The
+  principle ... is that". It is a supervision principle, not a measured quantity, so "argue" is the right verb.
+- "We address catastrophic forgetting" next to "an investigation rather than a method" is a mild mismatch (L3).
+- "Finally, ... on one schema ... across schemas they did not, in one run" keeps both scopes.
+
+**(iii) Intro.**
+- "replay is empirically the strongest" keeps its two survey citations (claim unchanged).
+- "Distillation, prompts, ... do no better (Tab. 3)" is unchanged from `c92a08d`. Every one of those cells carries † in
+  Tab. 3, and the sentence before it states that the ER cells are legacy.
+
+**(iv) Priority claim.**
+- "However, no prior work takes apart, on token-labelled documents, which part of the failure a memory repairs and which
+  survives true stored labels" (:77).
+- It is as strong as the old "What has not been done is ...", and Related Work (Sassioui et al. decompose by regime) does
+  not contradict it. It is still an absolute claim (L4).
+
+**(v) Conclusion.**
+- "The experiments show that two things go wrong and a memory repairs only one, drift" restates the old "Replay fails ...
+  because two things go wrong ..." with the same scope. The oracle is marked ("an oracle that keeps them true").
+- "per-session deltas then replace the memory" keeps "where label growth supplies a routing key" but, unlike the abstract,
+  not "on one schema" (L5).
+- The future-work sentence is harmless.
+
+**(vi) H titles.**
+- "H0: only harder forgetting", "H1: stale labels in the memory" and "H3: the shared normalisation" read as hypothesis
+  labels, and each opens with "We ... hypothesize".
+- "H2: current documents mislabel old entities" is a full clause. It is true by construction, but a reader can take it
+  as the finding, while the verdict is "not needed" / "partly" (L6).
+
+**(vii) Cuts.**
+- "Heads are linear": the head is still "the usual linear head" (Eq. 2 text).
+- "\Cref{fig:method} draws both readouts; details: \cref{app:method}" is now "(\cref{fig:method}b)". `app:method` is
+  still cited from the mask rule (:185) and from §6.
+- The oracle gap dropped from contribution 1 now makes no claim there.
+- The "never-stale memory decides" sentence removed from "What discriminates what" is still carried by H1 (:144) and H2
+  (:152).
+- "all are our ports" moved from §7 to Setup (:109).
+- One caveat was lost (M1).
+
+**(viii) Style.**
+- No avoid-list word.
+- No emphasis word (novel, significant, substantially, state-of-the-art, ...) except "state of the art" of the
+  encoders (:69).
+- No rhetorical question and no `---`.
+
+### Caveat checklist (R14 to R15b)
+
+| Caveat | Present? |
+|---|---|
+| R14-H1: drift-by-depth under naive fine-tuning; pilot stream named FUNSD->CORD->SROIE (:136; App. E) | yes |
+| R14-M1: per-seed metric-order sentence in App. A | yes |
+| R14-L1: "about 1% larger (406,800 against 402,689)" | yes (App. B) |
+| R14-L4/L5: "1.5 to 9.0 points"; "(per-seed minimum)" | yes |
+| R14b-H1: ICE-O "lower bound" (:209) and Limitations "ran under our recipe, still improving at the epoch cap" | yes |
+| R14b-M1: oracle marked (abstract, intro, H1 "the control is an oracle", Conclusion) | yes; the "What discriminates what (an oracle)" sentence is gone, and nothing there claims it now |
+| R14b-M2: "We read the shared normalisation (H3) as the channel ..." + const-bg result "partly" | yes |
+| R14b-M3: ladder caption "pre-session row of H1 also tests H2" | yes |
+| R14b-M4: "every method of Tab. 3 with a shared softmax ... at or below CoLaR" | yes |
+| R14b-L2: "nearly all" / "almost entirely" | yes |
+| R14c-H1: body <= 8 pp. | yes |
+| R15-H1: "did not change the finding here (three seeds, CIL-CORD)", "whole network trainable", "a raw memory could freeze the same layers", contribution 2 "within 1.7 ... on every seed", ladder footnote w | yes |
+| R15-M1: ladder "does not support" | yes |
+| R15-M2: Mixed not ranked | yes |
+| R15-L1 to L8 (learned-background; Tab. 3 caption; (not run); Mem. tick; trainable at once; L7 guard; "2.2x larger" first) | yes |
+| Limitations scope: "the controls of the ladder ran on LayoutLMv3 and one class-incremental partition of CORD only" (at `c92a08d`) | **partly: now "ran on CIL-CORD only"; LayoutLMv3 and "one partition" lost (M1)** |
+| R15b watch item: Mixed joint clean cell | still open: only `mixed_joint_seed42` exists, so the sentence stays true |
+
+### B. P26: format
+
+**Kit and preamble.**
+- `cmp paper_cvpr/cvpr.sty kit/cvpr.sty`: identical.
+- Preamble against the kit's main.tex + preamble.tex: the extras are booktabs/array/multirow/xcolor/amsmath/tikz/
+  algorithm, `caption` and `cuted` (both in the kit preamble), and `microtype` (commented out in the kit preamble, which
+  allows it "when you are just above the page limit"; it does not change margins or fonts).
+- A grep of main.tex, supp.tex, supp_body.tex, fig/*.tex and every generated input finds no negative `\vspace`,
+  `\linespread`/`\baselinestretch`, `\looseness`, `\enlargethispage`, float-separation length, `\fontsize` or
+  caption-skip change.
+- What remains is table-internal `\tabcolsep`/`\small`/`\scriptsize`/`\resizebox` and `\\[-2pt]` inside TikZ nodes.
+- The one body deviation (`\\[-1pt]` in `fig:findings`) was removed.
+
+**Pages and review mode.**
+- The Conclusion ends on p. 8 (label `mainend`).
+- "LLM Usage Statement" is `\section*` (unnumbered) after the Conclusion and before the References. It starts on p. 8 and
+  ends at the top of p. 9. The References are pp. 9-10.
+- It names no product, person or institution.
+- Review mode is on: line numbers, the "CVPR 2027 Submission. CONFIDENTIAL REVIEW COPY. DO NOT DISTRIBUTE." header, no
+  paper ID, author "Anonymous CVPR submission".
+
+**`make_submission.sh`.**
+- It uses `main.aux` labels and a `gs` page split, and refuses if `mainend` is after p. 8 or the statement is missing.
+- Exit 0. `main_paper.pdf` is 10 pp. (body 1-8, statement 8-9, references 9-10, no appendix page).
+  `supplementary.pdf` is 6 pp. (App. A-F).
+- Metadata: Title/Author/Subject/Keywords empty; Creator "LaTeX with hyperref"; Producer Ghostscript.
+- A text search of both PDFs for names, institutions, URLs, e-mail addresses, paths and tool names finds nothing.
+  `strings` finds no path.
+- Only the timestamps carry "+07:00" (L7).
+
+**References from main_paper.pdf into the supplement.**
+- main_paper.pdf cites "Appendix A" to "Appendix F" (19 times), "Tab. 5" (`fig:memory` caption) and "Tab. 7" (§6). None
+  says these live in the supplementary material, and the hyperlinks are dead after the split (M2).
+
+### C. Form
+
+- main and supp build with exit 0: 0 undefined, 0 multiply-defined, 0 overfull, 0 "??".
+- One harmless "Text page 15 contains only floats" (appendix).
+- main.pdf is 16 pp. and the appendix is pp. 11-16 (6 pp.). supp.pdf is 8 pp.
+- `make_clean_tables.py` exits 0 ("memory self-check passed: 12 runs"); every generated `.tex` is unchanged.
+- `make_paper_figs.py` exits 0 (self-check passed). Its 15 figure PDFs changed in metadata only (renders
+  pixel-identical) and were restored with `git checkout --`.
+
+### MEDIUM
+
+- **R16-M1. The single-backbone scope left the Limitations.**
+  - main.tex:237 now says "the ladder's controls ran on CIL-CORD only". At `c92a08d` it said "on LayoutLMv3 and one
+    class-incremental partition of CORD only".
+  - The same sentence names "four encoder-only backbones", so a reader can take the controls to span four encoders. The
+    scope survives only in §4's first line.
+  - Fix: "... and four encoder-only backbones; the ladder's controls ran on LayoutLMv3 and one class-incremental
+    partition of CORD only (\cref{sec:beyond})."
+- **R16-M2. main_paper.pdf points into the supplement without saying so.**
+  - The CVPR guideline asks authors to "refer to the contents of the supplementary material appropriately".
+  - Fix (minimal, about one line):
+    - In Setup, after "(\cref{tab:bench}; sessions in \cref{app:setup})", or in the first appendix pointer of the intro,
+      add once: "Appendices A to F are in the supplementary material."
+    - Make the two table pointers explicit: `fig:memory` caption "Sizes: supplementary \cref{tab:memory}." and §6
+      "(gathered in supplementary \cref{tab:ablation})".
+- **R16-M3 (needs the PM / the CfP). The LLM Usage Statement runs onto p. 9.**
+  - If the CVPR 2027 call counts the statement toward the 8-page limit, which the kit does not say, the paper is over
+    the limit by about 6 lines.
+  - Check the call.
+    - If it counts, place the statement after the References, which the split script then must keep in
+      main_paper.pdf, or cut 6 body lines.
+    - If it is exempt like the references, no change.
+  - Its content ("All experiments were designed and decided by the authors") is the user's to approve. The source marks
+    it USER TO APPROVE.
+
+### LOW
+
+- R16-L1. main.tex:113: "; hence the comparison set was fixed after a first grid ..." presents the procedure as
+  motivated by the cited paper. Restore the colon form: "... overstates CL methods~\citep{...}: the comparison set was
+  fixed ...".
+- R16-L2. main.tex:156: "Finally, we hypothesize" on H3, but H4 follows in §5.3. Write "Last among the label hypotheses,
+  we hypothesize" or just "We hypothesize". Also main.tex:166 "Hence we follow one principle": "We therefore state one
+  principle" reads as derivation, not as design history.
+- R16-L3. main.tex:63: "We address catastrophic forgetting in ..." beside "an investigation rather than a method". Write
+  "We study catastrophic forgetting in ...".
+- R16-L4. main.tex:77: write "However, to our knowledge, no prior work takes apart ...".
+- R16-L5. main.tex:239: "where label growth supplies a routing key, on one schema, per-session deltas then replace the
+  memory", to match the abstract.
+- R16-L6. main.tex:146: retitle H2 so that it reads as a hypothesis, for example "H2: the current documents' ``O''
+  labels".
+- R16-L7. Both split PDFs carry CreationDate/ModDate "+07:00" in Info and XMP, a weak location hint. In
+  `make_submission.sh`, strip or zero the dates (Ghostscript `-c "[/CreationDate () /ModDate () /DOCINFO pdfmark"` or
+  `qpdf --remove-metadata`/exiftool).
+- R16-L8. supp_body.tex App. E: "On the other hand, the buffer-free alternatives ..." has no contrast to answer. Drop
+  "On the other hand,".
+
+### Referee view
+
+**Score unchanged at 3.5 (Borderline, leaning accept).**
+- The voice pass reads more fluently and keeps every number, qualifier and oracle marking.
+- The format matches the 2027 kit.
+- What a referee would notice is the absolute "no prior work" and, if unfixed, the dropped single-backbone caveat in
+  Limitations.
