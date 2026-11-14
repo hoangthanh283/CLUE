@@ -65,6 +65,7 @@ STYLE = {
     # ladder controls not run yet: drawn only once their three clean seeds exist (Tol muted)
     "er_sbr": ("Raw memory + SBR", "#DDCC77"),
     "oracle_pre": ("Relabel before each session", "#882255"),
+    "oracle_mask": ("Mask before each session", "#661100"),
     "colar_mib": ("MiB-style loss", "#AA4499"),
     "sbr_constbg": ("Constant background", "#44AA99"),
     "ice_o": ("ICE-O", "#332288"),
@@ -72,7 +73,8 @@ STYLE = {
 SEED_MARK = {42: "o", 7: "s", 123: "^"}
 HATCH = "////"
 SLOT_LABEL = {"er_sbr": "raw mem.$^{w}$ + SBR", "oracle_pre": "relabel, pre-session", "colar_mib": "MiB loss",
-              "sbr_constbg": "const. bg", "ice_o": "ICE-O", "sliced": "sliced replay"}  # fmt: skip
+              "sbr_constbg": "const. bg", "ice_o": "ICE-O", "sliced": "sliced replay",
+              "oracle_mask": "mask, pre-session"}  # fmt: skip
 SHORT = {"colar": "CoLaR", "er": "ER", "oracle": "relabel, boundary", "sliced2": "sliced losses",
          "sbr": "CoLaR-SBR", "nobank": "SBR, no mem.", "recall": "SBR-Recall"}  # fmt: skip
 MECH_KEY = {"naive": "naive", "colar": "colar", "colar_r_oracle": "oracle",

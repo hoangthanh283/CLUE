@@ -304,7 +304,8 @@ ROW_LABEL = {"naive": "Naive", "nobank": "SBR, no memory", "colar": "CoLaR",
              "er250": "ER (250 documents)",
              "sbr_const_o": "CoLaR-SBR, constant background logit", "ice_o": "ICE-O (our port)",
              "sbr_r32": "CoLaR-SBR, rank 32", "sbr_r64": "CoLaR-SBR, rank 64",
-             "colar_r_sliced": "CoLaR, replay loss sliced to capture-time classes"}  # fmt: skip
+             "colar_r_sliced": "CoLaR, replay loss sliced to capture-time classes",
+             "colar_r_oracle_mask_pre": "False O masked before each session (not deployable)"}  # fmt: skip
 
 
 def write_perseed():
@@ -761,6 +762,7 @@ def baseline_macros() -> str:
 ORACLE_PRE_NAME = "cil_cord_colar_r_oracle_pre"  # PM 2026-11-12: colar_r_oracle_pre, _k4_d50_r128
 # Lit review A comparators (PM 2026-11-12; run names not reported yet: set them when Dev does)
 SBR_CONSTBG_NAME = "cil_cord_colar_sbr_const_o"  # CoLaR-SBR, every background logit fixed at 0
+MASK_NAME = "cil_cord_colar_r_oracle_mask_pre"  # R18 E2b: every false O of the memory masked
 SLICED_NAME = "cil_cord_colar_r_sliced"  # R18 E2a: replay CE over capture-time classes only
 ICE_O_NAME = "cil_cord_ice_o"  # ICE-O port: frozen encoder, head per session, constant Other = 0
 # P21 (2026-11-13), read per seed from the three clean runs each:
@@ -779,6 +781,9 @@ ICE_O_NAME = "cil_cord_ice_o"  # ICE-O port: frozen encoder, head per session, c
 #   sliced "partly" (R18 E2a; R19-M1: an H2 row, a label-free loss repair): above CoLaR and below
 #     joint training and the pre-session refresh on every seed, both metrics. The softmax slice
 #     keeps the stale "O" targets (they still train the shared O logit), so it bounds the slice only.
+#   oracle_mask (R18 E2b): no verdict typed before the runs exist; AUTO_VERDICT picks the first
+#     word whose per-seed check passes and the generator says so (the prose must follow).
+AUTO_VERDICT = {"oracle_mask": ("supports", "partly")}
 SLOT_VERDICT = {"er_sbr": "does not support", "oracle_pre": "supports", "colar_mib": "partly",
                 "sbr_constbg": "partly", "ice_o": "partly", "sliced": "partly"}  # fmt: skip
 MIX_RECALL_NOMEM = (GATE, "mixed_colar_sbr_recall_r64b", "*")  # seed 42, fp32 gate, legacy
@@ -799,6 +804,8 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
      [ORACLE_CLEAN], [ORACLE_CLEAN], "clean", "partly", 0),
     ("", "", "", "every stored document relabelled before each session$^{r}$", "oracle_pre",
      src(ORACLE_PRE_NAME), src(ORACLE_PRE_NAME), "slot", "", 3),
+    ("", "", "", "the same tokens masked instead, no label added$^{r}$", "oracle_mask",
+     src(MASK_NAME), src(MASK_NAME), "slot", "", 3),
     ("H2", "Current documents mislabel old entities",
      "a loss that lets ``O'' mean ``O or an old class'' closes the gap",
      "replay and current losses sliced to their classes", "sliced2",
@@ -885,6 +892,10 @@ def verdict_ok(key: str, verdict: str) -> bool | None:
         ("mix_mem", "supports"): lambda: mix["mem"] > mix["nomem"],
         ("oracle_pre", "supports"): lambda: _every([abs(x[s] - c["joint"][j][s]) < 3 for j, x in
                                                     enumerate(_ctrl(ORACLE_PRE_NAME)) for s in SEEDS], n3),
+        ("oracle_mask", "supports"): lambda: _every([abs(x[s] - c["joint"][j][s]) < 3 for j, x in
+                                                     enumerate(_ctrl(MASK_NAME)) for s in SEEDS], n3),
+        ("oracle_mask", "partly"): lambda: _every([c["colar"][j][s] < x[s] < c["joint"][j][s] for j, x in
+                                                   enumerate(_ctrl(MASK_NAME)) for s in SEEDS], n3),
         ("colar_mib", "partly"): lambda: _every([c["colar"][j][s] < x[s] < c["joint"][j][s] for j, x in
                                                  enumerate(_ctrl("cil_cord_colar_mib")) for s in SEEDS], n3),
         ("ice_o", "partly"): lambda: _every([x[s] < c["recall"][j][s] for j, x in
@@ -925,6 +936,9 @@ def write_ladder() -> None:
                     print(f"slot {key}: {len(aa[0])} clean seed(s), renders at {min_n}")
                 continue
             verdict = SLOT_VERDICT.get(key, "")
+            if not verdict and key in AUTO_VERDICT:
+                verdict = next((w for w in AUTO_VERDICT[key] if verdict_ok(key, w)), "")
+                print(f"slot {key}: verdict chosen by its per-seed check: '{verdict}' (write the prose)")
         elif kind == "clean":
             aa, full = pick_clean_only(aa_s, "AA"), pick_clean_only(full_s, "full_label_f1")
         else:
@@ -1545,6 +1559,30 @@ def ablation_macros() -> str:
     return _defs(v)
 
 
+def mask_macros() -> str:
+    """R18 E2b, the mask-only oracle (three clean seeds or "--"): mean (\\v, \\n) and per-seed
+    values of AA and full-label F1, the seed-matched share of the CoLaR -> joint gap, the largest
+    distance from joint training and the per-seed difference to the pre-session refresh (mask
+    minus relabel, rounded outward), both metrics."""
+    mk, c, pre = _ctrl(MASK_NAME), _ctrl("cil_cord_colar"), _ctrl(ORACLE_PRE_NAME)
+    j = [_clean("joint", m) for m in ("AA", "full_label_f1")]
+    names = ("nOracleMaskSeeds", "nOracleMaskFullSeeds", "nOracleMaskShare", "nOracleMaskShareFull",
+             "nOracleMaskJointGap", "nOracleMaskPreDiffMin", "nOracleMaskPreDiffMax")  # fmt: skip
+    if not all(len(d) == len(SEEDS) for d in mk):
+        return macro("OracleMask", []) + macro("OracleMaskFull", []) + _defs(dict.fromkeys(names, "--"))
+    t = macro("OracleMask", list(mk[0].values())) + macro("OracleMaskFull", list(mk[1].values()))
+    v = {"nOracleMaskSeeds": "/".join(f"{mk[0][s]:.1f}" for s in SEEDS),
+         "nOracleMaskFullSeeds": "/".join(f"{mk[1][s]:.1f}" for s in SEEDS)}  # fmt: skip
+    for i, nm in ((0, "nOracleMaskShare"), (1, "nOracleMaskShareFull")):
+        sh = _gap_share(mk[i], c[i], j[i])
+        v[nm] = f"{math.floor(100 * min(sh))} to {math.ceil(100 * max(sh))}"
+    v["nOracleMaskJointGap"] = up1(max(abs(mk[i][s] - j[i][s]) for i in (0, 1) for s in SEEDS))
+    dd = [mk[i][s] - pre[i][s] for i in (0, 1) for s in SEEDS if s in pre[i]]
+    v["nOracleMaskPreDiffMin"] = _signed(min(dd), True) if len(dd) == 2 * len(SEEDS) else "--"
+    v["nOracleMaskPreDiffMax"] = _signed(max(dd), False) if len(dd) == 2 * len(SEEDS) else "--"
+    return t + _defs(v)
+
+
 def sliced_macros() -> str:
     """R18 E2a, the clean sliced-replay control (three clean seeds or "--"): mean (\\v, \\n) and
     per-seed values (seeds 42/7/123) of AA and full-label F1, its seed-matched share of the CoLaR
@@ -1889,7 +1927,7 @@ def main():
     v += f"\\newcommand{{\\nErCilBuf}}{{{250 if er_src and er_src[0] == CLEAN else 200}}}\n"
     v += recall_macros() + oracle_macros() + conflict_macros() + agree_macros()
     v += baseline_macros() + gap_macros() + write_mechanism() + write_dropped()
-    v += ablation_macros() + control_macros() + sliced_macros() + write_memory()
+    v += ablation_macros() + control_macros() + sliced_macros() + mask_macros() + write_memory()
     (OUT / "vals.tex").write_text(v)
     write_ladder()
     write_beyond()

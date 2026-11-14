@@ -11,6 +11,7 @@ from doccl.data.encoders import encode_with_full_labels
 from doccl.methods.colar import CoLaR
 from doccl.methods.colar_r import (
     CoLaRRefresh,
+    mask_refresh,
     oracle_refresh,
     pseudo_refresh,
     pseudo_thresholds,
@@ -126,7 +127,13 @@ def test_oracle_pass_refreshes_stale_docs_once_and_counts_tokens():
 
 
 def test_capture_drops_labels_full_unless_oracle():
-    for refresh, keep in (("oracle", True), ("pseudo", False), ("sliced", False), ("none", False)):
+    for refresh, keep in (
+        ("oracle", True),
+        ("oracle_mask", True),
+        ("pseudo", False),
+        ("sliced", False),
+        ("none", False),
+    ):
         m = _method(refresh)
 
         def fake_capture(self, loader):
@@ -197,7 +204,7 @@ def test_sliced_pseudo_slices_loss_and_refreshes_with_candidate_count():
     assert abs(got.loss.item() - torch.log(torch.tensor(2.0)).item()) < 1e-5
 
 
-def _labels_during_each_session(pre: bool) -> list[list[list[int]]]:
+def _labels_during_each_session(pre: bool, refresh: str = "oracle") -> list[list[list[int]]]:
     """3 CIL sessions introducing classes 1, 2, 3; every page holds one entity of each. Returns,
     per session t, the labels every stored document carries WHILE session t trains."""
 
@@ -206,7 +213,7 @@ def _labels_during_each_session(pre: bool) -> list[list[list[int]]]:
         method.model = type("M", (), {"label_to_id": {}})()
 
     with patch.object(CoLaR, "__init__", fake_init):
-        m = CoLaRRefresh(None, {"refresh": "oracle", "refresh_before_task": pre})
+        m = CoLaRRefresh(None, {"refresh": refresh, "refresh_before_task": pre})
     seen = []
 
     def fake_after(self, task, _loader):  # capture: this session's CIL-masked labels
@@ -251,3 +258,43 @@ def test_pre_session_refresh_requires_oracle():
 
     with patch.object(CoLaR, "__init__", lambda m, _a, _b: None), pytest.raises(ValueError):
         CoLaRRefresh(None, {"refresh": "pseudo", "refresh_before_task": True})
+
+
+def test_mask_refresh_masks_exactly_what_the_oracle_relabels():
+    g = torch.Generator().manual_seed(0)
+    for _ in range(200):
+        n_capture = int(torch.randint(1, 6, (1,), generator=g))
+        n_current = int(torch.randint(n_capture, 8, (1,), generator=g))
+        full = torch.randint(0, 8, (40,), generator=g)
+        full[torch.rand(40, generator=g) < 0.1] = -100
+        # a CIL page of one session: only some classes below n_capture are labelled, the rest O
+        own = torch.rand(8, generator=g) < 0.5
+        labels = torch.where((full >= 0) & (full < n_capture) & own[full.clamp_min(0)], full, 0)
+        labels[full == -100] = -100
+        changed = (oracle_refresh(labels, full, n_current) != labels) & (labels != -100)
+        out = mask_refresh(labels, full, n_current)
+        assert torch.equal(out == -100, changed | (labels == -100))
+        assert torch.equal(out[~changed], labels[~changed])  # nothing else moves
+
+
+def test_oracle_mask_pre_session_masks_every_false_o():
+    seen = _labels_during_each_session(pre=True, refresh="oracle_mask")
+    assert seen[1] == [[1, -100, 0, 0]]  # session 1's class is in the head: masked, not labelled
+    # session 2: the session-1 page also masks its old class-1 entity (CIL pages label it O)
+    assert seen[2] == [[1, -100, -100, 0], [-100, 2, -100, 0]]
+
+
+def test_oracle_mask_keeps_labels_full_and_is_idempotent():
+    m = _method("oracle_mask")
+    m.store = [
+        {
+            "labels": torch.tensor([0, 0, 0, -100]),
+            "labels_full": torch.tensor([1, 2, 0, -100], dtype=torch.int16),
+            "n_labels": torch.tensor(2),
+        }
+    ]
+    m.model.label_to_id = {"O": 0, "a": 1, "b": 2}
+    m._refresh_memory(task_id=1, all_docs=True)
+    m._refresh_memory(task_id=1, all_docs=True)
+    assert m.store[0]["labels"].tolist() == [-100, -100, 0, -100]
+    assert [e["tokens_masked"] for e in m.refresh_log] == [2, 0]

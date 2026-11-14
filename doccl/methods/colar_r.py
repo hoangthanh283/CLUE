@@ -20,6 +20,10 @@ refresh: sliced_pseudo — sliced loss during the task, pseudo refresh after it.
                    pseudo relabels ~0 tokens because replaying stale O labels teaches the
                    model "O" on exactly the memory tokens it is later asked to relabel;
                    slicing removes that self-defeating signal so candidates survive.
+refresh: oracle_mask — mask-only counterpart of the oracle (R18 E2b): every stored token the
+                   oracle would relabel (an O whose true class is in the head now) is set to -100,
+                   so it leaves the replay CE as neither "O" nor a positive. Removes the false
+                   negatives without adding a label; needs ``labels_full``.
 refresh: none    — plain CoLaR (control).
 
 When the oracle refresh runs (AGENT IMPL 2026-11-12, D17). Capture and refresh both sit in
@@ -30,7 +34,7 @@ When the oracle refresh runs (AGENT IMPL 2026-11-12, D17). Capture and refresh b
   carry the true labels of every class of sessions 0..t-1 (session-t classes are O); the
   documents banked at session t-1 were never refreshed and carry ONLY session t-1's classes
   (everything else O, exactly like current data).
-``refresh_before_task: true`` (oracle only, "refreshed before the session", colar_r_oracle_pre):
+``refresh_before_task: true`` (oracle / oracle_mask, "refreshed before the session", colar_r_oracle_pre):
   additionally, ``before_task`` re-applies the oracle to EVERY stored document using the head
   as expanded for session t. While session t trains, every stored document (sessions 0..t-1)
   carries the true labels of all classes of sessions 0..t; only classes not yet in the head are
@@ -60,6 +64,16 @@ def oracle_refresh(labels: torch.Tensor, labels_full: torch.Tensor, n_current: i
     known = (labels_full >= 0) & (labels_full < n_current)
     out = torch.where(known, labels_full, torch.zeros_like(labels))
     out[labels == -100] = -100
+    return out
+
+
+def mask_refresh(labels: torch.Tensor, labels_full: torch.Tensor, n_current: int) -> torch.Tensor:
+    """Ignore (-100) exactly the tokens ``oracle_refresh`` would change: a stored O whose true
+    class is in the head now. That is not only classes added after capture (n_capture <=
+    class < n_current, the R18 spec's range) but also older classes, because a CIL session's
+    pages carry only that session's tags and label every earlier entity O."""
+    out = labels.clone()
+    out[(oracle_refresh(labels, labels_full, n_current) != labels) & (labels != -100)] = -100
     return out
 
 
@@ -117,7 +131,8 @@ def sliced_replay_loss(
 
 class CoLaRRefresh(CoLaR):
     name = "colar_r"
-    MODES = ("oracle", "pseudo", "sliced", "sliced_pseudo", "none")
+    MODES = ("oracle", "oracle_mask", "pseudo", "sliced", "sliced_pseudo", "none")
+    _TRUE_LABEL_MODES = ("oracle", "oracle_mask")
 
     def __init__(self, model, config):
         super().__init__(model, config)
@@ -128,15 +143,15 @@ class CoLaRRefresh(CoLaR):
         self.refresh_quantile = float(config.get("refresh_quantile", 0.5))
         self.refresh_log: list[dict] = []
         self.refresh_before_task = bool(config.get("refresh_before_task", False))
-        if self.refresh_before_task and self.refresh != "oracle":
-            raise ValueError("colar_r.refresh_before_task needs refresh: oracle")
+        if self.refresh_before_task and self.refresh not in self._TRUE_LABEL_MODES:
+            raise ValueError("colar_r.refresh_before_task needs refresh: oracle or oracle_mask")
 
     # ------------------------------------------------------------- capture
     def _capture_task(self, train_loader: DataLoader) -> None:
         n_before = len(self.store)
         super()._capture_task(train_loader)
         for d in self.store[n_before:]:
-            if self.refresh == "oracle" and "labels_full" in d:
+            if self.refresh in self._TRUE_LABEL_MODES and "labels_full" in d:
                 d["labels_full"] = d["labels_full"].to(torch.int16)  # <= 61 tags; 2 bytes/token
             else:
                 d.pop("labels_full", None)  # pseudo/none never see the true labels
@@ -175,7 +190,7 @@ class CoLaRRefresh(CoLaR):
 
     def after_task(self, task: TaskInfo, train_loader: DataLoader) -> None:
         super().after_task(task, train_loader)
-        if self.refresh in ("oracle", "pseudo", "sliced_pseudo"):
+        if self.refresh in ("oracle", "oracle_mask", "pseudo", "sliced_pseudo"):
             self._refresh_memory(task.task_id)
 
     def _refresh_memory(self, task_id: int, all_docs: bool = False) -> None:
@@ -186,6 +201,17 @@ class CoLaRRefresh(CoLaR):
         if not stale:
             return
         entry = {"task_id": task_id, "docs": len(stale)}
+        if self.refresh == "oracle_mask":
+            entry["tokens_masked"] = self._mask_pass(stale, n_cur)
+            for d in stale:
+                d["n_labels"] = torch.tensor(n_cur)
+            self.refresh_log.append(entry)
+            log.info(
+                "colar_r[oracle_mask]: refreshed %d docs, %d tokens masked",
+                len(stale),
+                entry["tokens_masked"],
+            )
+            return
         if self.refresh == "oracle":
             entry["tokens_relabelled"] = self._oracle_pass(stale, n_cur)
         else:
@@ -210,6 +236,17 @@ class CoLaRRefresh(CoLaR):
             changed += int((new != d["labels"]).sum())
             d["labels"] = new
         return changed
+
+    def _mask_pass(self, stale: list[dict], n_cur: int) -> int:
+        """Idempotent: masked tokens stay -100 and are never counted twice."""
+        masked = 0
+        for d in stale:
+            if "labels_full" not in d:
+                continue
+            new = mask_refresh(d["labels"], d["labels_full"].long(), n_cur)
+            masked += int(((new == -100) & (d["labels"] != -100)).sum())
+            d["labels"] = new
+        return masked
 
     @torch.no_grad()
     def _memory_probs(self, docs: list[dict]) -> list[torch.Tensor]:
