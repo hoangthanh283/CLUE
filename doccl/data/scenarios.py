@@ -95,14 +95,14 @@ def build_cil_funsd() -> CLScenario:
     ]
     snapshots, label_sets = _cil_head_snapshots(splits)
 
-    def _wrap(split: str) -> list[Dataset]:
+    def _wrap(split: str, full_head: dict[str, int] | None = None) -> list[Dataset]:
         wrapped = []
         for i, lbls in enumerate(splits):
             base = FUNSDDataset(split=split, label_filter=lbls)
-            wrapped.append(CIL_LabelRemapper(base, base.id_to_label, snapshots[i]))
+            wrapped.append(CIL_LabelRemapper(base, base.id_to_label, snapshots[i], full_head))
         return wrapped
 
-    train_dss = _wrap("train")
+    train_dss = _wrap("train", full_head=snapshots[-1])  # labels_full, as in build_cil_cord
     eval_dss = _wrap("test")
     # AGENT IMPL (2026-11-11): full-label joint pool + unmasked test set, as in build_cil_cord
     # (without the pool, joint concatenates the session-masked copies and collapses).
