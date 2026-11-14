@@ -5437,3 +5437,150 @@ Scope: `git diff 3b59fb9..85d9907` (main.tex, supp_body.tex). Built from `git ar
 
 - **R21b-L1 [W].** "one background logit per session, as in existing readouts". Dropping "per-session" makes it read as
   if all existing readouts did this. Restore "as in existing per-session readouts" (ICE-O, MORE) if the line allows.
+
+## R22 (2026-11-15): CIL-FUNSD settling runs (`8b3f2b4`) and P33 (`d0af066`)
+
+Scope:
+- Run logs, `metrics.json` and `matrix.npy` of the four new CIL-FUNSD cells.
+- `supp_funsd.tex` and the new `\vFunsd*` / `\nFunsd*` macros.
+- Word-diff `06dc468..d0af066` of main.tex and supp_body.tex.
+- Built from `git archive d0af066` in a scratch dir and split. Both outputs are text-identical to the committed
+  `submission/*.pdf`.
+- `make_clean_tables.py` exits 0 ("memory self-check passed: 15 runs") and changes no generated file.
+
+### Verdict: **PASS** (no HIGH; one MEDIUM [W] that should be fixed before upload)
+
+### 1. Run validity: no fault
+
+- **Oracle, 50 forms.**
+  - Each seed logs "banked 50 docs (store=50)" before the refresh, "refreshed 50 docs, 3111 / 3373 / 3080 tokens
+    relabelled", then "store=100".
+  - `replay_memory_bytes` is 40,371,200: 100 x 403,712, i.e. 402,688 plus 1,024 bytes of int16 `labels_full`.
+- **MiB-style loss.** `method=colar_mib`, 10 forms per session, banks 10 + 10. Same code path as the clean CIL-CORD cell.
+- **sliced2.** The log shows `refresh: sliced` and `current_sliced: true`, so both the replay and the current loss are
+  sliced. It banks 10 + 10.
+- **SBR, no memory.** `docs_per_task: 0`, `replay_memory_bytes` 0. The SBR plan opens 2 blocks.
+
+### 2. New sentences per seed (42 / 7 / 123)
+
+| Run | Full-label F1 | R[2,1] |
+|---|---|---|
+| CoLaR (d10) | 51.80 / 52.95 / 51.88 | |
+| Oracle, d50 | 62.05 / 52.43 / 49.95 | 34.6 / 0.0 / 0.0 |
+| MiB-style | 86.85 / 87.34 / 87.58 | 84.0 / 85.9 / 87.7 |
+| sliced2 | 80.52 / 86.52 / 84.19 | 74.9 / 83.8 / 81.2 |
+| SBR, no memory | 78.73 / 80.73 / 73.43 | 65.0-75.2 |
+| CoLaR-SBR | 87.57 / 86.42 / 87.46 | |
+| Joint | 77.80 / 87.56 / 87.60 | |
+
+- All new macros and table rows are correct, rounded outward.
+- "With fifty stored forms it reaches only 54.8": true. App. D "keeps session 1 in part on one seed only": true (34.6 on
+  seed 42 only).
+- "MiB-style loss ... level with CoLaR-SBR on every seed": per-seed differences are -0.72 / +0.92 / +0.12 (F1) and -0.14 /
+  +0.97 / -0.05 (AA). Level within 1 point. The bound is not printed (L1).
+- "Closes most of the gap" (MiB): share of the seed-matched CoLaR -> joint gap 1.35 / 0.99 / 1.00. App. D "slicing both
+  losses closes most of the gap on every seed": 1.10 / 0.97 / 0.90 (F1) and 1.13 / 0.98 / 0.93 (AA). True.
+- "Uses the memory: without it, it falls below CoLaR-SBR on every seed": true under both metrics. F1 drops by 8.8 / 5.7 /
+  14.0; AA no-memory 80.55 / 82.65 / 76.05 against 87.78 / 86.75 / 87.76.
+- **"The current side matters" (abstract, Sec. 7) is supported as a necessity statement.**
+  - The stored-side repair alone (true stored labels) fails at 10 forms and still at 50 (at most 62.1 F1 against at least
+    86.4 for the readout).
+  - Both two-sided repairs succeed: the MiB-style loss relaxes the current "O" as well as the replayed one, and sliced2
+    slices both losses.
+  - Both succeed with only 10 forms. That also answers R20's open question: memory size is not the bottleneck on FUNSD.
+- **"The readout covers both sides" is fair.** SBR's mask rule removes the stored and the current conflict by
+  construction, and no-memory SBR shows it does part of the work without replay.
+
+### MEDIUM
+
+**R22-M1 [W]. "It is the side that matters" (H2) and "the stored and current sides trade places" (Limitations) claim
+more than the runs test.**
+- Every repair that succeeds on FUNSD acts on **both** sides. No current-side-only repair was run: no MiB on current
+  tokens only, no current-only slice.
+- So the runs show the current side is needed on FUNSD. They do not show that it suffices, or that the stored side does
+  not matter there.
+- "Trade places" reads as the mirror of CIL-CORD, where a stored-side-only repair suffices; the FUNSD mirror would need
+  a current-only repair to succeed.
+- Seed 42 at 50 forms also gains 10.2 F1 from the stored side alone, so "fail" in the abstract should be "do not
+  rescue".
+- Fix (no new numbers needed):
+  - H2 (:148): "on CIL-FUNSD it is needed (\cref{sec:beyond})".
+  - Limitations (:233): "where the current side, not needed on CIL-CORD, is needed; whether a current-side repair alone
+    suffices there, and why the streams differ, is untested".
+  - Abstract: "On CIL-FUNSD the current side matters: true stored labels do not rescue the shared softmax even with
+    fifty forms, while a MiB-style loss, which also relaxes the current documents' ``O'', closes most of the gap, and the
+    readout covers both sides".
+  - Sec. 7: "the current side matters instead" -> "the current side matters".
+
+### LOW
+
+- **R22-L1 [W].** Sec. 7 "level with CoLaR-SBR on every seed": add the bound, "within 1.0 point on every seed". A macro
+  would be cleaner.
+- **R22-L2 [W].** The R21 clause "plain CoLaR learns the new session and loses the old one, as naive training does" was
+  dropped.
+  - The H0 claims stay scoped "on CIL-CORD" in the abstract and intro, so nothing becomes false.
+  - The reader no longer sees why the H0 suppression is CORD-only. Restore it if a line frees up.
+- **R22-L3 [E] (optional).** A FUNSD current-side-only repair, e.g. a MiB-style loss on current tokens only, would let
+  the paper say "trade places". Not queued.
+
+### 3. Space cuts: no caveat lost
+
+- Contribution (3): "(one seed; \cref{sec:recall})" replaces "where the task-identity view says they must". The
+  one-seed qualifier stays, and the prediction framing is still in §5.3.
+- H3 and H4 prediction rewordings ("without the conflict", "a fixed label space has one block, nothing to route by (not
+  run)") keep their meaning.
+- Limitations:
+  - "only the oracle and the constant background also on CIL-FUNSD" became "several also on CIL-FUNSD (two sessions,
+    50 test forms)". This is correct, and it adds the FUNSD test size R21-L2 asked for.
+  - The "whether the readout needs the memory" clause is gone because it is now tested and answered in §7.
+  - The rank-32 clause keeps "loses most of its accuracy".
+  - The replay-ratio clause is kept.
+- "Continual document methods should be tested on a growing label space with a mask-free metric" is a recommendation,
+  as before.
+- Dropping "where both causes act" (Mixed) and "a few hundred" (abstract) loses no qualifier.
+
+### 4. Form
+
+- main and supp exit 0 with 0 undefined, 0 multiply-defined, 0 overfull, 0 "??". There are two harmless "Text page ...
+  contains only floats" warnings: main p. 14 (appendix) and supp p. 4.
+- Main text ends p. 8, References pp. 9-10, appendix pp. 11-16 (6 pp.). The split gives 10 + 6 pp.
+- No `---`. The title and the LLM Usage Statement are unchanged.
+- **Abstract: 247 words** (pdftotext of the abstract block, with the 3-digit line numbers stripped).
+
+### 5. Three-persona estimate and remaining [E]
+
+**The FUNSD settling runs strengthen the paper.**
+- Memory size is ruled out as the FUNSD bottleneck.
+- The current side is shown to be needed there.
+- The readout is shown to use the memory on FUNSD as well.
+- The two-stream story is now coherent: the readout handles both sides and transfers; which side dominates depends on
+  the stream.
+
+**Personas.**
+- R1: **6** (Contribution 3, Soundness 3). Accept.
+- R2: 4 -> **5**. Soundness 3 and Quality 3, since the settling runs answer its confound questions, but it remains niche.
+  Borderline accept.
+- R3: **6**. Accept.
+
+| Dimension | Avg |
+|---|---|
+| Overall | 5.67 |
+| Contribution | 2.67 |
+| Presentation | 3 |
+| Soundness | 3 |
+| Originality | 2 |
+| Quality | 3 |
+| Clarity | 3 |
+| Significance | 2.33 |
+| Confidence | 3.67 |
+
+- Weighted: **about 6.3/10, Accept**. R22-M1 should be fixed first; left in, R2's soundness would drop to 2, giving
+  about 6.1.
+
+**Remaining [E].**
+- E2b mask-only oracle on CIL-CORD: running now (`cil_cord_colar_r_oracle_mask_pre_seed42` started 01:45).
+- BROS controls on CIL-CORD: queued (v15/v16 tail).
+- Clean ER-250, DER++-250, LwF and CL-LoRA: queued. CPFD, IS3, CODA and LCA stay legacy.
+- Mixed joint seeds 7/123 and the DIL clean cells: queued.
+- FUNSD current-only repair (R22-L3): not queued, optional.
+- Second class order for the controls: not queued.
