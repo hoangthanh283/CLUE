@@ -751,10 +751,10 @@ def fig_memory() -> dict:
                            zorder=4)  # fmt: skip
             means.append((x, m))
             out[(key, b)] = d
-        if len(means) > 1:  # same method, two encodings or ranks
+        if len(means) > 1:  # same method: two encodings (dotted) or ranks (dashed, R19-L2: it crosses the y break)
             for ax in axes[:, 1]:
                 ax.plot(*zip(*means, strict=True), color=col, lw=0.7,
-                        ls=":" if any(p[2] for p in pts) else "-", zorder=2)  # fmt: skip
+                        ls=":" if any(p[2] for p in pts) else "--", zorder=2)  # fmt: skip
     for ax in axes.flat:
         ax.axhline(jv, color=STYLE["joint"][1], lw=0.7, ls="--", zorder=1)
         ax.grid(axis="y", alpha=0.25, lw=0.3)
