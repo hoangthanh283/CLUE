@@ -10,6 +10,7 @@ first (the self-check compares the plotted values with the tables it wrote).
 
 Writes paper_cvpr/figures/:
   findings_a.pdf  findings_b.pdf  findings_c.pdf   (main paper, fig:findings)
+  memory.pdf  (main paper, fig:memory)
   heatmaps.pdf  perseed.pdf  trajectory.pdf  routing.pdf  spans.pdf  perclass.pdf  (appendix)
 """
 
@@ -689,8 +690,107 @@ def write_perclass_vals(perclass: dict) -> None:
 
 # ---------------------------------------------------------------- P18: ablation grid (App. K)
 ABL_COLOR = {"naive": "naive", "colar": "colar", "nobank": "nobank", "sbr": "sbr",
-             "recall": "recall", "oracle": "oracle", "oracle_pre": "oracle_pre",
-             "joint": "joint"}  # fmt: skip
+             "er_sbr": "er_sbr", "recall": "recall", "oracle": "oracle",
+             "oracle_pre": "oracle_pre", "joint": "joint"}  # fmt: skip
+
+
+# ---------------------------------------------------------------- memory cost (main body)
+def fig_memory() -> dict:
+    """fig:memory: full-label F1 on CIL-CORD against stored MB (1 MB = 1e6 B). Sizes come from
+    make_clean_tables.memory_forms (recorded ``replay_memory_bytes``, or computed: hollow, never run
+    in that encoding); one small dot per seed, a large marker at the mean. A narrow "0" panel holds
+    the memory-free runs; joint training (keeps all data) is the dashed line."""
+    from make_clean_tables import ER_SBR_NAME, MEM_RANKS, RECALL_NAME, SBR_NAME, memory_forms
+
+    forms = {f["key"]: f for f in memory_forms()}
+
+    def f1(name, sfx="*"):
+        return load_seeds(CLEAN, name, "full_label_f1", sfx)
+
+    colar_mb = set(load_seeds(CLEAN, "cil_cord_colar", "replay_memory_bytes").values())
+    assert len(colar_mb) == 1, colar_mb
+    sbr_pts = [(forms["colar128"]["total"], f1(SBR_NAME), False)]
+    sbr_pts += [(forms[f"colar{r}"]["total"], f1(f"{SBR_NAME}_r{r}"), False)
+                for r in MEM_RANKS if f"colar{r}" in forms]  # fmt: skip
+    series = [  # (style key, label, [(bytes, {seed: F1}, hollow)], x offset in the 0 panel)
+        ("naive", "Naive", [(0, f1("cil_cord_naive"), False)], -0.45),
+        ("nobank", "SBR, no memory", [(0, f1("cil_cord_colar_sbr_noreplay"), False)], 0.45),
+        ("colar", "CoLaR, shared softmax", [(colar_mb.pop(), f1("cil_cord_colar"), False)], 0),
+        ("sbr", "CoLaR-SBR" + (" (ranks)" if len(sbr_pts) > 1 else ""),
+         sorted(sbr_pts, key=lambda p: p[0]), 0),
+        ("er_sbr", "Raw memory + SBR", [(forms["raw8"]["total"], f1(ER_SBR_NAME, ""), True),
+                                        (forms["raw"]["total"], f1(ER_SBR_NAME, ""), False)], 0),
+        ("recall", "SBR-Recall", [(forms["recall16"]["total"], f1(RECALL_NAME), True),
+                                  (forms["recall32"]["total"], f1(RECALL_NAME), False)], 0),
+    ]  # fmt: skip
+    jv = float(np.mean(pick_clean_only(C["joint"], "full_label_f1")[0]))
+    ys = [v for _, _, pts, _ in series for _, d, _ in pts for v in d.values()]
+    hi_v, lo_v = [v for v in ys if v >= 50] + [jv], [v for v in ys if v < 50]
+    # broken y: the methods that retain sit within a few points of each other, the rest far below
+    top = (5 * np.floor((min(hi_v) - 1) / 5), 5 * np.ceil((max(hi_v) + 1) / 5))
+    bot = (0, 10 * np.ceil((max(lo_v, default=0) + 3) / 10))
+    fig, axes = plt.subplots(2, 2, figsize=(COL, 2.45), sharex="col", sharey="row",
+                             gridspec_kw={"width_ratios": (0.55, 5), "height_ratios": (1.7, 1),
+                                          "wspace": 0.05, "hspace": 0.2})  # fmt: skip
+    out = {}
+    for key, _label, pts, off in series:
+        col = STYLE[key][1]
+        means = []
+        for b, d, hollow in pts:
+            c, x = (0, off) if b == 0 else (1, b / 1e6)
+            m = float(np.mean(list(d.values())))
+            for ax in axes[:, c]:  # drawn in both rows; each row's limits clip the other
+                ax.scatter([x] * len(d), list(d.values()), s=11, fc="white" if hollow else col,
+                           ec=col if hollow else "black", lw=0.7 if hollow else 0.3, zorder=3)
+                ax.scatter(x, m, s=45, marker="_", color=col if hollow else "black", lw=1.1,
+                           zorder=4)  # fmt: skip
+            means.append((x, m))
+            out[(key, b)] = d
+        if len(means) > 1:  # same method, two encodings or ranks
+            for ax in axes[:, 1]:
+                ax.plot(*zip(*means, strict=True), color=col, lw=0.7,
+                        ls=":" if any(p[2] for p in pts) else "-", zorder=2)  # fmt: skip
+    for ax in axes.flat:
+        ax.axhline(jv, color=STYLE["joint"][1], lw=0.7, ls="--", zorder=1)
+        ax.grid(axis="y", alpha=0.25, lw=0.3)
+        ax.tick_params(length=1.5, pad=1)
+        ax.spines["top"].set_visible(False)
+    for r, lim in ((0, top), (1, bot)):
+        axes[r, 0].set_ylim(*lim)
+        axes[r, 1].spines["left"].set_visible(False)
+        axes[r, 1].tick_params(axis="y", left=False)
+        axes[r, 0].spines["right"].set_visible(False)
+    axes[0, 0].set_yticks(np.arange(top[0], top[1] + 1, 5))
+    axes[1, 0].set_yticks(np.arange(0, bot[1] + 1, 10))
+    for ax in axes[0]:
+        ax.spines["bottom"].set_visible(False)
+        ax.tick_params(axis="x", which="both", bottom=False)
+    axes[0, 1].spines["right"].set_visible(False)
+    axes[1, 1].spines["right"].set_visible(False)
+    axes[1, 0].set_xlim(-1, 1)
+    axes[1, 0].set_xticks([0], ["0"])
+    a1 = axes[1, 1]
+    a1.set_xscale("log")
+    a1.set_xlim(20, 330)
+    a1.set_xticks([25, 50, 100, 200], ["25", "50", "100", "200"])
+    a1.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    a1.set_xlabel("stored memory (MB)", labelpad=1)
+    fig.supylabel("full-label F1, CIL-CORD", x=0.01, fontsize=7)
+    axes[0, 1].text(21, jv + 0.3, "joint training", ha="left", va="bottom", fontsize=6)
+    kw = {"color": "black", "lw": 0.5, "clip_on": False}
+    for ax, xs, ys_ in ((axes[1, 0], (1, 1), (-0.03, 0.03)), (axes[1, 1], (0, 0), (-0.03, 0.03)),
+                        (axes[0, 0], (-0.04, 0.04), (0, 0)), (axes[1, 0], (-0.04, 0.04), (1, 1))):
+        ax.plot(xs, ys_, transform=ax.transAxes, **kw)  # axis-break marks  # fmt: skip
+    h = [plt.Line2D([], [], marker="o", ls="", ms=3.3, mfc=STYLE[k][1], mec="black", mew=0.3)
+         for k, *_ in series]  # fmt: skip
+    h += [plt.Line2D([], [], marker="_", ls="", ms=6, color="black", mew=1.1),
+          plt.Line2D([], [], marker="o", ls="", ms=3.3, mfc="white", mec="#555555", mew=0.7)]
+    labs = [s[1] for s in series] + ["mean of the seeds", "size computed, not run"]
+    fig.legend(h, labs, loc="lower center", ncol=2, frameon=False, handletextpad=0.2,
+               columnspacing=0.8, labelspacing=0.2, borderaxespad=0.1)  # fmt: skip
+    fig.subplots_adjust(left=0.12, right=0.985, top=0.98, bottom=0.37)
+    save(fig, "memory.pdf")
+    return out
 
 
 def fig_ablation() -> dict:
@@ -907,6 +1007,8 @@ def main() -> None:
     write_perclass_vals(perclass)
     selfcheck(cells, cols, pts, means, dots, traj, counts, spans, perclass)
     selfcheck_p18(fig_ablation(), fig_image_aa(), fig_image_traj(), fig_image_budget())
+    mem = fig_memory()
+    CHECKS.append(f"memory: {len(mem)} points, sizes from make_clean_tables.memory_forms")
     print("self-check passed:\n  " + "\n  ".join(CHECKS))
 
 

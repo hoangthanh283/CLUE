@@ -22,7 +22,9 @@ exact-zero legacy seed was actually dropped.
 
 import json
 import math
+import os
 import re
+from functools import lru_cache
 from glob import glob
 from pathlib import Path
 
@@ -300,7 +302,8 @@ ROW_LABEL = {"naive": "Naive", "nobank": "SBR, no memory", "colar": "CoLaR",
              "colar_mib": "CoLaR + MiB-style unbiased CE (shared softmax)",
              "er_sbr": "Raw-document memory + SBR", "cl_lora": "CL-LoRA",
              "er250": "ER (250 documents)",
-             "sbr_const_o": "CoLaR-SBR, constant background logit", "ice_o": "ICE-O (our port)"}  # fmt: skip
+             "sbr_const_o": "CoLaR-SBR, constant background logit", "ice_o": "ICE-O (our port)",
+             "sbr_r32": "CoLaR-SBR, rank 32", "sbr_r64": "CoLaR-SBR, rank 64"}  # fmt: skip
 
 
 def write_perseed():
@@ -762,8 +765,14 @@ ICE_O_NAME = "cil_cord_ice_o"  # ICE-O port: frozen encoder, head per session, c
 #   colar_mib "partly": above CoLaR and below joint training on every seed, both metrics.
 #   ice_o "partly": final row within 1 point of its diagonal (nothing forgotten), but below
 #     SBR-Recall on every seed, both metrics (the frozen encoder does not learn the sessions).
-SLOT_VERDICT = {"er_sbr": "", "oracle_pre": "supports", "colar_mib": "partly", "sbr_constbg": "",
-                "ice_o": "partly"}  # fmt: skip
+# D (2026-11-14), three clean seeds each:
+#   er_sbr "refutes" (H0's "raw beats compressed"): under the same blocked readout the raw
+#     memory is within 3 points of CoLaR-SBR on every seed and not above it on every seed, both
+#     metrics.
+#   sbr_constbg "partly": above CoLaR (shared softmax) and below joint training on every seed,
+#     both metrics, but below CoLaR-SBR on seeds 42/7 and above on 123 (no per-seed order).
+SLOT_VERDICT = {"er_sbr": "refutes", "oracle_pre": "supports", "colar_mib": "partly",
+                "sbr_constbg": "partly", "ice_o": "partly"}  # fmt: skip
 MIX_RECALL_NOMEM = (GATE, "mixed_colar_sbr_recall_r64b", "*")  # seed 42, fp32 gate, legacy
 MIX_RECALL_MEM = (GATE, "mixed_colar_sbr_recall_r64c", "*")
 LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, verdict, min_n)
@@ -862,6 +871,11 @@ def verdict_ok(key: str, verdict: str) -> bool | None:
                                              enumerate(_ctrl(ICE_O_NAME)) for s in SEEDS], n3)
         and _every([float(np.max(np.abs(m[-1] - np.diag(m)))) < 1.0
                     for m in matrices_by_seed(src(ICE_O_NAME)).values()], len(SEEDS)),
+        ("er_sbr", "refutes"): lambda: _every([abs(x[s] - c["sbr"][j][s]) < 3 for j, x in
+                                               enumerate(_ctrl("cil_cord_er_sbr")) for s in SEEDS], n3)
+        and all(any(x[s] <= c["sbr"][j][s] for s in SEEDS) for j, x in enumerate(_ctrl("cil_cord_er_sbr"))),
+        ("sbr_constbg", "partly"): lambda: _every([c["colar"][j][s] < x[s] < c["joint"][j][s] for j, x in
+                                                   enumerate(_ctrl(SBR_CONSTBG_NAME)) for s in SEEDS], n3),
     }  # fmt: skip
     f = checks.get((key, verdict))
     if f is None:
@@ -1439,6 +1453,7 @@ ABLATION = (  # (label, key, memory, blocked, deltas, true labels)
     ("+ memory (CoLaR)", "colar", 1, 0, 0, 0),
     ("+ blocked readout", "nobank", 0, 1, 0, 0),
     ("+ both (CoLaR-SBR)", "sbr", 1, 1, 0, 0),
+    ("+ both, raw memory", "er_sbr", 1, 1, 0, 0),
     ("SBR-Recall", "recall", 0, 1, 1, 0),
     ("Relabel, boundary$^{r}$", "oracle", 1, 0, 0, 1),
     ("Relabel, pre-session$^{r}$", "oracle_pre", 1, 0, 0, 1),
@@ -1449,6 +1464,8 @@ ABLATION = (  # (label, key, memory, blocked, deltas, true labels)
 def _abl_sources(key):
     if key == "oracle_pre":
         return [(CLEAN, ORACLE_PRE_NAME, "*")]
+    if key == "er_sbr":
+        return [(CLEAN, "cil_cord_er_sbr", "")]
     return [ORACLE_CLEAN] if key == "oracle" else [C[key][0]]
 
 
@@ -1535,6 +1552,252 @@ def control_macros() -> str:
     return t + _defs(v)
 
 
+# ---------------------------------------------------------------------------- memory cost
+# What every storage form costs on CIL-CORD (plan rippling-pondering-comet s.2; 1 KB = 1e3 B,
+# 1 MB = 1e6 B). Recorded sizes are ``replay_memory_bytes``; computed sizes use the formulas of
+# the methods' ``memory_bytes()`` on the tensor shapes er_sbr really banks, and
+# ``memory_selfcheck`` fails the generator when a formula does not reproduce a run's bytes.
+LV3_HIDDEN, LV3_LAYERS, LV3_PATCH = 768, 12, 16  # configs/model/layoutlmv3_base.yaml; 16 px patches
+# SessionLoRA sites per plastic layer for target_modules [query,key,value,dense] (d_in, d_out):
+# query, key, value, attention.output.dense, intermediate.dense, output.dense
+RECALL_SITES = ((768, 768),) * 4 + ((768, 3072), (3072, 768))
+MEM_RANKS = (32, 64)  # CoLaR-SBR rank sweep (v13 queue), shown once all three seeds exist
+SBR_NAME, ER_SBR_NAME = "cil_cord_colar_sbr", "cil_cord_er_sbr"
+RECALL_NAME = "cil_cord_colar_sbr_recall_r64"
+
+
+@lru_cache(maxsize=1)
+def raw_doc_tensors() -> dict[str, tuple[tuple[int, ...], int]]:
+    """{key: (shape, bytes per element)} of one document exactly as er_sbr banks it: the
+    LayoutLMv3 processor output (padded to max_length, so shapes do not depend on the page) for
+    ``er_sbr._RAW_KEYS``, plus the int64 session id. CPU only, no model weights."""
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    import torch
+    from PIL import Image
+
+    from doccl.data.encoders import LayoutLMv3Encoder
+    from doccl.methods.er_sbr import _RAW_KEYS
+
+    enc = LayoutLMv3Encoder().encode(Image.new("RGB", (64, 64)), ["a"], [[0, 0, 1, 1]], [0])
+    out = {k: (tuple(enc[k].shape), enc[k].element_size()) for k in _RAW_KEYS if k in enc}
+    sid = torch.tensor(0)  # er_sbr: doc["session"] = torch.tensor(self._cur_session)
+    out["session"] = (tuple(sid.shape), sid.element_size())
+    return out
+
+
+def _nbytes(shape_es) -> int:
+    return math.prod(shape_es[0]) * shape_es[1]
+
+
+def doc_bytes() -> dict[str, int]:
+    """Per-document bytes of each document form, and the layer-k sequence length."""
+    t = raw_doc_tensors()
+    raw = sum(_nbytes(x) for x in t.values())
+    # 8-bit raw (computed, never run): pixel_values as uint8 at the processor's resolution (the
+    # source images are 8-bit, so this loses only the normalisation's rounding); every other
+    # tensor and the session id unchanged (int64).
+    pix_shape, pix_es = t["pixel_values"]
+    raw8 = raw - math.prod(pix_shape) * (pix_es - 1)
+    # latent memories keep bbox / attention_mask / labels as int64 and no token ids (colar.py)
+    aux = sum(math.prod(t[k][0]) * 8 for k in ("bbox", "attention_mask", "labels"))
+    tokens = t["input_ids"][0][0] + (pix_shape[1] // LV3_PATCH) * (pix_shape[2] // LV3_PATCH) + 1
+    return {"raw": raw, "raw8": raw8, "aux": aux, "tokens": tokens,
+            "latent": tokens * LV3_HIDDEN * 2 + aux}  # fmt: skip
+
+
+def colar_doc_bytes(rank: int, sbr: bool) -> int:
+    """colar.py memory_bytes per document: fp16 factors U*S (T x r) and V (r x d), + aux; SBR adds
+    a 1-byte block id (colar_sbr.py)."""
+    d = doc_bytes()
+    return 2 * rank * (d["tokens"] + LV3_HIDDEN) + d["aux"] + int(sbr)
+
+
+def recall_session_params(meta: dict) -> int:
+    """Parameters of one SBR-Recall session delta: every site of layers split_layer_k..11."""
+    hp = meta["method_hparams"]
+    plastic = LV3_LAYERS - int(hp["split_layer_k"])
+    return plastic * int(hp["lora_rank"]) * sum(i + o for i, o in RECALL_SITES)
+
+
+def _metas(name: str, suffix: str = "*") -> dict[int, dict]:
+    """{seed: metrics.json} of a clean CIL-CORD run family."""
+    out = {}
+    for s in SEEDS:
+        f = _run_file(CLEAN, name, s, suffix, "metrics.json")
+        if f:
+            out[s] = json.loads(f.read_text())
+    return out
+
+
+def _n_docs(meta: dict) -> int:
+    return int(meta["method_hparams"]["docs_per_task"]) * int(meta["num_tasks"])
+
+
+def queue_hours(name: str) -> dict[int, float]:
+    """{seed: wall-clock hours} from queue.log START/DONE pairs of ``<name>_seed<s>``, for
+    uninterrupted runs only: one START line for the run, closed by its DONE, and no other START
+    in between (a run whose driver was swapped keeps running and counts if its DONE was logged)."""
+    from datetime import datetime
+
+    q = Path(CLEAN) / "queue.log"
+    if not q.exists():
+        return {}
+    ev = []
+    for line in q.read_text().splitlines():
+        m = re.match(r"(\d\d-\d\d \d\d:\d\d) (START|DONE|FAIL)\s+(\S+)$", line)
+        if m:
+            ev.append((datetime.strptime("2026-" + m[1], "%Y-%m-%d %H:%M"), m[2], m[3]))
+    out = {}
+    for s in SEEDS:
+        run = f"{name}_seed{s}"
+        starts = [i for i, e in enumerate(ev) if e[1] == "START" and e[2] == run]
+        if len(starts) != 1:
+            continue
+        i = starts[0]
+        for t, kind, nm in ev[i + 1 :]:
+            if kind == "START":
+                break  # another job started before this one was logged done: not timed
+            if nm == run:
+                if kind == "DONE":
+                    out[s] = (t - ev[i][0]).total_seconds() / 3600
+                break
+    return out
+
+
+def memory_forms() -> list[dict]:
+    """One dict per storage form (rows of supp_memory.tex, points of fig:memory): label, per-unit
+    and total bytes, unit, whether the size is computed (never run in that encoding), what is
+    kept, and the run family it describes (``run``; None when nothing was run)."""
+    d = doc_bytes()
+    sbr, er, rec = _metas(SBR_NAME), _metas(ER_SBR_NAME, ""), _metas(RECALL_NAME)
+    n = _n_docs(next(iter(sbr.values()))) if sbr else 0
+    n_er = _n_docs(next(iter(er.values()))) if er else n
+    forms = [
+        {"key": "latent", "label": "Layer-4 latent, fp16, uncompressed", "unit": d["latent"],
+         "per": "doc", "n": n, "computed": True, "pixels": False, "ids": False, "run": None},
+        {"key": "raw", "label": "Raw document as held (fp32 pixels)", "unit": d["raw"],
+         "per": "doc", "n": n_er, "computed": False, "pixels": True, "ids": True, "run": ER_SBR_NAME},
+        {"key": "raw8", "label": "Raw document, 8-bit pixels", "unit": d["raw8"], "per": "doc",
+         "n": n, "computed": True, "pixels": True, "ids": True, "run": None},
+        {"key": "colar128", "label": "CoLaR rank 128", "unit": colar_doc_bytes(128, True),
+         "per": "doc", "n": n, "computed": False, "pixels": False, "ids": False, "run": SBR_NAME},
+    ]  # fmt: skip
+    for r in MEM_RANKS:
+        name = f"{SBR_NAME}_r{r}"
+        if len(_metas(name)) == len(SEEDS):
+            forms.append({"key": f"colar{r}", "label": f"CoLaR rank {r}", "run": name,
+                          "unit": colar_doc_bytes(r, True), "per": "doc", "n": n,
+                          "computed": False, "pixels": False, "ids": False})  # fmt: skip
+    if rec:
+        m = next(iter(rec.values()))
+        p, ns = recall_session_params(m), int(m["num_tasks"]) - 1  # session 1 trains the base
+        for prec, b, comp, run in (("fp16", 2, True, None), ("fp32, as trained", 4, False, RECALL_NAME)):
+            forms.append({"key": f"recall{8 * b}", "label": f"SBR-Recall deltas, {prec}",
+                          "unit": p * b, "per": "session", "n": ns, "computed": comp,
+                          "pixels": False, "ids": False, "run": run})  # fmt: skip
+    for f in forms:
+        f["total"] = f["unit"] * f["n"]
+    return forms
+
+
+def memory_selfcheck() -> list[str]:
+    """Fail the generator unless every formula reproduces ``replay_memory_bytes`` of every run it
+    describes: CoLaR 2r(T+d)+aux per document (+1 under SBR) for CoLaR, CoLaR-SBR and the rank
+    sweep; the raw tensors for ER-SBR; 2 bytes x delta parameters x (T-1) for SBR-Recall."""
+    errs, ok = [], []
+    fams = [("cil_cord_colar", False, "*"), (SBR_NAME, True, "*")]
+    fams += [(f"{SBR_NAME}_r{r}", True, "*") for r in MEM_RANKS]
+    for name, sbr, sfx in fams:
+        for s, m in _metas(name, sfx).items():
+            want = colar_doc_bytes(int(m["method_hparams"]["rank_r"]), sbr) * _n_docs(m)
+            (ok if m["replay_memory_bytes"] == want else errs).append(
+                f"{name} seed {s}: recorded {m['replay_memory_bytes']}, formula {want}")
+    for s, m in _metas(ER_SBR_NAME, "").items():
+        want = doc_bytes()["raw"] * _n_docs(m)
+        (ok if m["replay_memory_bytes"] == want else errs).append(
+            f"{ER_SBR_NAME} seed {s}: recorded {m['replay_memory_bytes']}, formula {want}")
+    for s, m in _metas(RECALL_NAME).items():
+        want = 2 * recall_session_params(m) * (int(m["num_tasks"]) - 1)
+        if _n_docs(m):
+            errs.append(f"{RECALL_NAME} seed {s}: has a document memory, formula covers deltas only")
+        (ok if m["replay_memory_bytes"] == want else errs).append(
+            f"{RECALL_NAME} seed {s}: recorded {m['replay_memory_bytes']}, formula {want}")
+    if errs or not ok:
+        raise SystemExit("make_clean_tables: memory byte self-check failed:\n  " + "\n  ".join(errs or ["no run checked"]))  # fmt: skip
+    return ok
+
+
+def _signed(x: float, lo: bool) -> str:
+    """A signed bound rounded outward (lo: down), with a math minus for the prose."""
+    s = down1(x) if lo else up1(x)
+    return s.replace("-", "$-$") if s.startswith("-") else "+" + s
+
+
+def write_memory() -> str:
+    """supp_memory.tex (one row per storage form) and the memory macros for vals.tex."""
+    checked = memory_selfcheck()
+    forms = memory_forms()
+    yn = ("no", "yes")
+    t = HDR + "\\begin{tabular}{@{}lccccccc@{}}\n\\toprule\n"
+    t += ("Storage form & Per unit & Total MB & Pixels & Token ids & Trainable (M) & "
+          "Peak GPU MB & h/run \\\\\n\\midrule\n")  # fmt: skip
+    for f in forms:
+        unit = (f"{f['unit'] / 1e3:.1f}\\,KB/doc" if f["per"] == "doc"
+                else f"{f['unit'] / 1e6:.1f}\\,MB/session")  # fmt: skip
+        tr = pk = hr = "--"
+        if f["run"]:
+            ms = _metas(f["run"], "" if f["run"] == ER_SBR_NAME else "*")
+            tr = f"{max(m['trainable_params'] for m in ms.values()) / 1e6:.1f}"
+            pk = f"{max(m['peak_gpu_mem_mb'] for m in ms.values()):.0f}"
+            h = queue_hours(f["run"])
+            hr = (f"{np.mean(list(h.values())):.1f}" + ("" if len(h) == len(SEEDS) else f"$^{{n={len(h)}}}$")
+                  if h else "--")  # fmt: skip
+        lab = f["label"] + (" (computed)" if f["computed"] else "")
+        t += (f"{lab} & {unit} & {f['total'] / 1e6:.1f} & {yn[f['pixels']]} & {yn[f['ids']]} & "
+              f"{tr} & {pk} & {hr} \\\\\n")  # fmt: skip
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "supp_memory.tex").write_text(t)
+
+    by = {f["key"]: f for f in forms}
+    v = {}
+    for k, nm in (("latent", "Latent"), ("raw", "Raw"), ("raw8", "RawEight"), ("colar128", "Colar")):
+        v[f"nMem{nm}KB"] = f"{by[k]['unit'] / 1e3:.1f}"
+        v[f"nMem{nm}MB"] = f"{by[k]['total'] / 1e6:.1f}"
+    for r, nm in zip(MEM_RANKS, ("ThirtyTwo", "SixtyFour"), strict=True):  # computed sizes, any time
+        v[f"nMemColar{nm}KB"] = f"{colar_doc_bytes(r, True) / 1e3:.1f}"
+        v[f"nMemColar{nm}MB"] = f"{colar_doc_bytes(r, True) * by['colar128']['n'] / 1e6:.1f}"
+    v["nMemLatentOverColar"] = f"{by['latent']['unit'] / by['colar128']['unit']:.1f}"
+    v["nMemRawOverColar"] = f"{by['raw']['unit'] / by['colar128']['unit']:.1f}"
+    v["nMemColarOverRawEight"] = f"{by['colar128']['unit'] / by['raw8']['unit']:.1f}"
+    for k, nm in (("recall16", "Recall"), ("recall32", "RecallFp")):
+        f = by.get(k)
+        v[f"nMem{nm}MB"] = f"{f['total'] / 1e6:.1f}" if f else "--"
+        v[f"nMem{nm}SessMB"] = f"{f['unit'] / 1e6:.1f}" if f else "--"
+    tp = {nm: max(m["trainable_params"] for m in _metas(n, sfx).values())
+          for nm, n, sfx in (("sbr", SBR_NAME, "*"), ("er", ER_SBR_NAME, ""), ("rec", RECALL_NAME, "*"))}  # fmt: skip
+    v["nMemTrainSbrPct"] = f"{100 * tp['sbr'] / tp['er']:.0f}"  # CoLaR-SBR / whole network
+    v["nMemTrainFewerPct"] = f"{100 - 100 * tp['sbr'] / tp['er']:.0f}"
+    v["nMemTrainRecallPct"] = f"{100 * tp['rec'] / tp['er']:.1f}"
+    for run, nm in ((SBR_NAME, "Sbr"), (ER_SBR_NAME, "ErSbr"), (RECALL_NAME, "Recall")):
+        h = queue_hours(run)
+        v[f"nMemHours{nm}"] = _per_seed(h, [s for s in SEEDS if s in h])
+        v[f"nMemHours{nm}N"] = str(len(h))
+    # ER-SBR (raw memory, blocked readout) against CoLaR-SBR, seed-matched, both metrics
+    out = ""
+    for key, nm in (("AA", "Aa"), ("full_label_f1", "Full")):
+        e, s = load_seeds(CLEAN, ER_SBR_NAME, key, ""), _clean("sbr", key)
+        out += macro("ErSbr" + ("Full" if key != "AA" else ""), list(e.values()))
+        dd = [e[x] - s[x] for x in SEEDS if x in e and x in s]
+        v[f"nErSbrDiff{nm}Min"] = _signed(min(dd), True) if dd else "--"
+        v[f"nErSbrDiff{nm}Max"] = _signed(max(dd), False) if dd else "--"
+    for r, nm in zip(MEM_RANKS, ("ThirtyTwo", "SixtyFour"), strict=True):  # rule 6: 3 seeds or --
+        for key, suf in (("AA", ""), ("full_label_f1", "Full")):
+            vs = load_seeds(CLEAN, f"{SBR_NAME}_r{r}", key)
+            out += macro(f"SbrRank{nm}{suf}", list(vs.values()) if len(vs) == len(SEEDS) else [])
+    print("memory self-check passed:", len(checked), "runs")
+    return out + _defs(v)
+
+
 def main():
     cell = {k: pick(v) for k, v in C.items()}
     mix = {k: pick(v) for k, v in M.items()}
@@ -1572,7 +1835,7 @@ def main():
     v += f"\\newcommand{{\\nErCilBuf}}{{{250 if er_src and er_src[0] == CLEAN else 200}}}\n"
     v += recall_macros() + oracle_macros() + conflict_macros() + agree_macros()
     v += baseline_macros() + gap_macros() + write_mechanism() + write_dropped()
-    v += ablation_macros() + control_macros()
+    v += ablation_macros() + control_macros() + write_memory()
     (OUT / "vals.tex").write_text(v)
     write_ladder()
     write_beyond()
