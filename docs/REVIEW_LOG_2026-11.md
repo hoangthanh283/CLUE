@@ -5007,3 +5007,100 @@ Scores:
   6, giving about 5.6.
 - Moving to Accept still needs E1, which is landing now, and a true mask-only oracle (R18 E2b, about 6 h with Dev's
   `oracle_mask` mode).
+
+## R19b (2026-11-14): confirmation of P30 (`f849c93`, on Dev `51ad864` + `5e484b4`) against R19
+
+Scope:
+- `git show 51ad864 5e484b4 f849c93`, with a word-diff of main.tex and supp_body.tex against `e9ed0b1`.
+- HEAD built from `git archive` in a scratch dir (`latexmk -pdf`, no `-C`) and split with `make_submission.sh`. Both
+  outputs are text-identical to the committed `submission/*.pdf`.
+- Both generators re-run.
+- `matrix.npy` of the three sliced runs read.
+
+### Verdict: **PASS** (no HIGH; one MEDIUM, a one-token fix to make before the upload)
+
+| R19 | Status |
+|---|---|
+| H1 | **Fixed.** |
+| H2 | **Fixed.** |
+| M1 | **Fixed.** |
+| L1 | **Fixed.** |
+| L2 | **Fixed.** |
+| L3 | **Fixed.** |
+| L4 (= R18 L2/L3) | Still open (no room on p. 8). LOW. |
+
+**H1 (sliced wording).**
+- The sliced text has moved from H1 to H2.
+- H2 Test: "later classes are no longer pushed down, but its stale tokens still train the shared ``O'' logit".
+- H2 Result: "reaches only 45.9 full-label F1 (19 to 29% of the gap), above CoLaR and below the MiB-style loss on every
+  seed under both metrics, and trains unstably (App. D). Hence a softmax slice does not recover the oracle's gain; whether
+  removing the stale tokens altogether would is untested."
+- H1 now only says the refresh also adds labels for the current classes and points to H2.
+- Abstract: "a softmax slice of the replay loss, which leaves the stale ``O'' targets in place". Conclusion: "not by a
+  softmax slice of the replay loss".
+- No sentence anywhere still says "removing the stale O pressure" or "needs true current-class labels". The
+  per-seed facts are as recomputed in R19.
+
+**H2 (compression floor).** main.tex:224 now reads "Above a compression floor, bytes do not separate the methods; ... every
+store we ran at full rank (rank-128 latent or raw documents, or deltas) ends within 5.3 ... through the learned-background
+blocked readout". This is true: max gaps 5.25 / 4.38 / 0.17, and rank 32 is excluded and reported next.
+
+**M1 (ladder row).**
+- The row "replay softmax sliced, stale ``O'' kept" now sits in the H2 group after the MiB row, with verdict "partly".
+- The check is unchanged and holds on every seed under both metrics: CoLaR < x < min(joint, pre).
+- "Partly" against H2's prediction (a label-free loss repair closes the gap) fits.
+- Fig. 2a puts its "sliced replay" bar in the H2 group. Rendered and checked.
+
+**L1, L2, L3.**
+- L1: "below plain CoLaR in full-label F1 on every seed".
+- L2: the `fig:memory` connector is dashed, and the caption says so.
+- L3: Limitations reads "while at rank 32, below that size, it loses most of its accuracy".
+
+**App. D H2 (seed-specific statements, checked against `matrix.npy`).**
+- "Later sessions are barely learned on seeds 7 and 123" is true:
+  - Seed 7: diagonal for sessions 3/4/5 is 0.0 / 11.6 / 4.0.
+  - Seed 123: sessions 4/5 are 22.9 / 18.5; session 3 learned to 87.0.
+- "On seed 42 the first session, which holds `\mSessOneShare` (57)% of the test spans, ends low while the last ends high"
+  is true: final row 12.3 ... 87.8.
+- "Validation F1 can collapse after its peak" matches the logs (seed 42 T1 97.1 -> 49.0, T4 87.6 -> 6.8).
+- "At least 33.8 points below the pre-session refresh under either metric" is true.
+
+**`\vOracleMask*`.** Defined as "--" in vals.tex and cited nowhere in main.tex or supp_body.tex.
+
+**Mask-only oracle (`5e484b4`), sanity look.**
+- `mask_refresh` sets to -100 exactly the positions where `oracle_refresh` would change a stored label, which is "an O
+  whose true class is in the head now".
+- That range is broader than my R18 range `n_capture <= labels_full < n_current`, and it is the right one. A CIL page of
+  session s labels every out-of-session entity "O", earlier ones included (CORD's `_filter_by_labels` masks all of them).
+  The oracle relabels those earlier-class tokens as positives too, so the exact counterpart must mask them as well.
+- Classes not yet in the head stay "O" in both arms, so the two runs differ only in true label against ignore, token by
+  token.
+- `refresh_before_task` and the after-task refresh match `colar_r_oracle_pre`. The pass is idempotent.
+- I see no reason it is the wrong control. One limitation for the write-up: masked tokens also stop training
+  O-vs-capture-time classes on those positions, which the oracle keeps (as positives). The text should call it "the false
+  negatives removed, no label added".
+
+**Form.**
+- Main text ends p. 8, References pp. 9-10, appendix pp. 11-16 (6 pp.).
+- main and supp exit 0 with 0 undefined, 0 multiply-defined, 0 overfull, 0 "??". No `---`.
+- The LLM Usage Statement is unchanged (diff context lines only).
+- `make_clean_tables.py` exits 0 ("memory self-check passed: 15 runs"); every generated `.tex` is unchanged.
+- `make_paper_figs.py` exits 0. Its figure PDFs changed in metadata only and were restored.
+- Queue v16 was running (CIL-FUNSD oracle-pre seed 123) and left alone.
+
+### MEDIUM
+
+- **R19b-M1. The abstract prints "recovers only 19to29%".**
+  - main.tex:59 has `$\nSlicedShareFull\%$`. The macro is the text "19 to 29", and math mode drops the spaces. This was
+    already in P29, and I missed it in R19.
+  - After P30's cut, the clause also no longer says "of the gap".
+  - Fix: "recovers only \nSlicedShareFull\% of the gap" in text mode, with no `$...$`.
+  - No other range macro (`\nOracleShare*`, `\nMibShare*`, `\nSlicedShare*`, `\nOracleLast`) is used in math mode. The
+    only other math-mode share, `\nOracleLastShare`, is a single number.
+
+### LOW
+
+- **R19b-L1 (watch).** H2's "whether removing the stale tokens altogether would is untested" becomes false once
+  `colar_r_oracle_mask_pre` lands (queued, v16). Rewrite that sentence from the generated `\vOracleMask*` macros when all
+  three seeds exist, and give the ladder a row for it.
+- **R19b-L2.** R18 L2/L3 are still open.
