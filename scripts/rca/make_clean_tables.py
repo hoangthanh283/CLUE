@@ -827,6 +827,16 @@ def _gap_share(a: dict, lo: dict, hi: dict) -> list[float]:
     return [(a[s] - lo[s]) / (hi[s] - lo[s]) for s in SEEDS]
 
 
+def cord_test_docs() -> str:
+    """Number of CORD test documents, from the HF datasets cache metadata of naver-clova-ix/cord-v2
+    (dataset_info.json, no data loaded). "--" when the cache is absent on this machine."""
+    hits = glob(os.path.expanduser(
+        "~/.cache/huggingface/datasets/naver-clova-ix___cord-v2/*/*/*/dataset_info.json"))  # fmt: skip
+    if not hits:
+        return "--"
+    return str(json.loads(Path(hits[0]).read_text())["splits"]["test"]["num_examples"])
+
+
 def _every(conds: list[bool], n: int) -> bool:
     """True only when exactly ``n`` conditions were evaluated and all hold (no vacuous all([]))."""
     return len(conds) == n and all(conds)
@@ -1054,6 +1064,7 @@ def write_mechanism() -> str:
     spans = res.get("gold_spans_per_session_test_split") or []
     v["mSessOneShare"] = f"{100 * spans[0] / sum(spans):.0f}" if spans else "--"
     v["mTestSpans"] = f"{sum(spans):,}".replace(",", "{,}") if spans else "--"
+    v["nCordTestDocs"] = cord_test_docs()  # P28 (R17-W2): test-set size, read, not typed
     # pooled per-session own-class counts vs the full-label F1 of the same final model
     gaps, gaps_nb, missed_o, last, imp_p, nb_bound, old_p_lb = [], [], [], [], [], [], []
     for r in res.get("runs", {}).values():
