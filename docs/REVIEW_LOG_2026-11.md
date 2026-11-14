@@ -4603,3 +4603,229 @@ clean protocol and kept it at 2 and Overall at 3, since the impact objection sta
   - Freeze is Nov 17 07:00.
   - E1 costs about 2-3 h of GPU time, E2 about 6 h.
   - Otherwise submit with the W-fixes as a borderline paper.
+
+## R18 (2026-11-14): loop iteration 2, confirmation of P28 (`160eed1`) and three-persona self-review
+
+Scope:
+- `git show 160eed1`, with a word-diff of main.tex and supp_body.tex.
+- HEAD built from `git archive` in a scratch dir and split with `make_submission.sh`. Both outputs are text-identical to
+  the committed `submission/main_paper.pdf` and `supplementary.pdf`.
+- Both generators re-run.
+- Run files: `results/clean_2026-11/*/metrics.json`, `results/rescore/cil_cord_naive_seed*`, and the CORD HF cache
+  metadata.
+
+### (a) Confirmation of P28: **PASS** (no HIGH, no MEDIUM; five LOW)
+
+| R17 | Status |
+|---|---|
+| W1 | **Fixed.** |
+| W2 | **Fixed.** |
+| W3 | **Fixed.** |
+| W4 | **Fixed.** |
+| W5/W8 | **Fixed.** |
+| W6 | **Fixed.** |
+| W7 | **Fixed (abstract).** The title is unchanged, which is the user's call. |
+| W9 | **Fixed.** |
+| W10 | **Fixed.** |
+| G1 | **Fixed.** |
+| G2 | Skipped (appendix at 6 pp.). Acceptable. |
+
+**W1 (oracle wording).**
+- The abstract, intro, H1 (:140) and Conclusion now say "true stored labels" (an oracle).
+- The abstract and H1 say the refresh also adds labels for the current classes, so it does not isolate the false "O"
+  labels.
+- H1 adds "A repair that only removes the false negatives within a shared softmax recovers about half of the full-label
+  gap (H2)". That is true: the MiB-style loss removes the false negatives on both sides and adds no positive, at
+  46 to 49%.
+- §5: the principle is "which the per-session readout implements and H3 supports, partly as an explanation".
+
+**W2 (statistical scope).**
+- Limitations states three seeds, one test set of `\nCordTestDocs` receipts, "same sign on all three, not significance",
+  the three sub-2-point comparisons, and the replay ratio.
+- `\nCordTestDocs` = 100. It is read from `dataset_info.json` of `naver-clova-ix/cord-v2`, whose splits are train 800,
+  validation 100, test 100, and it matches Tab. 2.
+
+**W3, W4, W5/W8, W6, W9, W10.**
+- W3: "state what each hypothesis predicts before reporting its test" (abstract, intro).
+- W4: replay ratio, "four stored documents per current batch of two". Every clean memory run has
+  `replay_batch_size` 4 and batch size 2: CoLaR, both relabel oracles, MiB, constant background, raw memory + SBR,
+  Mixed CoLaR-SBR. The exception is in L2.
+- W5/W8: §4 now defines the verdict words, the blocked readout, block, claim and owning block (see L1).
+- W6: "our ports of ... do no better under the same protocol"; §7 "All baselines are our ports, none checked against
+  published numbers".
+- W9: "at the price of one inference pass per session (five on CIL-CORD; \cref{app:method})".
+- W10: DIL statement "(legacy protocol)", grammar fixed.
+
+**G1 (figure labels and tick sizes).**
+- Fig. 2a: "relabel, boundary" / "relabel, pre-session", "raw mem.$^w$ + SBR"; the caption defines w.
+- Tick labels in panels (b) and (c) are **6.5 pt at print size**, as the Paper agent says.
+  - Each panel PDF is 123.84 pt wide, placed at 0.25 x 495 pt = 123.75 pt, a scale of 1.00.
+  - `xtick.labelsize` is 6.5.
+  - The panel (c) legend is 6 pt.
+
+**Moves into the new App. D "Rung details".** Every number cut from the body is there, with its macro:
+- H0: `mColarRMin/Max`, `mColarOldPLb`.
+- H1: `nColarSeed`, `nOracle`, `nOracleShare`, `nJointSeedFull`, `nJointSeed`, `nOracleLateMin/Max`, `nOracleNextMin/Max`,
+  `nOracleLast`, `nOracleLastShare`, `vOraclePre`.
+- H2: `vMib`, `nMibShare`, `nMibDiagMin`, `nMibFirstMax`.
+- H3: `vSbr`, `mSbrOwner*`, `mSbrSame*`, `vNoBank`, `mNoBankOther*`, `mNoBankFalse*`, `mSbrFalse*`.
+- H4: `mRecallOwner*`.
+- Each body sentence that lost a number now points to App. D.
+
+**"Four end below naive training on every seed."**
+- The four are legacy cells with two seeds each: CODA 14.0 / 15.9, CPFD 2.7 / 0.0, IS3 5.6 / 7.7, LCA 13.7 / 7.0.
+- They are below clean naive (18.8 / 18.3 / 17.8) and also below legacy naive (18.97 / 19.08 / 18.60), seed by seed.
+- So the statement holds under either protocol. Only its wording needs a tweak (L3).
+
+**Verdict words against `tab:ladder`.**
+- supports, refutes, partly, does not support and open are all used, and each use matches its definition.
+- "not needed" appears only in the H2 heading.
+- One overlap remains (L1).
+
+**Abstract.** About 290 words, up from about 250. It still reads in order, but it is long for CVPR (L4).
+
+**Form.**
+- Main text ends p. 8, References pp. 9-10, appendix pp. 11-16 (6 pp.).
+- main and supp exit 0 with 0 undefined, 0 multiply-defined, 0 overfull, 0 "??". No `---`.
+- `make_submission.sh` gives 10 + 6 pp.
+- `make_clean_tables.py` exits 0 ("memory self-check passed: 12 runs"); every generated `.tex` is unchanged.
+- `make_paper_figs.py` exits 0. Its figure PDFs changed in metadata only (pixel-identical) and were restored.
+
+**LOW findings**
+
+- **R18-L1** §4 :113. "partly" ("holds in part") and "does not support" ("does not hold on every seed") overlap: the raw
+  row holds on one seed of three. Write "*partly*: on every seed part of the predicted effect appears; *does not
+  support*: the predicted effect does not appear consistently across the seeds".
+- **R18-L2** Setup :107. "memory runs replay four stored documents per current batch of two". The legacy ER cell
+  replays eight (`results/rescore/cil_cord_er_seed42`: `replay_batch_size` 8, batch 2), and so may DER++. Write "our
+  memory runs (the CoLaR family and the raw memory with SBR) replay four ...".
+- **R18-L3** §7 :224. Write "four (CODA-Prompt, CPFD, IS3, LCA) end below naive training on each of their two legacy
+  seeds, under either protocol's naive run", so a reader does not pair a legacy cell with a clean seed set.
+- **R18-L4** abstract :59. Trim it to about 230 words. Merge "We treat this failure as an investigation rather than a
+  method" into the first sentence, and move "(88.4 with raw documents in its place)" to the intro.
+- **R18-L5** `make_clean_tables.py` `cord_test_docs()`. It writes "--" when the HF cache is absent, which would print
+  "one test set of -- CORD receipts". The committed vals.tex is correct. The fallback could be 100 with a WARNING
+  instead.
+
+### (b) Three-persona self-review of the paper as it now stands
+
+Same procedure as R17: NeurIPS form, up to three reflection rounds, all three personas converge by round 2.
+
+- **R1, harsh but fair.** The oracle is now described as what it is. The statistical scope is stated. §4 reads in one
+  pass with one number per Result paragraph.
+  - Remaining: every control on one stream and one backbone; the mechanism is not isolated (E2).
+  - Overall 5, Soundness 3, Presentation 3, Clarity 3, Quality 3, Contribution 2, Originality 2, Significance 2,
+    Confidence 4. **Accept.**
+- **R2, harsh and critical.** Claims are now proportionate and the legacy comparison is honest.
+  - Remaining: narrow scope for CVPR (one dataset of 100 test receipts, one backbone for the controls); ingredients
+    known; mechanism not isolated; comparison cells are legacy ports.
+  - Overall 4, Soundness 3, Presentation 3, Clarity 3, Quality 2, Contribution 2, Originality 1, Significance 1,
+    Confidence 4. **Reject.**
+- **R3, open-minded.** The decomposition, the principle and the error-routing diagnostic are useful. It would like the
+  principle tested in isolation.
+  - Overall 6, Soundness 3, Presentation 3, Clarity 3, Quality 3, Contribution 3, Originality 3, Significance 3,
+    Confidence 3. **Accept.**
+
+| Dimension | R1 | R2 | R3 | Avg |
+|---|---|---|---|---|
+| Overall (/10) | 5 | 4 | 6 | 5.00 |
+| Contribution (/4) | 2 | 2 | 3 | 2.33 |
+| Presentation (/4) | 3 | 3 | 3 | 3.00 |
+| Soundness (/4) | 3 | 3 | 3 | 3.00 |
+| Originality (/4) | 2 | 1 | 3 | 2.00 |
+| Quality (/4) | 3 | 2 | 3 | 2.67 |
+| Clarity (/4) | 3 | 3 | 3 | 3.00 |
+| Significance (/4) | 2 | 1 | 3 | 2.00 |
+| Confidence (/5) | 4 | 4 | 3 | 3.67 |
+
+- Weighted: (0.5 + 0.4*0.583 + 0.2*0.75 + 0.1*(0.75+0.733+0.5+0.5+0.75+0.667)) / 2.2 = **5.8/10**, up from 5.4.
+- **Decision: Reject (marginal).** The score is below the ~5.9 bar. The persona decisions are 2 Accept, 1 Reject.
+
+**Strengths (consensus)**
+1. A clean one-factor ladder with per-seed verdicts.
+2. The oracle and the negative controls are now described accurately.
+3. Candid scope, statistics and cost reporting.
+
+**Weaknesses (consensus)**
+1. The controls ran on one stream and one backbone. [E1]
+2. Removing the negatives is not separated from adding positives. [E2]
+3. The comparison cells are legacy ports. [E3, partly queued]
+4. Narrow significance for CVPR. Writing cannot change this.
+
+**Remaining tags**
+- [W]: R18-L1 to L4, all LOW. The title (LOW, the user's decision).
+- [G]: R18-L5, LOW. G2, LOW, optional.
+- [E]: E1, E2 (both HIGH for the decision); E3 (MEDIUM: ER-250, DER++-250, LwF and CL-LoRA clean x3 queued; CPFD, IS3,
+  CODA and LCA not); E4 to E6 (LOW) as in R17.
+
+### Stopping judgement
+
+**No [W] or [G] item at MEDIUM or above remains. The writing loop ends here.**
+- With L1 to L5 fixed, the aggregate does not move: it stays at about 5.8, Reject (marginal).
+- Only E1 and E2 stand between the paper and Accept. If both come back consistent with the current reading, R1 goes to 6
+  and R2 to 5. The weighted score becomes about 6.1 to 6.2, and the decision becomes Accept.
+
+**E1: oracle and constant-background controls on CIL-FUNSD, three seeds each. Not queued.**
+
+1. Prerequisite code change (Dev, one line in `doccl/data/scenarios.py` `build_cil_funsd`):
+   - `_wrap` must accept `full_head` and pass it to `CIL_LabelRemapper` (as in `build_cil_cord`), and
+     `train_dss = _wrap("train", full_head=snapshots[-1])`.
+   - `FUNSDDataset._filter_by_labels` already keeps `ner_tags_full`, and `encode_with_full_labels` already emits
+     `labels_full`, so this one line is enough.
+   - **Trap:** without it, `colar_r_oracle_pre` runs as plain CoLaR. `_oracle_pass` silently skips documents without
+     `labels_full`. Check that the run log shows `colar_r[oracle]: refreshed N docs, M tokens relabelled` with M > 0.
+2. Lines for the v13 driver, inside the CIL-FUNSD block (6b), after its smokes. They use that block's
+   `F="scenario=cil_funsd $L"`, `$LR` and its 10 documents per session:
+   ```
+   run cil_funsd_smoke_colar_r_oracle_pre_e1_seed42 method=colar_r_oracle_pre method.run_alias=smoke_colar_r_oracle_pre_e1 method.docs_per_task=10 $LR1 $FS
+   for s in $S; do run cil_funsd_colar_r_oracle_pre_seed$s method=colar_r_oracle_pre method.docs_per_task=10 $LR $F seed=$s; done
+   for s in $S; do run cil_funsd_colar_sbr_const_o_seed$s method=colar_sbr_const_o method.docs_per_task=10 $LR $F seed=$s; done
+   ```
+3. Expanded single run (seed 42):
+   ```
+   uv run python scripts/train.py method=colar_r_oracle_pre method.docs_per_task=10 method.epochs=10 method.split_layer_k=4 method.rank_r=128 method.replay_batch_size=4 scenario=cil_funsd seed=42 model=layoutlmv3_base training.batch_size=2 training.gradient_checkpointing=true training.num_workers=0 training.amp=false wandb.mode=offline output_dir=results/clean_2026-11 +training.cil_restrict_eval=true +training.val_frac=0.1 +training.full_label_eval=true +training.full_label_dump=true
+   ```
+   The constant-background run is the same with `method=colar_sbr_const_o`.
+4. The comparison cells (CoLaR d10, CoLaR-SBR d10, joint, naive on CIL-FUNSD) are already in block 6b.
+5. Caveat for the paper: CIL-FUNSD has 2 sessions and 50 test forms. It is a weaker second stream, but it is a second
+   dataset, schema and document type.
+6. Cost: about 20 to 30 min per run, so 6 runs take about 2 to 3 h.
+
+**E2: separate removing the false negatives from adding positives, CIL-CORD, three seeds. Not queued.**
+
+- **E2a, no code change (recommended first).** `method=colar_r_sliced` (`refresh: sliced`) computes each stored
+  document's replay CE only over the classes that existed when it was banked (`sliced_replay_loss`). No later class
+  can be pushed towards "O", and no label is added. Its config header states this purpose: it "Isolates 'remove the
+  stale negative gradient' from 'add the new positive label'".
+  ```
+  for s in $S; do run cil_cord_colar_r_sliced_seed$s method=colar_r_sliced method.docs_per_task=50 $LR scenario=cil_cord seed=$s $L; done
+  ```
+  A smoke run (`$LR1`, seed 42) comes first, as usual. About 2 h per run.
+  - Reading:
+    - Near the pre-session oracle (within about 3 points on every seed): the false negatives explain the failure, and
+      the abstract caveat can be dropped.
+    - Near CoLaR or MiB: the oracle's success needs the added positives.
+  - Only a legacy one-seed gate exists (`results/gates/.../cil_cord_colar_r_sliced_seed42_k4_d50_r128`), and it is not
+    a table cell.
+- **E2b, mask-only oracle (exact token-level counterpart of `colar_r_oracle_pre`).** All changes in
+  `doccl/methods/colar_r.py`:
+  1. Add `"oracle_mask"` to `CoLaRRefresh.MODES`, and allow `refresh_before_task` for it (the check in `__init__`).
+  2. In `_capture_task`, keep `labels_full` (int16) for `oracle_mask` as for `oracle`.
+  3. Add `mask_refresh(labels, labels_full, n_capture, n_current)`: return a copy of `labels` with -100 wherever
+     `n_capture <= labels_full < n_current`. These are exactly the tokens `oracle_refresh` would turn into a non-O
+     class, so they drop out of the replay CE, as neither "O" nor positive.
+  4. In `_refresh_memory`, branch `oracle_mask` to a new `_mask_pass(stale, n_cur)`. It must use each document's
+     `d["n_labels"]` as `n_capture` before the loop overwrites it with `n_cur`. The pass is idempotent, since masked
+     tokens stay -100.
+  5. Add `oracle_mask` to the refresh modes in `after_task`.
+  6. Add config `configs/method/colar_r_oracle_mask_pre.yaml`, a copy of `colar_r_oracle_pre.yaml` with
+     `refresh: oracle_mask` and `run_alias: colar_r_oracle_mask_pre`.
+  7. Add a unit test: `mask_refresh` masks exactly the positions where `oracle_refresh` changes a label.
+  8. Run: `for s in $S; do run cil_cord_colar_r_oracle_mask_pre_seed$s method=colar_r_oracle_mask_pre method.docs_per_task=50 $LR scenario=cil_cord seed=$s $L; done`
+     (about 2 h per run).
+- Either E2a or E2b settles R17-W1's open question. E2a needs no Dev code, so it is the cheaper choice before the
+  Nov 17 07:00 freeze.
+
+### Referee view
+
+**Score 3.5, steady.** Self-review weighted score 5.8/10.
