@@ -3885,3 +3885,173 @@ No MEDIUM or LOW findings.
 
 **Score unchanged at 3.5 (Borderline, leaning accept).** The R14b content fixes are correct and honest, and the ICE-O port
 is now presented as a lower bound. What remains is mechanical: the one-line overflow.
+
+## R15 (2026-11-14): audit of 714d558 (memory exhibit, generators), 48dc3f9 (P23) and 4afebd3 (P23b)
+
+Scope: `git diff f17058a..HEAD -- paper_cvpr scripts/rca`. Both PDFs built from `git archive HEAD paper_cvpr` in a
+scratch dir (`latexmk -pdf`, no `-C`). Every number recomputed per seed from `results/clean_2026-11/*/metrics.json`,
+`queue.log`, and the tensor shapes in `doccl/methods/{er_sbr,colar,colar_sbr,latent_replay}.py`.
+
+### Verdict: **BLOCK** (one HIGH, text-only fix)
+
+### Recomputed (seeds 42 / 7 / 123)
+
+**Bytes.** Every size, ratio and macro is correct; no number differs from the paper.
+
+| Form | My count (bytes/doc or /session) | Paper |
+|---|---|---|
+| Raw as held | 3*224^2*4 = 602,112 pixels + 512*7 int64 = 28,672 + 8 (session) = 630,792; x250 = 157.698 MB (= recorded `replay_memory_bytes`) | 630.8 KB, 157.7 MB |
+| Raw, 8-bit pixels | 150,528 + 28,672 + 8 = 179,208; x250 = 44.8 MB | 179.2 KB, 44.8 MB |
+| Latent fp16, uncompressed | T = 512 + 14^2 + 1 = 709; 709*768*2 = 1,089,024 + 24,576 aux = 1,113,600; x250 = 278.4 MB | 1113.6 KB, 278.4 MB |
+| CoLaR r128 (SBR) | 2*128*(709+768) = 378,112 + 24,576 + 1 = 402,689; x250 = 100,672,250 (= recorded) | 402.7 KB, 100.7 MB |
+| CoLaR r64 / r32 (computed) | 213,633 / 119,105; x250 = 53.4 / 29.8 MB | 213.6 / 119.1 KB, 53.4 / 29.8 MB |
+| Record as held (r128) | 378,112 + bbox 16,384 + mask 4,096 + labels 4,096 + labels_full 4,096 + n_labels 8 + session 8 = 406,800 | "406,800 against 402,689" (exact) |
+| SBR-Recall delta | 8*(4*64*1536 + 2*64*3840) = 7,077,888 params; 2 B: 14,155,776/session, x4 = 56,623,104 (= recorded); 4 B: 28.3 / 113.2 MB | 14.2 / 56.6, 28.3 / 113.2 |
+
+- Ratios: 1113.6/402.7 = 2.77 (2.8x), 630.8/402.7 = 1.57 (1.6x), 402.7/179.2 = 2.25 (2.2x).
+- Trainable parameters: CoLaR-SBR 56,753,730 / ER-SBR 125,377,730 = 45.3%, so "55% fewer" holds. SBR-Recall 7,128,642 =
+  7,077,888 delta + 46,909 head + 3,845 background weights (5.7%).
+- Peak GPU: 2666 / 2436 / 2436 MB.
+- Hours from `queue.log`: ER-SBR 3.20 / 2.98 / 2.50 (mean 2.9); SBR-Recall 1.57 / 1.67 / 1.78 (1.7); CoLaR-SBR seed 42 2.02,
+  the only uninterrupted run (n=1). `metrics.json:total_wall_time_s` exists for all three CoLaR-SBR seeds
+  (1.95 / 2.27 / 2.00 h). No sentence compares run times.
+
+**Accuracy, full-label F1 (AA).** Seed-matched gap to joint training (91.70 / 91.80 / 92.38):
+
+| Run | Full-label F1 | AA | F1 gap to joint |
+|---|---|---|---|
+| CoLaR-SBR | 88.83 / 91.19 / 87.13 | 87.76 / 91.32 / 86.16 | 2.87 / 0.60 / 5.25 |
+| Raw memory + SBR (`er_sbr`) | 87.68 / 89.57 / 88.00 | 87.34 / 89.52 / 88.33 | 4.03 / 2.23 / 4.38 |
+| SBR-Recall | 91.53 / 93.52 / 92.62 | 91.35 / 92.62 / 91.86 | 0.17 / -1.72 / -0.23 |
+| Constant background | 75.34 / 82.79 / 89.19 | 71.26 / 82.27 / 87.05 | 16.36 / 9.00 / 3.19 |
+
+- Raw minus latent: F1 -1.15 / -1.62 / +0.87; AA -0.41 / -1.80 / +2.17. The macros (-1.7..+0.9, -1.9..+2.2) are outward
+  rounded and correct. "Neither above nor below on every seed" holds under both metrics.
+- "Within 5.3 full-label points of joint on every seed" holds for latent, raw and deltas (max 5.25).
+- Constant background:
+  - Above CoLaR and below joint on every seed, both metrics.
+  - Share of CoLaR-SBR's gain over CoLaR that it recovers: F1 76% / 86% / 104%, AA 70% / 85% / 102%.
+  - So "most but not all on 42 and 7, above CoLaR-SBR on 123" and "partly" are true.
+  - Ladder means 82.4±6.9 / 80.2±8.1 and ER-SBR 88.4±1.0 / 88.4±1.1 are correct.
+- Ablation deltas:
+  - Memory alone: 19.16 / 17.73 / 16.35.
+  - Blocked readout alone: -4.26 / -1.09 / +0.65.
+  - Both: 75.61 / 78.38 / 74.16.
+  - SBR-Recall is above CoLaR-SBR on every seed under both metrics.
+- Mixed CoLaR-SBR is clean on all three seeds (fp32, val_frac 0.1, restricted eval): 88.55 / 89.17 / 89.70, so `vSbrMix` =
+  89.1±0.6. Legacy ER on Mixed has seeds 42 and 7 only (75.6 / 73.3; fp16, 100-epoch cap, test-split early stop, 200-sample
+  reservoir).
+
+**What passes**
+- Hollow markers are used only for the two computed encodings (raw 8-bit, SBR-Recall fp16), and caption, legend and
+  `tab:memory` all say so.
+- No sentence claims a byte saving against raw replay. The text says CoLaR "saves no bytes", and Limitations repeats it.
+- No sentence claims a run-time advantage. App. B says "we do not compare run times".
+- No accuracy is stated for ranks 32/64. The macros render "--" and App. B says "we make no accuracy claim for these ranks".
+- Abstract, contributions, H1 to H3, the Conclusion and Limitations agree with each other. The never-stale oracle (within 2.4,
+  92.1 vs 92.0), MiB (about half, 46 to 49%) and ICE-O (lower bound) are stated correctly in the body.
+
+### HIGH
+
+- **R15-H1. The raw-vs-latent comparison is called "matched", and its result is stated as "the memory's type does not
+  matter", while the two runs differ in what they train.**
+  - `er_sbr.py:37` `_apply_freeze_map` is a no-op ("whole network plastic"), so ER-SBR trains 125.4M parameters.
+  - CoLaR-SBR freezes the embeddings and layers 1..4 and trains 56.8M.
+  - Every other setting is matched: same readout, 50 documents per session, replay batch 4, lr, and 10 epochs.
+  - So two factors change at once: the memory format, and the frozen trunk.
+  - Places where the wording overstates:
+    - main.tex:140 (H0): "the matched raw-memory comparison is in \cref{sec:memory}" is false as written.
+    - main.tex:197: "The memory type does not matter for the finding: raw documents under the same readout reach ..."
+      gives no disclosure.
+    - main.tex:228: "The memory's type does not matter: raw documents in its place ..." gives no disclosure.
+    - main.tex:232: "55% fewer trainable parameters than raw replay (layers 1..4 stay frozen and replay runs through the
+      upper eight layers only) and ... the accuracy of raw replay". This presents a property of our ER-SBR configuration
+      as a property of the memory type. A raw memory could freeze the same layers. Most of the frozen parameters are the
+      embeddings, not layers 1..4. "Runs through the upper eight layers only" is a compute statement that has no
+      measurement behind it.
+    - Contribution 2 (main.tex:83): "the latent one does as well as raw documents".
+  - The confound is disclosed only in App. B and in the App. D table caption.
+  - This is the same class of error as R14b-H1: an outcome attributed to one factor when the design changed two.
+  - Fix (text only):
+    - :140: "the raw-memory comparison under the same readout is in \cref{sec:memory}" (drop "matched").
+    - :197: "The memory format did not change the finding here (three seeds, CIL-CORD): raw documents under the same
+      readout, with the whole network trainable, reach $\vErSbrFull$ against $\vSbrFull$, seed-matched differences ...
+      The comparison also changes what trains: CoLaR needs the embeddings and layers $1..4$ frozen, and our raw run
+      trains them."
+    - :228: "Raw documents in its place (whole network trainable) are neither above nor below CoLaR-SBR on every seed."
+    - :232: "and, because latent replay requires the frozen lower layers, it trains $\nMemTrainSbrPct\%$ of the
+      parameters our raw-replay run trains (embeddings and layers $1..4$ frozen; a raw memory could freeze them too),
+      with full-label F1 within $1.7$ points of raw replay on every seed". Use the existing macros
+      `\nErSbrDiffFullMin/Max`, or add an abs-max macro. Drop "replay runs through the upper eight layers only".
+    - Contribution 2: "and the latent one is within $\ldots$ points of raw documents on every seed (neither ahead on every
+      seed) while keeping no pixels or token ids".
+    - Ladder: put footnote $^{e}$, or a new one ("trains every layer"), on the "raw-document memory, blocked readout" row.
+
+### MEDIUM
+
+- **R15-M1. The verdict "refutes" on the ladder's raw-memory + blocked-readout row is not a per-seed statement against the
+  rung's prediction.**
+  - The H0 prediction reads "raw beats compressed", and the caption says the verdict holds "on every seed".
+  - Raw is above CoLaR-SBR on seed 123 under both metrics (+0.87 F1, +2.17 AA).
+  - `verdict_ok(("er_sbr","refutes"))` checks only |diff| < 3 and "at least one seed with raw <= latent".
+  - Fix (caption, main.tex:90): add "For the raw-memory row, refutes means raw is not above the latent memory on every
+    seed and within 3 points of it on each (raw is above on seed 123)". Alternatively, change the verdict word to "does
+    not support", with its own check.
+- **R15-M2. The Mixed comparison with ER is cross-protocol on more axes than the sentence admits.**
+  - main.tex:236: "above ER ($\nErMix^\dagger$) on every seed although the legacy protocol favours ER".
+  - The legacy ER Mixed cell has two seeds (42, 7) and ran in **fp16**. On this box fp16 has collapsed other methods.
+  - It kept a 200-sample reservoir, against CoLaR-SBR's 300 documents (120.8 MB).
+  - Test-split early stopping favours ER, but fp16 and the smaller buffer do not, so "favours ER" is not established. The
+    margin (88.5 min vs 75.6 max, 12.9 points) is large enough that the comparison survives an honest wording. The P23
+    commit message says "Mixed compared only within protocol", which the text does not do.
+  - Fix: "above both legacy ER seeds ($\nErMix^\dagger$; fp16, test-split early stopping, $200$ stored samples against
+    our $300$ documents) by more than $12$ points; the protocols differ, so we read this as a large gap, not a ranking".
+    The 12 should come from a macro. Alternatively, drop the ER comparison as was done for joint training.
+
+### LOW
+
+- R15-L1. main.tex:232 "every store read through the blocked readout ... within 5.3": the constant-background variant is
+  also a blocked readout with the latent store, and it is 16.4 points below joint on seed 42. Write "every store read
+  through the learned-background blocked readout".
+- R15-L2. Table 3 (main.tex:202) lists SBR-Recall at 56.6 MB, while Fig. 4 marks 113.2 MB as the size the run held. Add
+  "half the fp32 size the runs held" to the Tab. 3 caption, or show "56.6 (113.2 fp32)".
+- R15-L3. The R14b-H1 Limitations clause "ICE-O ran under our recipe and was still improving at the epoch cap" was cut, and
+  so was the body's "not its published accuracy". "So this is a lower bound for ICE-O" remains (:217), which is adequate.
+  Restore the Limitations clause if a line is free.
+- R15-L4. The sentence "SBR-Recall on a fixed label space ... was not run" was cut. The H4 prediction (:209) still asserts
+  the DIL outcome. Tab. 3 shows "--", which suffices; optionally add "(not run)" to the prediction.
+- R15-L5. `tab:ablation` caption (supp_body.tex:109): "Ticks: latent memory (Mem.)", but the raw-memory row ticks Mem.
+  Write "memory (Mem.; latent unless stated)".
+- R15-L6. `tab:memory`: "Trainable: parameters trained after session 1" reads 7.1M for SBR-Recall. That is the count at any
+  one time; four deltas (28.3M) are trained over the run. Write "trained at once after session 1".
+- R15-L7. main.tex:170: "on seeds 42 and 7 ... on seed 123" is a typed per-seed outcome with no guard in the generator.
+  `verdict_ok(("sbr_constbg","partly"))` checks only colar < x < joint. Add the per-seed order (x < sbr on 42 and 7,
+  x > sbr on 123) to the check, so a rerun cannot silently falsify the sentence.
+- R15-L8 (referee risk, no change required). The raw-as-held row (fp32 normalised pixels, int64 ids, 512-token padding) is
+  not how anyone stores documents. JPEG of the 224^2 image plus int16 ids would sit far below the 8-bit row, and every form
+  counts padding. The text already concedes "saves no bytes"; "at least 2.2x larger than raw documents with 8-bit pixels"
+  would pre-empt the objection.
+
+### Form
+
+- Body ends p. 8 and References start p. 9. Appendix pp. 11-16 is 6 pp. (limit). supp.pdf is 8 pp.
+- Both builds exit 0 with 0 undefined, 0 multiply-defined, 0 overfull and 0 "??". One harmless "page contains only floats"
+  in supp.
+- No `---` in main.tex, supp_body.tex or supp.tex. Every `\cref` target exists.
+  - The new `tab:memory` floats onto p. 13 under App. C (cosmetic).
+  - `tab:ablation` is in App. D and is still cited from :228.
+- Hand-typed digits in the diff are architecture counts, and each one checks: 709, 768, 24,576, 3*224^2, 512*7+1, 7,077,888,
+  406,800 / 402,689. One exception is the per-seed wording (L7).
+- `make_clean_tables.py` exits 0 ("memory self-check passed: 12 runs") and every generated `.tex` is byte-identical to HEAD.
+- `make_paper_figs.py` exits 0 (self-check passed). All 15 figure PDFs changed only in metadata (renders pixel-identical) and
+  were restored with `git checkout --`.
+- Note for the PM: `mixed_joint_seed42` (clean) logged DONE at 07:39. Once three clean seeds exist, the Mixed joint cell
+  switches and :236 "joint training has only a legacy cell there" must be revisited.
+
+### Referee view
+
+**Score unchanged at 3.5 (Borderline, leaning accept).**
+- What works: the memory exhibit answers the cost question honestly. CoLaR buys no bytes over an 8-bit raw buffer, the
+  readout and not the bytes separates the methods, and lower ranks are computed, not claimed.
+- What a referee would attack: the latent-vs-raw "type does not matter / fewer trainable parameters" claim, which is
+  confounded by the frozen trunk (H1). Second, the fp32-pixel strawman raw size behind the 1.6x figure.
