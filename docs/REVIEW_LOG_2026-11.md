@@ -4055,3 +4055,79 @@ scratch dir (`latexmk -pdf`, no `-C`). Every number recomputed per seed from `re
   readout and not the bytes separates the methods, and lower ranks are computed, not claimed.
 - What a referee would attack: the latent-vs-raw "type does not matter / fewer trainable parameters" claim, which is
   confounded by the frozen trunk (H1). Second, the fp32-pixel strawman raw size behind the 1.6x figure.
+
+## R15b (2026-11-14): confirmation of P24 (`ab2aa78`) against R15
+
+Scope: `git show ab2aa78`. I built from `git archive ab2aa78 paper_cvpr` in a scratch dir (`latexmk -pdf`, no `-C`). The text
+of my build is identical to the committed `main.pdf`. I re-ran `make_clean_tables.py`.
+
+### Verdict: **PASS**
+
+| R15 | Status |
+|---|---|
+| H1 | **Fixed, and true per seed.** |
+| M1 | **Fixed.** |
+| M2 | **Fixed.** |
+| L1 | **Fixed.** :232 now says "learned-background blocked readout". |
+| L2 | **Fixed.** The Tab. 3 caption says "SBR-Recall at two bytes per parameter, half its fp32 size". |
+| L3 | **Fixed.** Limitations has "ICE-O ran under our recipe, still improving at the epoch cap" (true per R14c: sessions 4 and 5, every seed). |
+| L4 | **Fixed.** The H4 prediction ends "(not run)". |
+| L5 | **Fixed.** "memory (Mem.; latent unless marked raw)"; the row label says "raw memory". |
+| L6 | **Fixed.** "trained at once after session 1 (SBR-Recall: one delta at a time, four over the run)". |
+| L7 | **Fixed.** |
+| L8 | **Fixed.** :232 leads with "2.2x larger than raw documents with 8-bit pixels". The 1.6x is now "only against raw documents as our code holds them". |
+
+**H1**
+- "Matched" is gone (:140), and so is "the memory's type does not matter".
+- §5.2 now reads "did not change the finding here (three seeds, CIL-CORD) ... with the whole network trainable where
+  CoLaR freezes the embeddings and layers 1..4".
+- §6 reads "(whole network trainable) the finding did not change".
+- The cost paragraph reads "latent replay needs the frozen lower layers, so it trains 45% of the parameters our raw run
+  trains (a raw memory could freeze the same layers), with full-label F1 within 1.7 points of raw replay on every seed".
+  The "upper eight layers only" clause is gone from the body.
+- Contribution 2 reads "within 1.7 full-label points of raw documents on every seed", and the half-the-parameters clause
+  was dropped.
+- New macros: `\nErSbrAbsFullMax` = 1.7 (true max |raw - latent| = 1.62, seed 7) and `\nErSbrAbsAaMax` = 2.2 (true 2.17,
+  seed 123). Both are rounded up, so "within" holds on every seed.
+- The ladder row carries footnote $^{w}$ ("Trains every layer, where the CoLaR rows freeze the embeddings and layers
+  1..4"), and App. B adds "a raw memory could freeze the same layers; ours does not".
+
+**M1**
+- The verdict is now "does not support", with the same per-seed condition: |diff| < 3 on every seed, and raw not above
+  on every seed (raw is above only on seed 123).
+- That is an accurate reading of "raw beats compressed".
+- The rendered Tab. 1 (p. 3, 300 dpi) is legible. "does not support" fits on one line inside the right margin, and the
+  2.5 cm Hypothesis column wraps cleanly. There is no overfull box.
+
+**M2**
+- The Mixed sentence no longer ranks: "joint training and ER have only legacy cells there (87.7† and 74.5†, two seeds
+  each), so we do not rank the three".
+- Both legacy cells do have seeds 42 and 7 only.
+
+**L7**
+- The `sbr_constbg` check now also requires (x < CoLaR-SBR) to be true on seeds 42 and 7 and false on 123, under both
+  metrics.
+- It holds on the data: F1 75.34 < 88.83, 82.79 < 91.19, 89.19 > 87.13; AA 71.26 < 87.76, 82.27 < 91.32, 87.05 > 86.16.
+- The generator passes.
+
+**Form**
+- `make_clean_tables.py` exits 0 ("memory self-check passed: 12 runs", no warning, no ladder error). `git status` shows no
+  change to any generated file.
+- main: 16 pp. The Conclusion ends on p. 8, the References start on p. 9, and the appendix is pp. 11-16 (6 pp.).
+- supp: 8 pp.
+- 0 undefined refs, 0 multiply-defined refs, 0 overfull boxes, 0 "??", and no `---` in main.tex, supp_body.tex or
+  supp.tex.
+- One new harmless warning: appendix page 15 is float-only, which costs no page.
+
+### Remaining
+
+No CRITICAL, HIGH or MEDIUM findings.
+
+**Watch item for the PM.** `mixed_joint_seed42` finished on the clean protocol at 07:39. When all three clean seeds exist,
+the Mixed joint cell switches, and the Mixed sentence at §7 ("only legacy cells there ... two seeds each") must be
+rewritten.
+
+### Referee view
+
+**Score: 3.5 (Borderline, leaning accept).** The raw-vs-latent claim is now stated with its confound and a per-seed bound,
+the memory section claims no saving it lacks, and nothing in the paper overstates the cost exhibit.
