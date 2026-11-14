@@ -5228,3 +5228,155 @@ identical to the one-epoch smoke run, and why the wall time is 95 s.
     stream-dependent, which hurts R1 and R2 on soundness, while the readout transfer helps contribution.
   - Net, about unchanged (weighted around 5.8), and up if the paper is reframed around the readout as the transferring
     result.
+
+## R21 (2026-11-15): audit of P31 (`d2d3157`, `3b59fb9`; generators `0bdf14a`; queue `5f4192c`): CIL-FUNSD folded in
+
+Scope:
+- Word-diff of main.tex and supp_body.tex, `564b72c..HEAD`.
+- New generated files: `supp_funsd.tex`, `tab_bench.tex`, vals `\vFunsd*` / `\nFunsd*`.
+- Every FUNSD number recomputed per seed from `results/clean_2026-11/cil_funsd_*` (`metrics.json`, `matrix.npy`).
+- HEAD built from `git archive` in a scratch dir (`latexmk -pdf`, no `-C`) and split with `make_submission.sh`. Both
+  outputs are text-identical to the committed `submission/*.pdf`.
+
+### Verdict: **BLOCK** (one HIGH [W], text only)
+
+### 1. FUNSD numbers and macros (seeds 42 / 7 / 123)
+
+| Run | Full-label F1 | AA | Diagonal (s1, s2) |
+|---|---|---|---|
+| Naive | 50.71 / 51.05 / 50.76 | 43.30 / 44.34 / 43.97 | (85.0, 86.6) / (86.9, 88.7) / (86.4, 87.9) |
+| CoLaR | 51.80 / 52.95 / 51.88 | 44.83 / 45.30 / 44.97 | (85.0, 88.7) / (86.9, 90.6) / (86.4, 89.9) |
+| Oracle | 52.08 / 52.50 / 52.12 | 44.52 / 44.71 / 44.30 | |
+| SBR | 87.57 / 86.42 / 87.46 | 87.78 / 86.75 / 87.76 | |
+| Constant background | 87.56 / 87.22 / 86.92 | 87.92 / 87.74 / 87.35 | |
+| Joint | 77.80 / 87.56 / 87.60 | 77.39 / 87.91 / 87.95 | |
+
+- Every `\vFunsd*` mean ± s.d. and every Min/Max macro is correct, rounded outward.
+- Oracle minus CoLaR: F1 +0.28 / -0.45 / +0.24, macros -0.5 / +0.3; AA -0.31 / -0.59 / -0.67, macros -0.7 / -0.3. Correct.
+- R[2,1] ranges in `tab:funsd`, all correct:
+  - naive 0.0-0.0, CoLaR 0.0-1.0, oracle 0.0-0.0;
+  - SBR 85.0-86.6, constant background 85.5-86.0.
+- `\nFunsdSbrMinusJoint*Seeds` +9.8/-1.1/-0.1 (F1) and +10.4/-1.2/-0.2 (AA) are correct. `\nFunsdConstOSbrGapFullMax` 0.8 is
+  correct.
+- The ^s flag on joint seed 42 is correct: it stopped at its first epoch, as found in R20.
+- `tab_bench.tex`, CIL-FUNSD column (FUNSD; 2 sessions; label space grows; 3 classes / 7 BIO tags; reported full-label F1
+  and AA) is correct.
+  - It is worth keeping. "Four streams" in Setup needs it, and it took no body line because the column widths were
+    narrowed. No gate needed.
+- Sec. 7 FUNSD sentence ("differs from plain CoLaR by -0.5 to +0.3 full-label points per seed and forgets session 1
+  (R[2,1] at most 0.0) ... blocked readout keeps session 1 on every seed (R[2,1] at least 85.0), as does a constant
+  background") is true on every seed.
+- H1 ("on CIL-CORD ... though not on CIL-FUNSD"), H2 ("hence, on CIL-CORD, the current side is not needed") and the
+  Limitations clause are correct and match R20.
+
+### 2. Reordered abstract and contributions
+
+- **"Closes most of the gap with the memory on both streams and every seed" is true.**
+  - Share of the seed-matched CoLaR -> joint gap that SBR closes on CIL-FUNSD: 1.38 / 0.97 / 1.00 (F1) and 1.32 / 0.97 / 1.00
+    (AA). Seed 42 is above 1 because its joint run is undertrained.
+  - CIL-CORD per R15.
+- "With the memory" describes the configuration that was run. It does not claim the memory is needed. Whether it is
+  needed on FUNSD is untested (the no-memory FUNSD run is queued, v17), and Limitations says so. Acceptable (L1).
+
+### HIGH
+
+**R21-H1 [W]. The abstract's (and intro's) H0 claim is now framed for both streams but is false on CIL-FUNSD.**
+- The abstract (:59) now opens "On class-incremental streams of receipts (CIL-CORD) and forms (CIL-FUNSD) ... First,
+  forgetting is not simply harder: with a whole-document memory and a shared softmax, the model barely learns its last
+  sessions, which naive training learns well."
+- On CIL-FUNSD, CoLaR with a shared softmax learns its last session to 88.7 / 90.6 / 89.9, at least as well as naive
+  training (86.6 / 88.7 / 87.9), and loses session 1 entirely (R[2,1] 1.0 / 0.0 / 0.0), as naive training does.
+- So on FUNSD the losses do look like naive forgetting, which is H0's prediction. The suppression of the newest session
+  is a CIL-CORD finding.
+- The intro (:71) "First, forgetting is not just harder (H0): ... the model suppresses its last sessions" is unscoped
+  too. Only the next sentence says "on CIL-CORD".
+- Fix:
+  - Abstract: "First, on CIL-CORD forgetting is not simply harder: ... which naive training learns well."
+  - Intro :71: "First, on CIL-CORD, forgetting is not just harder (H0) ...".
+  - Optionally one clause in Sec. 7's FUNSD sentence: "there, the memory with a shared softmax learns the new session and
+    loses the old one, as naive training does". This is per-seed true from the diagonals above.
+
+### MEDIUM
+
+- **R21-M1 [W]. The intro never introduces CIL-FUNSD.** Contribution (1) says "on both streams and every seed, where the
+  continual-NER and replay methods in our comparison do not".
+  - "Both streams" is defined only in the abstract.
+  - The comparison methods ran on CIL-CORD (and Mixed, legacy) only, not on CIL-FUNSD.
+  - Fix: in intro paragraph 3 add "on CIL-CORD and a second stream of forms, CIL-FUNSD". In contribution (1) write
+    "... closes most of the gap on both streams and every seed; on CIL-CORD the continual-NER and replay methods in our
+    comparison do not".
+
+### LOW
+
+- **R21-L1 [W].** Abstract "with the memory on both streams": add "(whether the readout needs the memory on CIL-FUNSD is
+  untested)" only if space allows. Limitations already says it, so this is optional.
+- **R21-L2 [W].** Limitations: "Every control rests on three training seeds and one test set of 100 CORD receipts". The
+  FUNSD controls use FUNSD's 50 test forms. Write "of 100 CORD receipts (50 FUNSD forms for CIL-FUNSD)", or keep it
+  CIL-CORD-scoped.
+- **R21-L3 [W].** App. D: "every session-2 form also contains questions labelled O". "Every" is not verified from the
+  run files. Write "session-2 forms also contain questions, labelled O" unless Dev counts them.
+- **R21-L4 [W].** Conclusion: "two things go wrong and a memory repairs only one, drift". On CIL-FUNSD the memory with a
+  shared softmax repairs nothing measurable (+1.1 to +1.9 F1 over naive). Optionally: "a memory repairs only one, drift
+  (on CIL-CORD and DIL)".
+- **R21-L5 [E] (watch).** The v17 settling runs are queued: FUNSD oracle d50, MiB, sliced2, SBR without memory. When they
+  land, the Limitations "why ... untested" and App. D "not yet run" sentences must be rewritten from the `\vFunsd*`
+  macros, which are already wired as "--".
+
+### 3. Cuts made for space: no caveat, qualifier or citation lost
+
+- **Abstract numbers.** "(92.1 against 92.0 full-label F1)", "89.1 full-label F1 ... (88.4 with raw documents)" were
+  cut. The values remain in the body (H1, H3, §5.2) and in the ladder table.
+- **Related Work.** The taxonomy sentence and "the broader CL families are surveyed by \citet{wang2024survey}" were cut.
+  `wang2024survey` is still cited in the intro. No other citation was dropped.
+- **Sec. 6.** "True labels without the blocked readout fall below CoLaR-SBR at the boundaries and above it before each
+  session" was cut. The same comparison survives in H3's Result ("above the memory relabelled at each boundary and below
+  the memory relabelled before each session on every seed, under both metrics") and in `tab:ablation`.
+- **Sec. 7.** "Beyond CIL-CORD, evidence is ..." was cut. Its scope statements survive:
+  - DIL in H0;
+  - SBR-Recall's one-seed Mixed failure in §5.3;
+  - "(three seeds, CIL-CORD)" for the memory comparison in §5.2;
+  - the controls' scope in Limitations.
+- **H0.** "keeps part of the spans" was cut from the body. App. D H0 keeps it with `\mColarRMin/Max` and `\mColarOldPLb`.
+  - The H0 "What it rules out" sentence is shorter but keeps the same inference.
+- **App. A, C, E, F trims** are wording only:
+  - The "which is why the table reports four" clause and "the head-locus reading of documents" were dropped (less
+    claim, not less caveat).
+  - "One-seed" stays on the probe row, and "(mostly single-seed diagnostics ...)" stays.
+- **`tab_beyond.tex`** is no longer input. In the paper before P31 it was empty; its new FUNSD rows are all in
+  `tab:funsd`. No number becomes unreachable.
+
+### 4. Form
+
+- main and supp exit 0 with 0 undefined, 0 multiply-defined, 0 overfull, 0 "??". The old float-only warning is gone.
+- Main text ends p. 8, References pp. 9-10, appendix pp. 11-16 (6 pp.). The split gives 10 + 6 pp.
+- No `---`.
+- The title and the LLM Usage Statement are unchanged (the only diff hit is the Related Work line containing "LLMs").
+- The R19b math-mode fix holds: the abstract prints "only 19 to 29%".
+- The abstract is about 260 words.
+
+### 5. Updated three-persona estimate
+
+- **R1 (harsh but fair).** The cross-stream readout result answers most of R17's generality objection. The H1 failure on
+  FUNSD is reported honestly, with its two untested explanations. 5 -> **6**, Contribution 3. Accept.
+- **R2 (harsh and critical).** Still niche, and the mechanism story is now stream-dependent and partly unexplained.
+  Undertrained FUNSD joint seed. Overall stays **4**, Soundness 3 once H1 is fixed (2 as committed), Significance 2.
+  Reject.
+- **R3 (open-minded).** **6.** Accept.
+- Weighted, with R21-H1 fixed:
+
+  | Dimension | Avg |
+  |---|---|
+  | Overall | 5.33 |
+  | Contribution | 2.67 |
+  | Presentation | 3 |
+  | Soundness | 3 |
+  | Originality | 2 |
+  | Quality | 2.67 |
+  | Clarity | 3 |
+  | Significance | 2.33 |
+  | Confidence | 3.67 |
+
+  This gives **about 6.1/10**, an **Accept (marginal)**, the first time the aggregate crosses the ~5.9 bar.
+- As committed (H1 unfixed): about 5.9, borderline.
+- The v17 settling runs can move it either way. A FUNSD oracle with 50 stored forms that rescues would restore H1
+  across streams. A FUNSD readout that needs no memory would weaken the memory's role.
