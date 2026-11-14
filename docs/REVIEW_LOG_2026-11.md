@@ -5380,3 +5380,60 @@ Scope:
 - As committed (H1 unfixed): about 5.9, borderline.
 - The v17 settling runs can move it either way. A FUNSD oracle with 50 stored forms that rescues would restore H1
   across streams. A FUNSD readout that needs no memory would weaken the memory's role.
+
+## R21b (2026-11-15): confirmation of P32 (`85d9907`) against R21
+
+Scope: `git diff 3b59fb9..85d9907` (main.tex, supp_body.tex). Built from `git archive 85d9907` in a scratch dir.
+
+### Verdict: **PASS** (one MEDIUM wording item to fix before upload; no HIGH)
+
+| R21 | Status |
+|---|---|
+| H1 | **Fixed, true per seed.** |
+| Sec. 7 clause | **Added, true per seed.** |
+| M1 | **Fixed.** |
+| L2 | **Fixed.** |
+| L3 | **Fixed.** |
+| L4 | **Fixed, true.** |
+| L1 | Skipped (optional). Fine. |
+| Future-work clause | Dropped. No caveat lost. |
+
+- **H1.**
+  - The abstract now reads "First, on CIL-CORD forgetting is not simply harder: ... the model barely learns its last
+    sessions, unlike naive training".
+  - The intro reads "First, on CIL-CORD, forgetting is not just harder (H0)".
+- **Sec. 7 clause.** "plain CoLaR learns the new session and loses the old one, as naive training does". On CIL-FUNSD
+  CoLaR learns its new session to 88.7 / 90.6 / 89.9 and keeps 1.0 / 0.0 / 0.0 of the old one. Naive training learns
+  86.6 / 88.7 / 87.9 and keeps 0.0.
+- **M1.**
+  - Intro paragraph 3 introduces "a second stream of forms, CIL-FUNSD".
+  - Contribution (1) reads "while on CIL-CORD the continual-NER and replay methods in our comparison do not".
+- **L2.** "Every CIL-CORD control rests on ... 100 CORD receipts".
+- **L3.** "session-2 forms also contain questions, labelled O" ("every" dropped).
+- **L4.** Conclusion "a memory repairs only one, drift (on CIL-CORD and DIL)" is true: CoLaR keeps old sessions where
+  naive training keeps none on CIL-CORD, and repairs DIL (legacy).
+- **Other rewordings** keep their meaning:
+  - "We investigate this failure rather than propose a method".
+  - "with a memory" (was "whole-document memory"), still defined in Setup.
+  - "Two things go wrong" (was "The experiments show that two things go wrong").
+  - "on images, without a background class".
+  - "(four stored per current batch of two)".
+- **Form.**
+  - main and supp exit 0 with 0 undefined, 0 multiply-defined, 0 overfull, 0 "??". No `---`.
+  - Main text ends p. 8, appendix pp. 11-16 (6 pp.). The split gives 10 + 6 pp., text-identical to the committed PDFs.
+  - The title and the LLM Usage Statement are unchanged.
+
+### MEDIUM
+
+- **R21b-M1 [W].** Abstract: "On CIL-FUNSD, with ten stored forms per session, it does not." "It" has no clear
+  antecedent.
+  - The preceding sentence's subject is plural ("true stored labels suffice").
+  - The nearest singular nouns are "a MiB-style loss" and "a softmax slice". So the clause can be read as "the softmax
+    slice does not".
+  - Fix: "On CIL-FUNSD, with ten stored forms per session, the oracle does not rescue the shared softmax", or "...,
+    true stored labels do not suffice".
+
+### LOW
+
+- **R21b-L1 [W].** "one background logit per session, as in existing readouts". Dropping "per-session" makes it read as
+  if all existing readouts did this. Restore "as in existing per-session readouts" (ICE-O, MORE) if the line allows.
