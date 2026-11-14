@@ -70,9 +70,9 @@ STYLE = {
 }
 SEED_MARK = {42: "o", 7: "s", 123: "^"}
 HATCH = "////"
-SLOT_LABEL = {"er_sbr": "raw mem. + SBR", "oracle_pre": "relabel before", "colar_mib": "MiB loss",
+SLOT_LABEL = {"er_sbr": "raw mem.$^{w}$ + SBR", "oracle_pre": "relabel, pre-session", "colar_mib": "MiB loss",
               "sbr_constbg": "const. bg", "ice_o": "ICE-O"}  # fmt: skip
-SHORT = {"colar": "CoLaR", "er": "ER", "oracle": "relabelled", "sliced2": "sliced losses",
+SHORT = {"colar": "CoLaR", "er": "ER", "oracle": "relabel, boundary", "sliced2": "sliced losses",
          "sbr": "CoLaR-SBR", "nobank": "SBR, no mem.", "recall": "SBR-Recall"}  # fmt: skip
 MECH_KEY = {"naive": "naive", "colar": "colar", "colar_r_oracle": "oracle",
             "colar_sbr_noreplay": "nobank", "colar_sbr": "sbr", "colar_sbr_recall_r64": "recall",
@@ -167,7 +167,7 @@ def fig_findings_a() -> list[dict]:
         refs.append((plt.Line2D([], [], color=STYLE[key][1], lw=0.7, ls=ls),
                      f"{STYLE[key][0].split()[0].lower()} {v:.1f}"))  # fmt: skip
     labels = [SHORT.get(c["key"], SLOT_LABEL.get(c["key"], c["key"])) for c in cells]
-    ax.set_xticks(range(len(cells)), labels, rotation=50, ha="right", rotation_mode="anchor")
+    ax.set_xticks(range(len(cells)), labels, rotation=40, ha="right", rotation_mode="anchor")
     rung_x = {}
     for i, c in enumerate(cells):
         rung_x.setdefault(c["rung"] or list(rung_x)[-1], []).append(i)
@@ -190,7 +190,7 @@ def fig_findings_a() -> list[dict]:
                [labs[0], refs[0][1], labs[1], refs[1][1], labs[2]], loc="upper left",
                bbox_to_anchor=(0.1, 1.0), ncol=3, frameon=False, handlelength=1.4,
                columnspacing=1.0, borderaxespad=0.1, labelspacing=0.15)  # fmt: skip
-    fig.subplots_adjust(left=0.115, right=0.995, top=0.84, bottom=0.36)
+    fig.subplots_adjust(left=0.115, right=0.995, top=0.84, bottom=0.38)  # P28: longer relabel labels
     save(fig, "findings_a.pdf")
     return cells
 
@@ -296,7 +296,9 @@ def fig_findings_c() -> dict:
     ax.set_ylabel("mean F1, old sessions", labelpad=1)
     ax.tick_params(length=1.5, pad=1)
     # legend above the axes (as in panels a and b): inside, it sat on the diagonal and the points
-    fig.legend(*ax.get_legend_handles_labels(), loc="upper center", bbox_to_anchor=(0.56, 1.0), ncol=2,
+    hs, ls = ax.get_legend_handles_labels()  # P28 (R17-G1): the long relabel label goes last (right column)
+    order = sorted(range(len(ls)), key=lambda i: ls[i].startswith("relabel"))
+    fig.legend([hs[i] for i in order], [ls[i] for i in order], loc="upper center", bbox_to_anchor=(0.5, 1.0), ncol=2,
                frameon=False, handletextpad=0.1, borderaxespad=0.1, labelspacing=0.15, columnspacing=0.5,
                fontsize=6, markerscale=0.8)  # fmt: skip
     for s in ("top", "right"):
