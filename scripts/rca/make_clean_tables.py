@@ -1239,7 +1239,7 @@ BASE_INFO = {  # family, what is kept across sessions (read from doccl/methods/*
     "lca": ("Merging", "base and per-session backbones, class Gaussians"),
 }
 FAMILY_ORDER = ("Reference", "Regularisation", "Replay", "Prompt, LoRA", "Continual NER",
-                "Merging", "This paper")  # fmt: skip
+                "Merging", "Ours")  # fmt: skip
 
 
 def _base_cells(key: str, dz: bool) -> tuple:
@@ -1280,13 +1280,13 @@ def write_main(cell, mix, dil, full) -> None:
                "CODA-Prompt": "CODA-Prompt (2023)"}.get(label, label)  # fmt: skip
         rows.append((fam, lab, mem, "shared", _base_cells(key, dz), False))
     rows += [
-        ("This paper", "CoLaR", f"{colar_mem} ({_mb('cil_cord_colar')})", "shared",
+        ("Ours", "CoLaR", f"{colar_mem} ({_mb('cil_cord_colar')})", "shared",
          (fl("colar"), fmt(*cell["colar"]), fmt(*mix["colar"]), fmt(*dil["colar"])), False),
-        ("This paper", "CoLaR-SBR", f"{colar_mem} ({_mb('cil_cord_colar_sbr')})", "blocked",
+        ("Ours", "CoLaR-SBR", f"{colar_mem} ({_mb('cil_cord_colar_sbr')})", "blocked",
          (fl("sbr"), fmt(*cell["sbr"]), fmt(*mix["sbr"], bold=True), fmt(*dil["sbr"])), True),
-        ("This paper", "\\quad + LexSlot head slots", "+ head slots, token ids", "blocked",
+        ("Ours", "\\quad + LexSlot head slots", "+ head slots, token ids", "blocked",
          ("--", fmt(*cell["slot"]), fmt(*mix["slot"]), fmt(*dil["slot"])), False),
-        ("This paper", "SBR-Recall",
+        ("Ours", "SBR-Recall",
          f"one rank-64 trunk delta per session ({_mb('cil_cord_colar_sbr_recall_r64')})",
          "blocked, per delta",
          (fl("recall", bold=True), fmt(*cell["recall"], bold=True), fmt(*mix["recall"], mark="b"),
