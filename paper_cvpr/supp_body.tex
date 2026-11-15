@@ -106,7 +106,7 @@ b^\star=\arg\max_b e_b.
 \begin{table}[t]
 \centering\scriptsize
 \setlength{\tabcolsep}{2.5pt}
-\caption{\textbf{CIL-FUNSD} (clean protocol, LayoutLMv3, $10$ stored forms per session; mean $\pm$ s.d., three seeds). $R[2,1]$: session-1 F1 after session~2, range over seeds. $^{r}$Oracle: every stored form relabelled before each session. $^{s}$Stopped at its first epoch.}
+\caption{\textbf{CIL-FUNSD} (clean protocol, LayoutLMv3, $10$ stored forms per session; mean $\pm$ s.d., three seeds). $R[2,1]$: session-1 F1 after session~2, range over seeds. $^{r}$Oracle: every stored form relabelled before each session. $^{s}$Stopped at its first epoch. Bold: best of each column, Joint training and the true-label controls aside; underlined: CoLaR-SBR when another row is best.}
 \label{tab:funsd}
 \resizebox{\linewidth}{!}{\input{supp_funsd}}
 \end{table}
@@ -118,7 +118,7 @@ b^\star=\arg\max_b e_b.
 \begin{table}[t]
 \centering\scriptsize
 \setlength{\tabcolsep}{2pt}
-\caption{\textbf{Component ablations on CIL-CORD}, the runs of \bodyref{tab:ladder}{the ladder table of the main paper} (clean protocol, LayoutLMv3, mean $\pm$ s.d. over three seeds). Ticks: memory (Mem.; latent unless marked raw), blocked readout (Blk.), per-session deltas ($\Delta$), true labels (True). All rows but naive, joint and the raw memory freeze at least the embeddings and layers $1..4$ after session~1. MB: bytes kept across sessions (\bodyref{sec:cost}{the main paper's memory-cost section}); SBR-Recall's deltas at two bytes per parameter, a reporting choice ($\nMemRecallFpMB$ as trained in fp32). $^{r}$Stored documents given their true labels (H1): the older ones at each boundary, or all of them before each session (pre-session).}
+\caption{\textbf{Component ablations on CIL-CORD}, the runs of \bodyref{tab:ladder}{the ladder table of the main paper} (clean protocol, LayoutLMv3, mean $\pm$ s.d. over three seeds). Ticks: memory (Mem.; latent unless marked raw), blocked readout (Blk.), per-session deltas ($\Delta$), true labels (True). All rows but naive, joint and the raw memory freeze at least the embeddings and layers $1..4$ after session~1. MB: bytes kept across sessions (\bodyref{sec:cost}{the main paper's memory-cost section}); SBR-Recall's deltas at two bytes per parameter, a reporting choice ($\nMemRecallFpMB$ as trained in fp32). $^{r}$Stored documents given their true labels (H1): the older ones at each boundary, or all of them before each session (pre-session). Bold: best of each column, Joint training and the true-label controls aside.}
 \label{tab:ablation}
 \input{tab_ablation}
 \end{table}
@@ -167,7 +167,7 @@ b^\star=\arg\max_b e_b.
 \begin{table}[t]
 \centering\scriptsize
 \setlength{\tabcolsep}{3pt}
-\caption{\textbf{Image class-incremental learning} (AA, mean $\pm$ s.d., seeds 42/7/123). CIFAR-100 and ImageNet-R in ten sessions (class order seed $1993$, as in SLCA and RanPAC); ViT-B/16 pre-trained on ImageNet-21k with a linear head on the CLS token. House recipe, not the clean document protocol: AdamW at $5{\times}10^{-5}$ (SLCA and LCA: SGD at $0.01$), batch size $16$, epoch cap $100$ (SLCA: $20$) with early stopping, fp32 with gradient checkpointing (the latent memory and CoLaR: mixed precision). ER and DER++ keep $2{,}000$ raw images, SLCA class Gaussians, the latent memory and CoLaR $500$ images per session as layer-4 latents ($5{,}000$ after ten sessions). SLCA and RanPAC take the slots CPFD and IS3 take on documents. $^{v}$Diagnostic probe on seed-42 variant runs (on CIFAR-100 a second run of the latent memory, on ImageNet-R a CoLaR run with a $20$-epoch cap): a ridge readout refit on all training data through the run's adapted trunk; not a method. Generated.}
+\caption{\textbf{Image class-incremental learning} (AA, mean $\pm$ s.d., seeds 42/7/123). CIFAR-100 and ImageNet-R in ten sessions (class order seed $1993$, as in SLCA and RanPAC); ViT-B/16 pre-trained on ImageNet-21k with a linear head on the CLS token. House recipe, not the clean document protocol: AdamW at $5{\times}10^{-5}$ (SLCA and LCA: SGD at $0.01$), batch size $16$, epoch cap $100$ (SLCA: $20$) with early stopping, fp32 with gradient checkpointing (the latent memory and CoLaR: mixed precision). ER and DER++ keep $2{,}000$ raw images, SLCA class Gaussians, the latent memory and CoLaR $500$ images per session as layer-4 latents ($5{,}000$ after ten sessions). SLCA and RanPAC take the slots CPFD and IS3 take on documents. $^{v}$Diagnostic probe on seed-42 variant runs (on CIFAR-100 a second run of the latent memory, on ImageNet-R a CoLaR run with a $20$-epoch cap): a ridge readout refit on all training data through the run's adapted trunk; not a method. Generated. Bold: best of each column, Joint training and the probe aside; underlined: our best when a baseline is best.}
 \label{tab:image}
 \resizebox{\linewidth}{!}{\input{tab_image_core}}
 \end{table}

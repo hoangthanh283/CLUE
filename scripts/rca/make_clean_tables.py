@@ -29,6 +29,7 @@ from glob import glob
 from pathlib import Path
 
 import numpy as np
+from table_emph import emph
 
 SEEDS = (42, 7, 123)
 CLEAN, GATE, RESC = "results/clean_2026-11", "results/gates/cil_protocol_2026-11", "results/rescore"
@@ -1336,13 +1337,13 @@ def write_main(cell, mix, dil, full) -> None:
         ("Ours", "CoLaR", f"{colar_mem} ({_mb('cil_cord_colar')})", "shared",
          (fl("colar"), fmt(*cell["colar"]), fmt(*mix["colar"]), fmt(*dil["colar"])), False),
         ("Ours", "CoLaR-SBR", f"{colar_mem} ({_mb('cil_cord_colar_sbr')})", "blocked",
-         (fl("sbr"), fmt(*cell["sbr"]), fmt(*mix["sbr"], bold=True), fmt(*dil["sbr"])), True),
+         (fl("sbr"), fmt(*cell["sbr"]), fmt(*mix["sbr"]), fmt(*dil["sbr"])), True),
         ("Ours", "\\quad + LexSlot head slots", "+ head slots, token ids", "blocked",
          ("--", fmt(*cell["slot"]), fmt(*mix["slot"]), fmt(*dil["slot"])), False),
         ("Ours", "SBR-Recall",
          f"one rank-64 trunk delta per session ({_mb('cil_cord_colar_sbr_recall_r64')})",
          "blocked, per delta",
-         (fl("recall", bold=True), fmt(*cell["recall"], bold=True), fmt(*mix["recall"], mark="b"),
+         (fl("recall"), fmt(*cell["recall"]), fmt(*mix["recall"], mark="b"),
           "--"), True),
     ]  # fmt: skip
     rows.sort(key=lambda r: FAMILY_ORDER.index(r[0]))  # stable: keeps order inside a family
@@ -1353,12 +1354,15 @@ def write_main(cell, mix, dil, full) -> None:
           "\\cmidrule(l){10-10}\n"
           "\\textbf{Family} & \\textbf{Method} & \\textbf{Memory (what is stored)} & "
           "\\textbf{Readout} & full-label F1 & AA & AA & AA & AA & AA \\\\\n")  # fmt: skip
+    # bold: best of each column, Joint (the reference) aside; underlined: our best otherwise
+    grid = [tuple(r[4]) + _new_cells(keys[r[1]]) for r in rows]
+    ours, ref = [r[0] == "Ours" for r in rows], [r[1] == "Joint training" for r in rows]
+    grid = list(zip(*(emph(list(col), ours, ref) for col in zip(*grid, strict=True)), strict=True))
     prev = None
-    for fam, label, mem, readout, cells, bold in rows:
+    for (fam, label, mem, readout, _cells, bold), cells in zip(rows, grid, strict=True):
         if fam != prev:
             t += "\\midrule\n"
         lab = f"\\textbf{{{label}}}" if bold else label
-        cells = tuple(cells) + _new_cells(keys[label])
         t += f"{fam if fam != prev else ''} & {lab} & {mem} & {readout} & " + " & ".join(cells)
         t += " \\\\\n"
         prev = fam
@@ -1583,14 +1587,19 @@ def write_ablation() -> None:
     t = HDR + "\\begin{tabular}{@{}lccccccc@{}}\n\\toprule\n"
     t += ("Configuration & Mem. & Blk. & $\\Delta$ & True & Full-label F1 & AA & MB \\\\\n"
           "\\midrule\n")  # fmt: skip
+    kept = []
     for label, key, *flags in ABLATION:
         fl, aa = _abl_seeds(key, "full_label_f1"), _abl_seeds(key, "AA")
-        if len(fl) < len(SEEDS) or len(aa) < len(SEEDS):
-            continue
+        if len(fl) >= len(SEEDS) and len(aa) >= len(SEEDS):
+            kept.append((label, key, flags, fmt(list(fl.values()), True),
+                         fmt(list(aa.values()), True)))  # fmt: skip
+    ref = [bool(r[2][3]) for r in kept]  # true labels: the oracle controls and Joint
+    cols = [emph([r[i] for r in kept], [True] * len(kept), ref) for i in (3, 4)]
+    for (label, key, flags, _f, _a), fl, aa in zip(kept, *cols, strict=True):
         b = set(_abl_seeds(key, "replay_memory_bytes").values())
         mb = "--" if key == "joint" else (f"{max(b) / 1e6:.1f}" if b and max(b) else "0")
         t += (f"{label} & " + " & ".join(tick[f] for f in flags)
-              + f" & {fmt(list(fl.values()), True)} & {fmt(list(aa.values()), True)} & {mb} \\\\\n")  # fmt: skip
+              + f" & {fl} & {aa} & {mb} \\\\\n")  # fmt: skip
         if key in ("naive", "recall"):
             t += "\\midrule\n"
     t += "\\bottomrule\n\\end{tabular}\n"
@@ -1705,7 +1714,7 @@ def write_funsd() -> str:
     t = HDR + "\\begin{tabular}{@{}lcccccc@{}}\n\\toprule\n"
     t += (" & & & \\multicolumn{3}{c}{Full-label F1, seed} \\\\\n\\cmidrule(l){4-6}\n"
           "Method & Full-label F1 & AA & 42 & 7 & 123 & $R[2,1]$ \\\\\n\\midrule\n")  # fmt: skip
-    out, v = "", {}
+    out, v, shown = "", {}, []
     for stem, lab, _name, _sfx, settle in FUNSD:
         aa, fl, r21 = d[stem]
         ok = full3[stem]
@@ -1725,8 +1734,14 @@ def write_funsd() -> str:
             cells.append(f"${fl[sd]:.1f}{mark}$")
         rr = (f"{min(r21.values()):.1f}--{max(r21.values()):.1f}" if len(r21) == len(SEEDS)
               and stem != "Joint" else "--")  # fmt: skip
-        t += (f"{lab} & {fmt(list(fl.values()), True)} & {fmt(list(aa.values()), True)} & "
-              + " & ".join(cells) + f" & {rr} \\\\\n")  # fmt: skip
+        shown.append((stem, fmt(list(fl.values()), True), fmt(list(aa.values()), True)))
+        t += f"{lab} & @F{stem}@ & @A{stem}@ & " + " & ".join(cells) + f" & {rr} \\\\\n"
+    # bold: best per column, Joint and the true-label controls aside; underlined: CoLaR-SBR
+    ours = [s == "Sbr" for s, *_ in shown]
+    ref = [s in ("Joint", "Oracle", "OracleFifty") for s, *_ in shown]
+    for i, tag in ((1, "F"), (2, "A")):
+        for (stem, *_), c in zip(shown, emph([r[i] for r in shown], ours, ref), strict=True):
+            t = t.replace(f"@{tag}{stem}@", c)
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_funsd.tex").write_text(t)
 

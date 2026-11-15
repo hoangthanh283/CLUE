@@ -15,6 +15,8 @@ import json
 import statistics as st
 from pathlib import Path
 
+from table_emph import emph
+
 ROOT = Path(__file__).resolve().parents[2]
 RES = ROOT / "results"
 OUT = ROOT / "paper_cvpr" / "tab_image_core.tex"
@@ -39,7 +41,10 @@ ROWS = [
     ),
     (
         "\\textbf{CoLaR $r{=}128$, 500/session (ours)}",
-        {"cil_cifar100": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128", "cil_imagenet_r": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128"},
+        {
+            "cil_cifar100": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128",
+            "cil_imagenet_r": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128",
+        },
         "ours",
     ),
     ("Joint training (reference)", "{sc}_joint_seed{sd}_vit", "oracle"),
@@ -266,13 +271,16 @@ def main() -> None:
         "\\textbf{Method} & \\textbf{CIFAR-100} & \\textbf{ImageNet-R} \\\\",
         "\\midrule",
     ]
+    # bold: best per column, Joint (the reference) aside; underlined: our best otherwise
+    tms = [t if isinstance(t, dict) else dict.fromkeys(SCEN, t) for _, t, _ in ROWS]
+    ours, ref = [g == "ours" for *_, g in ROWS], [g == "oracle" for *_, g in ROWS]
+    cols = [emph([cell(tm[sc], sc) for tm in tms], ours, ref) for sc in SCEN]
     prev = None
-    for label, tmpl, group in ROWS:
+    for (label, _tmpl, group), *cells in zip(ROWS, *cols, strict=True):
         if prev and group != prev:
             lines.append("\\midrule")
         prev = group
-        tm = tmpl if isinstance(tmpl, dict) else dict.fromkeys(SCEN, tmpl)
-        lines.append(f"{label} & " + " & ".join(cell(tm[sc], sc) for sc in SCEN) + " \\\\")
+        lines.append(f"{label} & " + " & ".join(cells) + " \\\\")
         if group == "ours" and label.startswith("\\textbf{CoLaR"):
             lines.append(
                 "Ridge readout on a seed-42 variant run$^{v}$ (probe) & "
