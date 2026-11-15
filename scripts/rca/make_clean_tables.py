@@ -161,7 +161,7 @@ C = {
     "joint": src("cil_cord_joint", (RESC, "cil_cord_joint", "")),
     "er": src("cil_cord_er250", (RESC, "cil_cord_er", "")),
     "slot": src(None, (GATE, "cil_cord_colar_sbr_slot")),
-    "sbr_bros": src("cil_cord_colar_sbr_bros"),
+    "sbr_bros": src("cil_cord_colar_sbr_bros_b1"),  # BROS batch-1 recipe (v19), the only clean BROS
 }
 M = {  # Mixed
     "naive": src("mixed_naive", (RESC, "mixed_naive", "")),
@@ -1193,7 +1193,7 @@ BEYOND = (  # (stream, label, run name): a row renders only when its three clean
     ("CIL-FUNSD", "CoLaR-SBR", "cil_funsd_colar_sbr_d10", 3),
     ("CIL-FUNSD", "SBR-Recall", "cil_funsd_colar_sbr_recall_r64", 3),
     ("CIL-FUNSD", "Joint training (reference)", "cil_funsd_joint", 3),
-    ("CIL-CORD, BROS", "CoLaR-SBR", "cil_cord_colar_sbr_bros", 3),
+    ("CIL-CORD, BROS", "CoLaR-SBR", "cil_cord_colar_sbr_bros_b1", 3),
     ("CIL-CORD, order 2", "SBR-Recall", "cil_cord_o2_colar_sbr_recall_r64", 1),
     ("CIL-CORD, order 3", "SBR-Recall", "cil_cord_o3_colar_sbr_recall_r64", 1),
 )
@@ -1281,6 +1281,7 @@ def _new_cells(key: str) -> tuple:
     """(CIL-WildReceipt AA, DIL-XFUND AA) of method ``key``: clean-protocol runs only, so a
     cell reads '--' until its runs exist (the June-2026 legacy runs of these streams predate
     the class-incremental fixes and are not used)."""
+    key = {"der_pp": "der_pp250"}.get(key, key)  # v21 runs DER++ with the 250-document buffer
     return tuple(fmt(*pick_clean_only(src(f"{sc}_{key}"), "AA"), show_n=True)
                  for sc in NEW_STREAMS)  # fmt: skip
 
@@ -1384,7 +1385,7 @@ BENCH = {
     # doccl/data/scenarios.py: build_cil_wildreceipt (24 entity classes, 4 sessions) and
     # build_dil_xlingual (configs/scenario/dil_xlingual.yaml: de, es, fr, it, zh; DIL schema)
     "CIL-WildReceipt": ("WildReceipt", "4", "grows, 6 per session", "24 (49)", "new classes",
-                        "AA"),
+                        "full-label F1, AA"),  # full_eval_dataset since f0b9bd3
     "DIL-XFUND": ("XFUND: de, es, fr, it, zh in turn", "5", "fixed, unified", "4 (9)",
                   "new language", "AA"),
 }  # fmt: skip
@@ -1402,6 +1403,7 @@ def write_bench() -> None:
     t += " & " + " & ".join(cols) + " \\\\\n\\midrule\n"
     for i, name in enumerate(BENCH_ROWS):
         t += f"{name} & " + " & ".join(BENCH[c][i] for c in cols) + " \\\\\n"
+    t += "Documents (train/test) & " + " & ".join(bench_docs(c) for c in cols) + " \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_bench.tex").write_text(t)
 
@@ -2111,10 +2113,218 @@ def write_memory() -> str:
         drop = (
             [hi[x] - lo[x] for x in SEEDS if x in lo and x in hi] if len(lo) == len(SEEDS) else []
         )
-        v[f"nSbrRank{nm}DropMin"] = down1(min(drop)) if drop else "--"  # r128 minus rank r, F1
+        v[f"nSbrRank{nm}DropMin"] = down1(min(drop)).replace("-", "$-$") if drop else "--"  # r128 - r
         v[f"nSbrRank{nm}DropMax"] = up1(max(drop)) if drop else "--"
     print("memory self-check passed:", len(checked), "runs")
     return out + _defs(v)
+
+
+# ---------------------------------------------------------------------------- five datasets
+# Benchmark document counts from the HF cache the loaders read (dataset_info.json split sizes;
+# XFUND per language from the id column of its arrow files). 10% of each training set is held out
+# for early stopping (training.val_frac), so the trained-on count is about 90% of "train".
+HF_CACHE = Path.home() / ".cache/huggingface/datasets"
+HF_DIR = {"FUNSD": "nielsr___funsd-layoutlmv3", "CORD": "naver-clova-ix___cord-v2",
+          "SROIE": "mp-02___sroie", "WildReceipt": "kaydee___wildreceipt"}  # fmt: skip
+BENCH_SETS = {"CIL-CORD": ("CORD",), "DIL": ("FUNSD", "SROIE", "CORD"),
+              "Mixed": ("FUNSD", "SROIE", "CORD"), "CIL-FUNSD": ("FUNSD",),
+              "CIL-WildReceipt": ("WildReceipt",), "DIL-XFUND": ("XFUND",)}  # fmt: skip
+
+
+def _hf_sizes(cache_dir: str) -> dict[str, int]:
+    hits = sorted(HF_CACHE.glob(f"{cache_dir}/**/dataset_info.json"))
+    if not hits:
+        return {}
+    return {k: v["num_examples"] for k, v in json.loads(hits[0].read_text())["splits"].items()}
+
+
+@lru_cache(maxsize=1)
+def xfund_docs() -> dict[tuple[str, str], int]:
+    """{(lang, "train"|"test"): documents}; the loader maps test to XFUND's "val" split."""
+    import pyarrow as pa
+
+    out: dict[tuple[str, str], int] = {}
+    for f in sorted(HF_CACHE.glob("nnul___xfund-multilingual/**/xfund-multilingual-*.arrow")):
+        split = "train" if "-train" in f.name else "test"
+        with pa.memory_map(str(f)) as src:
+            ids = pa.ipc.open_stream(src).read_all().column("id").to_pylist()
+        for i in ids:
+            k = (i.split("_")[0], split)
+            out[k] = out.get(k, 0) + 1
+    return out
+
+
+def scenario_kwargs(name: str) -> dict:
+    """kwargs of configs/scenario/<name>.yaml (sessions, languages) as the runs used them."""
+    import yaml
+
+    f = Path("configs/scenario") / f"{name}.yaml"
+    return (yaml.safe_load(f.read_text()) or {}).get("kwargs") or {} if f.exists() else {}
+
+
+def bench_docs(col: str) -> str:
+    parts = []
+    for ds in BENCH_SETS.get(col, ()):
+        if ds == "XFUND":
+            langs, docs = scenario_kwargs("dil_xlingual").get("langs") or [], xfund_docs()
+            tr = {docs.get((lg, "train")) for lg in langs}
+            te = {docs.get((lg, "test")) for lg in langs}
+            if None in tr | te or not langs:
+                return "--"
+            parts.append(f"{'/'.join(map(str, sorted(tr)))}/{'/'.join(map(str, sorted(te)))} per language")
+            continue
+        sz = _hf_sizes(HF_DIR[ds])
+        parts.append(f"{sz['train']}/{sz['test']}" if "train" in sz and "test" in sz else "--")
+    return ", ".join(parts) if parts else "--"
+
+
+# The two new document streams (rented-box queue v21). NEW_METHODS: (stem, label, run, suffix, only-on)
+NEW_STREAM_INFO = (("Wild", "CIL-WildReceipt", "cil_wildreceipt", True),
+               ("Xfund", "DIL-XFUND", "dil_xlingual", False))  # (prefix, label, scenario, full-label)
+NEW_METHODS = (
+    ("Sbr", "CoLaR-SBR", "colar_sbr", "", None),
+    ("Colar", "CoLaR, shared softmax", "colar", "_k4_d50*", None),
+    ("Recall", "SBR-Recall", "colar_sbr_recall_r64", "", "cil"),
+    ("Er", "ER", "er", "", None),
+    ("DerPp", "DER++ (250 documents)", "der_pp250", "", None),
+    ("Lwf", "LwF", "lwf", "", None),
+    ("ClLora", "CL-LoRA", "cl_lora", "", None),
+    ("Naive", "Naive fine-tuning", "naive", "", None),
+    ("Joint", "Joint training (reference)", "joint", "", None),
+)  # fmt: skip
+NEW_GAPS = (("SbrMinusColar", "Sbr", "Colar"), ("SbrMinusNaive", "Sbr", "Naive"),
+            ("JointMinusSbr", "Joint", "Sbr"), ("ErMinusSbr", "Er", "Sbr"))  # fmt: skip
+
+
+def _stream_cells() -> dict:
+    """{(prefix, stem): [AA {seed: v}, full {seed: v}]} for every method that applies."""
+    out = {}
+    for pre, _lab, sc, has_full in NEW_STREAM_INFO:
+        for stem, _ml, run, sfx, only in NEW_METHODS:
+            if only and not sc.startswith(only):
+                continue
+            name = f"{sc}_{run}"
+            out[(pre, stem)] = [load_seeds(CLEAN, name, "AA", sfx),
+                                load_seeds(CLEAN, name, "full_label_f1", sfx) if has_full else {}]  # fmt: skip
+    return out
+
+
+def _pending(d: dict) -> str:
+    """Rule 6: a cell with fewer than three clean seeds prints no number, only its seed count."""
+    return f"--$^{{n={len(d)}}}$" if d else "--"
+
+
+def write_newstreams() -> str:
+    """tab_newstreams.tex (one column-width table: WildReceipt full-label F1 and AA, XFUND AA),
+    supp_newstreams.tex (every seed) and the \\v / \\n macros of both streams."""
+    cells = _stream_cells()
+    v, out = {}, ""
+    for (pre, stem), (aa, fl) in cells.items():
+        out += macro(f"{pre}{stem}", list(aa.values()) if len(aa) == len(SEEDS) else [])
+        if pre == "Wild":
+            out += macro(f"{pre}{stem}Full", list(fl.values()) if len(fl) == len(SEEDS) else [])
+    for pre, _lab, _sc, has_full in NEW_STREAM_INFO:
+        for gname, a, b in NEW_GAPS:
+            for i, suf in ((0, ""), (1, "Full")) if has_full else ((0, ""),):
+                x, y = cells[(pre, a)][i], cells[(pre, b)][i]
+                ok = len(x) == len(SEEDS) and len(y) == len(SEEDS)
+                dd = [x[s] - y[s] for s in SEEDS] if ok else []
+                v[f"n{pre}{gname}{suf}Min"] = _signed(min(dd), True) if dd else "--"
+                v[f"n{pre}{gname}{suf}Max"] = _signed(max(dd), False) if dd else "--"
+    # main-body table: one row per method, pending cells print "--" with their seed count
+    t = HDR + "\\begin{tabular}{@{}lccc@{}}\n\\toprule\n"
+    t += " & \\multicolumn{2}{c}{CIL-WildReceipt} & DIL-XFUND \\\\\n\\cmidrule(lr){2-3}\\cmidrule(l){4-4}\n"
+    t += "Method & Full-label F1 & AA & AA \\\\\n\\midrule\n"
+    s = HDR + "\\begin{tabular}{@{}llcccccc@{}}\n\\toprule\n"
+    s += " & & \\multicolumn{3}{c}{AA, seed} & \\multicolumn{3}{c}{Full-label F1, seed} \\\\\n"
+    s += "\\cmidrule(lr){3-5}\\cmidrule(l){6-8}\nStream & Method & 42 & 7 & 123 & 42 & 7 & 123 \\\\\n"
+    for stem, label, *_ in NEW_METHODS:
+        if stem == "Joint":
+            t += "\\midrule\n"
+        row = []
+        for pre, *_r in NEW_STREAM_INFO:
+            if (pre, stem) not in cells:
+                row += ["--", "--"] if pre == "Wild" else ["--"]
+                continue
+            aa, fl = cells[(pre, stem)]
+            if pre == "Wild":
+                row.append(fmt(list(fl.values()), True) if len(fl) == len(SEEDS) else _pending(fl))
+            row.append(fmt(list(aa.values()), True) if len(aa) == len(SEEDS) else _pending(aa))
+        t += f"{label} & " + " & ".join(row) + " \\\\\n"
+    for pre, slab, _sc, has_full in NEW_STREAM_INFO:
+        s += "\\midrule\n"
+        for stem, label, *_ in NEW_METHODS:
+            if (pre, stem) not in cells:
+                continue
+            aa, fl = cells[(pre, stem)]
+            per = [f"{aa[x]:.1f}" if x in aa else "--" for x in SEEDS]
+            per += [f"{fl[x]:.1f}" if x in fl else "--" for x in SEEDS] if has_full else ["n/a"] * 3
+            s += f"{slab} & {label} & " + " & ".join(per) + " \\\\\n"
+    t += "\\bottomrule\n\\end{tabular}\n"
+    s += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "tab_newstreams.tex").write_text(t)
+    (OUT / "supp_newstreams.tex").write_text(s)
+    done = sum(len(aa) == len(SEEDS) for aa, _ in cells.values())
+    print(f"new streams: {done}/{len(cells)} cells complete")
+    return out + _defs(v)
+
+
+# BROS (batch-1 recipe, v19): CoLaR-SBR, the pre-session true-label memory, the constant
+# background, plain CoLaR. (stem, label, run name)
+BROS_B1 = (("Sbr", "CoLaR-SBR", "cil_cord_colar_sbr_bros_b1"),
+           ("Oracle", "CoLaR, true labels before each session$^{r}$", "cil_cord_colar_r_oracle_pre_bros_b1"),
+           ("ConstO", "CoLaR-SBR, constant background logit", "cil_cord_colar_sbr_const_o_bros_b1"),
+           ("Colar", "CoLaR, shared softmax", "cil_cord_colar_bros_b1"))  # fmt: skip
+BROS_GAPS = (("SbrMinusColar", "Sbr", "Colar"), ("SbrMinusConstO", "Sbr", "ConstO"),
+             ("OracleMinusSbr", "Oracle", "Sbr"))  # fmt: skip
+
+
+def write_bros() -> str:
+    """supp_bros.tex (BROS on CIL-CORD, batch-1 recipe) + \\vBros<X>[Full] and per-seed gaps;
+    \\nBrosRecipe states the recipe as the runs recorded it (batch and replay batch sizes)."""
+    d = {stem: [load_seeds(CLEAN, run, m, "*") for m in ("AA", "full_label_f1")] for stem, _l, run in BROS_B1}
+    v, out = {}, ""
+    t = HDR + "\\begin{tabular}{@{}lccccc@{}}\n\\toprule\n"
+    t += " & & & \\multicolumn{3}{c}{Full-label F1, seed} \\\\\n\\cmidrule(l){4-6}\n"
+    t += "Method & Full-label F1 & AA & 42 & 7 & 123 \\\\\n\\midrule\n"
+    for stem, label, _run in BROS_B1:
+        aa, fl = d[stem]
+        ok = len(aa) == len(SEEDS) and len(fl) == len(SEEDS)
+        out += macro(f"Bros{stem}", list(aa.values()) if ok else [])
+        out += macro(f"Bros{stem}Full", list(fl.values()) if ok else [])
+        cells = [fmt(list(fl.values()), True), fmt(list(aa.values()), True)] if ok else [_pending(fl), _pending(aa)]
+        t += f"{label} & " + " & ".join(cells + [f"{fl[x]:.1f}" if x in fl else "--" for x in SEEDS]) + " \\\\\n"
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "supp_bros.tex").write_text(t)
+    for gname, a, b in BROS_GAPS:
+        for i, suf in ((0, ""), (1, "Full")):
+            x, y = d[a][i], d[b][i]
+            dd = [x[s] - y[s] for s in SEEDS] if len(x) == len(y) == len(SEEDS) else []
+            v[f"nBros{gname}{suf}Min"] = _signed(min(dd), True) if dd else "--"
+            v[f"nBros{gname}{suf}Max"] = _signed(max(dd), False) if dd else "--"
+    hp = {(json.loads(f.read_text())["training_hparams"]["batch_size"],
+           json.loads(f.read_text())["method_hparams"].get("replay_batch_size"))
+          for _s, _l, run in BROS_B1 for sd in SEEDS if (f := _run_file(CLEAN, run, sd, "*", "metrics.json"))}  # fmt: skip
+    if len(hp) > 1:
+        _warn(f"BROS b1 runs disagree on batch / replay batch: {hp}")
+    v["nBrosRecipe"] = (f"batch size {min(hp)[0]}, replay batch {min(hp)[1]}" if hp else "--")
+    return out + _defs(v)
+
+
+def rank_seed_macros() -> str:
+    """Per-seed values of the rank sweep, so the text can name a collapsing seed: full-label F1 and
+    AA per seed (42/7/123) and rank 128 minus rank r per seed (full-label)."""
+    v = {}
+    hi = _clean("sbr", "full_label_f1")
+    for r, nm in zip(MEM_RANKS, ("ThirtyTwo", "SixtyFour"), strict=True):
+        fl = load_seeds(CLEAN, f"{SBR_NAME}_r{r}", "full_label_f1")
+        aa = load_seeds(CLEAN, f"{SBR_NAME}_r{r}", "AA")
+        ok = len(fl) == len(aa) == len(SEEDS)
+        v[f"nSbrRank{nm}FullSeeds"] = "/".join(f"{fl[s]:.1f}" for s in SEEDS) if ok else "--"
+        v[f"nSbrRank{nm}Seeds"] = "/".join(f"{aa[s]:.1f}" for s in SEEDS) if ok else "--"
+        v[f"nSbrRank{nm}DropSeeds"] = ("/".join(f"{hi[s] - fl[s]:.1f}".replace("-", "$-$") for s in SEEDS)
+                                       if ok and len(hi) == len(SEEDS) else "--")  # fmt: skip
+    return _defs(v)
 
 
 def main():
@@ -2156,6 +2366,7 @@ def main():
     v += baseline_macros() + gap_macros() + write_mechanism() + write_dropped()
     v += ablation_macros() + control_macros() + sliced_macros() + mask_macros() + write_memory()
     v += write_funsd()
+    v += write_newstreams() + write_bros() + rank_seed_macros()
     (OUT / "vals.tex").write_text(v)
     write_ladder()
     write_beyond()
