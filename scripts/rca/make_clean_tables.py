@@ -1567,7 +1567,9 @@ def mask_macros() -> str:
     mk, c, pre = _ctrl(MASK_NAME), _ctrl("cil_cord_colar"), _ctrl(ORACLE_PRE_NAME)
     j = [_clean("joint", m) for m in ("AA", "full_label_f1")]
     names = ("nOracleMaskSeeds", "nOracleMaskFullSeeds", "nOracleMaskShare", "nOracleMaskShareFull",
-             "nOracleMaskJointGap", "nOracleMaskPreDiffMin", "nOracleMaskPreDiffMax")  # fmt: skip
+             "nOracleMaskJointGap", "nOracleMaskPreDiffMin", "nOracleMaskPreDiffMax",
+             "nOracleMaskMinusColarFullMin", "nOracleMaskMinusColarFullMax",
+             "nOraclePreMinusMaskFullMin", "nOraclePreMinusMaskFullMax")  # fmt: skip
     if not all(len(d) == len(SEEDS) for d in mk):
         return macro("OracleMask", []) + macro("OracleMaskFull", []) + _defs(dict.fromkeys(names, "--"))
     t = macro("OracleMask", list(mk[0].values())) + macro("OracleMaskFull", list(mk[1].values()))
@@ -1580,6 +1582,11 @@ def mask_macros() -> str:
     dd = [mk[i][s] - pre[i][s] for i in (0, 1) for s in SEEDS if s in pre[i]]
     v["nOracleMaskPreDiffMin"] = _signed(min(dd), True) if len(dd) == 2 * len(SEEDS) else "--"
     v["nOracleMaskPreDiffMax"] = _signed(max(dd), False) if len(dd) == 2 * len(SEEDS) else "--"
+    # full-label F1 only, per seed, rounded outward
+    for nm, a, b in (("nOracleMaskMinusColarFull", mk[1], c[1]), ("nOraclePreMinusMaskFull", pre[1], mk[1])):
+        x = [a[s] - b[s] for s in SEEDS if s in a and s in b]
+        ok = len(x) == len(SEEDS)
+        v[f"{nm}Min"], v[f"{nm}Max"] = (_signed(min(x), True), _signed(max(x), False)) if ok else ("--", "--")
     return t + _defs(v)
 
 
@@ -1597,6 +1604,7 @@ FUNSD = (
     ("Mib", "CoLaR + MiB-style unbiased CE", "cil_funsd_colar_mib", "", True),
     ("SlicedTwo", "CoLaR, replay and current losses sliced", "cil_funsd_colar_r_sliced2", "*", True),
     ("NoBank", "SBR, no memory", "cil_funsd_colar_sbr_noreplay", "", True),
+    ("CurSliced", "CoLaR, current loss sliced", "cil_funsd_colar_cur_sliced", "_k4_d10*", True),
 )  # fmt: skip
 
 
@@ -1669,6 +1677,10 @@ def write_funsd() -> str:
             v[f"nFunsdConstOSbrGap{nm}Max"] = up1(max(abs(d["ConstO"][i][s] - d["Sbr"][i][s]) for s in SEEDS))
             v[f"nFunsdSbrMinusJoint{nm}Seeds"] = "/".join(
                 f"{d['Sbr'][i][s] - d['Joint'][i][s]:+.1f}".replace("-", "$-$") for s in SEEDS)
+    for a, b, nm in (("CurSliced", "Colar", "nFunsdCurSlicedMinusColarFull"),
+                     ("Sbr", "CurSliced", "nFunsdSbrMinusCurSlicedFull")):  # fmt: skip
+        ok = full3[a] and full3[b]
+        v[f"{nm}Min"], v[f"{nm}Max"] = signed_range(a, b, 1) if ok else ("--", "--")
     v["nFunsdJointEarlySeeds"] = "/".join(map(str, early)) if early else "none"
     v["nFunsdJointEarlyN"] = str(len(early))
     return out + _defs(v)
