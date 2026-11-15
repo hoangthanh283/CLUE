@@ -306,6 +306,14 @@ The LexSlot items below are superseded except as honest negative-result material
   hand-kept inline); add a component-separability defense paragraph up front in ch2/ch3.
 
 ## Next Up
+-1. **Five document datasets in the CVPR paper (user, 2026-11-15, critical).** The setup is FUNSD, CORD,
+   SROIE, WildReceipt, XFUND; the paper reports only the first three, yet the abstract (79bec5a+) now says
+   "5 public document datasets". Before submission EITHER the two streams land OR the abstract goes back
+   to 3. Runs: `scripts/rca/clean_protocol_v20_2026-11.sh` (prepared, NOT started; cil_wildreceipt and
+   dil_xlingual x CoLaR-SBR, CoLaR, joint, naive, ER; smokes, seed 42 first). It needs the GPU: v19
+   (PID 3163529, BROS block then v13 list) holds results/clean_2026-11/.driver.lock. Then: plan with the
+   user how to reformat the whole paper (tab:bench, tab:main, setup, limitations "three English datasets",
+   intro) for five datasets. Also pending: body runs a few lines past page 8.
 0. **Replace thesis estimates (2026-10-08).** Ch6 component table + text and Ch7 conclusion carry
    PROJECTED routing numbers wrapped in `\est{}` (renders underlined). When `scripts/run_doc_route.sh`
    finishes (docU_d5, docR{near,far,task}_d{50,5}), replace each with the measured value and drop the
