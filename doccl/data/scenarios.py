@@ -292,6 +292,9 @@ def build_cil_wildreceipt(num_sessions: int = 4) -> CLScenario:
     # Joint pool: one full-label WildReceipt set remapped into the final cumulative head.
     full_head = snapshots[-1]
     joint_train = [CIL_LabelRemapper(full_train, full_train.id_to_label, full_head)]
+    # Unmasked test set in the final head space (training.full_label_eval), as in build_cil_cord.
+    full_test = WildReceiptDataset(split="test")
+    full_eval = CIL_LabelRemapper(full_test, full_test.id_to_label, full_head)
 
     tasks = [
         TaskInfo(
@@ -310,6 +313,7 @@ def build_cil_wildreceipt(num_sessions: int = 4) -> CLScenario:
         train_dss,
         eval_dss,
         joint_train_datasets=joint_train,
+        full_eval_dataset=full_eval,
     )
 
 
