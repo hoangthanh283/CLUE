@@ -433,7 +433,12 @@ def write_delta():
 
 # R10-H1: er_cflat ran with cflat_lambda = 0 (configs/method/er_cflat.yaml), i.e. ER + SAM; the
 # O-LoRA rows predate the fix of the port's orthogonality penalty (c974159), so they are left out.
-DROPPED = (("EWC", "ewc"), ("L2P", "l2p"), ("DualPrompt", "dualprompt"), ("ER with SAM", "er_cflat"))
+DROPPED = (
+    ("EWC", "ewc"),
+    ("L2P", "l2p"),
+    ("DualPrompt", "dualprompt"),
+    ("ER with SAM", "er_cflat"),
+)
 DROPPED_REF = (("Naive (reference)", "naive"), ("ER (kept)", "er"))
 UNLEARNED_F1 = 1.0  # a session whose own diagonal F1 stays below this was never learned
 
@@ -473,7 +478,9 @@ def write_dropped() -> str:
     (OUT / "supp_dropped.tex").write_text(t)
     for k in ("ewc", "l2p", "dualprompt"):
         if len(unl[k]) < len(SEEDS) or any(not {4, 5} <= set(u) for u in unl[k].values()):
-            _warn(f"{k} learns one of the last two sessions on some seed (dropped-methods sentence)")
+            _warn(
+                f"{k} learns one of the last two sessions on some seed (dropped-methods sentence)"
+            )
     sam, er = vals["er_cflat"], vals["er"]
     gaps = [abs(sam[s] - er[s]) for s in SEEDS if s in sam and s in er]
     if len(gaps) < len(SEEDS):
@@ -869,7 +876,10 @@ def verdict_ok(key: str, verdict: str) -> bool | None:
     Every condition must hold on every seed, under both metrics where both exist; a missing seed
     or value fails the check (R10-L6). ``open`` claims nothing, so its check is True by design."""
     m2 = ("AA", "full_label_f1")
-    c = {k: [_clean(k, m) for m in m2] for k in ("naive", "colar", "sbr", "nobank", "recall", "joint")}
+    c = {
+        k: [_clean(k, m) for m in m2]
+        for k in ("naive", "colar", "sbr", "nobank", "recall", "joint")
+    }
     orc = [load_seeds(*ORACLE_CLEAN[:2], key=m, suffix="*") for m in m2]
     mix = {k: load_seeds(*s[:2], suffix=s[2]).get(42) for k, s in
            (("nomem", MIX_RECALL_NOMEM), ("mem", MIX_RECALL_MEM))}  # fmt: skip
@@ -926,8 +936,10 @@ def verdict_ok(key: str, verdict: str) -> bool | None:
 
 def write_ladder() -> None:
     errors = []
-    t = HDR + "\\begin{tabular}{@{}l p{2.5cm} p{3.6cm} p{4.1cm} c c l@{}}\n\\toprule\n"
-    t += ("Rung & Hypothesis & Prediction if true & Intervention (CIL-CORD unless stated) & "
+    # compact layout: one full-width line per rung (hypothesis and prediction), then one line
+    # per intervention; the old three wrapped text columns took most of a page
+    t = HDR + "\\begin{tabular*}{\\textwidth}{@{\\extracolsep{\\fill}}l c c l@{}}\n\\toprule\n"
+    t += ("Hypothesis (\\emph{prediction if true}) and intervention & "
           "Full-label F1 & AA & Verdict \\\\\n\\midrule\n")  # fmt: skip
     for rung, hyp, pred, interv, key, aa_s, full_s, kind, verdict, min_n in LADDER:
         if kind == "slot":
@@ -940,7 +952,9 @@ def write_ladder() -> None:
             verdict = SLOT_VERDICT.get(key, "")
             if not verdict and key in AUTO_VERDICT:
                 verdict = next((w for w in AUTO_VERDICT[key] if verdict_ok(key, w)), "")
-                print(f"slot {key}: verdict chosen by its per-seed check: '{verdict}' (write the prose)")
+                print(
+                    f"slot {key}: verdict chosen by its per-seed check: '{verdict}' (write the prose)"
+                )
         elif kind == "clean":
             aa, full = pick_clean_only(aa_s, "AA"), pick_clean_only(full_s, "full_label_f1")
         else:
@@ -958,11 +972,14 @@ def write_ladder() -> None:
         if rung or key == "joint":
             t += "\\midrule\n"
         # n is marked on every cell with fewer than three seeds, clean or legacy (R9-L1)
-        t += (f"{rung} & {hyp} & {pred} & {interv} & {fmt(*full, show_n=True)} & "
-              f"{fmt(*aa, show_n=True)} & {verdict} \\\\\n")  # fmt: skip
+        if rung:
+            t += (f"\\multicolumn{{4}}{{@{{}}l@{{}}}}{{\\textbf{{{rung}.}} {hyp}. "
+                  f"\\emph{{If true: {pred}.}}}} \\\\\n")  # fmt: skip
+        t += (f"{'' if key in ('naive', 'joint') else chr(92) + 'quad '}{interv} & "
+              f"{fmt(*full, show_n=True)} & {fmt(*aa, show_n=True)} & {verdict} \\\\\n")  # fmt: skip
     if errors:
         raise SystemExit("make_clean_tables: ladder verdicts:\n  " + "\n  ".join(errors))
-    t += "\\bottomrule\n\\end{tabular}\n"
+    t += "\\bottomrule\n\\end{tabular*}\n"
     (OUT / "tab_ladder.tex").write_text(t)
 
 
@@ -1282,12 +1299,30 @@ def write_main(cell, mix, dil, full) -> None:
     buf_dpp = _hparams(src("cil_cord_der_pp", (RESC, "cil_cord_der_pp", ""))).get("buffer_size", "")
     colar_mem = "50 docs/session, rank-128 layer-4 latents"
     rows = [  # (family, label, memory, readout, (full, cil AA, mixed, dil), bold)
-        ("Reference", "Naive fine-tuning", "none", "shared",
-         (fl("naive"), fmt(*cell["naive"]), fmt(*mix["naive"]), fmt(*dil["naive"])), False),
-        ("Reference", "Joint training", "all data, all sessions", "shared",
-         (fl("joint"), fmt(*cell["joint"]), fmt(*mix["joint"]), fmt(*dil["joint"])), False),
-        ("Replay", "ER (2019)", f"{buf} raw documents", "shared",
-         (fl("er"), fmt(*cell["er"]), fmt(*mix["er"]), fmt(*dil["er"])), False),
+        (
+            "Reference",
+            "Naive fine-tuning",
+            "none",
+            "shared",
+            (fl("naive"), fmt(*cell["naive"]), fmt(*mix["naive"]), fmt(*dil["naive"])),
+            False,
+        ),
+        (
+            "Reference",
+            "Joint training",
+            "all data, all sessions",
+            "shared",
+            (fl("joint"), fmt(*cell["joint"]), fmt(*mix["joint"]), fmt(*dil["joint"])),
+            False,
+        ),
+        (
+            "Replay",
+            "ER (2019)",
+            f"{buf} raw documents",
+            "shared",
+            (fl("er"), fmt(*cell["er"]), fmt(*mix["er"]), fmt(*dil["er"])),
+            False,
+        ),
     ]
     for label, key, dz in BASE:
         fam, mem = BASE_INFO[key]
@@ -1599,7 +1634,11 @@ def mask_macros() -> str:
              "nOracleMaskMinusColarFullMin", "nOracleMaskMinusColarFullMax",
              "nOraclePreMinusMaskFullMin", "nOraclePreMinusMaskFullMax")  # fmt: skip
     if not all(len(d) == len(SEEDS) for d in mk):
-        return macro("OracleMask", []) + macro("OracleMaskFull", []) + _defs(dict.fromkeys(names, "--"))
+        return (
+            macro("OracleMask", [])
+            + macro("OracleMaskFull", [])
+            + _defs(dict.fromkeys(names, "--"))
+        )
     t = macro("OracleMask", list(mk[0].values())) + macro("OracleMaskFull", list(mk[1].values()))
     v = {"nOracleMaskSeeds": "/".join(f"{mk[0][s]:.1f}" for s in SEEDS),
          "nOracleMaskFullSeeds": "/".join(f"{mk[1][s]:.1f}" for s in SEEDS)}  # fmt: skip
@@ -1611,10 +1650,15 @@ def mask_macros() -> str:
     v["nOracleMaskPreDiffMin"] = _signed(min(dd), True) if len(dd) == 2 * len(SEEDS) else "--"
     v["nOracleMaskPreDiffMax"] = _signed(max(dd), False) if len(dd) == 2 * len(SEEDS) else "--"
     # full-label F1 only, per seed, rounded outward
-    for nm, a, b in (("nOracleMaskMinusColarFull", mk[1], c[1]), ("nOraclePreMinusMaskFull", pre[1], mk[1])):
+    for nm, a, b in (
+        ("nOracleMaskMinusColarFull", mk[1], c[1]),
+        ("nOraclePreMinusMaskFull", pre[1], mk[1]),
+    ):
         x = [a[s] - b[s] for s in SEEDS if s in a and s in b]
         ok = len(x) == len(SEEDS)
-        v[f"{nm}Min"], v[f"{nm}Max"] = (_signed(min(x), True), _signed(max(x), False)) if ok else ("--", "--")
+        v[f"{nm}Min"], v[f"{nm}Max"] = (
+            (_signed(min(x), True), _signed(max(x), False)) if ok else ("--", "--")
+        )
     return t + _defs(v)
 
 
@@ -1641,7 +1685,9 @@ def _best_epoch(name: str, seed: int) -> int | None:
     f = Path(CLEAN) / f"{name}_seed{seed}.log"
     if not f.exists():
         return None
-    eps = re.findall(r"T0 ep(\d+) val_f1=[\d.]+ best=[\d.]+ bad=(\d+)", f.read_text(errors="ignore"))
+    eps = re.findall(
+        r"T0 ep(\d+) val_f1=[\d.]+ best=[\d.]+ bad=(\d+)", f.read_text(errors="ignore")
+    )
     good = [int(e) for e, b in eps if b == "0"]
     return good[-1] if good else None
 
@@ -1696,15 +1742,22 @@ def write_funsd() -> str:
     if not core:
         v.update(dict.fromkeys(names, "--"))
     else:
-        v["nFunsdOracleMinusColarFullMin"], v["nFunsdOracleMinusColarFullMax"] = signed_range("Oracle", "Colar", 1)
-        v["nFunsdOracleMinusColarMin"], v["nFunsdOracleMinusColarMax"] = signed_range("Oracle", "Colar", 0)
+        v["nFunsdOracleMinusColarFullMin"], v["nFunsdOracleMinusColarFullMax"] = signed_range(
+            "Oracle", "Colar", 1
+        )
+        v["nFunsdOracleMinusColarMin"], v["nFunsdOracleMinusColarMax"] = signed_range(
+            "Oracle", "Colar", 0
+        )
         v["nFunsdOracleSessOneMax"] = up1(max(d["Oracle"][2].values()))  # R[2,1], any seed
         v["nFunsdSbrSessOneMin"] = down1(min(d["Sbr"][2].values()))
         v["nFunsdConstOSessOneMin"] = down1(min(d["ConstO"][2].values()))
         for i, nm in ((1, "Full"), (0, "")):
-            v[f"nFunsdConstOSbrGap{nm}Max"] = up1(max(abs(d["ConstO"][i][s] - d["Sbr"][i][s]) for s in SEEDS))
+            v[f"nFunsdConstOSbrGap{nm}Max"] = up1(
+                max(abs(d["ConstO"][i][s] - d["Sbr"][i][s]) for s in SEEDS)
+            )
             v[f"nFunsdSbrMinusJoint{nm}Seeds"] = "/".join(
-                f"{d['Sbr'][i][s] - d['Joint'][i][s]:+.1f}".replace("-", "$-$") for s in SEEDS)
+                f"{d['Sbr'][i][s] - d['Joint'][i][s]:+.1f}".replace("-", "$-$") for s in SEEDS
+            )
     for a, b, nm in (("CurSliced", "Colar", "nFunsdCurSlicedMinusColarFull"),
                      ("Sbr", "CurSliced", "nFunsdSbrMinusCurSlicedFull")):  # fmt: skip
         ok = full3[a] and full3[b]
@@ -1719,7 +1772,13 @@ def sliced_macros() -> str:
     per-seed values (seeds 42/7/123) of AA and full-label F1, its seed-matched share of the CoLaR
     -> joint gap, and the smallest per-seed distance below the pre-session refresh."""
     sl, c, j, pre = _ctrl(SLICED_NAME), _ctrl("cil_cord_colar"), [_clean("joint", m) for m in ("AA", "full_label_f1")], _ctrl(ORACLE_PRE_NAME)  # fmt: skip
-    names = ("nSlicedSeeds", "nSlicedFullSeeds", "nSlicedShare", "nSlicedShareFull", "nSlicedPreGapMin")
+    names = (
+        "nSlicedSeeds",
+        "nSlicedFullSeeds",
+        "nSlicedShare",
+        "nSlicedShareFull",
+        "nSlicedPreGapMin",
+    )
     if not all(len(d) == len(SEEDS) for d in sl):
         return macro("Sliced", []) + macro("SlicedFull", []) + _defs(dict.fromkeys(names, "--"))
     t = macro("Sliced", list(sl[0].values())) + macro("SlicedFull", list(sl[1].values()))
@@ -1749,7 +1808,9 @@ def control_macros() -> str:
     for name, d in (("OraclePre", pre), ("Mib", mib), ("IceO", ice)):
         t += macro(name, list(d[0].values())) + macro(f"{name}Full", list(d[1].values()))
     v = {}
-    v["nOraclePreJointGap"] = up1(max(abs(pre[j][s] - c["joint"][j][s]) for j in (0, 1) for s in SEEDS))
+    v["nOraclePreJointGap"] = up1(
+        max(abs(pre[j][s] - c["joint"][j][s]) for j in (0, 1) for s in SEEDS)
+    )
     if any(pre[j][s] <= c["sbr"][j][s] for j in (0, 1) for s in SEEDS):
         _warn("the never-stale memory is not above CoLaR-SBR on every seed under both metrics")
     for j, nm in ((0, "nMibShare"), (1, "nMibShareFull")):
@@ -1907,7 +1968,10 @@ def memory_forms() -> list[dict]:
     if rec:
         m = next(iter(rec.values()))
         p, ns = recall_session_params(m), int(m["num_tasks"]) - 1  # session 1 trains the base
-        for prec, b, comp, run in (("fp16", 2, True, None), ("fp32, as trained", 4, False, RECALL_NAME)):
+        for prec, b, comp, run in (
+            ("fp16", 2, True, None),
+            ("fp32, as trained", 4, False, RECALL_NAME),
+        ):
             forms.append({"key": f"recall{8 * b}", "label": f"SBR-Recall deltas, {prec}",
                           "unit": p * b, "per": "session", "n": ns, "computed": comp,
                           "pixels": False, "ids": False, "run": run})  # fmt: skip
@@ -1927,17 +1991,22 @@ def memory_selfcheck() -> list[str]:
         for s, m in _metas(name, sfx).items():
             want = colar_doc_bytes(int(m["method_hparams"]["rank_r"]), sbr) * _n_docs(m)
             (ok if m["replay_memory_bytes"] == want else errs).append(
-                f"{name} seed {s}: recorded {m['replay_memory_bytes']}, formula {want}")
+                f"{name} seed {s}: recorded {m['replay_memory_bytes']}, formula {want}"
+            )
     for s, m in _metas(ER_SBR_NAME, "").items():
         want = doc_bytes()["raw"] * _n_docs(m)
         (ok if m["replay_memory_bytes"] == want else errs).append(
-            f"{ER_SBR_NAME} seed {s}: recorded {m['replay_memory_bytes']}, formula {want}")
+            f"{ER_SBR_NAME} seed {s}: recorded {m['replay_memory_bytes']}, formula {want}"
+        )
     for s, m in _metas(RECALL_NAME).items():
         want = 2 * recall_session_params(m) * (int(m["num_tasks"]) - 1)
         if _n_docs(m):
-            errs.append(f"{RECALL_NAME} seed {s}: has a document memory, formula covers deltas only")
+            errs.append(
+                f"{RECALL_NAME} seed {s}: has a document memory, formula covers deltas only"
+            )
         (ok if m["replay_memory_bytes"] == want else errs).append(
-            f"{RECALL_NAME} seed {s}: recorded {m['replay_memory_bytes']}, formula {want}")
+            f"{RECALL_NAME} seed {s}: recorded {m['replay_memory_bytes']}, formula {want}"
+        )
     if errs or not ok:
         raise SystemExit("make_clean_tables: memory byte self-check failed:\n  " + "\n  ".join(errs or ["no run checked"]))  # fmt: skip
     return ok
@@ -1977,10 +2046,17 @@ def write_memory() -> str:
 
     by = {f["key"]: f for f in forms}
     v = {}
-    for k, nm in (("latent", "Latent"), ("raw", "Raw"), ("raw8", "RawEight"), ("colar128", "Colar")):
+    for k, nm in (
+        ("latent", "Latent"),
+        ("raw", "Raw"),
+        ("raw8", "RawEight"),
+        ("colar128", "Colar"),
+    ):
         v[f"nMem{nm}KB"] = f"{by[k]['unit'] / 1e3:.1f}"
         v[f"nMem{nm}MB"] = f"{by[k]['total'] / 1e6:.1f}"
-    for r, nm in zip(MEM_RANKS, ("ThirtyTwo", "SixtyFour"), strict=True):  # computed sizes, any time
+    for r, nm in zip(
+        MEM_RANKS, ("ThirtyTwo", "SixtyFour"), strict=True
+    ):  # computed sizes, any time
         v[f"nMemColar{nm}KB"] = f"{colar_doc_bytes(r, True) / 1e3:.1f}"
         v[f"nMemColar{nm}MB"] = f"{colar_doc_bytes(r, True) * by['colar128']['n'] / 1e6:.1f}"
     v["nMemLatentOverColar"] = f"{by['latent']['unit'] / by['colar128']['unit']:.1f}"
@@ -2008,13 +2084,19 @@ def write_memory() -> str:
         v[f"nErSbrDiff{nm}Min"] = _signed(min(dd), True) if dd else "--"
         v[f"nErSbrDiff{nm}Max"] = _signed(max(dd), False) if dd else "--"
         # P24 (R15-H1): |raw - latent| bound, rounded up so "within" holds on every seed
-        v[f"nErSbrAbs{nm}Max"] = f"{math.ceil(10 * max(abs(d) for d in dd)) / 10:.1f}" if dd else "--"
+        v[f"nErSbrAbs{nm}Max"] = (
+            f"{math.ceil(10 * max(abs(d) for d in dd)) / 10:.1f}" if dd else "--"
+        )
     for r, nm in zip(MEM_RANKS, ("ThirtyTwo", "SixtyFour"), strict=True):  # rule 6: 3 seeds or --
         for key, suf in (("AA", ""), ("full_label_f1", "Full")):
             vs = load_seeds(CLEAN, f"{SBR_NAME}_r{r}", key)
             out += macro(f"SbrRank{nm}{suf}", list(vs.values()) if len(vs) == len(SEEDS) else [])
-        lo, hi = load_seeds(CLEAN, f"{SBR_NAME}_r{r}", "full_label_f1"), _clean("sbr", "full_label_f1")
-        drop = [hi[x] - lo[x] for x in SEEDS if x in lo and x in hi] if len(lo) == len(SEEDS) else []
+        lo, hi = load_seeds(CLEAN, f"{SBR_NAME}_r{r}", "full_label_f1"), _clean(
+            "sbr", "full_label_f1"
+        )
+        drop = (
+            [hi[x] - lo[x] for x in SEEDS if x in lo and x in hi] if len(lo) == len(SEEDS) else []
+        )
         v[f"nSbrRank{nm}DropMin"] = down1(min(drop)) if drop else "--"  # r128 minus rank r, F1
         v[f"nSbrRank{nm}DropMax"] = up1(max(drop)) if drop else "--"
     print("memory self-check passed:", len(checked), "runs")
