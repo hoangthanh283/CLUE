@@ -5584,3 +5584,141 @@ more than the runs test.**
 - Mixed joint seeds 7/123 and the DIL clean cells: queued.
 - FUNSD current-only repair (R22-L3): not queued, optional.
 - Second class order for the controls: not queued.
+
+## R23 (2026-11-15): P34 (`26bc7c6`) on Dev `f4486d5` / `13ac427`: mask-only oracle (CIL-CORD), current-only repair (CIL-FUNSD)
+
+Scope:
+- `git diff 179e00f..26bc7c6` of main.tex and supp_body.tex.
+- Run files `cil_cord_colar_r_oracle_mask_pre_seed*_k4_d50_r128` and `cil_funsd_colar_cur_sliced_seed*_k4_d10_r128`.
+- `doccl/methods/colar_r.py` (oracle_mask) and `doccl/methods/latent_replay.py` (`_current_ce`).
+- Built from `git archive 26bc7c6` in a scratch dir and split. Both outputs are text-identical to the committed
+  `submission/*.pdf`.
+- `make_clean_tables.py` exits 0 ("memory self-check passed: 15 runs") and changes no generated file.
+
+### Verdict: **PASS** (no HIGH; one MEDIUM [W])
+
+### 1. Mask-only oracle, CIL-CORD (seeds 42 / 7 / 123)
+
+| Run | Full-label F1 | AA |
+|---|---|---|
+| Mask | 91.01 / 88.59 / 89.50 | 90.23 / 87.50 / 87.79 |
+| CoLaR | 32.38 / 30.54 / 29.32 | |
+| Pre-session relabel | 92.52 / 93.13 / 90.72 | |
+| Joint | 91.70 / 91.80 / 92.38 | |
+
+- **Mask minus CoLaR:** F1 +58.62 / +58.05 / +60.18. The macro reads "+58.0 to +60.2". True.
+- **Relabel minus mask:** F1 +1.52 / +4.54 / +1.22 (macro "+1.2 to +4.6"); AA +1.63 / +4.75 / +1.99. Positive on every seed
+  under both metrics, so "relabelling adds ... more" is true.
+- **Joint minus mask:** F1 0.70 / 3.21 / 2.88; AA 0.90 / 3.03 / 4.33.
+  - `\nOracleMaskJointGap` = 4.4 is the maximum over both metrics, rounded up.
+  - "Within 4.4 points of joint" is therefore true under either metric. In full-label F1 alone, which is the metric the
+    sentence quotes, the bound would be 3.3 (L3).
+- **"Removing the stale negatives alone recovers most of the gap":** the share of the seed-matched CoLaR -> joint gap is
+  0.988 / 0.948 / 0.954 (F1) and 0.984 / 0.948 / 0.925 (AA). The macros "94 to 99" and "92 to 99" are correct. True on every
+  seed.
+- **"All three read labels no continual learner has":** true. `mask_refresh` selects the tokens to ignore using
+  `labels_full`, the true final-head labels: exactly the positions `oracle_refresh` would change. So it is an oracle,
+  although it adds no label.
+- **Ladder verdict "partly" is consistent.**
+  - `AUTO_VERDICT` tries "supports" first, which needs |x - joint| < 3 on every seed under both metrics. That fails (F1 seed
+    7: 3.21; AA seed 123: 4.33).
+  - "Partly" (CoLaR < x < joint on every seed, both metrics) holds.
+  - The prose's "(partly) ... recovers most of the gap" matches.
+- The record holds 100,928,000 bytes, the same as the relabel oracle (`labels_full` kept).
+- **Effect on the paper.** This settles the mechanism question that R17-W1, R19-H1 and R22 left open. On CIL-CORD,
+  removing the stored false "O" negatives alone recovers 94 to 99% of the gap. Adding the true labels adds 1.2 to 4.6
+  points.
+  - The cut H1 clause "its refresh also adds labels for the current classes" is therefore superseded by a measurement.
+    Not a lost caveat.
+  - H2's "masking the stale tokens, an oracle (H1), recovers most of it" is true.
+  - The abstract clauses (unchanged, 252 words) all remain true. "An O label is evidence only against the classes its
+    annotator could see" is now directly supported on CIL-CORD.
+
+### 2. Current-side-only repair, CIL-FUNSD (seeds 42 / 7 / 123)
+
+- **Configuration checked.**
+  - `method=colar` (plain CoLaR class) with `current_sliced: true`. The log echoes `name: colar` and `current_sliced: true`.
+  - Plain CoLaR has no replay slicing: `sliced_replay_loss` and `replay_sliced` exist only in `colar_r`. So the replay loss
+    is untouched.
+  - It banks 10 + 10 forms.
+- **Numbers.**
+
+  | Run | Full-label F1 | AA | R[2,1] |
+  |---|---|---|---|
+  | Current-only slice | 71.75 / 83.90 / 78.36 | 73.57 / 84.63 / 79.18 | 56.3 / 79.7 / 73.1 |
+  | CoLaR | 51.80 / 52.95 / 51.88 | | |
+  | CoLaR-SBR | 87.57 / 86.42 / 87.46 | | |
+
+  - Current-only minus CoLaR: F1 +19.95 / +30.95 / +26.49 (macro "+19.9 to +31.0"). True.
+  - CoLaR-SBR minus current-only: F1 +15.82 / +2.52 / +9.10; AA +14.20 / +2.13 / +8.59.
+  - "Stays below CoLaR-SBR on every seed" is true under both metrics. It is also below the two-sided MiB-style loss on
+    every seed (by 15.1 / 3.4 / 9.2 F1).
+- **"Not sufficient": see M1.**
+
+### MEDIUM
+
+**R23-M1 [W]. "The current side is needed, not sufficient" (Sec. 7) and "needed but not sufficient alone" (Limitations)
+read the current-only run as a test of the current side as such. It is a softmax slice.**
+- `_current_ce` keeps the "O" target on current tokens and only removes the old classes from their softmax. So a current
+  token of an old entity still trains the shared O logit up.
+- That is the same partial repair R19 showed on the stored side, where the slice recovered 19 to 29% and the token mask
+  94 to 99%.
+- Its shortfall on seed 7 is 2.5 F1 / 2.1 AA, at the paper's own two-point resolution limit.
+- So the run shows that **a current-side slice alone falls short of the two-sided repairs on every seed**. It does not
+  show that the current side alone is insufficient.
+- Fix (both macros exist: `\nFunsdSbrMinusCurSlicedFullMin/Max` = +2.5 / +15.9):
+  - Sec. 7: "Slicing only the current loss lifts CoLaR by \nFunsdCurSlicedMinusColarFullMin{} to
+    \nFunsdCurSlicedMinusColarFullMax{} full-label points but stays below CoLaR-SBR on every seed (by
+    \nFunsdSbrMinusCurSlicedFullMin{} to \nFunsdSbrMinusCurSlicedFullMax{}): the current side is needed, and a slice of it
+    alone falls short."
+  - Limitations: "where the current side is needed and a current-side slice alone falls short; why the streams differ is
+    untested".
+  - App. D "and slicing only the current loss part of it" is fine as written.
+
+### LOW
+
+- **R23-L1 [W/G] (= R22-L1, not applied).** Sec. 7: "The MiB-style loss reaches 87.3, level with CoLaR-SBR (87.2) on
+  every seed."
+  - Per-seed differences are -0.72 / +0.92 / +0.12 (F1) and -0.14 / +0.97 / -0.05 (AA). So "level" holds within 1 point,
+    which is below the paper's stated two-point resolution, and is acceptable.
+  - Rule 7 is better served by printing the bound: "(within 1.0 point on every seed)". This needs a generated macro, e.g.
+    `\nFunsdMibSbrAbsMax`.
+- **R23-L2 [W].** H1: "Masking instead (partly) reaches \vOracleMaskFull". The verdict word in parentheses mid-sentence
+  reads oddly. Write "Masking instead reaches \vOracleMaskFull full-label F1 (verdict partly)", or drop "(partly)", since
+  the ladder carries it.
+- **R23-L3 [G].** `\nOracleMaskJointGap` (4.4) is the maximum over both metrics, but the sentence quotes full-label F1,
+  where the bound is 3.3. True as written but loose. Either add "(both metrics)" or emit a full-label-only macro.
+
+### 3. Space cuts: no caveat that an earlier review required was lost
+
+- **H1 "its refresh also adds labels for the current classes":** superseded by the mask result. The body now gives the
+  measured split ("relabelling adds +1.2 to +4.6 more").
+- **H2 MiB "the first session ends low":** cut from the body. App. D H2 keeps "the first session ends at no more than
+  `\nMibFirstMax` F1 on any seed". Acceptable; it was not a required caveat.
+- **Sec. 6 raw-documents sentence (P23b/R15):** kept where it matters.
+  - §5.2 still reads "The memory format did not change the finding here (three seeds, CIL-CORD): raw documents under the
+    same readout, with the whole network trainable where CoLaR freezes the embeddings and layers 1..4 ...".
+  - §6 cost still reads "within 1.7 points of raw replay on every seed".
+  - The cut was a duplicate.
+- **H0 drift-by-depth clause (R14-H1):**
+  - It was removed from the body. App. E keeps it with "under naive fine-tuning" and the pilot stream named.
+  - The body keeps "on a fixed label space every encoder forgets its earlier domains, and replay, not EWC or LwF, repairs
+    it". No false statement.
+- **Other cuts** lose no qualifier:
+  - "What discriminates what" first sentence;
+  - "an interaction";
+  - H3 prediction trims;
+  - App. F "a far smaller gap than with a shared softmax on CIL-CORD".
+
+### Form
+
+- main and supp exit 0 with 0 undefined, 0 multiply-defined, 0 overfull, 0 "??". The earlier float-only warnings are gone.
+- Main text ends p. 8, appendix pp. 11-16 (6 pp.). The split gives 10 + 6 pp. No `---`.
+- The abstract is 252 words by my method (pdftotext, line numbers stripped).
+
+### Score
+
+- The mask-only oracle closes the CIL-CORD mechanism question: the stored false negatives explain 94 to 99% of the gap.
+  This is the strongest internal result so far.
+- CIL-FUNSD's current-side reading stays honest once M1 is applied.
+- Personas: **R1 6, R2 5, R3 7.** Weighted **about 6.5/10, Accept**. Soundness is now 3 for all three personas.
