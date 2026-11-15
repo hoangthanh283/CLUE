@@ -1254,6 +1254,17 @@ def _base_cells(key: str, dz: bool) -> tuple:
             fmt(*dd, mark="p" if key == "cl_lora" and not dd[1] else ""))  # fmt: skip
 
 
+NEW_STREAMS = ("cil_wildreceipt", "dil_xlingual")  # CIL-WildReceipt, DIL-XFUND
+
+
+def _new_cells(key: str) -> tuple:
+    """(CIL-WildReceipt AA, DIL-XFUND AA) of method ``key``: clean-protocol runs only, so a
+    cell reads '--' until its runs exist (the June-2026 legacy runs of these streams predate
+    the class-incremental fixes and are not used)."""
+    return tuple(fmt(*pick_clean_only(src(f"{sc}_{key}"), "AA"), show_n=True)
+                 for sc in NEW_STREAMS)  # fmt: skip
+
+
 def write_main(cell, mix, dil, full) -> None:
     """tab_main_clean.tex: the comparison, full width, grouped by family, with what each method
     stores and how it reads out (P14). Cells are the same picks as before."""
@@ -1261,6 +1272,10 @@ def write_main(cell, mix, dil, full) -> None:
     def fl(k, **kw):  # full-label F1 cell: clean seeds only, n marked when < 3
         return fmt(*full[k], show_n=True, **kw)
 
+    keys = {"Naive fine-tuning": "naive", "Joint training": "joint", "ER (2019)": "er",
+            "CoLaR": "colar", "CoLaR-SBR": "colar_sbr",
+            "\\quad + LexSlot head slots": "colar_sbr_slot",
+            "SBR-Recall": "colar_sbr_recall_r64"}  # fmt: skip
     buf = _hparams(C["er"]).get("buffer_size", "")
     buf_dpp = _hparams(src("cil_cord_der_pp", (RESC, "cil_cord_der_pp", ""))).get("buffer_size", "")
     colar_mem = "50 docs/session, rank-128 layer-4 latents"
@@ -1278,6 +1293,7 @@ def write_main(cell, mix, dil, full) -> None:
             mem = f"{buf_dpp} {mem}"
         lab = {"LwF": "LwF (2016)", "DER++": "DER++ (2020)",
                "CODA-Prompt": "CODA-Prompt (2023)"}.get(label, label)  # fmt: skip
+        keys[lab] = key
         rows.append((fam, lab, mem, "shared", _base_cells(key, dz), False))
     rows += [
         ("Ours", "CoLaR", f"{colar_mem} ({_mb('cil_cord_colar')})", "shared",
@@ -1293,16 +1309,19 @@ def write_main(cell, mix, dil, full) -> None:
           "--"), True),
     ]  # fmt: skip
     rows.sort(key=lambda r: FAMILY_ORDER.index(r[0]))  # stable: keeps order inside a family
-    t = HDR + "\\begin{tabular}{@{}llllcccc@{}}\n\\toprule\n"
-    t += (" & & & & \\multicolumn{2}{c}{\\textbf{CIL-CORD}} & \\textbf{Mixed} & \\textbf{DIL} \\\\\n"
-          "\\cmidrule(lr){5-6}\\cmidrule(lr){7-7}\\cmidrule(l){8-8}\n"
+    t = HDR + "\\begin{tabular}{@{}llllcccccc@{}}\n\\toprule\n"
+    t += (" & & & & \\multicolumn{2}{c}{\\textbf{CIL-CORD}} & \\textbf{Mixed} & \\textbf{DIL} & "
+          "\\textbf{CIL-WildReceipt} & \\textbf{DIL-XFUND} \\\\\n"
+          "\\cmidrule(lr){5-6}\\cmidrule(lr){7-7}\\cmidrule(lr){8-8}\\cmidrule(lr){9-9}"
+          "\\cmidrule(l){10-10}\n"
           "\\textbf{Family} & \\textbf{Method} & \\textbf{Memory (what is stored)} & "
-          "\\textbf{Readout} & full-label F1 & AA & AA & AA \\\\\n")  # fmt: skip
+          "\\textbf{Readout} & full-label F1 & AA & AA & AA & AA & AA \\\\\n")  # fmt: skip
     prev = None
     for fam, label, mem, readout, cells, bold in rows:
         if fam != prev:
             t += "\\midrule\n"
         lab = f"\\textbf{{{label}}}" if bold else label
+        cells = tuple(cells) + _new_cells(keys[label])
         t += f"{fam if fam != prev else ''} & {lab} & {mem} & {readout} & " + " & ".join(cells)
         t += " \\\\\n"
         prev = fam
@@ -1322,6 +1341,12 @@ BENCH = {
     "Mixed": ("FUNSD, SROIE, CORD", "6", "grows, 3 schemas", "12 (25)",
               "new classes, domain or schema", "AA"),
     "CIL-FUNSD": ("FUNSD", "2", "grows", "3 (7)", "new classes", "full-label F1, AA"),
+    # doccl/data/scenarios.py: build_cil_wildreceipt (24 entity classes, 4 sessions) and
+    # build_dil_xlingual (configs/scenario/dil_xlingual.yaml: de, es, fr, it, zh; DIL schema)
+    "CIL-WildReceipt": ("WildReceipt", "4", "grows, 6 per session", "24 (49)", "new classes",
+                        "AA"),
+    "DIL-XFUND": ("XFUND: de, es, fr, it, zh in turn", "5", "fixed, unified", "4 (9)",
+                  "new language", "AA"),
 }  # fmt: skip
 
 
@@ -1329,7 +1354,8 @@ def write_bench() -> None:
     """tab_bench.tex: one column per stream. CIL-FUNSD joins once its tab:beyond rows render."""
     funsd = any(len(load(CLEAN, n, "AA")) >= k for s, _, n, k in BEYOND if s == "CIL-FUNSD")
     cols = [s for s in BENCH if s != "CIL-FUNSD" or funsd]
-    w = f"{(8.2 - 1.75 - 0.14 * (len(cols) + 1)) / len(cols):.2f}cm"  # fill one CVPR column
+    total = 8.2 if len(cols) <= 4 else 17.4  # one CVPR column, or the full width (table*)
+    w = f"{(total - 1.75 - 0.14 * (len(cols) + 1)) / len(cols):.2f}cm"
     t = HDR + "\\begin{tabular}{@{}>{\\raggedright\\arraybackslash}p{1.75cm}"
     t += f">{{\\centering\\arraybackslash}}p{{{w}}}" * len(cols)
     t += "@{}}\n\\toprule\n"
