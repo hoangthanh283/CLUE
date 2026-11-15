@@ -77,7 +77,7 @@ We benchmark our method against two references and eight CL baselines on six str
 \begin{table*}[t]
 \centering\footnotesize
 \setlength{\tabcolsep}{3pt}
-\caption{\textbf{The hypothesis ladder} (CIL-CORD, LayoutLMv3 unless stated; mean $\pm$ s.d. over three seeds, per-seed values when fewer; $^{n=k}$: $k$ seeds so far; $^\dagger$legacy protocol; ``--'': no full-label run). Verdict words: \cref{sec:investigation}. $^{r}$True labels for the documents stored before the session just finished, at each boundary, or for every stored document before each session (\cref{sec:h1}). $^{e}$ER also trains every layer and keeps $200$ raw documents, so it changes more than the memory format (\cref{sec:h0}). $^{w}$Trains every layer, where the CoLaR rows freeze the embeddings and layers $1..4$. The pre-session row of H1 also tests H2: it leaves every current document stale.}
+\caption{\textbf{The hypothesis ladder} on CIL-CORD with LayoutLMv3, unless stated (mean $\pm$ s.d. over three seeds; $^{n=k}$: $k$ seeds; $^\dagger$legacy protocol). $^{r}$Oracle: stored documents relabelled with their true labels (\cref{sec:h1}). $^{e}$ER also trains every layer and keeps $200$ raw documents (\cref{sec:h0}). $^{w}$Trains every layer. The pre-session row of H1 also tests H2.}
 \label{tab:ladder}
 \input{tab_ladder}
 \end{table*}
