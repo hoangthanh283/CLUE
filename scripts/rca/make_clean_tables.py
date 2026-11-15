@@ -340,7 +340,9 @@ def write_agree():
     t = HDR + "\\begin{tabular}{llcccc}\n\\toprule\n"
     t += "Scenario & Method & Seed & AA & Full-label F1 & Difference \\\\\n\\midrule\n"
     for sc, me, sd, aa, fl in rows:
-        lab = ROW_LABEL.get(me.replace("colar_sbr", "sbr"), me).replace("_", "\\_")
+        base, bros = me.removesuffix("_bros_b1"), me.endswith("_bros_b1")  # BROS batch-1 runs
+        lab = ROW_LABEL.get(base.replace("colar_sbr", "sbr"), base) + (" (BROS)" if bros else "")
+        lab = lab.replace("_", "\\_")
         t += f"{sc.replace('_', '-').upper()} & {lab} & {sd} & {aa:.1f} & {fl:.1f} & ${fl - aa:+.1f}$ \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_agree.tex").write_text(t)

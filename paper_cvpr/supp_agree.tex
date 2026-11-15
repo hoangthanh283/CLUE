@@ -6,6 +6,9 @@ Scenario & Method & Seed & AA & Full-label F1 & Difference \\
 CIL-CORD & CoLaR & 42 & 33.6 & 32.4 & $-1.2$ \\
 CIL-CORD & CoLaR & 7 & 32.4 & 30.5 & $-1.9$ \\
 CIL-CORD & CoLaR & 123 & 34.4 & 29.3 & $-5.1$ \\
+CIL-CORD & CoLaR (BROS) & 42 & 39.3 & 27.4 & $-11.9$ \\
+CIL-CORD & CoLaR (BROS) & 7 & 33.1 & 26.0 & $-7.1$ \\
+CIL-CORD & CoLaR (BROS) & 123 & 32.1 & 26.6 & $-5.5$ \\
 CIL-CORD & CoLaR + MiB-style unbiased CE (shared softmax) & 42 & 73.8 & 61.4 & $-12.4$ \\
 CIL-CORD & CoLaR + MiB-style unbiased CE (shared softmax) & 7 & 70.0 & 59.1 & $-10.9$ \\
 CIL-CORD & CoLaR + MiB-style unbiased CE (shared softmax) & 123 & 72.6 & 59.6 & $-12.9$ \\
@@ -18,21 +21,30 @@ CIL-CORD & False O masked before each session (not deployable) & 123 & 87.8 & 89
 CIL-CORD & True-label refresh before each session (not deployable) & 42 & 91.9 & 92.5 & $+0.7$ \\
 CIL-CORD & True-label refresh before each session (not deployable) & 7 & 92.3 & 93.1 & $+0.9$ \\
 CIL-CORD & True-label refresh before each session (not deployable) & 123 & 89.8 & 90.7 & $+0.9$ \\
+CIL-CORD & True-label refresh before each session (not deployable) (BROS) & 42 & 89.2 & 89.3 & $+0.1$ \\
+CIL-CORD & True-label refresh before each session (not deployable) (BROS) & 7 & 61.8 & 60.2 & $-1.6$ \\
+CIL-CORD & True-label refresh before each session (not deployable) (BROS) & 123 & 77.3 & 76.7 & $-0.6$ \\
 CIL-CORD & CoLaR, replay loss sliced to capture-time classes & 42 & 58.0 & 44.1 & $-13.9$ \\
 CIL-CORD & CoLaR, replay loss sliced to capture-time classes & 7 & 42.3 & 46.3 & $+4.0$ \\
 CIL-CORD & CoLaR, replay loss sliced to capture-time classes & 123 & 46.2 & 47.2 & $+1.1$ \\
 CIL-CORD & CoLaR-SBR & 42 & 87.8 & 88.8 & $+1.1$ \\
 CIL-CORD & CoLaR-SBR & 7 & 91.3 & 91.2 & $-0.1$ \\
 CIL-CORD & CoLaR-SBR & 123 & 86.2 & 87.1 & $+1.0$ \\
+CIL-CORD & CoLaR-SBR (BROS) & 42 & 88.4 & 88.8 & $+0.5$ \\
+CIL-CORD & CoLaR-SBR (BROS) & 7 & 87.7 & 89.5 & $+1.8$ \\
+CIL-CORD & CoLaR-SBR (BROS) & 123 & 86.4 & 88.2 & $+1.7$ \\
 CIL-CORD & CoLaR-SBR, constant background logit & 42 & 71.3 & 75.3 & $+4.1$ \\
 CIL-CORD & CoLaR-SBR, constant background logit & 7 & 82.3 & 82.8 & $+0.5$ \\
 CIL-CORD & CoLaR-SBR, constant background logit & 123 & 87.0 & 89.2 & $+2.1$ \\
+CIL-CORD & CoLaR-SBR, constant background logit (BROS) & 42 & 84.8 & 87.5 & $+2.7$ \\
+CIL-CORD & CoLaR-SBR, constant background logit (BROS) & 7 & 80.0 & 79.1 & $-0.9$ \\
 CIL-CORD & SBR, no memory & 42 & 21.2 & 9.0 & $-12.3$ \\
 CIL-CORD & SBR, no memory & 7 & 19.6 & 11.7 & $-7.9$ \\
 CIL-CORD & SBR, no memory & 123 & 24.0 & 13.6 & $-10.3$ \\
 CIL-CORD & CoLaR-SBR, rank 32 & 42 & 33.9 & 28.3 & $-5.6$ \\
 CIL-CORD & CoLaR-SBR, rank 32 & 7 & 35.2 & 29.4 & $-5.8$ \\
 CIL-CORD & CoLaR-SBR, rank 32 & 123 & 30.3 & 24.6 & $-5.7$ \\
+CIL-CORD & CoLaR-SBR, rank 64 & 42 & 86.8 & 86.6 & $-0.1$ \\
 CIL-CORD & SBR-Recall & 42 & 91.4 & 91.5 & $+0.2$ \\
 CIL-CORD & SBR-Recall & 7 & 92.6 & 93.5 & $+0.9$ \\
 CIL-CORD & SBR-Recall & 123 & 91.9 & 92.6 & $+0.8$ \\
