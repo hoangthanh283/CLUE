@@ -35,12 +35,12 @@ ROWS = [
     ("RanPAC (2023)", "{sc}_ranpac_seed{sd}_vit", "base"),
     ("LCA (2026)", "{sc}_lca_seed{sd}_vit", "base"),
     (
-        "\\textbf{Latent memory, 500/session (ours, uncompressed)}",
+        "Latent memory, 500/session (ours, uncompressed)",
         "{sc}_bank500_seed{sd}_vit_k4_d500",
         "ours",
     ),
     (
-        "\\textbf{CoLaR $r{=}128$, 500/session (ours)}",
+        "CoLaR $r{=}128$, 500/session (ours)",
         {
             "cil_cifar100": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128",
             "cil_imagenet_r": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128",
@@ -268,7 +268,7 @@ def main() -> None:
         "% Metric: AA (mean $\\pm$ std over seeds 42/7/123); ``pending'' = not all seeds on disk yet.",
         "\\begin{tabular}{lcc}",
         "\\toprule",
-        "\\textbf{Method} & \\textbf{CIFAR-100} & \\textbf{ImageNet-R} \\\\",
+        "Method & CIFAR-100 & ImageNet-R \\\\",
         "\\midrule",
     ]
     # bold: best per column, Joint (the reference) aside; underlined: our best otherwise
@@ -281,7 +281,7 @@ def main() -> None:
             lines.append("\\midrule")
         prev = group
         lines.append(f"{label} & " + " & ".join(cells) + " \\\\")
-        if group == "ours" and label.startswith("\\textbf{CoLaR"):
+        if group == "ours" and label.startswith("CoLaR"):
             lines.append(
                 "Ridge readout on a seed-42 variant run$^{v}$ (probe) & "
                 + " & ".join(probe_cell(sc) for sc in SCEN)

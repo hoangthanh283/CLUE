@@ -1348,21 +1348,20 @@ def write_main(cell, mix, dil, full) -> None:
     ]  # fmt: skip
     rows.sort(key=lambda r: FAMILY_ORDER.index(r[0]))  # stable: keeps order inside a family
     t = HDR + "\\begin{tabular}{@{}llllcccccc@{}}\n\\toprule\n"
-    t += (" & & & & \\multicolumn{2}{c}{\\textbf{CIL-CORD}} & \\textbf{Mixed} & \\textbf{DIL} & "
-          "\\textbf{CIL-WildReceipt} & \\textbf{DIL-XFUND} \\\\\n"
+    t += (" & & & & \\multicolumn{2}{c}{CIL-CORD} & Mixed & DIL & "
+          "CIL-WildReceipt & DIL-XFUND \\\\\n"
           "\\cmidrule(lr){5-6}\\cmidrule(lr){7-7}\\cmidrule(lr){8-8}\\cmidrule(lr){9-9}"
           "\\cmidrule(l){10-10}\n"
-          "\\textbf{Family} & \\textbf{Method} & \\textbf{Memory (what is stored)} & "
-          "\\textbf{Readout} & full-label F1 & AA & AA & AA & AA & AA \\\\\n")  # fmt: skip
+          "Family & Method & Memory (what is stored) & "
+          "Readout & full-label F1 & AA & AA & AA & AA & AA \\\\\n")  # fmt: skip
     # bold: best of each column, Joint (the reference) aside; underlined: our best otherwise
     grid = [tuple(r[4]) + _new_cells(keys[r[1]]) for r in rows]
     ours, ref = [r[0] == "Ours" for r in rows], [r[1] == "Joint training" for r in rows]
     grid = list(zip(*(emph(list(col), ours, ref) for col in zip(*grid, strict=True)), strict=True))
     prev = None
-    for (fam, label, mem, readout, _cells, bold), cells in zip(rows, grid, strict=True):
+    for (fam, lab, mem, readout, _cells, _bold), cells in zip(rows, grid, strict=True):
         if fam != prev:
             t += "\\midrule\n"
-        lab = f"\\textbf{{{label}}}" if bold else label
         t += f"{fam if fam != prev else ''} & {lab} & {mem} & {readout} & " + " & ".join(cells)
         t += " \\\\\n"
         prev = fam
@@ -1400,7 +1399,7 @@ def write_bench() -> None:
     t = HDR + "\\begin{tabular}{@{}>{\\raggedright\\arraybackslash}p{1.75cm}"
     t += f">{{\\centering\\arraybackslash}}p{{{w}}}" * len(cols)
     t += "@{}}\n\\toprule\n"
-    t += " & " + " & ".join(f"\\textbf{{{c}}}" for c in cols) + " \\\\\n\\midrule\n"
+    t += " & " + " & ".join(cols) + " \\\\\n\\midrule\n"
     for i, name in enumerate(BENCH_ROWS):
         t += f"{name} & " + " & ".join(BENCH[c][i] for c in cols) + " \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"

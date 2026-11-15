@@ -195,7 +195,7 @@ SBR's supervision needs stored documents that keep each token's label at its pos
 \begin{table*}[t]
 \centering\small
 \setlength{\tabcolsep}{4pt}
-\caption{\textbf{Benchmark results on LayoutLMv3}, grouped by family. Memory: what a method keeps (sizes on CIL-CORD; SBR-Recall at two bytes per parameter, half its fp32 size). CIL-WildReceipt and DIL-XFUND report clean-protocol runs only. Readout: one shared softmax or one block per session. Mean $\pm$ s.d. over three seeds, per-seed values when fewer; ``--'': not run. \textbf{Bold}: best of each column, Joint training aside; \underline{underlined}: our best when a baseline is best. $^\dagger$legacy protocol; $^{n=k}$: $k$ clean seeds so far; $^{c}$one fp16 LwF seed that collapsed to all-background is excluded; $^{b}$with the $50$-document memory; $^{p}$made before we fixed our port's orthogonality penalty. Ports and protocols: \cref{app:baselines}.}
+\caption{\textbf{Benchmark results on LayoutLMv3}, grouped by family. Memory: what a method keeps (sizes on CIL-CORD; SBR-Recall at two bytes per parameter, half its fp32 size). CIL-WildReceipt and DIL-XFUND report clean-protocol runs only. Readout: one shared softmax or one block per session. Mean $\pm$ s.d. over three seeds, per-seed values when fewer; ``--'': not run. Bold: best of each column, Joint training aside; underlined: our best when a baseline is best. $^\dagger$legacy protocol; $^{n=k}$: $k$ clean seeds so far; $^{c}$one fp16 LwF seed that collapsed to all-background is excluded; $^{b}$with the $50$-document memory; $^{p}$made before we fixed our port's orthogonality penalty. Ports and protocols: \cref{app:baselines}.}
 \label{tab:main}
 \resizebox{\linewidth}{!}{\input{tab_main_clean}}
 \end{table*}
