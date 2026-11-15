@@ -77,7 +77,7 @@ We benchmark our method against two references and eight CL baselines on six str
 \begin{table*}[t]
 \centering\footnotesize
 \setlength{\tabcolsep}{3pt}
-\caption{\textbf{The hypothesis ladder} on CIL-CORD with LayoutLMv3, unless stated (mean $\pm$ s.d. over three seeds; $^{n=k}$: $k$ seeds; $^\dagger$legacy protocol). $^{r}$Oracle: stored documents relabelled with their true labels (\cref{sec:h1}). $^{e}$ER also trains every layer and keeps $200$ raw documents (\cref{sec:h0}). $^{w}$Trains every layer. The pre-session row of H1 also tests H2.}
+\caption{\textbf{The hypothesis ladder} on CIL-CORD with LayoutLMv3, unless stated (AF: average forgetting, mean over seeds; other cells: mean $\pm$ s.d. over three seeds; $^{n=k}$: $k$ seeds; $^\dagger$legacy protocol). $^{r}$Oracle: stored documents relabelled with their true labels (\cref{sec:h1}). $^{e}$ER also trains every layer and keeps $200$ raw documents (\cref{sec:h0}). $^{w}$Trains every layer. The pre-session row of H1 also tests H2.}
 \label{tab:ladder}
 \input{tab_ladder}
 \end{table*}
@@ -114,11 +114,11 @@ In the following, we first define continual key-information extraction and the s
 \input{tab_bench}
 \end{table*}
 
-\paragraph{Evaluation protocol.} Our headline number is the \emph{full-label F1}: the final model on the complete CORD test set with all 30 classes, as in continual NER~\citep{ma2023learning}. Only clean runs record it; against a cell with only AA ($\dagger$, DIL, Mixed) we compare in AA. Retention needs per-session test splits, whose labels show only that session's classes; from $R[i,j]$, the F1 on session $j$ after session $i$, AA $=\tfrac1T\sum_j R[T,j]$. Since raw scoring of such labels charges a model for every correct entity of another session, we score each session \emph{session-restricted}, mapping a predicted tag outside session $j$'s label set to ``O'' before span matching. On every seed both metrics order the main groups of clean runs the same way (\cref{app:setup}).
+\paragraph{Evaluation protocol.} Our headline number is the \emph{full-label F1}: the final model on the complete CORD test set with all 30 classes, as in continual NER~\citep{ma2023learning}. Only clean runs record it; against a cell with only AA ($\dagger$, DIL, Mixed) we compare in AA. Retention needs per-session test splits, whose labels show only that session's classes; from $R[i,j]$, the F1 on session $j$ after session $i$, AA $=\tfrac1T\sum_j R[T,j]$. We also report the average forgetting, AF $=\tfrac1{T-1}\sum_{j<T}\big(R[j,j]-R[T,j]\big)$, the F1 of a session right after it was learned minus its final F1. It is noted that AF is also low when a session was never learned, so we read it together with AA. Since raw scoring of such labels charges a model for every correct entity of another session, we score each session \emph{session-restricted}, mapping a predicted tag outside session $j$'s label set to ``O'' before span matching. On every seed both metrics order the main groups of clean runs the same way (\cref{app:setup}).
 
 \section{Why Replay Fails under Label Growth}
 \label{sec:investigation}
-Every rung runs on CIL-CORD with LayoutLMv3 under the clean protocol (\cref{sec:protocol}) and changes one thing against the run it is compared with, unless stated (H0's memory rows change several). \Cref{tab:ladder} lists the rungs and \cref{fig:findings} draws them. A verdict word is a sign statement over the three seeds, not a significance test (\cref{sec:limitations}): on every seed, the prediction holds (\emph{supports}), fails (\emph{refutes}) or holds in part (\emph{partly}); \emph{does not support} means it does not hold on every seed, \emph{not needed} that the gap closes without the factor, and \emph{open} that only preliminary, cross-protocol evidence exists. The \emph{blocked readout} (\cref{sec:sbr}) gives each session's tags their own background logit and softmax, a \emph{block}; a block's \emph{claim} on a token is one minus its background probability, and the \emph{owning block} of an entity is the block of its gold class. Unless stated, a memory is CoLaR (\cref{sec:memory}): $50$ documents per session stored as rank-$128$ SVDs of their layer-$4$ activations.
+Every rung runs on CIL-CORD with LayoutLMv3 under the clean protocol (\cref{sec:protocol}) and changes one thing against the run it is compared with, unless stated (H0's memory rows change several). \Cref{tab:ladder} lists the rungs, \cref{fig:findings} draws them, and \cref{fig:forgetting} shows the forgetting session by session. A verdict word is a sign statement over the three seeds, not a significance test (\cref{sec:limitations}): on every seed, the prediction holds (\emph{supports}), fails (\emph{refutes}) or holds in part (\emph{partly}); \emph{does not support} means it does not hold on every seed, \emph{not needed} that the gap closes without the factor, and \emph{open} that only preliminary, cross-protocol evidence exists. The \emph{blocked readout} (\cref{sec:sbr}) gives each session's tags their own background logit and softmax, a \emph{block}; a block's \emph{claim} on a token is one minus its background probability, and the \emph{owning block} of an entity is the block of its gold class. Unless stated, a memory is CoLaR (\cref{sec:memory}): $50$ documents per session stored as rank-$128$ SVDs of their layer-$4$ activations.
 
 \begin{figure*}[t]
 \centering
@@ -129,6 +129,13 @@ Every rung runs on CIL-CORD with LayoutLMv3 under the clean protocol (\cref{sec:
 \includegraphics{figures/findings_b_key.pdf}
 \caption{\textbf{The findings in one figure} (CIL-CORD, LayoutLMv3, clean protocol unless marked). (a) The ladder (\cref{tab:ladder}): full-label F1 (dark) and AA (light); bar: mean of three seeds, dots: seeds; hatched: legacy ($\dagger$), AA only; ``--'': no full-label run; lines: joint and naive full-label F1; $^{w}$trains every layer (\cref{tab:ladder}). (b) Where the final model puts old-session gold entities (sessions 1 to 4, mean over seeds); a shared softmax records only span recall. (c) Per seed (circle: 42, square: 7, triangle: 123), newest-session F1 against mean old-session F1: with a shared softmax and a memory the newest session is suppressed; naive training learns it and keeps nothing older.}
 \label{fig:findings}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/forgetting.pdf}
+\caption{\textbf{Forgetting on CIL-CORD}, session by session (line: mean of three seeds, band: their range; $^\dagger$legacy protocol). (a) F1 averaged over the sessions seen so far. (b) F1 on session~1. Dashed purple: the memory with true labels before each session, an oracle. Dotted: joint training, one pooled run.}
+\label{fig:forgetting}
 \end{figure*}
 
 \subsection{H0: only harder forgetting}
@@ -205,7 +212,7 @@ We report its results in \cref{sec:ablations}.
 \begin{table*}[t]
 \centering\small
 \setlength{\tabcolsep}{4pt}
-\caption{\textbf{Benchmark results on LayoutLMv3}, grouped by family. Memory: what a method keeps (sizes on CIL-CORD; SBR-Recall at two bytes per parameter, half its fp32 size). CIL-WildReceipt and DIL-XFUND report clean-protocol runs only. Readout: one shared softmax or one block per session. Mean $\pm$ s.d. over three seeds, per-seed values when fewer; ``--'': not run. Bold: best of each column, Joint training aside; underlined: our best when a baseline is best. $^\dagger$legacy protocol; $^{n=k}$: $k$ clean seeds so far; $^{c}$one fp16 LwF seed that collapsed to all-background is excluded; $^{b}$with the $50$-document memory; $^{p}$made before we fixed our port's orthogonality penalty. Ports and protocols: \cref{app:baselines}.}
+\caption{\textbf{Comparison with continual-learning baselines} on LayoutLMv3 over six streams. F1: full-label F1; AA and AF: average accuracy and forgetting (\cref{sec:setup}). AA and F1: mean $\pm$ s.d. over three seeds, per-seed values when fewer; AF: mean; ``--'': not run. Bold: best of each column, Joint training aside; underlined: our best when a baseline is best. $^\dagger$legacy protocol; $^{n=k}$: $k$ clean seeds so far; $^{c}$one fp16 LwF seed that collapsed to all-background is excluded; $^{b}$with the $50$-document memory; $^{p}$made before we fixed our port's orthogonality penalty. Ports and protocols: \cref{app:baselines}; what each method stores: \cref{tab:memcmp}.}
 \label{tab:main}
 \resizebox{\linewidth}{!}{\input{tab_main_clean}}
 \end{table*}
@@ -220,6 +227,8 @@ We report its results in \cref{sec:ablations}.
 
 \paragraph{Results on DIL and DIL-XFUND.} On a fixed label space there is one block and nothing to separate. On DIL, every replay method comes close to joint training, and the blocked readout brings no gain: CoLaR-SBR is below CoLaR (AA $\nSbrDil^\dagger$ against $\nColarDil^\dagger$). On DIL-XFUND, CoLaR and CoLaR-SBR improve over naive fine-tuning, but they stay below ER, which keeps raw documents and trains every layer, and below joint training (\cref{tab:main}). The clean CIL-WildReceipt runs are not complete, so we report no comparison on it.
 
+\paragraph{Forgetting analysis.} \Cref{fig:forgetting} shows how each method forgets on CIL-CORD. After five sessions, naive fine-tuning keeps $\nFirstNaive$ F1 on session~1, ER $\nFirstEr^\dagger$ and CoLaR with a shared softmax $\nFirstColar$, whereas CoLaR-SBR keeps $\nFirstSbr$ and SBR-Recall $\nFirstRecall$. Besides, our two methods stay close to joint training after every session, not only at the end. It is noted that a low AF does not always mean a good model: in \cref{tab:ladder}, CoLaR with a shared softmax has a lower AF than ER because it suppresses each new session while learning it (\cref{sec:h0}), so there is less to forget. Hence, we read AF together with AA.
+
 \subsection{Ablation study}
 \label{sec:ablations}
 \paragraph{Ablation study for the two components.} On the runs of \cref{tab:ladder} (supplementary \cref{tab:ablation}) and on every seed, the memory alone lifts full-label F1 over naive training by $\nAblMemMin$ to $\nAblMemMax$ points, and the blocked readout alone by \nAblReadMin{} to \nAblReadMax; together by $\nAblBothMin$ to $\nAblBothMax$, more than the two add up to. Per-session deltas instead are above CoLaR-SBR under both metrics.
@@ -230,8 +239,18 @@ We report its results in \cref{sec:ablations}.
 
 \paragraph{Ablation study for the memory (H4).} On CIL-CORD SBR-Recall reaches $\vRecallFull$ full-label F1 ($\vRecall$ AA) with no stored document, within $\nRecallJointGap$ points of joint training on every seed under both metrics, at the price of one inference pass per session (five on CIL-CORD; \cref{app:method}). Our port of ICE-O (frozen encoder, one head per session over a constant Other logit, no memory) forgets nothing (final row within $\nIceODevMax$ points of its diagonal on every seed) and reaches $\vIceOFull$ full-label F1 ($\vIceO$ AA), below SBR-Recall on every seed under both metrics; under our $10$-epoch cap sessions 4 and 5 were still improving and session~3 early-stopped at $\nIceOThirdMax$ F1 on every seed, so this is a lower bound for ICE-O. On Mixed without a memory, SBR-Recall scores $\nRecallMixNoMem$ AA$^\dagger$ (seed 42): as predicted, the blocks of the other schemas fall silent until their domain returns, and with the $50$-document memory restored it scores $\nRecallMixMem$ (\cref{app:results}).
 
-\subsection{Memory cost}
+\subsection{Memory efficiency}
 \label{sec:cost}
+\begin{table*}[t]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{Memory comparison on CIL-CORD}: what each method keeps across sessions, its size, and the accuracy it reaches. $^{k}$Size computed from tensor shapes or parameter counts (fp32 as our code holds them, unless stated; SBR-Recall at two bytes per parameter); the other sizes were recorded by the runs. $^{l}$Not counted in the size. Marks on the accuracy cells as in \cref{tab:main}.}
+\label{tab:memcmp}
+\input{tab_memcmp}
+\end{table*}
+
+\paragraph{Comparison with memory-based approaches.} \Cref{tab:memcmp} compares what each method keeps across the sessions of CIL-CORD. ER and DER++ keep $200$ raw documents, which take $\nMemErMB$\,MB as our code holds them and expose pixels and token ids. The distillation methods keep a copy of the previous model ($\nMemModelMB$\,MB), and LCA keeps one backbone per session ($\nMemLcaMB$\,MB in all). In contrast, CoLaR-SBR keeps $250$ documents in $\nMemColarMB$\,MB, $\nMemLatentOverColar\times$ less than the activations it compresses, with no pixels or token ids. SBR-Recall stores no document at all: its four session deltas take $\nMemRecallMB$\,MB at two bytes per parameter. Among the methods of \cref{tab:memcmp}, only those with our readout at full rank come close to joint training. Nevertheless, the saving is against raw documents as our code holds them: with 8-bit pixels, the $200$ documents of ER would take $\nMemErEightMB$\,MB.
+
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/memory.pdf}
@@ -240,7 +259,7 @@ We report its results in \cref{sec:ablations}.
 \end{figure}
 CoLaR stores $\nMemColarKB$\,KB per document ($\nMemColarMB$\,MB for the $250$ documents of CIL-CORD; \cref{fig:memory}), $\nMemLatentOverColar\times$ less than the fp16 layer-$4$ activations it compresses. Raw replay keeps $\nMemRawKB$\,KB per document as our code holds it, with fp32 pixels and int64 ids and boxes ($\nMemRawMB$\,MB), and would take $\nMemRawEightMB$\,MB with 8-bit pixels. SBR-Recall keeps one delta per session instead: $\nMemRecallFpSessMB$\,MB in fp32 as trained ($\nMemRecallFpMB$\,MB in all), or $\nMemRecallSessMB$\,MB ($\nMemRecallMB$\,MB) at two bytes per parameter, a reporting choice that no run evaluated.
 
-Above a compression floor, bytes do not separate the methods; the readout does: every store we ran at full rank (rank-$128$ latent or raw documents, or deltas) ends within $\nSbrGapFullMax$ full-label points of joint training on every seed through the learned-background blocked readout, and the same latent bytes under a shared softmax stay at $\vColarFull$. At rank $128$ CoLaR saves no bytes: it is $\nMemColarOverRawEight\times$ larger than raw documents with 8-bit pixels, and $\nMemRawOverColar\times$ smaller only against raw documents as our code holds them. What it gives instead is a whole-document memory without pixels or token ids; latent replay needs the frozen lower layers, so it trains $\nMemTrainSbrPct\%$ of the parameters our raw run trains (a raw memory could freeze the same layers), with full-label F1 within $\nErSbrAbsFullMax$ points of raw replay on every seed (\cref{sec:ablations}). The rank is the one knob that sets its size, but at rank $32$ ($\nMemColarThirtyTwoMB$\,MB) CoLaR-SBR falls to $\vSbrRankThirtyTwoFull$ full-label F1, $\nSbrRankThirtyTwoDropMin$ to $\nSbrRankThirtyTwoDropMax$ points below rank $128$ and below plain CoLaR in full-label F1 on every seed; rank $64$ is not evaluated. SBR-Recall's cost grows with the sessions, not their documents: it is cheaper only when a session's documents take more than its delta.
+Above a compression floor, bytes do not separate the methods; the readout does: every store we ran at full rank (rank-$128$ latent or raw documents, or deltas) ends within $\nSbrGapFullMax$ full-label points of joint training on every seed through the learned-background blocked readout, and the same latent bytes under a shared softmax stay at $\vColarFull$. At rank $128$ CoLaR saves no bytes: it is $\nMemColarOverRawEight\times$ larger than raw documents with 8-bit pixels, and $\nMemRawOverColar\times$ smaller only against raw documents as our code holds them. What it gives instead is a whole-document memory without pixels or token ids; latent replay needs the frozen lower layers, so it trains $\nMemTrainSbrPct\%$ of the parameters our raw run trains (a raw memory could freeze the same layers), with full-label F1 within $\nErSbrAbsFullMax$ points of raw replay on every seed (\cref{sec:ablations}). The rank is the one knob that sets its size, but at rank $32$ ($\nMemColarThirtyTwoMB$\,MB) CoLaR-SBR falls to $\vSbrRankThirtyTwoFull$ full-label F1, $\nSbrRankThirtyTwoDropMin$ to $\nSbrRankThirtyTwoDropMax$ points below rank $128$ and below plain CoLaR in full-label F1 on every seed; at rank $64$ ($\nMemColarSixtyFourMB$\,MB) it reaches $\vSbrRankSixtyFourFull$ and is unstable across seeds. SBR-Recall's cost grows with the sessions, not their documents: it is cheaper only when a session's documents take more than its delta.
 
 \section{Limitations and conclusion}
 \label{sec:limitations}

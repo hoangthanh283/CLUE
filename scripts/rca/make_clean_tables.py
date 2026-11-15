@@ -939,9 +939,9 @@ def write_ladder() -> None:
     errors = []
     # compact layout: one full-width line per rung (hypothesis and prediction), then one line
     # per intervention; the old three wrapped text columns took most of a page
-    t = HDR + "\\begin{tabular*}{\\textwidth}{@{\\extracolsep{\\fill}}l c c l@{}}\n\\toprule\n"
+    t = HDR + "\\begin{tabular*}{\\textwidth}{@{\\extracolsep{\\fill}}l c c c l@{}}\n\\toprule\n"
     t += ("Hypothesis (\\emph{prediction if true}) and intervention & "
-          "Full-label F1 & AA & Verdict \\\\\n\\midrule\n")  # fmt: skip
+          "Full-label F1$\\uparrow$ & AA$\\uparrow$ & AF$\\downarrow$ & Verdict \\\\\n\\midrule\n")  # fmt: skip
     for rung, hyp, pred, interv, key, aa_s, full_s, kind, verdict, min_n in LADDER:
         if kind == "slot":
             full = pick_clean_only(full_s, "full_label_f1")
@@ -961,6 +961,12 @@ def write_ladder() -> None:
         else:
             aa = pick(aa_s)
             full = pick_clean_only(full_s, "full_label_f1") if full_s else ([], True, False)
+        # forgetting from the runs of the AA cell; joint training has no session order
+        af = (
+            "--"
+            if key == "joint"
+            else _af(*(pick(aa_s, "AF") if kind == "cell" else pick_clean_only(aa_s, "AF")))
+        )
         # R9-L7: every rendered rung row carries a verdict, and the verdict's per-seed condition
         if key not in ("naive", "joint"):  # the two references carry none
             ok = verdict_ok(key, verdict) if verdict else False
@@ -974,10 +980,10 @@ def write_ladder() -> None:
             t += "\\midrule\n"
         # n is marked on every cell with fewer than three seeds, clean or legacy (R9-L1)
         if rung:
-            t += (f"\\multicolumn{{4}}{{@{{}}l@{{}}}}{{\\textbf{{{rung}.}} {hyp}. "
+            t += (f"\\multicolumn{{5}}{{@{{}}l@{{}}}}{{\\textbf{{{rung}.}} {hyp}. "
                   f"\\emph{{If true: {pred}.}}}} \\\\\n")  # fmt: skip
         t += (f"{'' if key in ('naive', 'joint') else chr(92) + 'quad '}{interv} & "
-              f"{fmt(*full, show_n=True)} & {fmt(*aa, show_n=True)} & {verdict} \\\\\n")  # fmt: skip
+              f"{fmt(*full, show_n=True)} & {fmt(*aa, show_n=True)} & {af} & {verdict} \\\\\n")  # fmt: skip
     if errors:
         raise SystemExit("make_clean_tables: ladder verdicts:\n  " + "\n  ".join(errors))
     t += "\\bottomrule\n\\end{tabular*}\n"
@@ -1286,85 +1292,167 @@ def _new_cells(key: str) -> tuple:
                  for sc in NEW_STREAMS)  # fmt: skip
 
 
+FUNSD_RUN = {  # CIL-FUNSD run of a method key (name, suffix); others: cil_funsd_<key>
+    "colar": ("cil_funsd_colar", "_k4_d10*"),
+    "colar_sbr": ("cil_funsd_colar_sbr_d10", ""),
+}
+
+
+def _af(vs, *_rest) -> str:
+    """Forgetting cell: mean over seeds of metrics.json AF (the F1 of a session right after it
+    was learned minus its F1 at the end, averaged over the old sessions); '--' when undefined
+    (no run, or joint training, which has no session order)."""
+    vs = [v for v in vs if not math.isnan(v)]
+    return f"${np.mean(vs):.1f}$" if vs else "--"
+
+
+def write_memcmp(cell, full) -> str:
+    """tab_memcmp.tex: what every method keeps across the sessions of CIL-CORD, its size, and the
+    accuracy it reaches. Sizes of our runs are the recorded ones (memory_forms); a baseline's
+    size is computed from tensor shapes or parameter counts, since its run records none."""
+    d, by = doc_bytes(), {f["key"]: f for f in memory_forms()}
+    naive = _metas("cil_cord_naive", "")
+    model = max(m["total_params"] for m in naive.values()) * 4 if naive else 0  # fp32 copy
+    sessions = max((int(m["num_tasks"]) for m in naive.values()), default=0)
+    buf = int(_hparams(C["er"]).get("buffer_size", 0))
+    buf_dpp = int(
+        _hparams(src("cil_cord_der_pp", (RESC, "cil_cord_der_pp", ""))).get("buffer_size", 0)
+    )
+    aa = {k: _base_cells(k, dz)[1] for _l, k, dz in BASE}
+    rank = {r: load_seeds(CLEAN, f"{SBR_NAME}_r{r}", "AA") for r in MEM_RANKS}
+    rank_f = {r: load_seeds(CLEAN, f"{SBR_NAME}_r{r}", "full_label_f1") for r in MEM_RANKS}
+
+    def seeds3(x):
+        return fmt(list(x.values()), True) if len(x) == len(SEEDS) else "--"
+
+    yes, no = "yes", "no"
+    rows = [  # (group, method, what is stored, bytes, pixels, token ids, full-label F1, AA, ours)
+        ("Replay", "ER (2019)", f"{buf} raw documents$^{{k}}$", buf * d["raw"], yes, yes,
+         "--", fmt(*cell["er"]), False),
+        ("Replay", "\\quad with 8-bit pixels$^{k}$", f"{buf} raw documents", buf * d["raw8"], yes,
+         yes, "--", "--", False),
+        ("Replay", "DER++ (2020)", f"{buf_dpp} raw documents$^{{k}}$ + logits$^{{l}}$",
+         buf_dpp * d["raw"], yes, yes, "--", aa["der_pp"], False),
+        ("Model copy", "LwF (2016)", "previous model$^{k}$", model, no, no, "--", aa["lwf"], False),
+        ("Model copy", "CL-LoRA (2025)", "previous model$^{k}$, adapters$^{l}$", model, no, no,
+         "--", aa["cl_lora"], False),
+        ("Model copy", "CPFD (2023)", "previous model$^{k}$", model, no, no, "--", aa["cpfd"], False),
+        ("Model copy", "IS3 (2024)", "previous model$^{k}$, prototypes$^{l}$", model, no, no, "--",
+         aa["is3"], False),
+        ("Model copy", "LCA (2026)", f"base and {sessions} session backbones$^{{k}}$",
+         (sessions + 1) * model, no, no, "--", aa["lca"], False),
+        ("Ours", "CoLaR-SBR, rank 128", f"{by['colar128']['n']} latent documents",
+         by["colar128"]["total"], no, no, fmt(*full["sbr"], show_n=True), fmt(*cell["sbr"]), True),
+    ]  # fmt: skip
+    raw_f, raw_a = (load_seeds(CLEAN, ER_SBR_NAME, k, "") for k in ("full_label_f1", "AA"))
+    rows.insert(-1, ("Ours", "SBR on raw documents", f"{by['raw']['n']} raw documents",
+                     by["raw"]["total"], yes, yes, seeds3(raw_f), seeds3(raw_a), True))  # fmt: skip
+    for r in sorted(MEM_RANKS, reverse=True):
+        rows.append(("Ours", f"CoLaR-SBR, rank {r}", f"{by['colar128']['n']} latent documents",
+                     colar_doc_bytes(r, True) * by["colar128"]["n"], no, no, seeds3(rank_f[r]),
+                     seeds3(rank[r]), True))  # fmt: skip
+    if "recall16" in by:
+        rows.append(("Ours", "SBR-Recall", f"{by['recall16']['n']} session deltas$^{{k}}$, no document",
+                     by["recall16"]["total"], no, no, fmt(*full["recall"], show_n=True),
+                     fmt(*cell["recall"]), True))  # fmt: skip
+    ours = [r[-1] for r in rows]
+    f1 = emph([r[6] for r in rows], ours)
+    acc = emph([r[7] for r in rows], ours)
+    t = HDR + "\\begin{tabular}{@{}lllrcccc@{}}\n\\toprule\n"
+    t += (" & Method & Stored across sessions & MB & Pixels & Token ids & Full-label F1 & AA \\\\\n")  # fmt: skip
+    prev = None
+    for (grp, lab, what, nbytes, px, ids, *_), f, a in zip(rows, f1, acc, strict=True):
+        if grp != prev:
+            t += "\\midrule\n"
+        t += (f"{grp if grp != prev else ''} & {lab} & {what} & {nbytes / 1e6:.1f} & {px} & {ids} & "
+              f"{f} & {a} \\\\\n")  # fmt: skip
+        prev = grp
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "tab_memcmp.tex").write_text(t)
+    # session-1 F1 of the final model (fig:forgetting b), mean over the seeds of the AA cell
+    first = {nm: [float(m[-1, 0]) for m in matrices(C[k])]
+             for k, nm in (("naive", "Naive"), ("er", "Er"), ("colar", "Colar"), ("sbr", "Sbr"),
+                           ("recall", "Recall"))}  # fmt: skip
+    v = {f"nFirst{nm}": f"{np.mean(x):.1f}" if x else "--" for nm, x in first.items()}
+    v["nMemErMB"] = f"{buf * d['raw'] / 1e6:.1f}"
+    v["nMemErEightMB"] = f"{buf * d['raw8'] / 1e6:.1f}"
+    v["nMemModelMB"] = f"{model / 1e6:.1f}"
+    v["nMemLcaMB"] = f"{(sessions + 1) * model / 1e6:.0f}"
+    return _defs(v)
+
+
+IS_AF = (False, False, True) + (False, True) * 5  # columns of tab_main_clean.tex
+
+
 def write_main(cell, mix, dil, full) -> None:
-    """tab_main_clean.tex: the comparison, full width, grouped by family, with what each method
-    stores and how it reads out (P14). Cells are the same picks as before."""
+    """tab_main_clean.tex: the benchmark, one row per method grouped by family; per stream AA and
+    forgetting (CIL-CORD also full-label F1). What a method stores is in tab_memcmp.tex."""
 
-    def fl(k, **kw):  # full-label F1 cell: clean seeds only, n marked when < 3
-        return fmt(*full[k], show_n=True, **kw)
+    def fl(k):  # full-label F1 cell: clean seeds only, n marked when < 3
+        return fmt(*full[k], show_n=True) if k in full else "--"
 
-    keys = {"Naive fine-tuning": "naive", "Joint training": "joint", "ER (2019)": "er",
-            "CoLaR": "colar", "CoLaR-SBR": "colar_sbr",
-            "\\quad + LexSlot head slots": "colar_sbr_slot",
-            "SBR-Recall": "colar_sbr_recall_r64"}  # fmt: skip
-    buf = _hparams(C["er"]).get("buffer_size", "")
-    buf_dpp = _hparams(src("cil_cord_der_pp", (RESC, "cil_cord_der_pp", ""))).get("buffer_size", "")
-    colar_mem = "50 docs/session, rank-128 layer-4 latents"
-    rows = [  # (family, label, memory, readout, (full, cil AA, mixed, dil), bold)
-        (
-            "Reference",
-            "Naive fine-tuning",
-            "none",
-            "shared",
-            (fl("naive"), fmt(*cell["naive"]), fmt(*mix["naive"]), fmt(*dil["naive"])),
-            False,
-        ),
-        (
-            "Reference",
-            "Joint training",
-            "all data, all sessions",
-            "shared",
-            (fl("joint"), fmt(*cell["joint"]), fmt(*mix["joint"]), fmt(*dil["joint"])),
-            False,
-        ),
-        (
-            "Replay",
-            "ER (2019)",
-            f"{buf} raw documents",
-            "shared",
-            (fl("er"), fmt(*cell["er"]), fmt(*mix["er"]), fmt(*dil["er"])),
-            False,
-        ),
+    def old(k, mixmark=""):  # CIL-CORD (F1, AA, AF), Mixed (AA, AF), DIL (AA, AF) of our own keys
+        return (fl(k), fmt(*cell[k]), _af(*pick(C[k], "AF")),
+                fmt(*mix[k], mark=mixmark) if k in mix else "--",
+                _af(*pick(M[k], "AF")) if k in M else "--",
+                fmt(*dil[k]) if k in dil else "--",
+                _af(*pick(D[k], "AF")) if k in D else "--")  # fmt: skip
+
+    def base(key, dz):  # the same seven cells of a baseline, by the one selection rule
+        cc = src(f"cil_cord_{key}", (RESC, f"cil_cord_{key}", ""))
+        mm = src(f"mixed_{key}", (RESC, f"mixed_{key}", ""))
+        dd = src(f"dil_{key}", ("results", f"dil_{key}", ""))
+        f1, a_c, a_m, a_d = _base_cells(key, dz)
+        return (f1, a_c, _af(*pick(cc, "AF", dz)), a_m, _af(*pick(mm, "AF", dz)),
+                a_d, _af(*pick(dd, "AF")))  # fmt: skip
+
+    def clean(sc_run):  # (AA, AF) of a stream that has clean runs only
+        s_ = [(CLEAN, *sc_run)]
+        return (fmt(*pick_clean_only(s_, "AA"), show_n=True), _af(*pick_clean_only(s_, "AF")))
+
+    def new(key):  # CIL-FUNSD, CIL-WildReceipt, DIL-XFUND
+        out = clean(FUNSD_RUN.get(key, (f"cil_funsd_{key}", "")))
+        for sc in NEW_STREAMS:
+            out += clean((f"{sc}_{key}", "*"))
+        return out
+
+    rows = [  # (family, label, method key, the seven old-stream cells)
+        ("Reference", "Naive fine-tuning", "naive", old("naive")),
+        ("Reference", "Joint training", "joint", old("joint")),
+        ("Replay", "ER (2019)", "er", old("er")),
     ]
     for label, key, dz in BASE:
-        fam, mem = BASE_INFO[key]
-        if key == "der_pp":
-            mem = f"{buf_dpp} {mem}"
         lab = {"LwF": "LwF (2016)", "DER++": "DER++ (2020)",
                "CODA-Prompt": "CODA-Prompt (2023)"}.get(label, label)  # fmt: skip
-        keys[lab] = key
-        rows.append((fam, lab, mem, "shared", _base_cells(key, dz), False))
+        rows.append((BASE_INFO[key][0], lab, key, base(key, dz)))
     rows += [
-        ("Ours", "CoLaR", f"{colar_mem} ({_mb('cil_cord_colar')})", "shared",
-         (fl("colar"), fmt(*cell["colar"]), fmt(*mix["colar"]), fmt(*dil["colar"])), False),
-        ("Ours", "CoLaR-SBR", f"{colar_mem} ({_mb('cil_cord_colar_sbr')})", "blocked",
-         (fl("sbr"), fmt(*cell["sbr"]), fmt(*mix["sbr"]), fmt(*dil["sbr"])), True),
-        ("Ours", "\\quad + LexSlot head slots", "+ head slots, token ids", "blocked",
-         ("--", fmt(*cell["slot"]), fmt(*mix["slot"]), fmt(*dil["slot"])), False),
-        ("Ours", "SBR-Recall",
-         f"one rank-64 trunk delta per session ({_mb('cil_cord_colar_sbr_recall_r64')})",
-         "blocked, per delta",
-         (fl("recall"), fmt(*cell["recall"]), fmt(*mix["recall"], mark="b"),
-          "--"), True),
-    ]  # fmt: skip
+        ("Ours", "CoLaR (memory only)", "colar", old("colar")),
+        ("Ours", "CoLaR-SBR", "colar_sbr", old("sbr")),
+        ("Ours", "SBR-Recall", "colar_sbr_recall_r64", old("recall", mixmark="b")),
+    ]
     rows.sort(key=lambda r: FAMILY_ORDER.index(r[0]))  # stable: keeps order inside a family
-    t = HDR + "\\begin{tabular}{@{}llllcccccc@{}}\n\\toprule\n"
-    t += (" & & & & \\multicolumn{2}{c}{CIL-CORD} & Mixed & DIL & "
-          "CIL-WildReceipt & DIL-XFUND \\\\\n"
-          "\\cmidrule(lr){5-6}\\cmidrule(lr){7-7}\\cmidrule(lr){8-8}\\cmidrule(lr){9-9}"
-          "\\cmidrule(l){10-10}\n"
-          "Family & Method & Memory (what is stored) & "
-          "Readout & full-label F1 & AA & AA & AA & AA & AA \\\\\n")  # fmt: skip
-    # bold: best of each column, Joint (the reference) aside; underlined: our best otherwise
-    grid = [tuple(r[4]) + _new_cells(keys[r[1]]) for r in rows]
+    # bold: best of each column (forgetting: lowest), Joint aside; underlined: our best otherwise
+    grid = [r[3] + new(r[2]) for r in rows]
+    # joint training has no session order: its forgetting is undefined, whatever a file records
+    grid = [tuple("--" if af and r[2] == "joint" else c for c, af in zip(g, IS_AF, strict=True))
+            for r, g in zip(rows, grid, strict=True)]  # fmt: skip
     ours, ref = [r[0] == "Ours" for r in rows], [r[1] == "Joint training" for r in rows]
-    grid = list(zip(*(emph(list(col), ours, ref) for col in zip(*grid, strict=True)), strict=True))
+    grid = list(zip(*(emph(list(col), ours, ref, lower=lo)
+                      for col, lo in zip(zip(*grid, strict=True), IS_AF, strict=True)),
+                    strict=True))  # fmt: skip
+    t = HDR + "\\begin{tabular}{@{}ll" + "c" * 13 + "@{}}\n\\toprule\n"
+    t += (" & & \\multicolumn{3}{c}{CIL-CORD} & \\multicolumn{2}{c}{Mixed} & "
+          "\\multicolumn{2}{c}{DIL} & \\multicolumn{2}{c}{CIL-FUNSD} & "
+          "\\multicolumn{2}{c}{CIL-WildReceipt} & \\multicolumn{2}{c}{DIL-XFUND} \\\\\n"
+          "\\cmidrule(lr){3-5}\\cmidrule(lr){6-7}\\cmidrule(lr){8-9}\\cmidrule(lr){10-11}"
+          "\\cmidrule(lr){12-13}\\cmidrule(l){14-15}\n"
+          "Family & Method & F1$\\uparrow$ & AA$\\uparrow$ & AF$\\downarrow$"
+          + " & AA$\\uparrow$ & AF$\\downarrow$" * 5 + " \\\\\n")  # fmt: skip
     prev = None
-    for (fam, lab, mem, readout, _cells, _bold), cells in zip(rows, grid, strict=True):
+    for (fam, lab, _key, _c), cells in zip(rows, grid, strict=True):
         if fam != prev:
             t += "\\midrule\n"
-        t += f"{fam if fam != prev else ''} & {lab} & {mem} & {readout} & " + " & ".join(cells)
-        t += " \\\\\n"
+        t += f"{fam if fam != prev else ''} & {lab} & " + " & ".join(cells) + " \\\\\n"
         prev = fam
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_main_clean.tex").write_text(t)
@@ -2113,7 +2201,9 @@ def write_memory() -> str:
         drop = (
             [hi[x] - lo[x] for x in SEEDS if x in lo and x in hi] if len(lo) == len(SEEDS) else []
         )
-        v[f"nSbrRank{nm}DropMin"] = down1(min(drop)).replace("-", "$-$") if drop else "--"  # r128 - r
+        v[f"nSbrRank{nm}DropMin"] = (
+            down1(min(drop)).replace("-", "$-$") if drop else "--"
+        )  # r128 - r
         v[f"nSbrRank{nm}DropMax"] = up1(max(drop)) if drop else "--"
     print("memory self-check passed:", len(checked), "runs")
     return out + _defs(v)
@@ -2171,7 +2261,9 @@ def bench_docs(col: str) -> str:
             te = {docs.get((lg, "test")) for lg in langs}
             if None in tr | te or not langs:
                 return "--"
-            parts.append(f"{'/'.join(map(str, sorted(tr)))}/{'/'.join(map(str, sorted(te)))} per language")
+            parts.append(
+                f"{'/'.join(map(str, sorted(tr)))}/{'/'.join(map(str, sorted(te)))} per language"
+            )
             continue
         sz = _hf_sizes(HF_DIR[ds])
         parts.append(f"{sz['train']}/{sz['test']}" if "train" in sz and "test" in sz else "--")
@@ -2179,8 +2271,10 @@ def bench_docs(col: str) -> str:
 
 
 # The two new document streams (rented-box queue v21). NEW_METHODS: (stem, label, run, suffix, only-on)
-NEW_STREAM_INFO = (("Wild", "CIL-WildReceipt", "cil_wildreceipt", True),
-               ("Xfund", "DIL-XFUND", "dil_xlingual", False))  # (prefix, label, scenario, full-label)
+NEW_STREAM_INFO = (
+    ("Wild", "CIL-WildReceipt", "cil_wildreceipt", True),
+    ("Xfund", "DIL-XFUND", "dil_xlingual", False),
+)  # (prefix, label, scenario, full-label)
 NEW_METHODS = (
     ("Sbr", "CoLaR-SBR", "colar_sbr", "", None),
     ("Colar", "CoLaR, shared softmax", "colar", "_k4_d50*", None),
@@ -2282,7 +2376,10 @@ BROS_GAPS = (("SbrMinusColar", "Sbr", "Colar"), ("SbrMinusConstO", "Sbr", "Const
 def write_bros() -> str:
     """supp_bros.tex (BROS on CIL-CORD, batch-1 recipe) + \\vBros<X>[Full] and per-seed gaps;
     \\nBrosRecipe states the recipe as the runs recorded it (batch and replay batch sizes)."""
-    d = {stem: [load_seeds(CLEAN, run, m, "*") for m in ("AA", "full_label_f1")] for stem, _l, run in BROS_B1}
+    d = {
+        stem: [load_seeds(CLEAN, run, m, "*") for m in ("AA", "full_label_f1")]
+        for stem, _l, run in BROS_B1
+    }
     v, out = {}, ""
     t = HDR + "\\begin{tabular}{@{}lccccc@{}}\n\\toprule\n"
     t += " & & & \\multicolumn{3}{c}{Full-label F1, seed} \\\\\n\\cmidrule(l){4-6}\n"
@@ -2292,8 +2389,16 @@ def write_bros() -> str:
         ok = len(aa) == len(SEEDS) and len(fl) == len(SEEDS)
         out += macro(f"Bros{stem}", list(aa.values()) if ok else [])
         out += macro(f"Bros{stem}Full", list(fl.values()) if ok else [])
-        cells = [fmt(list(fl.values()), True), fmt(list(aa.values()), True)] if ok else [_pending(fl), _pending(aa)]
-        t += f"{label} & " + " & ".join(cells + [f"{fl[x]:.1f}" if x in fl else "--" for x in SEEDS]) + " \\\\\n"
+        cells = (
+            [fmt(list(fl.values()), True), fmt(list(aa.values()), True)]
+            if ok
+            else [_pending(fl), _pending(aa)]
+        )
+        t += (
+            f"{label} & "
+            + " & ".join(cells + [f"{fl[x]:.1f}" if x in fl else "--" for x in SEEDS])
+            + " \\\\\n"
+        )
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_bros.tex").write_text(t)
     for gname, a, b in BROS_GAPS:
@@ -2307,7 +2412,7 @@ def write_bros() -> str:
           for _s, _l, run in BROS_B1 for sd in SEEDS if (f := _run_file(CLEAN, run, sd, "*", "metrics.json"))}  # fmt: skip
     if len(hp) > 1:
         _warn(f"BROS b1 runs disagree on batch / replay batch: {hp}")
-    v["nBrosRecipe"] = (f"batch size {min(hp)[0]}, replay batch {min(hp)[1]}" if hp else "--")
+    v["nBrosRecipe"] = f"batch size {min(hp)[0]}, replay batch {min(hp)[1]}" if hp else "--"
     return out + _defs(v)
 
 
@@ -2367,6 +2472,7 @@ def main():
     v += ablation_macros() + control_macros() + sliced_macros() + mask_macros() + write_memory()
     v += write_funsd()
     v += write_newstreams() + write_bros() + rank_seed_macros()
+    v += write_memcmp(cell, full)
     (OUT / "vals.tex").write_text(v)
     write_ladder()
     write_beyond()

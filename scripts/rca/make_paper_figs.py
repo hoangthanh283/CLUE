@@ -193,7 +193,9 @@ def fig_findings_a() -> list[dict]:
                [labs[0], refs[0][1], labs[1], refs[1][1], labs[2]], loc="upper left",
                bbox_to_anchor=(0.1, 1.0), ncol=3, frameon=False, handlelength=1.4,
                columnspacing=1.0, borderaxespad=0.1, labelspacing=0.15)  # fmt: skip
-    fig.subplots_adjust(left=0.115, right=0.995, top=0.84, bottom=0.38)  # P28: longer relabel labels
+    fig.subplots_adjust(
+        left=0.115, right=0.995, top=0.84, bottom=0.38
+    )  # P28: longer relabel labels
     save(fig, "findings_a.pdf")
     return cells
 
@@ -299,7 +301,9 @@ def fig_findings_c() -> dict:
     ax.set_ylabel("mean F1, old sessions", labelpad=1)
     ax.tick_params(length=1.5, pad=1)
     # legend above the axes (as in panels a and b): inside, it sat on the diagonal and the points
-    hs, ls = ax.get_legend_handles_labels()  # P28 (R17-G1): the long relabel label goes last (right column)
+    hs, ls = (
+        ax.get_legend_handles_labels()
+    )  # P28 (R17-G1): the long relabel label goes last (right column)
     order = sorted(range(len(ls)), key=lambda i: ls[i].startswith("relabel"))
     fig.legend([hs[i] for i in order], [ls[i] for i in order], loc="upper center", bbox_to_anchor=(0.5, 1.0), ncol=2,
                frameon=False, handletextpad=0.1, borderaxespad=0.1, labelspacing=0.15, columnspacing=0.5,
@@ -419,6 +423,50 @@ def fig_trajectory() -> dict:
     fig.subplots_adjust(left=0.12, right=0.58, top=0.97, bottom=0.2)
     save(fig, "trajectory.pdf")
     return traj
+
+
+FORGET_KEYS = ("naive", "er", "colar", "oracle_pre", "sbr", "recall")
+
+
+def fig_forgetting() -> dict:
+    """forgetting.pdf: (a) mean F1 over the sessions seen so far, after each session; (b) F1 on
+    session 1 after each session. Mean over seeds, band = min..max over seeds; dashed = legacy
+    or an oracle. Joint training: one pooled run, drawn as a line at its final value."""
+    out = {}
+    fig, axes = plt.subplots(1, 2, figsize=(WIDE, 1.75), sharey=True)
+    for k in FORGET_KEYS:
+        by_seed, clean = mats(k)
+        if not by_seed:
+            continue
+        seen = np.array([[np.mean(m[i, : i + 1]) for i in range(len(m))] for m in by_seed.values()])
+        first = np.array([m[:, 0] for m in by_seed.values()])
+        out[k] = (seen.mean(0), first.mean(0))
+        x = range(1, seen.shape[1] + 1)
+        for ax, y in zip(axes, (seen, first), strict=True):
+            ax.fill_between(x, y.min(0), y.max(0), color=STYLE[k][1], alpha=0.18, lw=0)
+            ax.plot(x, y.mean(0), marker="o", ms=2.5, lw=0.9, color=STYLE[k][1], mec="black",
+                    mew=0.2, ls="-" if clean and k != "oracle_pre" else "--",
+                    label=STYLE[k][0] + tag(len(by_seed), clean))  # fmt: skip
+    jb, jc = mats("joint")
+    if jb:
+        for ax, col in zip(axes, (slice(None), 0), strict=True):
+            jv = np.mean([np.mean(m[-1][col]) for m in jb.values()])
+            ax.axhline(jv, color="black", lw=0.7, ls=":",
+                       label="Joint training" + tag(len(jb), jc))  # fmt: skip
+    for ax, title in zip(axes, ("(a) all sessions seen so far", "(b) session 1"), strict=True):
+        ax.set_xticks(range(1, 6))
+        ax.set_xlim(0.8, 5.2)
+        ax.set_ylim(0, 100)
+        ax.set_xlabel("sessions trained", labelpad=1)
+        ax.set_title(title, pad=2)
+        ax.grid(alpha=0.25, lw=0.3)
+        ax.tick_params(length=1.5, pad=1)
+    axes[0].set_ylabel("F1", labelpad=1)
+    axes[1].legend(loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False, fontsize=6.5,
+                   handlelength=1.6, labelspacing=0.25, borderaxespad=0.2)  # fmt: skip
+    fig.subplots_adjust(left=0.06, right=0.78, top=0.9, bottom=0.2, wspace=0.06)
+    save(fig, "forgetting.pdf")
+    return out
 
 
 ROUTE_KEYS = ("nobank", "sbr")
@@ -747,13 +795,22 @@ def fig_memory() -> dict:
             c, x = (0, off) if b == 0 else (1, b / 1e6)
             m = float(np.mean(list(d.values())))
             for ax in axes[:, c]:  # drawn in both rows; each row's limits clip the other
-                ax.scatter([x] * len(d), list(d.values()), s=11, fc="white" if hollow else col,
-                           ec=col if hollow else "black", lw=0.7 if hollow else 0.3, zorder=3)
+                ax.scatter(
+                    [x] * len(d),
+                    list(d.values()),
+                    s=11,
+                    fc="white" if hollow else col,
+                    ec=col if hollow else "black",
+                    lw=0.7 if hollow else 0.3,
+                    zorder=3,
+                )
                 ax.scatter(x, m, s=45, marker="_", color=col if hollow else "black", lw=1.1,
                            zorder=4)  # fmt: skip
             means.append((x, m))
             out[(key, b)] = d
-        if len(means) > 1:  # same method: two encodings (dotted) or ranks (dashed, R19-L2: it crosses the y break)
+        if (
+            len(means) > 1
+        ):  # same method: two encodings (dotted) or ranks (dashed, R19-L2: it crosses the y break)
             for ax in axes[:, 1]:
                 ax.plot(*zip(*means, strict=True), color=col, lw=0.7,
                         ls=":" if any(p[2] for p in pts) else "--", zorder=2)  # fmt: skip
@@ -785,13 +842,19 @@ def fig_memory() -> dict:
     fig.supylabel("full-label F1, CIL-CORD", x=0.01, fontsize=7)
     axes[0, 1].text(21, jv + 0.3, "joint training", ha="left", va="bottom", fontsize=6)
     kw = {"color": "black", "lw": 0.5, "clip_on": False}
-    for ax, xs, ys_ in ((axes[1, 0], (1, 1), (-0.03, 0.03)), (axes[1, 1], (0, 0), (-0.03, 0.03)),
-                        (axes[0, 0], (-0.04, 0.04), (0, 0)), (axes[1, 0], (-0.04, 0.04), (1, 1))):
+    for ax, xs, ys_ in (
+        (axes[1, 0], (1, 1), (-0.03, 0.03)),
+        (axes[1, 1], (0, 0), (-0.03, 0.03)),
+        (axes[0, 0], (-0.04, 0.04), (0, 0)),
+        (axes[1, 0], (-0.04, 0.04), (1, 1)),
+    ):
         ax.plot(xs, ys_, transform=ax.transAxes, **kw)  # axis-break marks  # fmt: skip
     h = [plt.Line2D([], [], marker="o", ls="", ms=3.3, mfc=STYLE[k][1], mec="black", mew=0.3)
          for k, *_ in series]  # fmt: skip
-    h += [plt.Line2D([], [], marker="_", ls="", ms=6, color="black", mew=1.1),
-          plt.Line2D([], [], marker="o", ls="", ms=3.3, mfc="white", mec="#555555", mew=0.7)]
+    h += [
+        plt.Line2D([], [], marker="_", ls="", ms=6, color="black", mew=1.1),
+        plt.Line2D([], [], marker="o", ls="", ms=3.3, mfc="white", mec="#555555", mew=0.7),
+    ]
     labs = [s[1] for s in series] + ["mean of the seeds", "size computed, not run"]
     fig.legend(h, labs, loc="lower center", ncol=2, frameon=False, handletextpad=0.2,
                columnspacing=0.8, labelspacing=0.2, borderaxespad=0.1)  # fmt: skip
@@ -1008,6 +1071,7 @@ def main() -> None:
     means = fig_heatmaps()
     dots = fig_perseed()
     traj = fig_trajectory()
+    fig_forgetting()
     counts = fig_routing()
     spans = fig_spans()
     perclass = fig_perclass()

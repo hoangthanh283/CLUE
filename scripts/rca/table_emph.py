@@ -9,7 +9,7 @@ values, compared by their mean) and ``87.5\\;{\\scriptsize ...}``. Cells with no
 
 import re
 
-_NUM = re.compile(r"\$?(\d+\.\d+(?:/\d+\.\d+)*)")
+_NUM = re.compile(r"\$?(-?\d+\.\d+(?:/-?\d+\.\d+)*)")
 _MATH = re.compile(r"^\$(.+?)(\^\{.*\})?\$$")
 
 
@@ -31,18 +31,22 @@ def _wrap(cell: str, bold: bool) -> str:
     return f"{cmd}{{{num}}}{cell[len(num):]}"
 
 
-def emph(cells: list[str], ours: list[bool], skip: list[bool] | None = None) -> list[str]:
-    """``cells`` of one column, top to bottom. ``skip`` rows (references, oracles) do not compete."""
+def emph(
+    cells: list[str], ours: list[bool], skip: list[bool] | None = None, lower: bool = False
+) -> list[str]:
+    """``cells`` of one column, top to bottom. ``skip`` rows (references, oracles) do not compete.
+    ``lower``: the smallest value is the best one (forgetting)."""
     skip = skip or [False] * len(cells)
     vals = [None if s else _value(c) for c, s in zip(cells, skip, strict=True)]
     got = [v for v in vals if v is not None]
     if not got:
         return list(cells)
-    best = max(got)
+    top = min if lower else max
+    best = top(got)
     out = [_wrap(c, True) if v == best else c for c, v in zip(cells, vals, strict=True)]
     mine = [v for v, o in zip(vals, ours, strict=True) if o and v is not None]
-    if mine and max(mine) < best:
-        out = [_wrap(c, False) if o and v == max(mine) else c
+    if mine and top(mine) != best:
+        out = [_wrap(c, False) if o and v == top(mine) else c
                for c, v, o in zip(out, vals, ours, strict=True)]  # fmt: skip
     return out
 
@@ -58,4 +62,9 @@ if __name__ == "__main__":
         "\\textbf{2.0}",
     ]
     assert emph(["--", "--"], [True, False]) == ["--", "--"]
+    assert emph(["$2.4$", "$-0.1$", "$90.1$"], [True, False, False], lower=True) == [
+        "$\\underline{2.4}$",
+        "$\\mathbf{-0.1}$",
+        "$90.1$",
+    ]
     print("ok")
