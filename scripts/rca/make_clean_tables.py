@@ -576,6 +576,12 @@ def write_supp_vals():
         vs = list(cu.values())
         t += m("vSlicedCurFull", f"{np.mean(vs):.1f}{{\\pm}}{np.std(vs, ddof=1):.1f}")
         t += m("nSlicedAnyBelowSbrMin", down1(min(sb_full[s] - max(sl[s], cu[s]) for s in SEEDS)))
+    # Class order (2026-11-17): CIL-CORD with the sessions reversed (cil_cord_o2), seed 42, full-label F1.
+    o2 = {k: load_seeds(CLEAN, f"cil_cord_o2_{n}", "full_label_f1").get(42)
+          for k, n in (("Colar", "colar"), ("Sbr", "colar_sbr"), ("Recall", "colar_sbr_recall_r64"))}
+    if all(v is not None for v in o2.values()):
+        for k, v in o2.items():
+            t += m(f"nOrderRev{k}", f"{v:.1f}")
     (OUT / "supp_vals.tex").write_text(t)
 
 
