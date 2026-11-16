@@ -20,8 +20,17 @@ declare -A STATE=()
 while slots >/dev/null; do
   C=$(ls -d $P/.claims_v25_* | tail -1)
   # the run a free slot would take next: first unclaimed line of the job list
-  nm=$(while IFS='|' read -r class gate name args; do [ -d $C/$name ] || { echo "$args" | grep -o 'method=[a-z_0-9]*' | head -1 | cut -d= -f2; break; }; done <$C/jobs.txt)
-  need=$(( $(peak "${nm:-x}") + MARGIN ))
+  # a slot may take any of the next few unclaimed runs (gates, admission), so reserve room for
+  # the largest unclaimed run, not only the head of the list
+  nm=""; need=0; k=0
+  while IFS='|' read -r class gate name args; do
+    [ -d $C/$name ] && continue
+    m=$(echo "$args" | grep -o 'method=[a-z_0-9]*' | head -1 | cut -d= -f2); pk=$(peak "${m:-x}")
+    [ $pk -gt $need ] && { need=$pk; nm=$m; }
+    k=$((k+1)); [ $k -ge 999 ] && break
+  done <$C/jobs.txt
+  [ $need -eq 0 ] && need=$(peak x)
+  need=$(( need + MARGIN ))
   declare -A PROJ=(); for g in 0 1 2 3 4 5; do PROJ[$g]=0; done
   for p in $(pgrep -f "bin/python scripts/train.py"); do
     a=$(tr '\0' ' ' </proc/$p/cmdline 2>/dev/null) || continue
