@@ -571,6 +571,11 @@ def write_supp_vals():
         vs = list(sl.values())
         t += m("vSlicedBothFull", f"{np.mean(vs):.1f}{{\\pm}}{np.std(vs, ddof=1):.1f}")
         t += m("nSlicedBothBelowSbrMin", down1(min(sb_full[s] - sl[s] for s in SEEDS)))
+    cu = load_seeds(CLEAN, "cil_cord_colar_cur_sliced", "full_label_f1")  # current loss sliced only (ER-ACE-style)
+    if len(cu) == len(SEEDS) and len(sl) == len(SEEDS) and len(sb_full) == len(SEEDS):
+        vs = list(cu.values())
+        t += m("vSlicedCurFull", f"{np.mean(vs):.1f}{{\\pm}}{np.std(vs, ddof=1):.1f}")
+        t += m("nSlicedAnyBelowSbrMin", down1(min(sb_full[s] - max(sl[s], cu[s]) for s in SEEDS)))
     (OUT / "supp_vals.tex").write_text(t)
 
 
