@@ -11,7 +11,7 @@ LwF & Regularisation & -- & previous model & 3 & 3 & 3 \\
 CODA-Prompt & Prompt, LoRA & prompts prepended to the input sequence (an input-prepend variant) & none (prompt pool) & 3 & 3 & 3 \\
 CL-LoRA & Prompt, LoRA & one shared rank-8 adapter retrained each session (published: random-orthogonal shared and block-wise task-specific adapters, early-exit distillation); gradient reassignment at scale 1, i.e.\ off & previous model, past adapter matrices & 3 & 2$^{\dagger}$ & 3 \\
 CPFD & Continual NER & one growing token head (published: per-task classifiers); sample weights set to 1 & previous model & 3 & 3 & 3 \\
-IS3 & Continual NER & one growing token head (published: per-task classifiers) & previous model, class prototypes & 3 & 2$^{\dagger}$ & 3 \\
+IS3 & Continual NER & one growing token head (published: per-task classifiers) & previous model, class prototypes & 3 & 3 & 3 \\
 LCA & Merging & one growing token head (published: per-task heads); Gaussians per token class, ``O'' excluded & base and per-session backbones, class Gaussians & 3 & 3 & 3 \\
 \bottomrule
 \end{tabular}
