@@ -6,7 +6,7 @@
 Method & Family & What our port changes & Memory & CIL-CORD & Mixed & DIL \\
 \midrule
 ER & Replay & -- & 250 raw documents & 3 & 3 & 3 \\
-DER++ & Replay & -- & 200 raw documents + logits & 3$^{\dagger}$ & 2$^{\dagger}$ & 3 \\
+DER++ & Replay & -- & 250 raw documents + logits & 3 & 2$^{\dagger}$ & 3 \\
 LwF & Regularisation & -- & previous model & 3 & 3 & 3 \\
 CODA-Prompt & Prompt, LoRA & prompts prepended to the input sequence (an input-prepend variant) & none (prompt pool) & 3 & 3 & 3 \\
 CL-LoRA & Prompt, LoRA & one shared rank-8 adapter retrained each session (published: random-orthogonal shared and block-wise task-specific adapters, early-exit distillation); gradient reassignment at scale 1, i.e.\ off & previous model, past adapter matrices & 3 & 3 & 3 \\

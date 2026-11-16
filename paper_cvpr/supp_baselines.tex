@@ -4,7 +4,7 @@
 Method & Venue & Family & Our port keeps & Our port changes & Memory \\
 \midrule
 ER & NeurIPS 2019 & Replay & reservoir buffer replayed in every step & -- & 250 raw documents \\
-DER++ & NeurIPS 2020 & Replay & replay of documents with labels and stored logits & -- & 200 raw documents + logits \\
+DER++ & NeurIPS 2020 & Replay & replay of documents with labels and stored logits & -- & 250 raw documents + logits \\
 LwF & ECCV 2016 & Regularisation & distillation of the old logits towards the previous model & -- & previous model \\
 CODA-Prompt & CVPR 2023 & Prompt, LoRA & attention-weighted prompt components with an orthogonality penalty, frozen encoder & prompts prepended to the input sequence (an input-prepend variant) & none (prompt pool) \\
 CL-LoRA & CVPR 2025 & Prompt, LoRA & orthogonality penalty, distillation towards the previous model & one shared rank-8 adapter retrained each session (published: random-orthogonal shared and block-wise task-specific adapters, early-exit distillation); gradient reassignment at scale 1, i.e.\ off & previous model, past adapter matrices \\

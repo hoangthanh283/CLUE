@@ -564,6 +564,13 @@ def write_supp_vals():
         sign = lambda x: f"+{x:.1f}" if x >= 0 else f"$-${-x:.1f}"  # noqa: E731
         t += m("nProbeDeltaMin", sign(min(d))) + m("nProbeDeltaMax", sign(max(d)))
         t += m("nProbeBestGapSbr", down1(sbr42 - max(p10.values())))
+    # Both losses sliced on CIL-CORD (SS-IL-style separated softmax, no distillation), three clean seeds.
+    sl = load_seeds(CLEAN, "cil_cord_colar_r_sliced2", "full_label_f1")
+    sb_full = load_seeds(CLEAN, "cil_cord_colar_sbr", "full_label_f1", "")
+    if len(sl) == len(SEEDS) and len(sb_full) == len(SEEDS):
+        vs = list(sl.values())
+        t += m("vSlicedBothFull", f"{np.mean(vs):.1f}{{\\pm}}{np.std(vs, ddof=1):.1f}")
+        t += m("nSlicedBothBelowSbrMin", down1(min(sb_full[s] - sl[s] for s in SEEDS)))
     (OUT / "supp_vals.tex").write_text(t)
 
 
