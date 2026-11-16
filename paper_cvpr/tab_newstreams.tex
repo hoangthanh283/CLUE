@@ -5,14 +5,14 @@
 \cmidrule(lr){2-3}\cmidrule(l){4-4}
 Method & Full-label F1 & AA & AA \\
 \midrule
-CoLaR-SBR & -- & -- & $76.4{\pm}0.5$ \\
-CoLaR, shared softmax & -- & -- & $76.9{\pm}1.6$ \\
-SBR-Recall & -- & -- & -- \\
-ER & -- & -- & --$^{n=2}$ \\
-DER++ (250 documents) & -- & -- & -- \\
-LwF & -- & -- & $72.0{\pm}0.2$ \\
-CL-LoRA & -- & -- & $53.6{\pm}5.2$ \\
-Naive fine-tuning & -- & -- & $71.2{\pm}0.7$ \\
+CoLaR-SBR & $79.5{\pm}0.3$ & $79.4{\pm}0.3$ & $76.4{\pm}0.5$ \\
+CoLaR, shared softmax & $32.5{\pm}1.8$ & $22.8{\pm}4.8$ & $76.9{\pm}1.6$ \\
+SBR-Recall & $81.0{\pm}0.5$ & $81.1{\pm}0.4$ & -- \\
+ER & --$^{n=2}$ & --$^{n=2}$ & $79.3{\pm}1.0$ \\
+DER++ (250 documents) & -- & -- & $80.2{\pm}0.3$ \\
+LwF & $31.1{\pm}0.4$ & $19.8{\pm}0.3$ & $72.0{\pm}0.2$ \\
+CL-LoRA & $29.8{\pm}0.5$ & $18.2{\pm}0.4$ & $53.6{\pm}5.2$ \\
+Naive fine-tuning & $30.8{\pm}0.7$ & $19.6{\pm}0.1$ & $71.2{\pm}0.7$ \\
 \midrule
 Joint training (reference) & $83.7{\pm}1.0$ & $83.5{\pm}0.8$ & $79.5{\pm}0.4$ \\
 \bottomrule

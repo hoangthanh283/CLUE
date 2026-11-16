@@ -1413,7 +1413,8 @@ def write_main(cell, mix, dil, full) -> None:
     def new(key):  # CIL-FUNSD, CIL-WildReceipt, DIL-XFUND
         out = clean(FUNSD_RUN.get(key, (f"cil_funsd_{key}", "")))
         for sc in NEW_STREAMS:
-            out += clean((f"{sc}_{key}", "*"))
+            # v21 runs DER++ with the 250-document buffer (as _new_cells)
+            out += clean((f"{sc}_{ {'der_pp': 'der_pp250'}.get(key, key)}", "*"))
         return out
 
     rows = [  # (family, label, method key, the seven old-stream cells)

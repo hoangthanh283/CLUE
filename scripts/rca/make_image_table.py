@@ -197,6 +197,7 @@ VAL_RUNS = {
     "Colar": "{sc}_colar500r128_seed{sd}_vit_k4_d500_r128", "Slca": "{sc}_slca_seed{sd}_vit",
     "SlcaNoca": "{sc}_slca_noca_seed{sd}_vit", "Ranpac": "{sc}_ranpac_seed{sd}_vit",
     "Lca": "{sc}_lca_seed{sd}_vit", "Joint": "{sc}_joint_seed{sd}_vit",
+    "Sbr": "{sc}_colar_sbr500r128_seed{sd}_vit",
 }  # fmt: skip
 DS = {"cil_cifar100": "Cifar", "cil_imagenet_r": "Imnr"}
 OUT_VALS = ROOT / "paper_cvpr" / "image_vals.tex"
@@ -230,6 +231,15 @@ def write_vals() -> None:
                 _warn(f"SLCA or RanPAC is not above {ours} on every seed of {sc}")
         gap = max(abs(r[ours][s] - r["ErTwoK"][s]) for s in SEEDS)
         t += f"\\newcommand{{\\img{ours}ErGapImnr}}{{{math.ceil(10 * gap - 1e-9) / 10:.1f}}}\n"
+    # CoLaR-SBR against CoLaR, seed-matched (the prose states the ImageNet-R gain on every seed)
+    for sc, ds in DS.items():
+        dd = [v[sc]["Sbr"][s] - v[sc]["Colar"][s] for s in SEEDS]
+        t += f"\\newcommand{{\\imgSbrMinusColar{ds}Min}}{{{min(dd):+.1f}}}\n"
+        t += f"\\newcommand{{\\imgSbrMinusColar{ds}Max}}{{{max(dd):+.1f}}}\n"
+    if not all(v[sc]["Slca"][s] > v[sc]["Sbr"][s] for sc in SCEN for s in SEEDS):
+        _warn("SLCA is not above CoLaR-SBR on every seed")
+    if not all(r["Sbr"][s] > max(r["Ranpac"][s], r["ErTwoK"][s], r["Bank"][s]) for s in SEEDS):
+        _warn("CoLaR-SBR is not above RanPAC, ER and the latent memory on every ImageNet-R seed")
     cb = max(abs(v[sc]["Colar"][s] - v[sc]["Bank"][s]) for sc in SCEN for s in SEEDS)
     t += f"\\newcommand{{\\imgColarBankGapMax}}{{{math.ceil(10 * cb - 1e-9) / 10:.1f}}}\n"
     for sc in SCEN:

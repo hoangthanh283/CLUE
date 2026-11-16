@@ -1026,7 +1026,7 @@ def fig_image_budget() -> dict:
 def _tab_cell(fname: str, label_start: str, col: int) -> str:
     """The mean printed in column ``col`` (0-based, after the label) of a generated image table."""
     line = next(x for x in (OUT / fname).read_text().splitlines() if x.startswith(label_start))
-    return re.match(r"\s*([0-9.]+)", line.split("&")[1 + col]).group(1)
+    return re.match(r"\s*(?:\\(?:textbf|underline)\{)?([0-9.]+)", line.split("&")[1 + col]).group(1)
 
 
 def selfcheck_p18(abl, img_aa, img_traj, img_budget) -> None:
@@ -1041,8 +1041,8 @@ def selfcheck_p18(abl, img_aa, img_traj, img_budget) -> None:
     CHECKS.append(f"ablation: {len(abl)} rows = tab_ablation.tex")
     core = {"Naive": "Naive &", "Lwf": "LwF &", "ErTwoK": "ER (2", "DerTwoK": "DER++ (2",
             "Coda": "CODA-Prompt &", "Cllora": "CL-LoRA", "Slca": "SLCA (2023)",
-            "Ranpac": "RanPAC", "Lca": "LCA", "Bank": "\\textbf{Latent memory",
-            "Colar": "\\textbf{CoLaR", "Joint": "Joint training"}  # fmt: skip
+            "Ranpac": "RanPAC", "Lca": "LCA", "Bank": "Latent memory",
+            "Colar": "CoLaR $r", "Joint": "Joint training"}  # fmt: skip
     supp = {"ErTwoH": "ER (200", "DerTwoH": "DER++ (200"}
     n = 0
     for (k, sc), d in {**img_aa, **img_budget}.items():
