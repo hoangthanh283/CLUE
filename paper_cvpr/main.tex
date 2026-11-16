@@ -107,14 +107,14 @@ Every rung runs on CIL-CORD with LayoutLMv3 under the protocol of \cref{sec:prot
 \begin{table}[t]
 \centering\small
 \setlength{\tabcolsep}{4pt}
-\caption{\textbf{Three repairs on three class-incremental streams} (full-label F1, mean $\pm$ s.d. over three seeds). Every row but the last trains with the same CoLaR memory. True stored labels are an oracle. ``--'': not run.}
+\caption{\textbf{Three repairs on three class-incremental streams} (full-label F1, mean $\pm$ s.d. over three seeds). Every row but the last trains with the same CoLaR memory; the first three keep the shared softmax. True stored labels are an oracle. Only the per-session readout closes most of the gap on every stream. ``--'': not run.}
 \label{tab:repairs}
 \IfFileExists{tab_repairs.tex}{\resizebox{\linewidth}{!}{\input{tab_repairs}}}{}
 \end{table}
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/forgetting.pdf}
-\caption{\textbf{Forgetting on CIL-CORD}, session by session (line: mean of three seeds, band: their range; $^\dagger$legacy protocol). (a) F1 averaged over the sessions seen so far. (b) F1 on session~1. Dashed purple: the memory with true labels before each session, an oracle. Dotted: joint training, one pooled run.}
+\caption{\textbf{Forgetting on CIL-CORD}, session by session (line: mean of three seeds, band: their range). (a) F1 averaged over the sessions seen so far. (b) F1 on session~1. Dashed purple: the memory with true labels before each session, an oracle. Dotted: joint training, one pooled run.}
 \label{fig:forgetting}
 \end{figure*}
 
