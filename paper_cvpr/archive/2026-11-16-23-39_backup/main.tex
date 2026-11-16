@@ -1,0 +1,253 @@
+% CVPR 2027 submission; template: https://github.com/cvpr-org/author-kit (CVPR2027-v1 kit)
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+%%%%%%%%% PAPER TYPE
+% \usepackage{cvpr}              % camera-ready
+\usepackage[review]{cvpr}      % review version
+% \usepackage[pagenumbers]{cvpr} % arXiv version
+
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage[table]{xcolor}
+\usepackage{amsmath}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,patterns}
+\usepackage{microtype}  % kit preamble.tex: tighter layout
+\definecolor{ourteal}{HTML}{0D5C63}
+\definecolor{memgreen}{HTML}{2F8F83}
+\definecolor{lexorange}{HTML}{C4841D}
+
+% Submission-ready: debug macros neutralised.
+\newcommand{\vnum}[1]{#1}
+\newcommand{\todo}[1]{}
+
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+%% pagebackref (recommended by cvpr.sty for the review copy) costs one extra pdflatex pass
+%% (4 instead of 3). It is enabled only where refs.bib exists (local builds, which produce the
+%% submission PDF) and skipped on Overleaf (free plan, 10 s compile limit).
+%% It needs no BibTeX: the bibliography itself always comes from refs_precompiled.bbl when
+%% that file exists (see the switch before \end{document}). Do NOT upload refs.bib to
+%% Overleaf: it would only add this extra pass.
+\IfFileExists{refs.bib}{\PassOptionsToPackage{pagebackref}{hyperref}}{}
+\usepackage[breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
+
+\def\confName{CVPR}
+\def\confYear{2027}
+
+\title{Memory Is Not Enough: Separating Drift from Background Conflict\\in Continual Document Understanding}
+
+\author{Anonymous CVPR submission}
+
+%% Headline numbers: generated from the result files (never typed by hand).
+\input{vals}
+%% Merged view: the appendix (supp_body.tex) follows the references in this PDF.
+%% CVPR 2027 kit practice: compile together, then split. make_submission.sh writes
+%% submission/main_paper.pdf (pages up to the references) and submission/supplementary.pdf.
+%% With \withappendixfalse the body's \cref{app:...}, \cref{fig:heatmaps} and \cref{eq:infer}-style
+%% pointers into the appendix print as ?? (accepted: build supp.tex alongside; the merged view is the default).
+\newif\ifwithappendix \withappendixtrue
+\newcommand{\bodyref}[2]{\cref{#1}}  % appendix -> body pointer (supp.tex prints #2)
+\ifwithappendix\input{supp_vals}\input{supp_perclass_vals}\input{image_vals}\fi
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study catastrophic forgetting issues in document understanding as key-information extraction (KIE) models must adapt to new documents arriving in a streaming fashion, which often leads them to forget what they learned from previous ones. Whereas replaying stored documents shows competitive performance against joint training when new domains arrive, it suffers from a big gap when the label space grows, known as class-incremental learning (CIL). We investigate the cause of this gap. A memory only repairs the drift of the model, and the remaining forgetting mainly comes from the background label ``O'', since a shared softmax treats every ``O'' label as evidence against all classes while it is evidence only against the classes its annotator could see. Based on this finding, we propose a novel method called CoLaR-SBR. Inspired by latent replay and per-session readouts, our method maintains a Compressed Latent Replay (CoLaR) memory of whole documents to remind the model of past sessions, and uses a Session-Blocked Readout (SBR) that gives each session its own background logit to remove the conflict on the ``O'' label. We also show that per-session low-rank updates can replace the memory when all sessions share one annotation schema. We benchmark our method against various continual learning baselines on 5 public document datasets and achieve significant improvement in the class-incremental setting, with competitive performance against joint training.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+The recent literature has shown the high potential of multimodal encoders such as LayoutLMv3~\citep{huang2022layoutlmv3}, LiLT~\citep{wang2022lilt} and BROS~\citep{hong2022bros} in key-information extraction (KIE), where each OCR token of a visually-rich document (form, invoice, receipt) is labelled using its words, its 2-D layout and the page image. However, when documents arrive in a streaming fashion, with new document types and growing label sets, these models suffer from catastrophic forgetting~\citep{mccloskey1989catastrophic}. Retraining on all history is often blocked by cost and by privacy constraints. Thus, a deployed KIE model has to learn continually.
+
+There exist many continual learning (CL) methods to cope with catastrophic forgetting, and replay is empirically the strongest~\citep{masana2022class,wang2024survey}. On documents, replay looks sufficient at first. When new domains arrive under one fixed label space, i.e., domain-incremental learning (DIL), replaying a few hundred stored documents keeps LayoutLMv3 close to joint training (\cref{app:drift}). Unfortunately, when the label space grows session by session, i.e., class-incremental learning (CIL), replay ends far below joint training (\cref{tab:main}). It is expected that a class-incremental stream is harder. Nevertheless, it is unclear why a memory that holds the old documents together with their labels does not help. The shift of the background label is known from class-incremental segmentation~\citep{cermelli2020mib,douillard2021plop}, incremental detection~\citep{liu2023abr,mo2024bpf} and continual named-entity recognition (NER)~\citep{monaikul2021extendner,zhang2023cpfd}, and separated softmaxes~\citep{ahn2021ssil,kim2022more,liu2023ice} already undo the shared normalisation. However, to our knowledge, no prior work examines, on token-labelled documents, which part of the failure a memory repairs and which part remains.
+
+\input{fig/conflict}
+
+In this work, we investigate the cause of this gap and propose a novel method called CoLaR-SBR. First, we examine a ladder of hypotheses on class-incremental streams (\cref{tab:ladder}). For each hypothesis, we state what it predicts, run an intervention on the same encoder, stream and recipe, and measure where the errors go. We find that label growth does not only make forgetting harder: with a whole-document memory, the model suppresses the session it is learning, which naive training does not do. Then, on CIL-CORD, an oracle that relabels every stored document with its true labels brings the shared softmax close to joint training, whereas on CIL-FUNSD it does not, and a loss that lets ``O'' mean ``O or an earlier class''~\citep{cermelli2020mib} does. Giving each session its own background is the one repair that closes most of the gap on every class-incremental stream we test (\cref{tab:repairs}). These results hint that a memory only repairs the drift of the model, and the remaining forgetting mainly comes from the background label ``O'', since a shared softmax treats every ``O'' label as evidence against all classes, while it is evidence only against the classes its annotator could see (\cref{fig:conflict}).
+
+Based on this finding, we propose CoLaR-SBR (\cref{fig:method}). Our method maintains a Compressed Latent Replay (CoLaR) memory, inspired by latent replay~\citep{hayes2020remind,pellegrini2020latent}, which stores the compressed activations of whole documents together with their labels and the session that wrote them, to remind the model of past sessions. On top of that, we use a Session-Blocked Readout (SBR), inspired by ICE-O~\citep{liu2023ice} and MORE~\citep{kim2022more}, which gives each session its own background logit and its own softmax. We argue that each class should be supervised only with negatives from the documents that annotated it, as in training on disjoint tag sets~\citep{greenberg2018marginal}. Hence, an ``O'' label trains only the blocks of the sessions that annotated the document. Furthermore, we show that the memory can be replaced in one case: when all sessions share one annotation schema, per-session low-rank updates~\citep{hu2022lora} (SBR-Recall) come close to joint training with no stored document.
+
+We benchmark our method against two references and eight CL baselines on six streams over five public document datasets, FUNSD, CORD, SROIE, WildReceipt and XFUND. On the three class-incremental streams, CoLaR-SBR closes most of the gap to joint training on every seed. It is noted that our readout is not limited to the latent memory: with raw documents instead, the full-label F1 differs by at most $\nErSbrAbsFullMax$ points on every seed. The contributions of our study are as follows: (1) we investigate why replay fails under label growth and find that a memory only repairs drift, while the remaining forgetting comes from the conflict on the background label (\cref{sec:investigation}); (2) we propose a novel method called CoLaR-SBR, which combines a whole-document latent memory with a per-session background readout to address this conflict, and we show when per-session low-rank updates can replace the memory (\cref{sec:design}); (3) we conduct experiments against various CL baselines on five public document datasets (see \cref{tab:main}), with ablations on each component (\cref{sec:ablations}).
+\section{Related Work}
+\label{sec:related}
+\paragraph{Document understanding and continual document IE.} Recent studies on visually-rich documents mainly consist of layout-aware encoders~\citep{xu2020layoutlm,xu2021layoutlmv2,huang2022layoutlmv3,wang2022lilt,hong2022bros} and generative models~\citep{kim2022donut,tang2023udop}. They achieve strong results on forms and receipts. However, they are trained once on all the data, with a classifier sized to a fixed label set. There have been few works on continual learning for documents: continual table detection uses plain ER~\citep{minouei2022table}, ProtoNER uses prototypes~\citep{kumar2023protoner} and AMD-Proj projects gradients against task subspaces~\citep{sassioui2026amdproj}. Recently, \citet{sassioui2026documents} benchmarked layout-aware models by stream regime and found that no method they test consistently preserves old knowledge under label-space shift. However, they decompose forgetting by regime, whereas we decompose it by cause. It is noted that a generative model emits no per-token background label; hence, we work with token classifiers (\cref{sec:limitations}).
+
+\paragraph{Continual learning and replay.} Recent studies on catastrophic forgetting mainly consist of regularization~\citep{kirkpatrick2017ewc,li2017lwf}, parameter isolation~\citep{mallya2018packnet,rusu2016pnn} and replay~\citep{rolnick2019er,buzzega2020der}, and replay is reported to be the strongest in the class-incremental setting~\citep{masana2022class}. More recently, methods built on a frozen pre-trained model learn prompts~\citep{wang2022l2p,smith2023coda} or low-rank adapters~\citep{liang2024inflora,he2025cllora}, or realign the classifier~\citep{zhang2023slca,mcdonnell2023ranpac}. These methods are mainly designed for image classification, where each sample carries one label and no class plays the role of a background. To reduce the cost of raw samples, latent replay stores intermediate activations and freezes the layers below them~\citep{hayes2020remind,pellegrini2020latent}. Whereas most prior replay mechanisms focus on which samples to store or how to compress them, we investigate another aspect, namely what the stored labels say: under label growth, a stored document carries ``O'' on every entity outside its session.
+
+\paragraph{Background shift.} When each step annotates only its own classes, the background label changes meaning. In class-incremental segmentation, MiB~\citep{cermelli2020mib} lets a background label mean background or any old class in the loss, PLOP~\citep{douillard2021plop} pseudo-labels the background with the old model, and SSUL~\citep{cha2021ssul} replaces the softmax with per-class sigmoid outputs. \citet{kalb2022causes} find that the semantic shift of the background and the bias towards new classes are the main causes of forgetting there. Incremental detection has named both the stored side of the shift~\citep{liu2023abr} and its two-sided form~\citep{mo2024bpf}. In continual NER, it is the unlabelled-entity problem~\citep{ma2023learning}, answered by distillation on ``O'' tokens~\citep{monaikul2021extendner,zheng2022cfner}, pseudo-labels~\citep{zhang2023cpfd} and a debiased loss~\citep{qiu2024is3}. These methods name the shift, and most of them answer it through the old model. We do not claim the conflict; instead, we separate what a replay memory repairs from what survives true stored labels, and measure what each repair leaves.
+
+\paragraph{Separated readouts and task identity.} A softmax over old and new classes together biases them, and separating it removes the bias~\citep{ahn2021ssil}; ER-ACE~\citep{caccia2022erace} masks the old classes out of the softmax of incoming samples. A ``none of mine'' output per task turns class-incremental learning into within-task prediction plus task identification~\citep{kim2022theoretical}. MORE~\citep{kim2022more} isolates each task's parameters and trains an out-of-distribution output per head from saved samples, and ICE-O~\citep{liu2023ice}, on a frozen encoder with no memory, trains one softmax per session over a constant Other logit. Unlike them, SBR learns one background per session and keeps old blocks trainable from a memory, and SBR-Recall shares MORE's isolation, by low-rank deltas, with no saved samples. To our knowledge, no prior work combines a memory against drift with one background per session on token-labelled documents, or measures what each one repairs.
+
+\section{Problem Formulation}
+\label{sec:setup}
+In the following, we first define continual key-information extraction and the streams we study. Then, we describe how a model is scored.
+
+\paragraph{Continual key-information extraction.} A document is its OCR tokens, normalised boxes and page image; the model emits BIO tags per token, scored by entity-level F1 (\texttt{seqeval}). The documents arrive in $T$ sessions, and session $t$ brings a training set annotated with its own tag set $\mathcal{T}_t$: a token whose true tag is $y^{\ast}$ is labelled $y^{\ast}$ if $y^{\ast}\in\mathcal{T}_t$ and ``O'' otherwise. We consider three kinds of stream. In class-incremental learning (CIL), each session annotates new classes only: the head grows, and every entity outside the session, earlier or later, is labelled ``O''. A session keeps every training document that holds at least one of its entities, so a document can return in several sessions under different label masks, as in the overlapped protocol of class-incremental segmentation~\citep{cermelli2020mib}. In domain-incremental learning (DIL), the label space is fixed and the domain changes. In a Mixed stream both change, across annotation schemas. After the last session, the model is tested on the classes of all sessions without knowing the session of a document.
+
+\paragraph{Streams.} We consider six streams over five public document datasets, FUNSD~\citep{jaume2019funsd}, CORD~\citep{park2019cord}, SROIE~\citep{huang2019sroie}, WildReceipt~\citep{sun2021sdmgr} and XFUND~\citep{xu2022xfund} (sessions and document counts: \cref{app:setup}). Three are class-incremental: CIL-CORD ($30$ receipt classes, six per session over five sessions), CIL-FUNSD (three entity types in two sessions) and CIL-WildReceipt ($24$ classes, six per session over four sessions). Two are domain-incremental under one fixed four-entity schema: DIL (FUNSD$\rightarrow$SROIE$\rightarrow$CORD) and DIL-XFUND (German, Spanish, French, Italian and Chinese forms in turn). Mixed has six sessions over three datasets and annotation schemas. LayoutLMv3-base~\citep{huang2022layoutlmv3} is the encoder unless stated.
+\paragraph{Evaluation protocol.} Our headline number is the \emph{full-label F1}: the final model on the complete, unmasked test set of the stream's dataset with all its classes, as in continual NER~\citep{ma2023learning}. To measure retention, we also test on per-session splits, whose labels show only that session's classes: from $R[i,j]$, the F1 on session $j$ after session $i$, we report the average accuracy AA $=\tfrac1T\sum_j R[T,j]$ and the average forgetting AF $=\tfrac1{T-1}\sum_{j<T}\big(R[j,j]-R[T,j]\big)$. Since raw scoring of such labels charges a model for every correct entity of another session, we score each session \emph{session-restricted}, mapping a predicted tag outside session $j$'s label set to ``O'' before span matching (\cref{app:setup}). A fixed label space has no masked split, so DIL and DIL-XFUND report AA only.
+
+\section{Why Replay Fails under Label Growth}
+\label{sec:investigation}
+Every rung runs on CIL-CORD with LayoutLMv3 under the protocol of \cref{sec:protocol} and changes one thing against the run it is compared with, unless stated. \Cref{tab:ladder} lists the rungs and \cref{fig:forgetting} shows the forgetting session by session. A verdict is a sign statement over the three seeds, not a significance test: on every seed the prediction holds (\emph{supports}), fails (\emph{refutes}) or holds in part (\emph{partly}). The \emph{blocked readout} (\cref{sec:sbr}) gives each session's tags their own background logit and softmax, a \emph{block}. Unless stated, a memory is CoLaR (\cref{sec:memory}): $50$ documents per session stored as rank-$128$ SVDs of their layer-$4$ activations.
+
+\begin{table*}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{\textbf{The hypothesis ladder} on CIL-CORD with LayoutLMv3, unless stated (AF: average forgetting, mean over seeds; other cells: mean $\pm$ s.d. over three seeds; $^{n=k}$: $k$ seeds; $^\dagger$legacy protocol). $^{r}$Oracle: stored documents relabelled with their true labels (\cref{sec:h1}). $^{e}$ER trains every layer and keeps $\nErCilBuf$ raw documents. The pre-session row of H1 also tests H2.}
+\label{tab:ladder}
+\input{tab_ladder}
+\end{table*}
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{Three repairs on three class-incremental streams} (full-label F1, mean $\pm$ s.d. over three seeds). Every row but the last trains with the same CoLaR memory; the first three keep the shared softmax. True stored labels are an oracle. Only the per-session readout closes most of the gap on every stream. ``--'': not run.}
+\label{tab:repairs}
+\IfFileExists{tab_repairs.tex}{\resizebox{\linewidth}{!}{\input{tab_repairs}}}{}
+\end{table}
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/forgetting.pdf}
+\caption{\textbf{Forgetting on CIL-CORD}, session by session (line: mean of three seeds, band: their range). (a) F1 averaged over the sessions seen so far. (b) F1 on session~1. Dashed purple: the memory with true labels before each session, an oracle. Dotted: joint training, one pooled run.}
+\label{fig:forgetting}
+\end{figure*}
+
+\subsection{H0: only harder forgetting}
+\label{sec:h0}
+We first hypothesize that label growth only makes drift harder. Then the memory that retains under domain shift would still retain here, and the losses would look like naive forgetting, where old sessions are lost and the newest is learned well. However, the results refute it. The CoLaR memory comes within $\nColarDilGapMax$ AA points of joint training on DIL on every seed, whereas on CIL-CORD with a shared softmax it reaches only $\vColarFull$ full-label F1 against $\vJointFull$, and raw documents do no better (ER with $\nErCilBuf$ documents: $\vErFull$). What separates the memory run from naive forgetting is the session being trained: its newest session ends at $\mColarLastMin$ to $\mColarLastMax$ F1, whereas naive training learns every session to at least $\nNaiveDiagMin$ on every seed (\cref{app:results}). With the same frozen layers and the same replay, the blocked readout learns every session to at least $\nSbrDiagMin$, so lost plasticity does not explain it. Hence, drift alone does not explain the failure. Nevertheless, drift is real: on a fixed label space every encoder forgets its earlier domains, and replay repairs it (\cref{app:drift}).
+
+\subsection{H1: stale labels in the memory}
+\label{sec:h1}
+We next hypothesize that the stored labels are stale. A document stored at session $t$ carries ``O'' on every entity of another session, so the memory itself calls background what the model must keep or learn; in detection, this staleness was named foreground shift~\citep{liu2023abr}. If so, true stored labels should close the gap with the shared softmax unchanged. To examine it, we repair the stored labels with two oracles, which read labels no continual learner has. First, \emph{before each session}, every stored document receives the true labels of all classes in the grown head, so no stored label is stale during training, while the current documents still call old entities ``O''. Second, we mask the same stale tokens in replay instead, removing the false ``O'' without adding a label (a refresh at the session boundaries only: \cref{app:results}).
+
+The hypothesis is supported on CIL-CORD. Refreshed before each session, the same memory and softmax reach $\vOraclePreFull$ full-label F1, within $\nOraclePreJointGap$ points of joint training on every seed. Masking instead reaches $\vOracleMaskFull$; hence, removing the stale negatives alone recovers most of the gap. As a result, on CIL-CORD true stored labels suffice to explain nearly all of the failure under a shared softmax. However, this does not hold on every stream: on CIL-FUNSD the same oracle leaves the shared softmax where it was (\cref{tab:repairs}).
+
+\subsection{H2: the current documents' ``O'' labels}
+\label{sec:h2}
+We then hypothesize that the current documents are the cause: each labels every entity of an earlier session ``O'', so even a memory with true labels is opposed in every batch; this is the second side of the conflict named in detection~\citep{mo2024bpf}. If so, a loss that lets a current ``O'' mean ``O or an earlier class'', as MiB does for segmentation~\citep{cermelli2020mib} and marginal-likelihood taggers do offline~\citep{greenberg2018marginal}, should close the gap within a shared softmax. To examine it, we train the memory and the shared softmax with two label-free repairs. The first is MiB's unbiased cross-entropy in both directions: a current ``O'' token matches ``O'' or any earlier-session class, a replayed one ``O'' or any class introduced after storage (no distillation). The second slices each stored document's replay loss to the classes known at storage.
+
+The results show that a loss repair only partly helps on CIL-CORD. The MiB-style loss lifts full-label F1 to $\vMibFull$, \nMibShareFull\% of the seed-matched gap, and the softmax slice reaches only $\vSlicedFull$ (\cref{app:results}). Besides, the oracle of H1 closes the gap although every current document still calls old entities ``O''; hence, on CIL-CORD the current side is not the main cause. On CIL-FUNSD, in contrast, the MiB-style loss is level with our readout (\cref{tab:repairs}).
+
+\subsection{H3: the shared normalisation}
+\label{sec:h3}
+We hypothesize that the conflict lives in the shared normalisation, one background logit trained by documents that disagree on the background. Then one background logit per session, normalised with that session's tags only, should close most of the gap with no true labels. This is SS-IL's diagnosis of a shared softmax~\citep{ahn2021ssil} with a background added, and ICE-O's readout~\citep{liu2023ice} without its frozen encoder. It needs the memory, since separating labels does not undo drift.
+
+The hypothesis is supported on every seed. With the memory, the blocked readout (CoLaR-SBR, \cref{sec:sbr}) reaches $\vSbrFull$ full-label F1, $\nSbrGapFullMin$ to $\nSbrGapFullMax$ points below joint training per seed. Without the memory, the same readout scores $\vNoBankFull$: old blocks on a drifted trunk claim far more than their own entities (\cref{app:results}), which is drift, and the memory reduces it. \Cref{tab:repairs} compares the three repairs on the three class-incremental streams. True stored labels close the gap on CIL-CORD but not on CIL-FUNSD, the MiB-style loss does the opposite, and the blocked readout closes most of it on all three. It is noted that the readout is not free: on DIL, with nothing to separate, CoLaR-SBR is slightly below CoLaR (\cref{tab:main}).
+
+\section{Method}
+\label{sec:design}
+In this section, we describe CoLaR-SBR (\cref{fig:method}). In the following, we first state the principle behind it. Then, we detail its memory (\cref{sec:memory}), its readout (\cref{sec:sbr}) and a variant that replaces the memory (\cref{sec:recall}).
+
+\paragraph{The principle.} The rungs point at one fact about annotation under label growth, familiar from training on partially annotated data~\citep{greenberg2018marginal}. A token marked ``O'' in session $s$ means ``none of the classes annotated in session $s$'': it is evidence against those classes and silent about every other. However, a shared softmax turns it into evidence against all classes, and a stale stored label makes the same error inside the memory. We therefore state one principle: \emph{supervise each class only with negatives from documents that annotated it, and normalise together only classes that were annotated together.} Three consequences follow: each session needs its own background; the memory must keep whole documents with their labels and the session that wrote them; and each session's background logit, trained on that session's true negatives, is also a detector of its entities, so it can route a token without task identity. We name the resulting method CoLaR-SBR.
+
+\input{fig/method}
+
+\subsection{CoLaR: a whole-document latent memory}
+\label{sec:memory}
+Our readout (\cref{sec:sbr}) needs stored documents that keep each token's label at its position and the session that wrote it. CoLaR (Compressed Latent Replay), inspired by latent replay~\citep{hayes2020remind,pellegrini2020latent}, keeps whole documents: after the first session layers $1..k$ are frozen, and each stored document's layer-$k$ activations $H_j$ are kept as a rank-$r$ truncated SVD with its boxes, mask, labels and session, rebuilt at replay and injected at layer $k$; it holds no raw pixels or token ids (no privacy claim: activations can leak content). The stored documents are drawn at random from the session's training set. We use CoLaR because it keeps no pixels or token ids (\cref{sec:cost}).
+
+\subsection{SBR: one background per session}
+\label{sec:sbr}
+SBR (Session-Blocked Readout) is our instantiation of a per-session background readout~\citep{liu2023ice,kim2022more} (\cref{fig:method}b). Every session that brings new tags opens a block $b$ holding those tags $\mathcal{T}_b$. Whereas a shared softmax normalises over $\{\mathrm{O}\}\cup\bigcup_b\mathcal{T}_b$, SBR gives every session its own background logit $o_b(x)=w_b^{\top}h(x)+c_b$ on the token feature $h(x)$ and normalises each block separately:
+\begin{equation}
+p_b(\cdot\mid x)=\operatorname{softmax}\big([\,o_b(x),\,z_{\mathcal{T}_b}(x)\,]\big),
+\label{eq:block}
+\end{equation}
+where $z(x)$ are the tag logits of the usual linear head and $z_{\mathcal{T}_b}(x)$ its entries for the tags in $\mathcal{T}_b$. Within block $b$ a token labelled ``O'' in session-$b$ data is truly background, so the block's supervision is never stale. For a token $x$ with label $y$ in a document of session $s$,
+\begin{equation}
+\begin{gathered}
+\mathcal{L}(x,y,s)=\sum_{b}\,m_{sb}\;\mathrm{CE}\big(p_b(\cdot\mid x),\,y_b\big),\\
+y_b=\begin{cases} y & y\in\mathcal{T}_b\\ \mathrm{O}_b & \text{otherwise,}\end{cases}
+\end{gathered}
+\label{eq:sbr}
+\end{equation}
+with one rule for the mask: $m_{sb}{=}1$ when session $s$ annotates every tag of $\mathcal{T}_b$; $m_{sb}{=}1$ with $y_b{=}\mathrm{O}_b$ when $b$ belongs to a different annotation schema (every token is a negative for $b$, a training-time convention; \cref{app:method}); and $m_{sb}{=}0$ otherwise, because the document's ``O'' labels say nothing about block $b$. Stored documents follow the rule of the session that stored them. A shared softmax is the special case of a single block that every session supervises ($m_{sb}{=}1$ for all $s$), which is where a stale ``O'' becomes a wrong negative. Since a session that adds no tags creates no block, SBR has a single block on a fixed label space. At inference each block reports its claim $e_b=1-p_b(\mathrm{O}_b\mid x)$; the block with the largest $e_b$ labels the token with its best tag if $e_b>0.5$, and the token is ``O'' otherwise, as in ICE-O's ``Other unless some session scores above it''. Blocks trained at different times need not produce claims on one scale; hence we measure the routing directly (\cref{fig:findings}b).
+
+\subsection{SBR-Recall: per-session deltas instead of the memory}
+\label{sec:recall}
+We hypothesize that, without the conflict, the memory is needed only against drift. The task-identity view~\citep{kim2022theoretical} says when it can go: if each block is read under the trunk state that learned it, nothing drifts for it, provided the model can tell which state a token needs. On one schema under label growth each block's background logit supplies that key. Across schemas, however, the all-background terms of \cref{eq:sbr} train every old block towards background on other-schema documents with nothing to pull it back, so isolation should fail without stored documents; a fixed label space has one block, nothing to route by (not run). To examine this hypothesis (H4), SBR-Recall freezes the layers above $k$ after the first session (the base $\theta_0$), stores for each later session $b$ a rank-$64$ delta $\Delta_b$~\citep{hu2022lora} of them ($\Delta_1{=}0$), and computes every term of \cref{eq:sbr} for block $b$, at training and test time, under the trunk state that learned it (\cref{app:method}):
+\begin{equation}
+p_b(\cdot\mid x)=\operatorname{softmax}\big([\,o_b,\,z_{\mathcal{T}_b}\,]\big)\big(x;\,\theta_0+\Delta_b\big).
+\label{eq:recall}
+\end{equation}
+We report its results in \cref{sec:ablations}.
+
+\section{Experiments}
+\label{sec:experiments}
+\subsection{Experimental setup}
+\paragraph{Baselines.} We benchmark against two references (naive fine-tuning, joint training) and eight methods from five families (\cref{tab:main}): ER~\citep{rolnick2019er}, DER++~\citep{buzzega2020der}, LwF~\citep{li2017lwf}, CODA-Prompt~\citep{smith2023coda}, CL-LoRA~\citep{he2025cllora}, LCA~\citep{lca2026}, and the continual-NER methods CPFD~\citep{zhang2023cpfd} and IS3~\citep{qiu2024is3}. All of them are our ports onto the one growing token head that every row uses (\cref{app:baselines}).
+
+\paragraph{Training protocol.}\label{sec:protocol} We use AdamW with learning rate $5{\times}10^{-5}$ (LCA: its own SGD recipe), batch size $2$, which is a hardware limit, and seeds 42, 7 and 123; memory runs replay four stored documents per current batch of two. Every session trains in full precision for at most $10$ epochs and early-stops, with a patience of two epochs, on $10\%$ held out from its \emph{training} data; the test split never selects a model. Joint training is given up to $100$ epochs and a patience of ten, which favours the reference. Cells marked $\dagger$ come from earlier runs that early-stopped on the test split (\emph{legacy protocol}); they are given for completeness (\cref{app:setup}).
+
+\paragraph{Hyperparameter tuning.} Tuning and evaluating on the same scenario overstates CL methods~\citep{cha2025hyperparameters}. Hence, the comparison set was fixed after a first grid on all three streams, the memory settings were chosen on DIL, SBR's claim threshold ($0.5$) was not tuned, and the one setting chosen on CIL-CORD is SBR-Recall's delta capacity (\cref{app:baselines,app:results}).
+
+\begin{table*}[t]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{Comparison with continual-learning baselines} on LayoutLMv3 over six streams. F1: full-label F1; AA and AF: average accuracy and forgetting (\cref{sec:setup}). AA and F1: mean $\pm$ s.d. over three seeds, per-seed values when fewer; AF: mean; ``--'': not run. Bold: best of each column, Joint training aside; underlined: our best when a baseline is best. $^\dagger$legacy protocol; $^{n=k}$: $k$ clean seeds so far; $^{c}$one fp16 LwF seed that collapsed to all-background is excluded; $^{b}$with the $50$-document memory; on CIL-WildReceipt and DIL-XFUND, ER keeps $200$ documents and DER++ $250$; on CIL-FUNSD both keep $20$, the memory of the CoLaR cells there; $^{p}$made before we fixed our port's orthogonality penalty. Ports and protocols: \cref{app:baselines}; what each method stores: \cref{tab:memcmp}.}
+\label{tab:main}
+\resizebox{\linewidth}{!}{\input{tab_main_clean}}
+\end{table*}
+
+\subsection{Results}
+\label{sec:beyond}
+\paragraph{Results on CIL-CORD.} \Cref{tab:main} shows the comparison between our method and the baselines. CoLaR-SBR reaches $\vSbrFull$ full-label F1 ($\vSbr$ AA), against $\vJointFull$ for joint training and $\vColarFull$ for the same memory with a shared softmax, and SBR-Recall reaches $\vRecallFull$ with no stored document. Every shared-softmax method of \cref{tab:main} stays far below them: the best baseline, ER with $\nErCilBuf$ raw documents, reaches $\vErFull$ full-label F1, below CoLaR with a shared softmax. It is noted that all baselines are our ports, and several of them learn the later sessions poorly. This is not an artefact of early stopping: with a patience of ten epochs instead of two on CIL-FUNSD, the four weakest ports change by \nProbeDeltaMin{} to \nProbeDeltaMax{} AA points, and the best of them stays $\nProbeBestGapSbr$ points below CoLaR-SBR (seed 42; \cref{app:baselines}). Besides, the finding holds on a second backbone: with BROS, CoLaR-SBR reaches $\vBrosSbrFull$ full-label F1 against $\vBrosColarFull$ for CoLaR (\cref{app:results}).
+
+\paragraph{Results on CIL-FUNSD and CIL-WildReceipt.} We observe the same pattern on the two other class-incremental streams. On CIL-FUNSD (two sessions, ten stored forms per session), CoLaR with a shared softmax stays close to naive fine-tuning ($\vFunsdColarFull$ against $\vFunsdNaiveFull$ full-label F1), whereas CoLaR-SBR reaches $\vFunsdSbrFull$ and SBR-Recall $\vFunsdRecallFull$, level with joint training ($\vFunsdJointFull$). Besides, every baseline of \cref{tab:main} stays at least $\nFunsdSbrMinusBestBaseMin$ AA points below CoLaR-SBR on every seed, LCA being the best of them ($\vFunsdBaseLca$ AA). On CIL-WildReceipt (four sessions), CoLaR with a shared softmax reaches $\vWildColarFull$ full-label F1, close to naive fine-tuning ($\vWildNaiveFull$), while CoLaR-SBR reaches $\vWildSbrFull$, which is \nWildSbrMinusColarFullMin{} to \nWildSbrMinusColarFullMax{} points above CoLaR on every seed and \nWildJointMinusSbrFullMin{} to \nWildJointMinusSbrFullMax{} points below joint training ($\vWildJointFull$). SBR-Recall, which stores no documents, reaches $\vWildRecallFull$.
+
+\paragraph{Results on Mixed, DIL and DIL-XFUND.} On Mixed, where the sessions also change the annotation schema, CoLaR-SBR reaches $\vSbrMix$ AA, against $\vJointMix$ for joint training. On a fixed label space there is one block and nothing to separate. Hence, on DIL every replay method comes close to joint training and the blocked readout brings no gain (CoLaR-SBR $\nSbrDil$ against CoLaR $\nColarDil$ AA). On DIL-XFUND, CoLaR and CoLaR-SBR improve over naive fine-tuning, but they stay below ER and DER++, which keep raw documents and train every layer. The layers that CoLaR freezes after the first session can be one of the factors when the language changes.
+
+\paragraph{Forgetting analysis.} \Cref{fig:forgetting} shows how each method forgets on CIL-CORD. After five sessions, naive fine-tuning keeps $\nFirstNaive$ F1 on session~1 and CoLaR with a shared softmax $\nFirstColar$, whereas CoLaR-SBR keeps $\nFirstSbr$ and SBR-Recall $\nFirstRecall$. Besides, our two methods stay close to joint training after every session, not only at the end. It is noted that a low AF does not always mean a good model: CoLaR with a shared softmax has a lower AF than ER because it suppresses each new session while learning it (\cref{sec:h0}), so there is less to forget. Hence, we read AF together with AA.
+
+\subsection{Ablation study}
+\label{sec:ablations}
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\caption{\textbf{The two components} on CIL-CORD (mean $\pm$ s.d. over three seeds).}
+\label{tab:2x2}
+\resizebox{\linewidth}{!}{\input{tab_2x2}}
+\end{table}
+
+\paragraph{Ablation study for the two components.} \Cref{tab:2x2} crosses the memory with the readout on CIL-CORD. On every seed, the memory alone lifts full-label F1 over naive training by $\nAblMemMin$ to $\nAblMemMax$ points, and the blocked readout alone by \nAblReadMin{} to \nAblReadMax; together they lift it by $\nAblBothMin$ to $\nAblBothMax$ points, far more than the two add up to. This hints that the two components answer two different causes: the memory repairs drift, and the readout removes the conflict that the memory would otherwise replay.
+
+\paragraph{Ablation study for the memory format.} Our readout is not limited to the latent memory. Raw documents under the same readout, with the whole network trainable, reach $\vErSbrFull$ full-label F1 against $\vSbrFull$, with seed-matched differences of \nErSbrDiffFullMin{} to \nErSbrDiffFullMax{} points. Hence, the readout carries the gain, and we use CoLaR because it keeps no pixels or token ids.
+
+\paragraph{Ablation study for the background logit.} With every background logit fixed at zero, as in ICE-O, the memory and the blocked readout stay above CoLaR and below joint training on every seed and recover most of CoLaR-SBR's gain, while the learned background adds on two of three seeds (\cref{tab:ladder}). On BROS, the learned background is ahead on every seed ($\vBrosSbrFull$ against $\vBrosConstOFull$). Thus, separation does most of the work, and learning the background adds to it.
+
+\paragraph{Ablation study for the memory (H4).} On CIL-CORD, SBR-Recall reaches $\vRecallFull$ full-label F1 ($\vRecall$ AA) with no stored document, within $\nRecallJointGap$ points of joint training on every seed, at the price of one inference pass per session. Our port of ICE-O (frozen encoder, one head per session over a constant Other logit) forgets nothing but reaches only $\vIceOFull$, below SBR-Recall on every seed. On Mixed without a memory, SBR-Recall scores $\nRecallMixNoMem$ AA (one seed): as predicted, the blocks of the other schemas fall silent until their domain returns, and with the $50$-document memory restored it scores $\nRecallMixMem$ (\cref{app:results}).
+
+\paragraph{Memory cost.}\label{sec:cost} CoLaR keeps the $250$ documents of CIL-CORD in $\nMemColarMB$\,MB with no pixels or token ids, whereas raw documents take $\nMemRawMB$\,MB as our code holds them and $\nMemRawEightMB$\,MB with 8-bit pixels; hence, we claim no byte saving. SBR-Recall stores no document, and its four session deltas take $\nMemRecallFpMB$\,MB as trained. Below rank $128$ the latent memory loses accuracy: at rank $32$, CoLaR-SBR falls to $\vSbrRankThirtyTwoFull$ full-label F1 (\cref{app:method}).
+\section{Limitations and conclusion}
+\label{sec:limitations}
+\label{sec:conclusion}
+\paragraph{Limitations.} (1) Every control rests on three training seeds and on test sets of $50$ to $472$ documents; ``on every seed'' states the same sign on all three, not significance, and differences under about two points are not resolved. (2) The full ladder ran on LayoutLMv3 and one class order of CORD; which side of the conflict dominates differs between CIL-CORD and CIL-FUNSD, and we have not tested why. (3) All baselines are our ports, and several background-shift methods (PLOP, BPF, per-class sigmoid heads) were not run; besides, on images, where no background label exists, our readout also helps (\cref{app:image}), so part of its gain can be due to the known effect of separating the softmax~\citep{ahn2021ssil}. (4) CoLaR saves no bytes against 8-bit raw documents and keeps activations that can leak content, and SBR-Recall grows by a delta and an inference pass per session and may depend on the session order.
+
+\paragraph{Conclusion.} We investigated why replay fails in continual KIE under label growth and proposed CoLaR-SBR. A memory repairs only the drift of the model, while the remaining forgetting comes from the background label, since a shared softmax counts every ``O'' against all classes. On CIL-CORD, CoLaR-SBR achieves $\nSbrFull$ full-label F1, against $\nJointFull$ for joint training and $\nColarFull$ for the same memory with a shared softmax, and the per-session readout is the one repair that holds on all three class-incremental streams. On one schema, per-session deltas replace the memory. In the future, we wish to extend the readout to generative document models, which emit no per-token background label.\label{mainend}% last line of the main text (make_submission.sh checks its page)
+
+\section*{LLM Usage Statement}
+Claude (Anthropic), an LLM-based assistant, was used in this work to support running and monitoring experiments and to search and summarise related literature. All experiments were designed and decided by the authors, every reported number is produced by scripts from saved run files, and the authors reviewed and take full responsibility for all content.
+{
+    \small
+    %% Overleaf free plan = 10 s compile limit. The bibliography is read from
+    %% refs_precompiled.bbl whenever that file exists, so NO BibTeX pass runs on Overleaf even
+    %% if refs.bib was uploaded too (BibTeX + its reruns alone exceed the limit). Both commands
+    %% sit inside the conditional: a bare \bibliographystyle makes latexmk run BibTeX, which
+    %% would overwrite the jobname .bbl with an empty one.
+    %% Rule: the precompiled .bbl wins whenever it exists, so Overleaf runs
+    %% pdflatex only (2 passes) even if refs.bib was uploaded too. To regenerate the
+    %% bibliography locally: mv refs_precompiled.bbl aside, latexmk -pdf main.tex, then
+    %%   cp main.bbl refs_precompiled.bbl   and re-upload main.tex + refs_precompiled.bbl.
+    \IfFileExists{refs_precompiled.bbl}{\input{refs_precompiled.bbl}}%
+      {\bibliographystyle{ieeenat_fullname}\bibliography{refs}}
+}
+
+%% Appendix heading without the paper title (one document: the body's \cref pointers resolve to it).
+\ifwithappendix\clearpage\twocolumn[\centering\Large\textbf{Appendix}\vspace{1.0em}]\appendix\input{supp_body}\fi
+\end{document}

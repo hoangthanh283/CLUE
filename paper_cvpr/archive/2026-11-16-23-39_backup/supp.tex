@@ -1,0 +1,58 @@
+% CVPR 2027 submission: SUPPLEMENTARY MATERIAL (separate PDF); template: https://github.com/cvpr-org/author-kit (CVPR2027-v1 kit)
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+%%%%%%%%% PAPER TYPE
+% \usepackage{cvpr}              % camera-ready
+\usepackage[review]{cvpr}      % review version
+% \usepackage[pagenumbers]{cvpr} % arXiv version
+
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage[table]{xcolor}
+\usepackage{amsmath}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,patterns}
+\usepackage{microtype}  % kit preamble.tex: tighter layout
+\definecolor{ourteal}{HTML}{0D5C63}
+\definecolor{memgreen}{HTML}{2F8F83}
+\definecolor{lexorange}{HTML}{C4841D}
+
+% Submission-ready: debug macros neutralised.
+\newcommand{\vnum}[1]{#1}
+\newcommand{\todo}[1]{}
+
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
+
+\def\confName{CVPR}
+\def\confYear{2027}
+
+\title{Memory Is Not Enough: Separating Drift from Background Conflict\\in Continual Document Understanding}
+
+\author{Anonymous CVPR submission}
+
+%% Headline numbers shared with the main paper (generated, never typed by hand).
+\input{vals}
+\input{supp_vals}
+\input{supp_perclass_vals}
+\input{image_vals}
+\newcommand{\bodyref}[2]{#2}  % appendix -> body pointer: plain text in the standalone supplement
+
+%% Local heading without the paper title (cvpr.sty untouched).
+\renewcommand{\maketitlesupplementary}{\newpage\twocolumn[\centering\Large\textbf{Supplementary Material}\vspace{1.0em}]}
+
+\begin{document}
+\maketitlesupplementary
+\appendix
+\input{supp_body}
+
+{
+    \small
+    %% The same precompiled bibliography as the main paper (no BibTeX pass).
+    \input{refs_precompiled.bbl}
+}
+
+\end{document}
