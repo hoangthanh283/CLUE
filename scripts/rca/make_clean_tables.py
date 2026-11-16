@@ -168,7 +168,7 @@ M = {  # Mixed
     "colar": src("mixed_colar", (RESC, "mixed_colar", "")),
     "sbr": src("mixed_colar_sbr", (RESC, "mixed_colar_sbr", "")),
     "joint": src("mixed_joint", (RESC, "mixed_joint", "")),
-    "er": src(None, (RESC, "mixed_er", "")),
+    "er": src("mixed_er", (RESC, "mixed_er", "")),
     "slot": src(None, (GATE, "mixed_colar_sbr_slot")),
     "recall": src(None, (GATE, "mixed_colar_sbr_recall_r64c")),
 }
