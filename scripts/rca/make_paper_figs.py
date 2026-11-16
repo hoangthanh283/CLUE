@@ -658,11 +658,11 @@ def selfcheck(cells, cols, pts, means, dots, traj, counts, spans, perclass) -> N
     by_run = {(r["method"], r["seed"]): r["aa_vs_full"] for r in res["runs"].values()}
     meth = {"naive": "naive", "nobank": "colar_sbr_noreplay", "colar": "colar",
             "oracle": "colar_r_oracle", "sbr": "colar_sbr", "recall": "colar_sbr_recall_r64",
-            "joint": "joint"}  # fmt: skip
+            }  # fmt: skip  (joint: the figure reads the patience-10 runs, the analysis file the patience-2 ones)
     n_c = 0
     for k, (by_seed, _) in pts.items():  # F2(c) = aa_vs_full of the mechanism analysis
         for s, (x, y) in by_seed.items():
-            a = by_run.get((meth[k], s))
+            a = by_run.get((meth[k], s)) if k in meth else None
             if a:
                 assert (
                     abs(a["last_session_f1"] - x) < 1e-9 and abs(a["old_sessions_mean"] - y) < 1e-9
@@ -712,6 +712,8 @@ def selfcheck(cells, cols, pts, means, dots, traj, counts, spans, perclass) -> N
         assert abs(v["micro"] - v["dump_f1"]) < 1e-6, k
         # P17: each dump re-run reproduces the full-label F1 of its clean run of the same seed
         src_clean = [x for x in _sources(k) if x[0] == CLEAN][0]
+        if k == "joint":  # the dump re-run is of the patience-2 joint run (the tables read patience 10)
+            src_clean = (CLEAN, "cil_cord_joint", "*")
         ref = load_seeds(*src_clean[:2], key="full_label_f1", suffix=src_clean[2])
         assert abs(ref[v["seed"]] - v["dump_f1"]) < 1e-6, (k, ref, v["dump_f1"])
     CHECKS.append(

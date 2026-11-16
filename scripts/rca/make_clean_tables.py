@@ -845,13 +845,12 @@ MIX_RECALL_MEM = (GATE, "mixed_colar_sbr_recall_r64c", "*")
 LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, verdict, min_n)
     ("", "", "", "Naive fine-tuning (reference)", "naive", C["naive"], C["naive"], "cell", "", 0),
     ("H0", "Only drift: forgetting is just harder",
-     "a memory that retains under domain shift retains here; raw beats compressed",
+     "a memory that retains under domain shift retains here",
      "whole-document memory (CoLaR), shared softmax", "colar", C["colar"], C["colar"], "cell",
      "refutes", 0),
     ("", "", "", "raw-document memory (ER), shared softmax$^{e}$", "er", C["er"], C["er"], "cell",
      "refutes", 0),
-    ("", "", "", "raw-document memory, blocked readout$^{w}$", "er_sbr", src("cil_cord_er_sbr"),
-     src("cil_cord_er_sbr"), "slot", "", 3),
+    # 2026-11-16: the raw-memory + SBR row moved to the ablations (tab:ablation); it tested no rung.
     ("H1", "Stale labels in the memory",
      "true labels in the stored documents close the gap",
      "older stored documents relabelled at each boundary$^{r}$", "oracle",
@@ -862,9 +861,7 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
      src(MASK_NAME), src(MASK_NAME), "slot", "", 3),
     ("H2", "Current documents mislabel old entities",
      "a loss that lets ``O'' mean ``O or an old class'' closes the gap",
-     "replay and current losses sliced to their classes", "sliced2",
-     src(None, (GATE, "cil_cord_colar_r_sliced2", "_k4_d50_r128")), [], "cell", "open", 0),
-    ("", "", "", "MiB-style unbiased CE, both directions", "colar_mib",
+     "MiB-style unbiased CE, both directions", "colar_mib",
      src("cil_cord_colar_mib"), src("cil_cord_colar_mib"), "slot", "", 3),
     ("", "", "", "replay softmax sliced, stale ``O'' kept", "sliced", src(SLICED_NAME),
      src(SLICED_NAME), "slot", "", 3),
@@ -2542,6 +2539,7 @@ def main():
         ("nobank", "NoBankFull"),
         ("naive", "NaiveFull"),
         ("colar", "ColarFull"),
+        ("er", "ErFull"),
     ):
         v += macro(n, full[k][0])
     er_src = chosen_source(C["er"])  # the CIL-CORD ER buffer the \nEr cell was trained with
