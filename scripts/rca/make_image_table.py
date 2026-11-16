@@ -39,6 +39,7 @@ ROWS = [
         "{sc}_bank500_seed{sd}_vit_k4_d500",
         "ours",
     ),
+    ("CoLaR-SBR $r{=}128$, 500/session (ours)", "{sc}_colar_sbr500r128_seed{sd}_vit", "ours"),
     (
         "CoLaR $r{=}128$, 500/session (ours)",
         {
