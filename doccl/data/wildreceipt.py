@@ -23,7 +23,7 @@ from typing import Any
 import torch
 from datasets import load_dataset
 from torch.utils.data import Dataset
-from doccl.data.encoders import KIEEncoder, get_default_encoder
+from doccl.data.encoders import KIEEncoder, encode_with_full_labels, get_default_encoder
 
 # Upstream background classes that map to O (no entity).
 _BACKGROUND = {"Ignore", "Others"}
@@ -146,7 +146,8 @@ class WildReceiptDataset(Dataset):
             if not (set(ex["ner_tags"]) & target_entity_ids):
                 continue
             masked = [t if t in target_entity_ids else o_id for t in ex["ner_tags"]]
-            filtered.append({**ex, "ner_tags": masked})
+            # ner_tags_full: the unmasked tags, for label-refreshing replay (as FUNSD / CORD)
+            filtered.append({**ex, "ner_tags": masked, "ner_tags_full": ex["ner_tags"]})
         return filtered
 
     def __len__(self) -> int:
@@ -155,6 +156,17 @@ class WildReceiptDataset(Dataset):
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         ex = self.data[idx]
         image = self._ds[ex["row"]]["image"] if self.encoder.has_image else None
+        if "ner_tags_full" in ex:
+            return encode_with_full_labels(
+                self.encoder,
+                image,
+                ex["tokens"],
+                ex["bboxes"],
+                ex["ner_tags"],
+                ex["ner_tags_full"],
+                len(self.label_to_id),
+                self.max_length,
+            )
         return self.encoder.encode(
             image, ex["tokens"], ex["bboxes"], ex["ner_tags"], self.max_length
         )
