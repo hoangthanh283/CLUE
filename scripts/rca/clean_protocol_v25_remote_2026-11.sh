@@ -81,6 +81,7 @@ dil 0.8
 mixed 1.3
 xfund 1.5
 cord 2.0"
+[ "${DRY_RUN:-0}" = 2 ] && { jobs; echo "T|$T"; exit 0; }   # raw list (the pre-flight check reads it)
 if [ "${DRY_RUN:-0}" = 1 ]; then
   jobs | awk -F'|' -v e="$EST_DEFAULT" 'BEGIN {n=split(e, a, /[ \n]/); for (i=1; i<n; i+=2) est[a[i]]=a[i+1]}
        {printf "%3d  %-6s %4sh  gate %-12s %s\n", NR, $1, est[$1], $2, $3; c[$1]++; h+=est[$1]}
@@ -95,7 +96,7 @@ C=$P/.claims_v25_$(date +%Y%m%d%H%M%S); mkdir -p $C; jobs >$C/jobs.txt
 E=$P/.est_v25; [ -f $E ] || echo "$EST_DEFAULT" >$E
 T_STOP=$(( $(date +%s) + $(awk -v h="${T_HOURS:-11.5}" 'BEGIN {printf "%d", h * 3600}') )); echo $T_STOP >$C/t_stop
 admit() {  # admit <class>: does a run of this class still fit before T_stop - 15 min?
-  awk -v c=$1 -v now=$(date +%s) -v stop=$T_STOP '$1 == c {h = $2} END {exit !(now + 1.25 * h * 3600 <= stop - 900)}' $E
+  awk -v c=$1 -v now=$(date +%s) -v stop=$T_STOP -v m=${MARGIN:-900} '$1 == c {h = $2} END {exit !(now + 1.25 * h * 3600 <= stop - m)}' $E
 }
 port_state() {  # ok | fail | wait: the port's CIL-FUNSD seed-42 run is its test
   [ "$1" = - ] && { echo ok; return; }
@@ -121,16 +122,16 @@ worker() {  # worker <slot id> <gpu index>
       # one start at a time per card, and only with room: 4 slots share 12 GB
       flock 8
       free=$(nvidia-smi -i $2 --query-gpu=memory.free --format=csv,noheader,nounits | tr -d ' ')
-      if [ "${free:-0}" -lt 4600 ]; then flock -u 8; waiting=1; sleep 60; continue 2; fi
+      if [ "${free:-0}" -lt ${MEMFREE:-3600} ]; then flock -u 8; waiting=1; sleep ${MEMWAIT:-60}; continue 2; fi
       mkdir $C/$name 2>/dev/null || { flock -u 8; continue; }  # atomic claim: another slot got it first
       run $name $args & pid=$!
-      sleep 150; flock -u 8; wait $pid   # let the run reach its memory before the next start on this card
+      sleep ${HOLD:-150}; flock -u 8; wait $pid   # let the run reach its memory before the next start on this card
       touch $C/$name/finished
       continue 2  # rescan from the top after every job
     done 3<$C/jobs.txt
     [ $waiting = 0 ] && break          # nothing admissible left
     [ $(date +%s) -ge $T_STOP ] && break
-    sleep 30
+    sleep ${SCAN:-30}
   done
   echo "[$SLOT] $(date '+%m-%d %H:%M') slot exit: nothing admissible left" >>$Q
 }
