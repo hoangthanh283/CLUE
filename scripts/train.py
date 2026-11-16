@@ -489,6 +489,62 @@ def add_full_label_f1(out_dir: Path, cfg, scenario, method) -> float | None:
         return None
 
 
+SESSION_CKPT = "session_ckpt.pt"
+
+
+def save_session_ckpt(out_dir: Path, method, tracker, task_idx: int, task_times: list) -> None:
+    """Opt-in (``training.session_ckpt``): after session ``task_idx`` pickle the whole method
+    (model, memories, buffers, teachers), the retention matrix and the RNG states, so a killed
+    run restarts at the next session instead of from scratch. Written atomically; never fails a
+    run (a method that cannot be pickled just logs a warning and keeps training)."""
+    tb_diag = getattr(method, "tb_diag", None)
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        if tb_diag is not None:
+            method.tb_diag = None  # the TensorBoard writer holds file handles
+        state = {
+            "task_idx": task_idx,
+            "method": method,
+            "tracker": tracker,
+            "task_times": list(task_times),
+            "rng": {
+                "py": random.getstate(),
+                "np": np.random.get_state(),
+                "torch": torch.get_rng_state(),
+                "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+            },
+        }
+        tmp = out_dir / (SESSION_CKPT + ".tmp")
+        torch.save(state, tmp)
+        tmp.replace(out_dir / SESSION_CKPT)
+        log.info("Session checkpoint written after session %d", task_idx)
+    except Exception as e:  # a checkpoint must never cost a run
+        log.warning("session checkpoint skipped: %s", e)
+    finally:
+        if tb_diag is not None:
+            method.tb_diag = tb_diag
+
+
+def load_session_ckpt(out_dir: Path, device):
+    """The state written by ``save_session_ckpt`` if this run dir has one, else None. A file that
+    cannot be read is ignored (the run then starts from scratch)."""
+    path = out_dir / SESSION_CKPT
+    if not path.exists():
+        return None
+    try:
+        state = torch.load(path, map_location=device, weights_only=False)
+        rng = state["rng"]
+        random.setstate(rng["py"])
+        np.random.set_state(rng["np"])
+        torch.set_rng_state(rng["torch"].cpu())
+        if rng["cuda"] is not None and torch.cuda.is_available():
+            torch.cuda.set_rng_state_all(rng["cuda"])
+        return state
+    except Exception as e:
+        log.warning("session checkpoint at %s ignored: %s", path, e)
+        return None
+
+
 def split_val(dataset, cfg, seed: int):
     """AGENT FIX (2026-11-01): carve a held-out val split off the TRAIN set for early
     stopping. ``training.val_frac`` (default 0 = legacy behaviour: the test loader is the
@@ -1055,7 +1111,29 @@ def main(cfg: DictConfig) -> None:
 
     # Standard CL loop
     task_times: list[float] = []
+    # Opt-in resume (training.session_ckpt): continue after the last finished session.
+    session_ckpt = bool(cfg.training.get("session_ckpt", False))
+    start_task = 0
+    if session_ckpt:
+        resumed = load_session_ckpt(out_dir, device)
+        if resumed is not None:
+            method, tracker, task_times = resumed["method"], resumed["tracker"], resumed["task_times"]
+            model = method.model
+            method.out_dir = str(out_dir)
+            if tb_diag_on:
+                method.tb_diag = tb
+            start_task = resumed["task_idx"] + 1
+            log.info("Resumed from %s: sessions 1..%d are done", SESSION_CKPT, start_task)
     for task_idx, task in enumerate(scenario.tasks):
+        if task_idx < start_task:  # finished before the restart: only its eval loader is needed
+            eval_loaders_seen[task_idx] = DataLoader(
+                scenario.eval_datasets[task_idx],
+                batch_size=cfg.training.batch_size,
+                shuffle=False,
+                num_workers=cfg.training.num_workers,
+                pin_memory=True,
+            )
+            continue
         log.info("=== Task %d/%d: %s ===", task_idx + 1, len(scenario.tasks), task.task_name)
 
         # Expand classifier for new labels in this task
@@ -1170,6 +1248,8 @@ def main(cfg: DictConfig) -> None:
             task_idx,
             {tid: f"F1={r.f1:.2f}" for tid, r in results.items()},
         )
+        if session_ckpt and task_idx < len(scenario.tasks) - 1:
+            save_session_ckpt(out_dir, method, tracker, task_idx, task_times)
 
     summary = tracker.summary()
     log.info("Final: AA=%.2f BWT=%.2f AF=%.2f", summary["AA"], summary["BWT"], summary["AF"])
@@ -1189,6 +1269,7 @@ def main(cfg: DictConfig) -> None:
         torch.save(method.eval_dump, out_dir / "eval_dump.pt")
     save_run_metrics(out_dir, cfg, tracker, method, task_times, scenario_key)
     add_full_label_f1(out_dir, cfg, scenario, method)
+    (out_dir / SESSION_CKPT).unlink(missing_ok=True)  # the finished run no longer needs it
 
     # Per-class F1 on the final model — DIL-degeneracy evidence (review M5).
     # Standard-forward methods only (prompt/LoRA methods have a custom forward).
