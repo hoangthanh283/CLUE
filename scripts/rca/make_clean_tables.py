@@ -411,6 +411,40 @@ def write_conflict():
     (OUT / "supp_conflict.tex").write_text(t)
 
 
+REPAIR_ROWS = (  # (label, run key per stream): the label-side repairs under one memory
+    ("Shared softmax (CoLaR)", "colar"),
+    ("+ true stored labels (oracle)", "colar_r_oracle_pre"),
+    ("+ MiB-style loss", "colar_mib"),
+    ("+ per-session readout (CoLaR-SBR)", "colar_sbr"),
+    ("Joint training (reference)", "joint"),
+)
+REPAIR_STREAMS = (  # (header, scenario, {key: (name, suffix)} overrides)
+    ("CIL-CORD", "cil_cord", {}),
+    ("CIL-FUNSD", "cil_funsd", {"colar": ("colar", "_k4_d10_r128"),
+                                "colar_r_oracle_pre": ("colar_r_oracle_pre", "_k4_d10_r128"),
+                                "colar_sbr": ("colar_sbr_d10", "*")}),
+    ("CIL-WildReceipt", "cil_wildreceipt", {}),
+)
+
+
+def write_repairs():
+    """tab_repairs.tex: full-label F1 of each repair on the three class-incremental streams.
+    A cell needs all three clean seeds; otherwise it prints "--"."""
+    t = HDR + "\\begin{tabular}{lccc}\n\\toprule\nRepair & " + " & ".join(h for h, _, _ in REPAIR_STREAMS)
+    t += " \\\\\n\\midrule\n"
+    for label, key in REPAIR_ROWS:
+        cells = []
+        for _, sc, over in REPAIR_STREAMS:
+            name, sfx = over.get(key, (key, "*"))
+            vs = load(CLEAN, f"{sc}_{name}", "full_label_f1", sfx)
+            cells.append(f"${np.mean(vs):.1f}{{\\pm}}{np.std(vs, ddof=1):.1f}$" if len(vs) == len(SEEDS) else "--")
+        if key == "joint":
+            t += "\\midrule\n"
+        t += f"{label} & " + " & ".join(cells) + " \\\\\n"
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "tab_repairs.tex").write_text(t)
+
+
 DELTA_RUNS = (  # (label, run name, suffix): SBR-Recall delta capacity on CIL-CORD
     ("rank 8, Q/K/V, memory", "cil_cord_colar_sbr_recall", ""),
     ("rank 8, Q/K/V, no memory", "cil_cord_colar_sbr_recall_d0", ""),
@@ -2502,6 +2536,7 @@ def main():
     v += write_memcmp(cell, full)
     (OUT / "vals.tex").write_text(v)
     write_ladder()
+    write_repairs()
     write_beyond()
 
     # ---- tab_2x2.tex

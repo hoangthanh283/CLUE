@@ -6,6 +6,14 @@
 %% ============================================================================ A
 \section{Setup and protocol}
 \label{app:setup}
+\begin{table*}[t]
+\centering\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\caption{\textbf{Benchmark settings}: six streams over five document datasets (sessions: \cref{app:setup}). Train/test documents: FUNSD 149/50, SROIE 626/347, CORD 800/100. AA: mean F1 of the final model over the sessions; full-label F1: on the unmasked test set of the stream's dataset (\cref{sec:setup}).}
+\label{tab:bench}
+\input{tab_bench}
+\end{table*}
+
 
 \paragraph{Streams.} We use the dataset-provided OCR and boxes of FUNSD, CORD, SROIE, WildReceipt and XFUND, page images at $224{\times}224$ and $512$ text tokens, so a LayoutLMv3 document is a sequence of $709$ positions. On CIL-CORD (\cref{tab:sessions}) a session's training and test pools keep every receipt that contains at least one of its entities, every entity of another session is labelled ``O'', and the head grows by twelve BIO tags per session; joint training uses the full-label pool, each receipt once with all its labels. Mixed alternates between new classes within a dataset and a new dataset, and its last session returns to FUNSD with all its labels and adds no tag. DIL keeps one schema \{HEADER, KEY, VALUE, OTHER\} fixed over FUNSD$\rightarrow$SROIE$\rightarrow$CORD. CIL-WildReceipt is built as CIL-CORD: WildReceipt's $24$ entity classes, in the dataset's order, arrive six per session over four sessions. DIL-XFUND maps XFUND's HEADER, QUESTION and ANSWER tags into the DIL schema and presents German, Spanish, French, Italian and Chinese in turn, so the label space is fixed and only the language changes. Every head is one linear layer; when it grows, old rows are kept and new rows are drawn from $\mathcal{N}(0,0.02^2)$.
 
@@ -70,6 +78,26 @@ b^\star=\arg\max_b e_b.
 \paragraph{Memory accounting (\cref{tab:memory}).} We count a raw-replay document as our code holds it: $3\cdot224^2$ pixels at four bytes (one byte in the 8-bit row, which no run used) and $512\cdot7{+}1$ int64 values (per token its id, four box coordinates, mask and label; one for the session). The uncompressed latent is $709\cdot768$ fp16 values plus the $24{,}576$ bytes of the CoLaR record. Raw replay with the blocked readout trains the whole network (a raw memory could freeze the same layers; ours does not); CoLaR and SBR-Recall train only what lies above layer~$4$ after session~1, and CoLaR replays a document through the upper eight layers only. Wall-clock is reported for completeness: only one CoLaR-SBR run ran uninterrupted, so we do not compare run times.
 
 %% ============================================================================ C
+\begin{table*}[t]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{Memory comparison on CIL-CORD}: what each method keeps across sessions, its size, and the accuracy it reaches. $^{k}$Size computed from tensor shapes or parameter counts (fp32 as our code holds them, unless stated; SBR-Recall at two bytes per parameter); the other sizes were recorded by the runs. $^{l}$Not counted in the size. Marks on the accuracy cells as in \cref{tab:main}.}
+\label{tab:memcmp}
+\input{tab_memcmp}
+\end{table*}
+
+\paragraph{Comparison with memory-based approaches.} \Cref{tab:memcmp} compares what each method keeps across the sessions of CIL-CORD. ER and DER++ keep $200$ raw documents, which take $\nMemErMB$\,MB as our code holds them and expose pixels and token ids. The distillation methods keep a copy of the previous model ($\nMemModelMB$\,MB), and LCA keeps one backbone per session ($\nMemLcaMB$\,MB in all). In contrast, CoLaR-SBR keeps $250$ documents in $\nMemColarMB$\,MB, $\nMemLatentOverColar\times$ less than the activations it compresses, with no pixels or token ids. SBR-Recall stores no document at all: its four session deltas take $\nMemRecallMB$\,MB at two bytes per parameter. Among the methods of \cref{tab:memcmp}, only those with our readout at full rank come close to joint training. Nevertheless, the saving is against raw documents as our code holds them: with 8-bit pixels, the $200$ documents of ER would take $\nMemErEightMB$\,MB.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\linewidth]{figures/memory.pdf}
+\caption{\textbf{Accuracy against stored bytes} (CIL-CORD, clean protocol; dots: seeds, bar: their mean). Bytes: what a method keeps across sessions; joint training keeps every document. Filled: the size the run held; hollow: the same run's size computed for an encoding it never ran in (raw documents with 8-bit pixels, SBR-Recall's deltas at two bytes per parameter); a dotted line joins the two sizes of one run, a dashed line CoLaR-SBR at ranks $32$ and $128$. Sizes: supplementary \cref{tab:memory}.}
+\label{fig:memory}
+\end{figure}
+CoLaR stores $\nMemColarKB$\,KB per document ($\nMemColarMB$\,MB for the $250$ documents of CIL-CORD; \cref{fig:memory}), $\nMemLatentOverColar\times$ less than the fp16 layer-$4$ activations it compresses. Raw replay keeps $\nMemRawKB$\,KB per document as our code holds it, with fp32 pixels and int64 ids and boxes ($\nMemRawMB$\,MB), and would take $\nMemRawEightMB$\,MB with 8-bit pixels. SBR-Recall keeps one delta per session instead: $\nMemRecallFpSessMB$\,MB in fp32 as trained ($\nMemRecallFpMB$\,MB in all), or $\nMemRecallSessMB$\,MB ($\nMemRecallMB$\,MB) at two bytes per parameter, a reporting choice that no run evaluated.
+
+Above a compression floor, bytes do not separate the methods; the readout does: every store we ran at full rank (rank-$128$ latent or raw documents, or deltas) ends within $\nSbrGapFullMax$ full-label points of joint training on every seed through the learned-background blocked readout, and the same latent bytes under a shared softmax stay at $\vColarFull$. At rank $128$ CoLaR saves no bytes: it is $\nMemColarOverRawEight\times$ larger than raw documents with 8-bit pixels, and $\nMemRawOverColar\times$ smaller only against raw documents as our code holds them. What it gives instead is a whole-document memory without pixels or token ids; latent replay needs the frozen lower layers, so it trains $\nMemTrainSbrPct\%$ of the parameters our raw run trains (a raw memory could freeze the same layers), with full-label F1 within $\nErSbrAbsFullMax$ points of raw replay on every seed (\bodyref{sec:ablations}{the ablation study}). The rank is the one knob that sets its size, but at rank $32$ ($\nMemColarThirtyTwoMB$\,MB) CoLaR-SBR falls to $\vSbrRankThirtyTwoFull$ full-label F1, $\nSbrRankThirtyTwoDropMin$ to $\nSbrRankThirtyTwoDropMax$ points below rank $128$ and below plain CoLaR in full-label F1 on every seed; at rank $64$ ($\nMemColarSixtyFourMB$\,MB) it reaches $\vSbrRankSixtyFourFull$ and is unstable across seeds. SBR-Recall's cost grows with the sessions, not their documents: it is cheaper only when a session's documents take more than its delta.
+
 \section{Baselines}
 \label{app:baselines}
 
@@ -139,6 +167,17 @@ b^\star=\arg\max_b e_b.
 \paragraph{Design choices (\cref{fig:ablation,tab:ablext}).} \Cref{fig:ablation} draws the component grid with its seeds; \cref{tab:ablext} gathers the design-choice runs, all legacy gate runs and mostly single seeds, so each is compared only within its own protocol. \emph{Delta capacity.} At rank $8$ on query, key and value, SBR-Recall learns its weakest session (the sub-total and total fields, mostly prices) only to the value in the min $R[j,j]$ column, and adding the memory does not help; at rank $64$ with the attention output and feed-forward layers every session is learned on all three seeds. Hence, isolation was sound at rank $8$, and the capacity of the delta was the limit. Rank $64$ is the one setting we chose on CIL-CORD, from these legacy runs, before the clean re-runs. \emph{Across schemas.} Without a memory on Mixed, an old block is trained towards its background on every token of another schema's documents and nothing trains it towards its own tags, so its blocks fall silent until their domain returns and at least one session ends at zero; the trunk is frozen, so this is a readout effect, not drift. In contrast, the $50$-document memory supplies the positive counterweight: no session ends below the value in the last column, and isolation by deltas does not replace the memory across schemas (one seed). \emph{Head slots.} LexSlot adds head slots that a session updates only when its OCR vocabulary selects them, and stores token ids, unlike CoLaR. Stacked on CoLaR-SBR it raises the gate mean and narrows the spread between seeds; we keep it as a row, not a method.
 
 %% ============================================================================ E
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.5\textwidth]{figures/findings_a.pdf}\hfill
+\includegraphics[width=0.25\textwidth]{figures/findings_b.pdf}\hfill
+\includegraphics[width=0.25\textwidth]{figures/findings_c.pdf}\\
+\makebox[0.5\textwidth]{\small(a)}\hfill\makebox[0.25\textwidth]{\small(b)}\hfill\makebox[0.25\textwidth]{\small(c)}\\[1pt]
+\includegraphics{figures/findings_b_key.pdf}
+\caption{\textbf{The findings in one figure} (CIL-CORD, LayoutLMv3, clean protocol unless marked). (a) The ladder (\cref{tab:ladder}): full-label F1 (dark) and AA (light); bar: mean of three seeds, dots: seeds; hatched: legacy ($\dagger$), AA only; ``--'': no full-label run; lines: joint and naive full-label F1; $^{w}$trains every layer (\cref{tab:ladder}). (b) Where the final model puts old-session gold entities (sessions 1 to 4, mean over seeds); a shared softmax records only span recall. (c) Per seed (circle: 42, square: 7, triangle: 123), newest-session F1 against mean old-session F1: with a shared softmax and a memory the newest session is suppressed; naive training learns it and keeps nothing older.}
+\label{fig:findings}
+\end{figure*}
+
 \section{Drift evidence}
 \label{app:drift}
 
