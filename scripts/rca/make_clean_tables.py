@@ -1295,6 +1295,9 @@ def _new_cells(key: str) -> tuple:
 FUNSD_RUN = {  # CIL-FUNSD run of a method key (name, suffix); others: cil_funsd_<key>
     "colar": ("cil_funsd_colar", "_k4_d10*"),
     "colar_sbr": ("cil_funsd_colar_sbr_d10", ""),
+    # v23: 20 documents, the memory of the CIL-FUNSD CoLaR cells (200 would hold every form)
+    "er": ("cil_funsd_er_b20", ""),
+    "der_pp": ("cil_funsd_der_pp_b20", ""),
 }
 
 
