@@ -514,34 +514,40 @@ def save_session_ckpt(out_dir: Path, method, tracker, task_idx: int, task_times:
                 "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
             },
         }
+        import dill  # the model wrapper holds local closures (gradient checkpointing): plain pickle cannot
+
         tmp = out_dir / (SESSION_CKPT + ".tmp")
-        torch.save(state, tmp)
+        torch.save(state, tmp, pickle_module=dill)
         tmp.replace(out_dir / SESSION_CKPT)
         log.info("Session checkpoint written after session %d", task_idx)
     except Exception as e:  # a checkpoint must never cost a run
         log.warning("session checkpoint skipped: %s", e)
+        (out_dir / (SESSION_CKPT + ".tmp")).unlink(missing_ok=True)
     finally:
         if tb_diag is not None:
             method.tb_diag = tb_diag
 
 
-def load_session_ckpt(out_dir: Path, device):
+def load_session_ckpt(out_dir: Path, device, cfg_seed: int):
     """The state written by ``save_session_ckpt`` if this run dir has one, else None. A file that
     cannot be read is ignored (the run then starts from scratch)."""
     path = out_dir / SESSION_CKPT
     if not path.exists():
         return None
     try:
-        state = torch.load(path, map_location=device, weights_only=False)
+        import dill
+
+        state = torch.load(path, map_location=device, weights_only=False, pickle_module=dill)
         rng = state["rng"]
         random.setstate(rng["py"])
         np.random.set_state(rng["np"])
-        torch.set_rng_state(rng["torch"].cpu())
+        torch.set_rng_state(rng["torch"].cpu())  # map_location moved the state tensors to the GPU
         if rng["cuda"] is not None and torch.cuda.is_available():
-            torch.cuda.set_rng_state_all(rng["cuda"])
+            torch.cuda.set_rng_state_all([t.cpu() for t in rng["cuda"]])
         return state
     except Exception as e:
         log.warning("session checkpoint at %s ignored: %s", path, e)
+        set_seed(cfg_seed)  # a half-restored RNG must not leak into the from-scratch run
         return None
 
 
@@ -1115,7 +1121,7 @@ def main(cfg: DictConfig) -> None:
     session_ckpt = bool(cfg.training.get("session_ckpt", False))
     start_task = 0
     if session_ckpt:
-        resumed = load_session_ckpt(out_dir, device)
+        resumed = load_session_ckpt(out_dir, device, cfg.seed)
         if resumed is not None:
             method, tracker, task_times = resumed["method"], resumed["tracker"], resumed["task_times"]
             model = method.model
