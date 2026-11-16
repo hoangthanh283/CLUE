@@ -9,20 +9,20 @@ SBR, no memory & clean & 21.2 & 19.6 & 24.0 & 1.2 \\
 CoLaR & clean & 33.6 & 32.4 & 34.4 & 1.6 \\
 CoLaR-SBR & clean & 87.8 & 91.3 & 86.2 & 2.1 \\
 SBR-Recall & clean & 91.4 & 92.6 & 91.9 & 1.6 \\
-Joint training & clean & 91.1 & 90.5 & 92.1 & 0.3 \\
+Joint training & clean & 92.0 & 92.0 & 93.6 & 1.6 \\
 ER & rescore$^{\dagger}$ & 26.9 & 22.0 & 24.0 & 3.4 \\
 CoLaR-SBR + LexSlot & gate$^{\dagger}$ & 90.2 & 89.7 & 89.2 & 2.3 \\
 CoLaR-SBR (BROS) & clean & 88.4 & 87.7 & 86.4 & 1.1 \\
-LwF & rescore$^{\dagger}$ & 18.4 & 18.5 & $0.0^{c}$ & 1.3 \\
+LwF & clean & 18.6 & 19.0 & 17.8 & 1.7 \\
 DER++ & rescore$^{\dagger}$ & 21.3 & 18.8 & 21.1 & 8.2 \\
 CODA-Prompt & rescore$^{\dagger}$ & 14.0 & 15.9 & -- & 4.0 \\
 CL-LoRA (2025) & rescore$^{\dagger}$ & 18.7 & 18.6 & -- & 3.0 \\
-CPFD (2023) & rescore$^{\dagger}$ & 2.7 & 0.0 & -- & 1.0 \\
+CPFD (2023) & clean & 18.5 & 0.0 & 0.3 & 0.9 \\
 IS3 (2024) & rescore$^{\dagger}$ & 5.6 & 7.7 & -- & 2.2 \\
 LCA (2026) & rescore$^{\dagger}$ & 13.7 & 7.0 & -- & 1.6 \\
 \midrule
 \multicolumn{6}{l}{\textit{Mixed}} \\
-Naive & rescore$^{\dagger}$ & 44.4 & 43.7 & -- & 0.7 \\
+Naive & clean & 42.5 & 42.6 & 41.3 & 1.3 \\
 CoLaR & rescore$^{\dagger}$ & 75.6 & 74.6 & -- & 1.5 \\
 CoLaR-SBR & clean & 88.5 & 89.2 & 89.7 & 1.8 \\
 Joint training & clean & 88.4 & 86.9 & 87.4 & 0.8 \\
@@ -33,19 +33,19 @@ LwF & rescore$^{\dagger}$ & 47.7 & $0.0^{c}$ & -- & 1.1 \\
 DER++ & rescore$^{\dagger}$ & 75.1 & 74.0 & -- & 4.3 \\
 CODA-Prompt & rescore$^{\dagger}$ & 12.1 & 10.6 & -- & 4.4 \\
 CL-LoRA (2025) & rescore$^{\dagger}$ & 45.7 & 43.9 & -- & 2.2 \\
-CPFD (2023) & rescore$^{\dagger}$ & 0.3 & 15.1 & -- & 0.8 \\
+CPFD (2023) & clean & 0.0 & 0.1 & 6.0 & 1.0 \\
 IS3 (2024) & rescore$^{\dagger}$ & 0.0 & 40.6 & -- & 1.6 \\
 LCA (2026) & rescore$^{\dagger}$ & 38.0 & 36.4 & -- & 1.3 \\
 \midrule
 \multicolumn{6}{l}{\textit{DIL}} \\
 Naive & clean & 39.6 & 39.0 & 39.0 & 0.8 \\
 CoLaR & clean & 86.5 & 87.2 & 85.9 & 1.3 \\
-CoLaR-SBR & gate$^{\dagger}$ & 86.8 & 84.8 & 87.1 & 1.5 \\
-Joint training & grid$^{\dagger}$ & 89.7 & 89.0 & 87.5 & 0.3 \\
+CoLaR-SBR & clean & 85.7 & 85.5 & 84.9 & 1.4 \\
+Joint training & clean & 86.5 & 86.7 & 87.0 & 0.9 \\
 ER & clean & 86.7 & 87.2 & 87.0 & 2.1 \\
 CoLaR-SBR + LexSlot & gate$^{\dagger}$ & 87.2 & 87.2 & 86.6 & 1.4 \\
 LwF & clean & 38.7 & 36.5 & 37.7 & 1.3 \\
-DER++ & grid$^{\dagger}$ & 88.2 & 87.1 & 88.8 & 0.2 \\
+DER++ & clean & 89.4 & 86.1 & 89.1 & 4.2 \\
 CODA-Prompt & clean & 31.1 & 31.1 & 30.8 & 1.5 \\
 CL-LoRA (2025) & clean & 43.4 & 42.4 & 41.8 & 1.9 \\
 CPFD (2023) & clean & 0.0 & 0.0 & 0.0 & 0.6 \\
