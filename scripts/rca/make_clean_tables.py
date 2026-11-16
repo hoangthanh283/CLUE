@@ -2307,6 +2307,29 @@ def _stream_cells() -> dict:
     return out
 
 
+FUNSD_BASE = (("Lwf", "lwf"), ("Er", "er_b20"), ("DerPp", "der_pp_b20"), ("ClLora", "cl_lora"),
+              ("Coda", "coda_prompt"), ("Cpfd", "cpfd"), ("Is", "is3"), ("Lca", "lca"))  # fmt: skip
+
+
+def write_funsd_baselines() -> str:
+    """Macros for the CIL-FUNSD baseline cells of tab:main (v25 runs): \\vFunsdBase<Stem> (AA),
+    the best baseline's seed-matched distance below CoLaR-SBR, and SBR-Recall (AA, full-label).
+    A comparative macro stays "--" until every run of the comparison has three seeds."""
+    out, base = "", {}
+    for stem, run in FUNSD_BASE:
+        base[stem] = load_seeds(CLEAN, f"cil_funsd_{run}", "AA", "")
+        out += macro("FunsdBase" + stem, list(base[stem].values()))
+    sbr = load_seeds(CLEAN, "cil_funsd_colar_sbr_d10", "AA", "")
+    full = all(len(d) == len(SEEDS) for d in (*base.values(), sbr))
+    gaps = [sbr[s] - max(d[s] for d in base.values()) for s in SEEDS] if full else []
+    v = {"nFunsdSbrMinusBestBaseMin": down1(min(gaps)) if gaps else "--",
+         "nFunsdBaseAllBelowSbr": "true" if gaps and min(gaps) > 0 else "false"}  # fmt: skip
+    for key, nm in (("AA", ""), ("full_label_f1", "Full")):
+        out += macro("FunsdRecall" + nm,
+                     list(load_seeds(CLEAN, "cil_funsd_colar_sbr_recall_r64", key, "").values()))
+    return out + "".join(f"\\newcommand{{\\{k}}}{{{x}}}\n" for k, x in v.items())
+
+
 def _pending(d: dict) -> str:
     """Rule 6: a cell with fewer than three clean seeds prints no number, only its seed count."""
     return f"--$^{{n={len(d)}}}$" if d else "--"
@@ -2475,7 +2498,7 @@ def main():
     v += baseline_macros() + gap_macros() + write_mechanism() + write_dropped()
     v += ablation_macros() + control_macros() + sliced_macros() + mask_macros() + write_memory()
     v += write_funsd()
-    v += write_newstreams() + write_bros() + rank_seed_macros()
+    v += write_newstreams() + write_bros() + rank_seed_macros() + write_funsd_baselines()
     v += write_memcmp(cell, full)
     (OUT / "vals.tex").write_text(v)
     write_ladder()
