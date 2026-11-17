@@ -537,7 +537,10 @@ def load_session_ckpt(out_dir: Path, device, cfg_seed: int):
     try:
         import dill
 
-        state = torch.load(path, map_location=device, weights_only=False, pickle_module=dill)
+        # No map_location: restore every tensor to the device it was saved from. map_location=device
+        # moved the CPU-resident latent banks of the CoLaR family to the GPU and broke their replay
+        # (torch.cat of CPU and CUDA tensors right after resume).
+        state = torch.load(path, weights_only=False, pickle_module=dill)
         rng = state["rng"]
         random.setstate(rng["py"])
         np.random.set_state(rng["np"])
