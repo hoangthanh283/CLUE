@@ -418,7 +418,7 @@ def fig_budget() -> dict:
     if sum(k == "sbr" for k, _n in pts) < 3:
         return pts
     xs = sorted({n for _k, n in pts})
-    fig, ax = plt.subplots(figsize=(COL, 1.8))
+    fig, ax = plt.subplots(figsize=(COL, 1.45))
     for key, label in (("sbr", "CoLaR-SBR (ours)"), ("colar", "CoLaR, shared softmax")):
         ns = [n for n in xs if (key, n) in pts]
         for n in ns:
@@ -437,7 +437,7 @@ def fig_budget() -> dict:
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     ax.legend(loc="center right", frameon=False, handlelength=1.4)
-    fig.subplots_adjust(left=0.13, right=0.995, top=0.97, bottom=0.2)
+    fig.subplots_adjust(left=0.13, right=0.995, top=0.97, bottom=0.25)
     save(fig, "budget.pdf")
     return pts
 

@@ -479,6 +479,22 @@ def write_analysis():
     (OUT / "tab_analysis.tex").write_text(t)
 
 
+BUDGET_WORDS = {5: "Five", 10: "Ten", 20: "Twenty", 30: "Thirty", 40: "Forty", 50: "Fifty",
+                100: "Hundred", 200: "TwoHundred"}
+
+
+def write_budget_vals():
+    """budget_vals.tex: seed-42 full-label F1 of CoLaR-SBR (\\nBudSbr<N>) and of the shared softmax
+    (\\nBudColar<N>) per number of stored documents per session, for every run that exists."""
+    t = HDR
+    for key, base in (("Sbr", "cil_cord_colar_sbr"), ("Colar", "cil_cord_colar")):
+        for n, word in BUDGET_WORDS.items():
+            v = load_seeds(CLEAN, base if n == 50 else f"{base}_d{n}", "full_label_f1").get(42)
+            if v is not None:
+                t += f"\\newcommand{{\\nBud{key}{word}}}{{{v:.1f}}}\n"
+    (OUT / "budget_vals.tex").write_text(t)
+
+
 DELTA_RUNS = (  # (label, run name, suffix): SBR-Recall delta capacity on CIL-CORD
     ("rank 8, Q/K/V, memory", "cil_cord_colar_sbr_recall", ""),
     ("rank 8, Q/K/V, no memory", "cil_cord_colar_sbr_recall_d0", ""),
@@ -2615,6 +2631,7 @@ def main():
     write_ladder()
     write_repairs()
     write_analysis()
+    write_budget_vals()
     write_beyond()
 
     # ---- tab_2x2.tex
