@@ -292,12 +292,6 @@ def main() -> None:
             lines.append("\\midrule")
         prev = group
         lines.append(f"{label} & " + " & ".join(cells) + " \\\\")
-        if group == "ours" and label.startswith("CoLaR"):
-            lines.append(
-                "Ridge readout on a seed-42 variant run$^{v}$ (probe) & "
-                + " & ".join(probe_cell(sc) for sc in SCEN)
-                + " \\\\"
-            )
     lines += ["\\bottomrule", "\\end{tabular}", ""]
     OUT.write_text("\n".join(lines))
     print(OUT.read_text())

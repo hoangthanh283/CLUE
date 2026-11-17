@@ -449,10 +449,6 @@ def write_repairs():
 # One setting of CoLaR-SBR at a time around the default run (CIL-CORD):
 # (label, base run, default value, {value: run-name suffix}).
 ANALYSIS = (
-    ("Documents per session", "cil_cord_colar_sbr", 50,
-     {n: f"_d{n}" for n in (5, 10, 20, 25, 30, 40, 100, 200)}),
-    ("\\quad the same, shared softmax", "cil_cord_colar", 50,
-     {n: f"_d{n}" for n in (10, 20, 100, 200)}),
     ("SVD rank", "cil_cord_colar_sbr", 128, {32: "_r32", 64: "_r64"}),
     ("Injection layer $k$", "cil_cord_colar_sbr", 4, {2: "_k2", 6: "_k6", 8: "_k8"}),
     ("Replayed documents per batch", "cil_cord_colar_sbr", 4, {2: "_rb2", 8: "_rb8"}),
@@ -461,22 +457,29 @@ ANALYSIS = (
 
 
 def write_analysis():
-    """tab_analysis.tex: full-label F1 and AA of CoLaR-SBR when one setting changes (clean runs;
-    a cell with fewer than three seeds lists its seeds' values, marked with n). A setting is
-    printed only once a non-default value has a run, so the table grows as runs land."""
+    """tab_analysis.tex: full-label F1 and AA of CoLaR-SBR when one setting changes (a cell with
+    fewer than three runs is marked with n), and analysis_vals.tex: the range of full-label F1
+    over the values of each setting (\\nAna<Setting>Lo/Hi; means per value), for the text.
+    The memory size is not here: it is the chart of the body (budget.pdf, budget_vals.tex)."""
     t = HDR + "\\begin{tabular}{@{}lccc@{}}\n\\toprule\nSetting & Value & Full-label F1 & AA \\\\\n"
-    for label, base, default, others in ANALYSIS:
-        rows = []
-        for v in sorted([default, *others]):
-            name = base + others.get(v, "")
+    v = HDR
+    keys = ("Rank", "Layer", "Replay", "Thresh")
+    for (label, base, default, others), key in zip(ANALYSIS, keys, strict=True):
+        rows, means = [], []
+        for val in sorted([default, *others]):
+            name = base + others.get(val, "")
             f1, aa = load(CLEAN, name, "full_label_f1", "*"), load(CLEAN, name, "AA", "*")
             if f1:
-                val = f"\\textbf{{{v}}}" if v == default else f"{v}"
-                rows.append(f" & {val} & {fmt(f1, True, show_n=True)} & {fmt(aa, True, show_n=True)} \\\\\n")
+                shown = f"\\textbf{{{val}}}" if val == default else f"{val}"
+                rows.append(f" & {shown} & {fmt(f1, True, show_n=True)} & {fmt(aa, True, show_n=True)} \\\\\n")
+                means.append(float(np.mean(f1)))
         if len(rows) > 1:
             t += "\\midrule\n" + label + rows[0] + "".join(rows[1:])
+            v += (f"\\newcommand{{\\nAna{key}Lo}}{{{min(means):.1f}}}"
+                  f"\\newcommand{{\\nAna{key}Hi}}{{{max(means):.1f}}}\n")
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_analysis.tex").write_text(t)
+    (OUT / "analysis_vals.tex").write_text(v)
 
 
 # The component ablation of the body (CIL-CORD): (index, memory, readout, learned background, run).
@@ -1783,13 +1786,13 @@ def write_ablation_ext() -> None:
             t += ("\\midrule\n" if i else "") + head
         vals = load_seeds(s[0], s[1], suffix=s[2])
         mats = matrices_by_seed([s])
-        if not vals or not mats:
+        if not vals:
             _warn(f"ablation_ext: no run for {s[1]}")
             continue
-        dg = min(float(np.min(np.diag(m))) for m in mats.values())
-        fr = min(float(np.min(m[-1])) for m in mats.values())
-        t += (f"\\quad {label} & {fmt(list(vals.values()), s[0] == CLEAN)} & {dg:.1f} & {fr:.1f}"
-              " \\\\\n")  # fmt: skip
+        full = len(mats) == len(vals)  # the two minima need the matrix of every run of the row
+        dg = f"{min(float(np.min(np.diag(m))) for m in mats.values()):.1f}" if full else "--"
+        fr = f"{min(float(np.min(m[-1])) for m in mats.values()):.1f}" if full else "--"
+        t += f"\\quad {label} & {fmt(list(vals.values()), s[0] == CLEAN)} & {dg} & {fr} \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_ablation_ext.tex").write_text(t)
 
@@ -1982,9 +1985,8 @@ def write_funsd() -> str:
         d[stem].append({s: m[-1, 0] for s, m in matrices_by_seed([(CLEAN, name, sfx)]).items()})
     full3 = {k: all(len(x) == len(SEEDS) for x in v[:2]) for k, v in d.items()}
     early = [s for s in SEEDS if _best_epoch("cil_funsd_joint_p10", s) == 1]
-    t = HDR + "\\begin{tabular}{@{}lcccccc@{}}\n\\toprule\n"
-    t += (" & & & \\multicolumn{3}{c}{Full-label F1, seed} \\\\\n\\cmidrule(l){4-6}\n"
-          "Method & Full-label F1 & AA & 42 & 7 & 123 & $R[2,1]$ \\\\\n\\midrule\n")  # fmt: skip
+    t = HDR + "\\begin{tabular}{@{}lccc@{}}\n\\toprule\n"
+    t += "Method & Full-label F1 & AA & $R[2,1]$ \\\\\n\\midrule\n"
     out, v, shown = "", {}, []
     for stem, lab, _name, _sfx, settle in FUNSD:
         aa, fl, r21 = d[stem]
@@ -2006,7 +2008,7 @@ def write_funsd() -> str:
         rr = (f"{min(r21.values()):.1f}--{max(r21.values()):.1f}" if len(r21) == len(SEEDS)
               and stem != "Joint" else "--")  # fmt: skip
         shown.append((stem, fmt(list(fl.values()), True), fmt(list(aa.values()), True)))
-        t += f"{lab} & @F{stem}@ & @A{stem}@ & " + " & ".join(cells) + f" & {rr} \\\\\n"
+        t += f"{lab} & @F{stem}@ & @A{stem}@ & {rr} \\\\\n"
     # bold: best per column, Joint and the true-label controls aside; underlined: CoLaR-SBR
     ours = [s == "Sbr" for s, *_ in shown]
     ref = [s in ("Joint", "Oracle", "OracleFifty") for s, *_ in shown]
@@ -2309,24 +2311,20 @@ def write_memory() -> str:
     checked = memory_selfcheck()
     forms = memory_forms()
     yn = ("no", "yes")
-    t = HDR + "\\begin{tabular}{@{}lcccccccc@{}}\n\\toprule\n"
-    t += ("Storage form & Per unit & Total MB & Pixels & Token ids & Full-label F1 & "
-          "Trainable (M) & Peak GPU MB & h/run \\\\\n\\midrule\n")  # fmt: skip
+    t = HDR + "\\begin{tabular}{@{}lcccccc@{}}\n\\toprule\n"
+    t += ("Storage form & Per unit & Total MB & Pixels & Token ids & "
+          "Trainable (M) & Peak GPU MB \\\\\n\\midrule\n")  # fmt: skip
     for f in forms:
         unit = (f"{f['unit'] / 1e3:.1f}\\,KB/doc" if f["per"] == "doc"
                 else f"{f['unit'] / 1e6:.1f}\\,MB/session")  # fmt: skip
-        tr = pk = hr = fl = "--"
+        tr = pk = "--"
         if f["run"]:
             ms = _metas(f["run"], "" if f["run"] == ER_SBR_NAME else "*")
-            fl = fmt([m["full_label_f1"] for m in ms.values()], True, show_n=True)  # measured
             tr = f"{max(m['trainable_params'] for m in ms.values()) / 1e6:.1f}"
             pk = f"{max(m['peak_gpu_mem_mb'] for m in ms.values()):.0f}"
-            h = queue_hours(f["run"])
-            hr = (f"{np.mean(list(h.values())):.1f}" + ("" if len(h) == len(SEEDS) else f"$^{{n={len(h)}}}$")
-                  if h else "--")  # fmt: skip
         lab = f["label"] + (" (computed)" if f["computed"] else "")
         t += (f"{lab} & {unit} & {f['total'] / 1e6:.1f} & {yn[f['pixels']]} & {yn[f['ids']]} & "
-              f"{fl} & {tr} & {pk} & {hr} \\\\\n")  # fmt: skip
+              f"{tr} & {pk} \\\\\n")  # fmt: skip
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_memory.tex").write_text(t)
 

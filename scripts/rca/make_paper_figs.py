@@ -685,11 +685,11 @@ def fig_perclass() -> dict:
         lo = sum(len(s) for s in res["session_types"][:t])
         ax.text(lo + (len(sess) - 1) / 2, 103, f"session {t + 1}", ha="center", va="bottom",
                 fontsize=6.5)  # fmt: skip
-    ax.set_xticks(x, order, rotation=50, ha="right", rotation_mode="anchor", fontsize=6.5)
+    ax.set_xticks(x, order, rotation=60, ha="right", rotation_mode="anchor", fontsize=6)
     # R11-L7: a class absent from the test set has no F1 (n/a), not F1 = 0
     absent = [i for i in range(len(order)) if all(np.isnan(v["f1"][i]) for v in found.values())]
     for i in absent:
-        ax.text(i, 1.5, "n/a", ha="center", va="bottom", rotation=90, fontsize=6.5, color="#777777")
+        ax.text(i, 1.5, "n/a", ha="center", va="bottom", rotation=90, fontsize=5.5, color="#999999")
         ax.get_xticklabels()[i].set_color("#999999")
     ax.set_xlim(-0.6, len(order) - 0.4)
     ax.set_ylim(0, 112)
