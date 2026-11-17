@@ -1932,3 +1932,5 @@ NEVER run parallel work that loads CORD/mixed/dil datasets alongside the grid â€
 Superseded/completed sections (June + early-July: LexMem pilot, baseline porting,
 backbone-agnostic audit, HGT/DocMERGE/LCA/HRP branches, bug sagas) moved to
 `STATE_ARCHIVE.md` (2026-07-04) to keep this ledger lean. All DONE/FALSIFIED â€” kept for provenance.
+
+- 2026-11-17 18:47: last review round. No new result, body untouched; OpenReview #35275 holds submission/main_paper.pdf (sha256 a2d5476f, tag cvpr2027-submitted-body). Review cron c60377ce deleted. Next: supplement by Nov 23 AOE (numbering frozen; place the qualitative receipt figure after the findings figure).
