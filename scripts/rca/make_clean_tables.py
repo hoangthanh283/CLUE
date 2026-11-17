@@ -5,7 +5,7 @@ Writes into paper_cvpr/:
   tab_2x2.tex         memory x readout on CIL-CORD (strict 2x2; AA and full-label F1)
   tab_main_clean.tex  comparison table (CIL-CORD AA, CIL-CORD full-label F1, Mixed AA, DIL AA)
   tab_dil_grid.tex    DIL AA of the classical methods on four backbones (legacy grid)
-  tab_ladder.tex      the hypothesis ladder H0-H4 (slot rows render only once their runs exist)
+  tab_ladder.tex      the hypotheses H1-H3 (slot rows render only once their runs exist)
   tab_mech.tex        where old-session errors go (from results/clean_2026-11/mechanism_analysis.json)
   tab_beyond.tex      the whole "beyond one stream" float, or an empty file while no row exists
 
@@ -917,24 +917,22 @@ MIX_RECALL_NOMEM = (CLEAN, "mixed_colar_sbr_recall_r64", "*")  # clean, three se
 MIX_RECALL_MEM = (CLEAN, "mixed_colar_sbr_recall_r64c", "*")  # clean, three seeds (2026-11-17)
 LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, verdict, min_n)
     ("", "", "", "Naive fine-tuning (reference)", "naive", C["naive"], C["naive"], "cell", "", 0),
-    ("H0", "Only drift: forgetting is just harder",
+    ("H1", "Only drift: forgetting is just harder",
      "a memory that retains under domain shift retains here",
      "whole-document memory (CoLaR), shared softmax", "colar", C["colar"], C["colar"], "cell",
      "refutes", 0),
     ("", "", "", "raw-document memory (ER), shared softmax$^{e}$", "er", C["er"], C["er"], "cell",
      "refutes", 0),
     # 2026-11-16: the raw-memory + SBR row moved to the ablations (tab:ablation); it tested no rung.
-    ("H1", "Stale labels in the memory",
-     "true labels in the stored documents close the gap",
+    ("H2", "The labels are the cause: stale in the memory, wrong on the current documents",
+     "repairing the labels closes the gap within a shared softmax",
      "older stored documents relabelled at each boundary$^{r}$", "oracle",
      [ORACLE_CLEAN], [ORACLE_CLEAN], "clean", "partly", 0),
     ("", "", "", "every stored document relabelled before each session$^{r}$", "oracle_pre",
      src(ORACLE_PRE_NAME), src(ORACLE_PRE_NAME), "slot", "", 3),
     ("", "", "", "the same tokens masked instead, no label added$^{r}$", "oracle_mask",
      src(MASK_NAME), src(MASK_NAME), "slot", "", 3),
-    ("H2", "Current documents mislabel old entities",
-     "a loss that lets ``O'' mean ``O or an old class'' closes the gap",
-     "MiB-style unbiased CE, both directions", "colar_mib",
+    ("", "", "", "MiB-style loss: ``O'' may mean ``O or another session's class''", "colar_mib",
      src("cil_cord_colar_mib"), src("cil_cord_colar_mib"), "slot", "", 3),
     ("", "", "", "replay softmax sliced, stale ``O'' kept", "sliced", src(SLICED_NAME),
      src(SLICED_NAME), "slot", "", 3),
@@ -946,16 +944,10 @@ LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, 
      "supports", 0),
     ("", "", "", "CoLaR memory, blocked readout with a constant background logit",
      "sbr_constbg", src(SBR_CONSTBG_NAME), src(SBR_CONSTBG_NAME), "slot", "", 3),
-    ("H4", "Isolation replaces memory where a routing key exists",
-     "per-session deltas need no memory on one schema, and fail across schemas",
-     "per-session deltas, blocked readout, no memory (SBR-Recall)", "recall", C["recall"],
-     C["recall"], "cell", "supports", 0),
-    ("", "", "", "ICE-O (our port): frozen encoder, head per session, no memory",
+    # 2026-11-17: the former H4 (per-session deltas replace the memory) is no longer a hypothesis;
+    # SBR-Recall is a variant of the method (main table, ablations). ICE-O stays as a readout row.
+    ("", "", "", "ICE-O (our port): frozen encoder, constant Other logit, no memory",
      "ice_o", src(ICE_O_NAME), src(ICE_O_NAME), "slot", "", 3),
-    ("", "", "", "the same on Mixed (AA), no memory", "mix_nomem", [MIX_RECALL_NOMEM], [],
-     "cell", "supports", 0),
-    ("", "", "", "the same on Mixed (AA), 50-document memory", "mix_mem", [MIX_RECALL_MEM], [],
-     "cell", "supports", 0),
     ("", "", "", "Joint training (reference)", "joint", C["joint"], C["joint"], "cell", "", 0),
 )  # fmt: skip
 
