@@ -271,7 +271,7 @@ Above a compression floor, bytes do not separate the methods; the readout does: 
 \paragraph{Conclusion.} We investigated why replay fails in continual KIE under partial-schema label growth. On CIL-CORD, the clean hypothesis ladder separates representation drift from false-negative background supervision: CoLaR-SBR reaches $\nSbrFull$ full-label F1, against $\nJointFull$ for joint training and $\nColarFull$ for the same memory with a shared softmax. True stored labels nearly remove the CIL-CORD failure in an oracle control, while a MiB-style loss recovers part and a session-blocked readout supplies a label-free repair. CIL-FUNSD differs: its oracle does not rescue the shared softmax, delimiting rather than weakening the diagnostic claim. On one shared schema, per-session deltas replace stored documents.\label{mainend}% last line of the main text (make_submission.sh checks its page)
 
 \section*{LLM Usage Statement}
-Claude (Anthropic), an LLM-based assistant, was used in this work to support running and monitoring experiments and to search and summarise related literature. All experiments were designed and decided by the authors, every reported number is produced by scripts from saved run files, and the authors reviewed and take full responsibility for all content.
+ChatGPT, an LLM-based assistant, was used to polish the language, improve clarity and readability, and refine the overall structure. All experiments were designed and decided by the authors, every reported number is produced by scripts from saved run files, and the authors reviewed and take full responsibility for all content.
 {
     \small
     %% Overleaf free plan = 10 s compile limit. The bibliography is read from
