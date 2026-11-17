@@ -6,6 +6,14 @@
 %% ============================================================================ A
 \section{Setup and protocol}
 \label{app:setup}
+\begin{table*}[t]
+\centering\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\caption{\textbf{Benchmark settings}: six streams over five document datasets (sessions: \cref{app:setup}). Train/test documents: FUNSD 149/50, SROIE 626/347, CORD 800/100. AA: mean F1 of the final model over the sessions; full-label F1: on the unmasked test set of the stream's dataset (\bodyref{sec:setup}{the main paper}).}
+\label{tab:bench}
+\input{tab_bench}
+\end{table*}
+
 \paragraph{Streams.} We use the dataset-provided OCR and boxes of FUNSD, CORD, SROIE, WildReceipt and XFUND, page images at $224{\times}224$ and $512$ text tokens, so a LayoutLMv3 document is a sequence of $709$ positions. On CIL-CORD (\cref{tab:sessions}) a session's training and test pools keep every receipt that contains at least one of its entities, every entity of another session is labelled ``O'', and the head grows by twelve BIO tags per session; joint training uses the full-label pool, each receipt once with all its labels. Mixed alternates between new classes within a dataset and a new dataset, and its last session returns to FUNSD with all its labels and adds no tag. DIL keeps one schema \{HEADER, KEY, VALUE, OTHER\} fixed over FUNSD$\rightarrow$SROIE$\rightarrow$CORD. CIL-WildReceipt is built as CIL-CORD: WildReceipt's $24$ entity classes, in the dataset's order, arrive six per session over four sessions. DIL-XFUND maps XFUND's HEADER, QUESTION and ANSWER tags into the DIL schema and presents German, Spanish, French, Italian and Chinese in turn, so the label space is fixed and only the language changes. Every head is one linear layer; when it grows, old rows are kept and new rows are drawn from $\mathcal{N}(0,0.02^2)$.
 
 \begin{table}[t]
@@ -72,7 +80,7 @@ b^\star=\arg\max_b e_b.
 \begin{table*}[t]
 \centering\small
 \setlength{\tabcolsep}{4pt}
-\caption{\textbf{Memory comparison on CIL-CORD}: what each method keeps across sessions, its size, and the accuracy it reaches. $^{k}$Size computed from tensor shapes or parameter counts (fp32 as our code holds them, unless stated; SBR-Recall at two bytes per parameter); the other sizes were recorded by the runs. $^{l}$Not counted in the size. The 8-bit row is the same ER run with its size recomputed for 8-bit pixels, an encoding no run used, so it carries no accuracy of its own. Marks on the accuracy cells as in \cref{tab:main}.}
+\caption{\textbf{Memory comparison on CIL-CORD}: what each method keeps across sessions, its size, and the accuracy it reaches. $^{k}$Size computed from tensor shapes or parameter counts (fp32 as our code holds them, unless stated; SBR-Recall at two bytes per parameter); the other sizes were recorded by the runs. $^{l}$Not counted in the size. The 8-bit row is the same ER run with its size recomputed for 8-bit pixels, an encoding no run used, so it carries no accuracy of its own. Marks on the accuracy cells as in \bodyref{tab:main}{the main comparison table}.}
 \label{tab:memcmp}
 \input{tab_memcmp}
 \end{table*}
@@ -148,6 +156,32 @@ b^\star=\arg\max_b e_b.
 \IfFileExists{tab_repairs.tex}{\resizebox{\linewidth}{!}{\input{tab_repairs}}}{}
 \end{table}
 
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{\textbf{One principle, six repairs} (CIL-CORD, same CoLaR memory, full-label F1). How each repair treats a stored background label. $^{r}$Oracle: reads the true labels.}
+\label{tab:scope}
+\resizebox{\linewidth}{!}{\begin{tabular}{@{}llc@{}}
+\toprule
+Repair & Treatment of stored background label & F1 \\
+\midrule
+Shared softmax & background against all entities & $\vColarFull$ \\
+Softmax slice & background against capture-time entities & $\vSlicedFull$ \\
+MiB-style loss & marginal target: ``O or a later class'' & $\vMibFull$ \\
+Stale tokens masked$^{r}$ & no loss where the label is stale & $\vOracleMaskFull$ \\
+True stored labels$^{r}$ & corrected to the true label & $\vOraclePreFull$ \\
+Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/forgetting.pdf}
+\caption{\textbf{Forgetting on CIL-CORD}, session by session (line: mean of three seeds, band: their range). (a) F1 averaged over the sessions seen so far. (b) F1 on session~1. Dashed purple: the memory with true labels before each session, an oracle. Dotted: joint training, one pooled run.}
+\label{fig:forgetting}
+\end{figure*}
+
 \input{supp_document_bootstrap}
 
 \paragraph{Directional slicing.} The replay slice retains all classes known when a document was stored. The current-side slice removes old-class logits only for tokens labelled ``O''; positive current tokens still use the full softmax. Combining these two slices is a partial-label control, not a full reproduction of SS-IL or ER-ACE. FUNSD includes both current-only and combined slicing in \cref{tab:funsd}; the completed CORD combined slice is reported in the main text.
@@ -187,7 +221,7 @@ b^\star=\arg\max_b e_b.
 \includegraphics[width=0.25\textwidth]{figures/findings_c.pdf}\\
 \makebox[0.5\textwidth]{\small(a)}\hfill\makebox[0.25\textwidth]{\small(b)}\hfill\makebox[0.25\textwidth]{\small(c)}\\[1pt]
 \includegraphics{figures/findings_b_key.pdf}
-\caption{\textbf{The findings in one figure} (CIL-CORD, LayoutLMv3, clean protocol unless marked). (a) The series of hypotheses (\cref{tab:ladder}): full-label F1 (dark) and AA (light); bar: mean of three seeds, dots: seeds; hatched: legacy ($\dagger$), AA only; ``--'': no full-label run; lines: joint and naive full-label F1; $^{w}$trains every layer (\cref{tab:ladder}). (b) Where the final model puts old-session gold entities (sessions 1 to 4, mean over seeds); a shared softmax records only span recall. (c) Per seed (circle: 42, square: 7, triangle: 123), newest-session F1 against mean old-session F1: with a shared softmax and a memory the newest session is suppressed; naive training learns it and keeps nothing older.}
+\caption{\textbf{The findings in one figure} (CIL-CORD, LayoutLMv3, clean protocol unless marked). (a) The series of hypotheses (\bodyref{tab:ladder}{the hypothesis table of the main paper}): full-label F1 (dark) and AA (light); bar: mean of three seeds, dots: seeds; hatched: legacy ($\dagger$), AA only; ``--'': no full-label run; lines: joint and naive full-label F1; $^{w}$trains every layer (\bodyref{tab:ladder}{the hypothesis table of the main paper}). (b) Where the final model puts old-session gold entities (sessions 1 to 4, mean over seeds); a shared softmax records only span recall. (c) Per seed (circle: 42, square: 7, triangle: 123), newest-session F1 against mean old-session F1: with a shared softmax and a memory the newest session is suppressed; naive training learns it and keeps nothing older.}
 \label{fig:findings}
 \end{figure*}
 
@@ -224,4 +258,4 @@ b^\star=\arg\max_b e_b.
 \resizebox{\linewidth}{!}{\input{tab_image_core}}
 \end{table}
 
-\paragraph{What transfers, and what does not.} SLCA~\citep{zhang2023slca} leads on both datasets, above all of our rows on every seed, and RanPAC~\citep{mcdonnell2023ranpac} is above the latent memory and CoLaR on every seed; we make no state-of-the-art claim on images; our recipe is not SLCA's, and our SLCA and joint-training numbers are below the published ones. The latent memory is competitive with raw replay at $2.5\times$ the items: on CIFAR-100 the latent memory and CoLaR are above ER and DER++ with $2{,}000$ raw images on every seed, and on ImageNet-R they are within $\imgBankErGapImnr$ and $\imgColarErGapImnr$ points of ER on every seed. They store no pixel but more items ($\imgBankMB$ and $\imgColarMB$\,MB against $\imgErTwoKMB$\,MB for $2{,}000$ raw images, as our buffers record them), and replay with $200$ raw images falls to $\imgErTwoHCifar$ / $\imgErTwoHImnr$ (ER). Rank-$128$ compression moves AA by at most $\imgColarBankGapMax$ points on any seed. Without its classifier alignment, SLCA falls to $\imgSlcaNocaCifar$ / $\imgSlcaNocaImnr$. On the one-seed probe row, the adapted trunk supports a readout above every seed of the latent memory and CoLaR rows: the trunk holds more than the trained head reads out. An image has one label and no background class, and a stored image's label never goes stale, so the conflict of \cref{sec:investigation} does not arise. Nevertheless, we also run CoLaR-SBR unchanged on the same memory, with one block per session and each image supervising only the block of its own session. On ImageNet-R it reaches $\imgSbrImnr$, which is \imgSbrMinusColarImnrMin{} to \imgSbrMinusColarImnrMax{} points above CoLaR on every seed and above RanPAC, ER and the latent memory on every seed, while SLCA remains higher; on CIFAR-100 it reaches $\imgSbrCifar$, within \imgSbrMinusColarCifarMin{} to \imgSbrMinusColarCifarMax{} points of CoLaR. This hints that separating the sessions in the readout can help beyond the background label, but we did not test why.
+\paragraph{What transfers, and what does not.} SLCA~\citep{zhang2023slca} leads on both datasets, above all of our rows on every seed, and RanPAC~\citep{mcdonnell2023ranpac} is above the latent memory and CoLaR on every seed; we make no state-of-the-art claim on images; our recipe is not SLCA's, and our SLCA and joint-training numbers are below the published ones. The latent memory is competitive with raw replay at $2.5\times$ the items: on CIFAR-100 the latent memory and CoLaR are above ER and DER++ with $2{,}000$ raw images on every seed, and on ImageNet-R they are within $\imgBankErGapImnr$ and $\imgColarErGapImnr$ points of ER on every seed. They store no pixel but more items ($\imgBankMB$ and $\imgColarMB$\,MB against $\imgErTwoKMB$\,MB for $2{,}000$ raw images, as our buffers record them), and replay with $200$ raw images falls to $\imgErTwoHCifar$ / $\imgErTwoHImnr$ (ER). Rank-$128$ compression moves AA by at most $\imgColarBankGapMax$ points on any seed. Without its classifier alignment, SLCA falls to $\imgSlcaNocaCifar$ / $\imgSlcaNocaImnr$. On the one-seed probe row, the adapted trunk supports a readout above every seed of the latent memory and CoLaR rows: the trunk holds more than the trained head reads out. An image has one label and no background class, and a stored image's label never goes stale, so the conflict of \bodyref{sec:investigation}{the main paper} does not arise. Nevertheless, we also run CoLaR-SBR unchanged on the same memory, with one block per session and each image supervising only the block of its own session. On ImageNet-R it reaches $\imgSbrImnr$, which is \imgSbrMinusColarImnrMin{} to \imgSbrMinusColarImnrMax{} points above CoLaR on every seed and above RanPAC, ER and the latent memory on every seed, while SLCA remains higher; on CIFAR-100 it reaches $\imgSbrCifar$, within \imgSbrMinusColarCifarMin{} to \imgSbrMinusColarCifarMax{} points of CoLaR. This hints that separating the sessions in the readout can help beyond the background label, but we did not test why.
