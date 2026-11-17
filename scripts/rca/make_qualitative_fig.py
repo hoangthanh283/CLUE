@@ -31,8 +31,8 @@ from mechanism_analysis import blocked_pred  # noqa: E402
 
 CLEAN = ROOT / "results" / "clean_2026-11"
 RUNS = {  # panel label -> run directory of the prediction dump
-    "shared softmax (CoLaR)": CLEAN / "cil_cord_colar_dump_seed42_k4_d50_r128",
-    "one background per session (CoLaR-SBR)": CLEAN / "cil_cord_colar_sbr_dump_seed42",
+    "CoLaR, shared softmax": CLEAN / "cil_cord_colar_dump_seed42_k4_d50_r128",
+    "CoLaR-SBR": CLEAN / "cil_cord_colar_sbr_dump_seed42",
 }
 OUT = ROOT / "paper_cvpr"
 RIGHT, WRONG, FALSE_POS = "#0072B2", "#D55E00", "#E69F00"  # Okabe-Ito: blue, vermillion, orange
@@ -115,9 +115,11 @@ def main() -> None:
         counts[tag] = (int(ok), int(ok + wrong), int(fp))
         ax.set_title(f"({tag}) {label}: {ok} of {ok + wrong} entity words correct", fontsize=7.5,
                      pad=3)  # fmt: skip
+    keys = [(RIGHT, "entity word, correct tag"), (WRONG, "entity word, wrong tag")]
+    if any(c[2] for c in counts.values()):  # only when a panel shows such a word
+        keys.append((FALSE_POS, "background word tagged as an entity"))
     fig.legend(
-        [Patch(fc=RIGHT, alpha=0.5), Patch(fc=WRONG, alpha=0.5), Patch(fc=FALSE_POS, alpha=0.5)],
-        ["entity word, correct tag", "entity word, wrong tag", "background word tagged as an entity"],
+        [Patch(fc=c, alpha=0.5) for c, _ in keys], [t for _, t in keys],
         loc="lower center", ncol=3, frameon=False, fontsize=7, handlelength=1.2, columnspacing=1.2,
     )  # fmt: skip
     fig.subplots_adjust(left=0.01, right=0.99, top=0.95, bottom=0.07, wspace=0.03)

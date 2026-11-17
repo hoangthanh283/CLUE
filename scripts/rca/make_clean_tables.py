@@ -1767,9 +1767,9 @@ def write_baseline_card_short() -> None:
 # delta capacity (DELTA_RUNS), its memory across schemas (Mixed), and LexSlot stacked on CoLaR-SBR.
 ABL_EXT = (  # (group heading or None, row label, source)
     ("SBR-Recall delta capacity, CIL-CORD", "rank 8, Q/K/V, with memory",
-     (GATE, DELTA_RUNS[0][1], DELTA_RUNS[0][2])),
-    (None, "rank 8, Q/K/V, no memory", (GATE, DELTA_RUNS[1][1], DELTA_RUNS[1][2])),
-    (None, "rank 64, Q/K/V + dense, no memory", (GATE, DELTA_RUNS[2][1], DELTA_RUNS[2][2])),
+     (CLEAN, "cil_cord_colar_sbr_recall_r8", "")),  # clean, three seeds (2026-11-17)
+    (None, "rank 8, Q/K/V, no memory", (CLEAN, "cil_cord_colar_sbr_recall_r8d0", "")),
+    (None, "rank 64, Q/K/V + dense, no memory", (CLEAN, "cil_cord_colar_sbr_recall_r64", "")),
     ("SBR-Recall across schemas, Mixed (rank 64)", "no memory", MIX_RECALL_NOMEM),
     (None, "$50$-document memory", MIX_RECALL_MEM),
 )  # fmt: skip
