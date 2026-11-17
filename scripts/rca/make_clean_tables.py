@@ -864,7 +864,7 @@ ICE_O_NAME = "cil_cord_ice_o"  # ICE-O port: frozen encoder, head per session, c
 AUTO_VERDICT = {"oracle_mask": ("supports", "partly")}
 SLOT_VERDICT = {"er_sbr": "does not support", "oracle_pre": "supports", "colar_mib": "partly",
                 "sbr_constbg": "partly", "ice_o": "partly", "sliced": "partly"}  # fmt: skip
-MIX_RECALL_NOMEM = (GATE, "mixed_colar_sbr_recall_r64b", "*")  # seed 42, fp32 gate, legacy
+MIX_RECALL_NOMEM = (CLEAN, "mixed_colar_sbr_recall_r64", "*")  # clean, three seeds (2026-11-17)
 MIX_RECALL_MEM = (GATE, "mixed_colar_sbr_recall_r64c", "*")
 LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, verdict, min_n)
     ("", "", "", "Naive fine-tuning (reference)", "naive", C["naive"], C["naive"], "cell", "", 0),
@@ -1245,7 +1245,8 @@ def gap_macros() -> str:
         v[f"nSbrGap{nm}Max"] = up1(max(g)) if g else "--"
     for nm, srcs in (("nRecallMixNoMem", MIX_RECALL_NOMEM), ("nRecallMixMem", MIX_RECALL_MEM),
                      ("nSbrFrozen", (GATE, "cil_cord_colar_sbr_frozen", "*"))):  # fmt: skip
-        x = load_seeds(*srcs[:2], suffix=srcs[2]).get(42)
+        sd = load_seeds(*srcs[:2], suffix=srcs[2])
+        x = sum(sd.values()) / len(sd) if len(sd) >= 3 else sd.get(42)  # mean of three seeds, else seed 42
         v[nm] = f"{x:.1f}" if x is not None else "--"
     er, co = pick(C["er"])[0], pick(C["colar"])[0]
     if er and co and max(er) >= min(co):
