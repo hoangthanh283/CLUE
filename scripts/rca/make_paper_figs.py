@@ -316,7 +316,7 @@ def fig_findings_c() -> dict:
 
 
 # ---------------------------------------------------------------- appendix
-HEAT_KEYS = ("naive", "colar", "oracle", "nobank", "sbr", "recall", "joint")
+HEAT_KEYS = ("naive", "er", "colar", "oracle", "nobank", "sbr", "recall", "joint")  # 2 x 4, no empty slot
 
 
 def fig_heatmaps() -> dict:
@@ -346,9 +346,6 @@ def fig_heatmaps() -> dict:
         ax.tick_params(length=0, pad=1)
         for s in ax.spines.values():
             s.set_visible(False)
-    axes.flat[-1].axis("off")
-    axes.flat[-1].text(0.05, 0.5, "row $i$: after session $i$\ncolumn $j$: session $j$\n"
-                       "session-restricted F1,\nmean over the seeds", va="center", fontsize=7)  # fmt: skip
     fig.subplots_adjust(left=0.03, right=0.995, top=0.94, bottom=0.05, wspace=0.18, hspace=0.32)
     save(fig, "heatmaps.pdf")
     return means

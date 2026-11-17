@@ -81,7 +81,7 @@ b^\star=\arg\max_b e_b.
 \begin{table*}[t]
 \centering\small
 \setlength{\tabcolsep}{4pt}
-\caption{\textbf{Memory comparison on CIL-CORD}: what each method keeps across sessions, its size, and the accuracy it reaches. $^{k}$Size computed from tensor shapes or parameter counts (fp32 as our code holds them, unless stated; SBR-Recall at two bytes per parameter); the other sizes were recorded by the runs. $^{l}$Not counted in the size. Marks on the accuracy cells as in \cref{tab:main}.}
+\caption{\textbf{Memory comparison on CIL-CORD}: what each method keeps across sessions, its size, and the accuracy it reaches. $^{k}$Size computed from tensor shapes or parameter counts (fp32 as our code holds them, unless stated; SBR-Recall at two bytes per parameter); the other sizes were recorded by the runs. $^{l}$Not counted in the size. The 8-bit row is the same ER run with its size recomputed for 8-bit pixels, an encoding no run used, so it carries no accuracy of its own. Marks on the accuracy cells as in \cref{tab:main}.}
 \label{tab:memcmp}
 \input{tab_memcmp}
 \end{table*}

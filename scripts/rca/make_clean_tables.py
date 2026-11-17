@@ -1395,22 +1395,25 @@ def write_memcmp(cell, full) -> str:
     def seeds3(x):
         return fmt(list(x.values()), True) if len(x) == len(SEEDS) else "--"
 
+    def bf(run):  # a baseline's clean full-label F1 on CIL-CORD (three seeds, else "--")
+        return seeds3(load_seeds(CLEAN, f"cil_cord_{run}", "full_label_f1", ""))
+
     yes, no = "yes", "no"
     rows = [  # (group, method, what is stored, bytes, pixels, token ids, full-label F1, AA, ours)
         ("Replay", "ER (2019)", f"{buf} raw documents$^{{k}}$", buf * d["raw"], yes, yes,
-         "--", fmt(*cell["er"]), False),
+         bf("er250"), fmt(*cell["er"]), False),
         ("Replay", "\\quad with 8-bit pixels$^{k}$", f"{buf} raw documents", buf * d["raw8"], yes,
          yes, "--", "--", False),
         ("Replay", "DER++ (2020)", f"{buf_dpp} raw documents$^{{k}}$ + logits$^{{l}}$",
-         buf_dpp * d["raw"], yes, yes, "--", aa["der_pp"], False),
-        ("Model copy", "LwF (2016)", "previous model$^{k}$", model, no, no, "--", aa["lwf"], False),
+         buf_dpp * d["raw"], yes, yes, bf("der_pp"), aa["der_pp"], False),
+        ("Model copy", "LwF (2016)", "previous model$^{k}$", model, no, no, bf("lwf"), aa["lwf"], False),
         ("Model copy", "CL-LoRA (2025)", "previous model$^{k}$, adapters$^{l}$", model, no, no,
-         "--", aa["cl_lora"], False),
-        ("Model copy", "CPFD (2023)", "previous model$^{k}$", model, no, no, "--", aa["cpfd"], False),
-        ("Model copy", "IS3 (2024)", "previous model$^{k}$, prototypes$^{l}$", model, no, no, "--",
+         bf("cl_lora"), aa["cl_lora"], False),
+        ("Model copy", "CPFD (2023)", "previous model$^{k}$", model, no, no, bf("cpfd"), aa["cpfd"], False),
+        ("Model copy", "IS3 (2024)", "previous model$^{k}$, prototypes$^{l}$", model, no, no, bf("is3"),
          aa["is3"], False),
         ("Model copy", "LCA (2026)", f"base and {sessions} session backbones$^{{k}}$",
-         (sessions + 1) * model, no, no, "--", aa["lca"], False),
+         (sessions + 1) * model, no, no, bf("lca"), aa["lca"], False),
         ("Ours", "CoLaR-SBR, rank 128", f"{by['colar128']['n']} latent documents",
          by["colar128"]["total"], no, no, fmt(*full["sbr"], show_n=True), fmt(*cell["sbr"]), True),
     ]  # fmt: skip
