@@ -170,7 +170,7 @@ M = {  # Mixed
     "joint": src("mixed_joint", (RESC, "mixed_joint", "")),
     "er": src("mixed_er", (RESC, "mixed_er", "")),
     "slot": src(None, (GATE, "mixed_colar_sbr_slot")),
-    "recall": src(None, (GATE, "mixed_colar_sbr_recall_r64c")),
+    "recall": src("mixed_colar_sbr_recall_r64c", (GATE, "mixed_colar_sbr_recall_r64c")),
 }
 D = {  # DIL (scoring unaffected by the restriction; legacy = fp32 grid, test-split stopping)
     "naive": src("dil_naive", ("results", "dil_naive", "")),
@@ -646,7 +646,7 @@ def write_supp():
     write_matrix("supp_mat_recall.tex", "SBR-Recall, CIL-CORD", C["recall"])
     write_matrix("supp_mat_sbr_mix.tex", "CoLaR-SBR, Mixed", M["sbr"])
     write_matrix("supp_mat_recall_mix_nomem.tex", "SBR-Recall, Mixed, no memory",
-                 src(None, (GATE, "mixed_colar_sbr_recall_r64b")))  # fmt: skip
+                 src("mixed_colar_sbr_recall_r64", (GATE, "mixed_colar_sbr_recall_r64b")))  # fmt: skip
     write_matrix("supp_mat_recall_mix_mem.tex", "SBR-Recall, Mixed, 50-document memory",
                  M["recall"])  # fmt: skip
     write_supp_vals()
@@ -914,7 +914,7 @@ AUTO_VERDICT = {"oracle_mask": ("supports", "partly")}
 SLOT_VERDICT = {"er_sbr": "does not support", "oracle_pre": "supports", "colar_mib": "partly",
                 "sbr_constbg": "partly", "ice_o": "partly", "sliced": "partly"}  # fmt: skip
 MIX_RECALL_NOMEM = (CLEAN, "mixed_colar_sbr_recall_r64", "*")  # clean, three seeds (2026-11-17)
-MIX_RECALL_MEM = (GATE, "mixed_colar_sbr_recall_r64c", "*")
+MIX_RECALL_MEM = (CLEAN, "mixed_colar_sbr_recall_r64c", "*")  # clean, three seeds (2026-11-17)
 LADDER = (  # (rung, hypothesis, prediction, intervention, key, aa, full, kind, verdict, min_n)
     ("", "", "", "Naive fine-tuning (reference)", "naive", C["naive"], C["naive"], "cell", "", 0),
     ("H0", "Only drift: forgetting is just harder",
