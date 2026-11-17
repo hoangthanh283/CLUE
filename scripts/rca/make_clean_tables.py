@@ -446,6 +446,39 @@ def write_repairs():
     (OUT / "tab_repairs.tex").write_text(t)
 
 
+# One setting of CoLaR-SBR at a time around the default run (CIL-CORD):
+# (label, base run, default value, {value: run-name suffix}).
+ANALYSIS = (
+    ("Documents per session", "cil_cord_colar_sbr", 50,
+     {n: f"_d{n}" for n in (5, 10, 20, 25, 30, 40, 100, 200)}),
+    ("\\quad the same, shared softmax", "cil_cord_colar", 50,
+     {n: f"_d{n}" for n in (10, 20, 100, 200)}),
+    ("SVD rank", "cil_cord_colar_sbr", 128, {32: "_r32", 64: "_r64"}),
+    ("Injection layer $k$", "cil_cord_colar_sbr", 4, {2: "_k2", 6: "_k6", 8: "_k8"}),
+    ("Replayed documents per batch", "cil_cord_colar_sbr", 4, {2: "_rb2", 8: "_rb8"}),
+    ("Claim threshold", "cil_cord_colar_sbr", 0.5, {0.3: "_t03", 0.7: "_t07"}),
+)
+
+
+def write_analysis():
+    """tab_analysis.tex: full-label F1 and AA of CoLaR-SBR when one setting changes (clean runs;
+    a cell with fewer than three seeds lists its seeds' values, marked with n). A setting is
+    printed only once a non-default value has a run, so the table grows as runs land."""
+    t = HDR + "\\begin{tabular}{@{}lccc@{}}\n\\toprule\nSetting & Value & Full-label F1 & AA \\\\\n"
+    for label, base, default, others in ANALYSIS:
+        rows = []
+        for v in sorted([default, *others]):
+            name = base + others.get(v, "")
+            f1, aa = load(CLEAN, name, "full_label_f1", "*"), load(CLEAN, name, "AA", "*")
+            if f1:
+                val = f"\\textbf{{{v}}}" if v == default else f"{v}"
+                rows.append(f" & {val} & {fmt(f1, True, show_n=True)} & {fmt(aa, True, show_n=True)} \\\\\n")
+        if len(rows) > 1:
+            t += "\\midrule\n" + label + rows[0] + "".join(rows[1:])
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "tab_analysis.tex").write_text(t)
+
+
 DELTA_RUNS = (  # (label, run name, suffix): SBR-Recall delta capacity on CIL-CORD
     ("rank 8, Q/K/V, memory", "cil_cord_colar_sbr_recall", ""),
     ("rank 8, Q/K/V, no memory", "cil_cord_colar_sbr_recall_d0", ""),
@@ -2581,6 +2614,7 @@ def main():
     (OUT / "vals.tex").write_text(v)
     write_ladder()
     write_repairs()
+    write_analysis()
     write_beyond()
 
     # ---- tab_2x2.tex
