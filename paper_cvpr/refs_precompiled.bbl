@@ -1,4 +1,4 @@
-\begin{thebibliography}{55}
+\begin{thebibliography}{56}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -327,6 +327,13 @@ Zineng Tang, Ziyi Yang, Guoxin Wang, Yuwei Fang, Yang Liu, Chenguang Zhu,
 \newblock Unifying vision, text, and layout for universal document processing.
 \newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
   and Pattern Recognition (CVPR)}, 2023.
+
+\bibitem[Tjong Kim~Sang and De~Meulder(2003)]{tjong2003conll}
+Erik~F. Tjong Kim~Sang and Fien De~Meulder.
+\newblock Introduction to the {CoNLL}-2003 shared task: Language-independent
+  named entity recognition.
+\newblock In \emph{Proceedings of the Seventh Conference on Natural Language
+  Learning at {HLT-NAACL} 2003}, pages 142--147, 2003.
 
 \bibitem[Tran et~al.(2026)Tran, Vasconcellos~Vargas, and Than]{lca2026}
 Tung Tran, Danilo Vasconcellos~Vargas, and Khoat Than.

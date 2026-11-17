@@ -90,7 +90,7 @@ The contributions of our study are as follows: (1) we investigate why replay fai
 
 \section{Problem Formulation}
 \label{sec:setup}
-\runin{Continual key-information extraction.} A document is its OCR tokens, their normalised boxes and the page image. The model labels every token with a BIO tag, and the entities are scored by entity-level F1 (\texttt{seqeval}). The documents arrive in $T$ sessions. Session $t$ brings a training set $\mathcal{D}_t$ that is annotated with its own tag set $\mathcal{T}_t$ only: a token whose true tag is $y^{\ast}$ is labelled
+\runin{Continual key-information extraction.} A document is its OCR tokens, their normalised boxes and the page image. The model labels every token with a BIO tag, and the entities are scored by entity-level F1~\citep{tjong2003conll} (\texttt{seqeval}). The documents arrive in $T$ sessions. Session $t$ brings a training set $\mathcal{D}_t$ that is annotated with its own tag set $\mathcal{T}_t$ only: a token whose true tag is $y^{\ast}$ is labelled
 \begin{equation}
 y=\begin{cases} y^{\ast} & y^{\ast}\in\mathcal{T}_t\\ \mathrm{O} & \text{otherwise.}\end{cases}
 \label{eq:mask}
