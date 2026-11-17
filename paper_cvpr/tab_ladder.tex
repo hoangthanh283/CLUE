@@ -17,7 +17,7 @@ Naive fine-tuning (reference) & $13.0{\pm}0.2$ & $18.3{\pm}0.5$ & $91.3$ &  \\
 \quad replay softmax sliced, stale ``O'' kept & $45.9{\pm}1.6$ & $48.8{\pm}8.2$ & $15.8$ & partly \\
 \midrule
 \multicolumn{5}{@{}l@{}}{\textbf{H3.} The shared background normalisation. \emph{If true: one background per session closes the gap without true labels, given a memory.}} \\
-\quad CoLaR memory, session-blocked readout (CoLaR-SBR) & $89.1{\pm}2.0$ & $88.4{\pm}2.6$ & $4.2$ & supports \\
+\quad \textbf{CoLaR memory, session-blocked readout (CoLaR-SBR)} & $89.1{\pm}2.0$ & $88.4{\pm}2.6$ & $4.2$ & supports \\
 \quad session-blocked readout, no memory & $11.4{\pm}2.3$ & $21.6{\pm}2.2$ & $87.5$ & supports \\
 \quad CoLaR memory, blocked readout with a constant background logit & $82.4{\pm}6.9$ & $80.2{\pm}8.1$ & $0.2$ & partly \\
 \quad ICE-O (our port): frozen encoder, constant Other logit, no memory & $57.0{\pm}0.7$ & $35.2{\pm}0.7$ & $0.0$ & partly \\

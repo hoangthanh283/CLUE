@@ -394,7 +394,10 @@ def fig_repairs() -> dict:
     ax.tick_params(axis="x", length=0)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
-    ax.legend(loc="upper center", bbox_to_anchor=(0.46, 1.42), ncol=2, frameon=False,
+    hs, ls = ax.get_legend_handles_labels()  # bars in bar order, the joint line last
+    order = [i for i, lab in enumerate(ls) if lab != "joint training"] + [ls.index("joint training")]
+    ax.legend([hs[i] for i in order], [ls[i] for i in order], loc="upper center",
+              bbox_to_anchor=(0.46, 1.42), ncol=2, frameon=False,
               handlelength=1.2, columnspacing=1.0, handletextpad=0.4)
     fig.subplots_adjust(left=0.13, right=0.995, top=0.72, bottom=0.11)
     save(fig, "repairs.pdf")
@@ -433,7 +436,7 @@ def fig_budget() -> dict:
         ax.axhline(np.mean(list(joint.values())), color="black", linestyle="dashed",
                    linewidth=0.7, label="joint training")
     ax.set_xticks(range(len(xs)), [str(n) for n in xs])
-    ax.set_xlabel("stored documents per session")
+    ax.set_xlabel("stored documents per session (not to scale)")
     ax.set_ylabel("full-label F1")
     ax.set_ylim(0, 100)
     for sp in ("top", "right"):

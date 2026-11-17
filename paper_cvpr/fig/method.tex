@@ -5,7 +5,8 @@
 \begin{tikzpicture}[font=\scriptsize, >={Stealth[length=3.5pt]}, x=1cm, y=1cm,
   box/.style={draw, rounded corners=1.5pt, align=center, inner sep=2pt, minimum height=0.46cm},
   tg/.style={draw=black!70, minimum height=0.36cm, inner sep=1pt, anchor=west},
-  bgc/.style={tg, fill=black!12}]
+  bgc/.style={tg, fill=black!12},
+  stp/.style={circle, fill=ourteal, text=white, inner sep=0.8pt, font=\tiny\bfseries}]
 % ==== encoder
 \node[box, minimum width=2.4cm] (in) at (1.2,0) {tokens, boxes, page image};
 \node[box, minimum width=2.4cm, draw=black!45, pattern=north east lines, pattern color=black!12]
@@ -16,8 +17,11 @@
 % ==== memory, injected between layer 4 and layer 5
 \node[box, draw=memgreen, thick, minimum width=4.85cm] (mem) at (5.35,0.4)
   {\textcolor{memgreen}{\textbf{memory}}: per stored document, a rank-128 SVD of\\its layer-4 activations, with its boxes, labels and session};
-\draw[->, memgreen, thick] (4.55,0.4|-mem.north) |- (2.42,1.27);
-\node[anchor=north west, inner sep=1pt, text=memgreen] at (2.45,1.22) {replayed at layer 4};
+\draw[<->, memgreen, thick] (4.55,0.4|-mem.north) |- (2.42,1.27);
+\node[stp] at (2.6,1.07) {1};
+\node[anchor=west, inner sep=1pt, text=memgreen] at (2.7,1.07) {store};
+\node[stp] at (3.52,1.07) {2};
+\node[anchor=west, inner sep=1pt, text=memgreen] at (3.62,1.07) {replay};
 % ==== SBR-Recall deltas
 \foreach \b/\x in {2/3.45,3/4.1,5/5.05} {
   \node[box, draw=ourteal, densely dashed, minimum width=0.5cm, minimum height=0.36cm] (d\b) at (\x,1.75) {$\Delta_{\b}$};
@@ -30,6 +34,7 @@
 \node[tg] (sb) at (sa.east) {\makebox[2.15cm]{tags of sessions $1..5$}};
 \draw[->] ([xshift=-0.5cm]up.north) -- ([xshift=0.7cm]sa.south);
 % ==== (b) session-blocked readout
+\node[stp] at (3.07,3.1) {3};
 \node[anchor=west, font=\scriptsize\bfseries, inner sep=1pt] at (3.2,3.1) {(b) one background per session (SBR)};
 \node[bgc] (o1) at (3.2,2.65) {\makebox[0.3cm]{O$_1$}};
 \node[tg] (t1) at (o1.east) {\makebox[0.42cm]{$\mathcal{T}_1$}};
@@ -42,6 +47,6 @@
 \draw[->, ourteal, densely dashed] (d2.north) -- ([xshift=0.1cm]o2.south);
 \draw[->, ourteal, densely dashed] (d5.north) -- ([xshift=0.1cm]o5.south);
 \end{tikzpicture}
-\caption{\textbf{Overview of CoLaR-SBR.} (a) Shared softmax: one background for all tags. (b) SBR: one background per session. SBR-Recall replaces the memory with one low-rank update per session.}
+\caption{\textbf{Overview of CoLaR-SBR.} Documents are (1) stored and (2) replayed as layer-4 activations; (3) each session reads with its own background (b), not a shared one (a). SBR-Recall: per-session updates, no memory.}
 \label{fig:method}
 \end{figure}

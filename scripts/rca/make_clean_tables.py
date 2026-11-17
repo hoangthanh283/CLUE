@@ -508,7 +508,7 @@ def write_components():
     f1 = {}
     for idx, mem, ro, bg, name in COMPONENT_ROWS:
         f, aa, af = cell(name, "full_label_f1"), cell(name, "AA"), cell(name, "AF")
-        f1[idx] = float(np.mean(f)) if f else float("nan")
+        f1[idx] = round(float(np.mean(f)), 1) if f else float("nan")  # as printed in the table
         if idx == "VI":
             t += "\\midrule\n"
         best = idx == "V"
@@ -1154,6 +1154,8 @@ def write_ladder() -> None:
         if rung:
             t += (f"\\multicolumn{{5}}{{@{{}}l@{{}}}}{{\\textbf{{{rung}.}} {hyp}. "
                   f"\\emph{{If true: {pred}.}}}} \\\\\n")  # fmt: skip
+        if key == "sbr":  # our method in bold
+            interv = f"\\textbf{{{interv}}}"
         t += (f"{'' if key in ('naive', 'joint') else chr(92) + 'quad '}{interv} & "
               f"{fmt(*full, show_n=True)} & {fmt(*aa, show_n=True)} & {af} & {verdict} \\\\\n")  # fmt: skip
     if errors:
@@ -1618,7 +1620,7 @@ def write_main(cell, mix, dil, full) -> None:
     grid = [tuple("--" if af and r[2] == "joint" else c for c, af in zip(g, IS_AF, strict=True))
             for r, g in zip(rows, grid, strict=True)]  # fmt: skip
     ours, ref = [r[0] == "Ours" for r in rows], [r[1] == "Joint training" for r in rows]
-    grid = list(zip(*(emph(list(col), ours, ref, lower=lo)
+    grid = list(zip(*(list(col) if lo else emph(list(col), ours, ref)  # no emphasis on forgetting
                       for col, lo in zip(zip(*grid, strict=True), IS_AF, strict=True)),
                     strict=True))  # fmt: skip
     t = HDR + "\\begin{tabular}{@{}ll" + "c" * 13 + "@{}}\n\\toprule\n"
@@ -1633,7 +1635,8 @@ def write_main(cell, mix, dil, full) -> None:
     for (fam, lab, _key, _c), cells in zip(rows, grid, strict=True):
         if fam != prev:
             t += "\\midrule\n"
-        t += f"{fam if fam != prev else ''} & {lab} & " + " & ".join(cells) + " \\\\\n"
+        band = "\\rowcolor{black!7}" if fam == "Ours" else ""  # our rows on a light band
+        t += f"{band}{fam if fam != prev else ''} & {lab} & " + " & ".join(cells) + " \\\\\n"
         prev = fam
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_main_clean.tex").write_text(t)
