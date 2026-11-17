@@ -2597,9 +2597,11 @@ def main():
     for (_, sbr_g, slot_g), n in zip(SLOT_PAIRS, ("Gate", "GateMix", "GateDil"), strict=True):
         v += macro(f"Sbr{n}", load(sbr_g[0], sbr_g[1], suffix=sbr_g[2]))
         v += macro(f"Slot{n}", load(slot_g[0], slot_g[1], suffix=slot_g[2]))
-    for k, n in (("sbr", "SbrMix"), ("joint", "JointMix"), ("colar", "ColarMix"), ("er", "ErMix")):
+    for k, n in (("sbr", "SbrMix"), ("joint", "JointMix"), ("colar", "ColarMix"), ("er", "ErMix"),
+                 ("naive", "NaiveMix")):  # fmt: skip
         v += macro(n, mix[k][0])
-    for k, n in (("sbr", "SbrDil"), ("joint", "JointDil"), ("colar", "ColarDil"), ("er", "ErDil")):
+    for k, n in (("sbr", "SbrDil"), ("joint", "JointDil"), ("colar", "ColarDil"), ("er", "ErDil"),
+                 ("naive", "NaiveDil"), ("recall", "RecallDil")):  # fmt: skip
         v += macro(n, dil[k][0])
     for k, n in (
         ("sbr", "SbrFull"),
