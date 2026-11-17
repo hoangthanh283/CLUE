@@ -1,5 +1,14 @@
 # ROADMAP
 
+### CVPR submission build — 2026-11-17 16:15 ICT
+Submission PDF built (`paper_cvpr/submission/main_paper.pdf`, 11 pages, main text ends on page 8); title is now "Memory Is Not Enough: Resolving the Background-Label Conflict in Class-Incremental Document Understanding". Next up for the supplement (due Nov 23): (1) consistency read of the appendix running text against the rewritten body (hypothesis numbers, wording); (2) fold the remaining memory-size runs (5, 30, 200 documents, third runs) into the chart; (3) optional: one qualitative figure on a real receipt; (4) the image-classification table was not covered by the independent number audit.
+
+### CVPR evidence review — 2026-11-17 06:40 ICT
+Completed scoped paper fixes and fixed-model document bootstrap; body stays 8 pages. Report/change record: `docs/CVPR_REVIEW_2026-11-17_062717.md`. WildReceipt oracle/MiB and CORD directional controls are now verified, not missing. Remaining priorities: validate a faithful close baseline; adjudicate owner-managed order runs and remaining clean cells; reconcile author LLM disclosure. Do not duplicate queues or FUNSD controls. New generated supplement paragraph: `paper_cvpr/supp_document_bootstrap.tex`; reproducible analysis under `results/paper_audit_2026-11-17_062717/`. No publication or scheduler changes by this pass.
+
+### CVPR handoff — 2026-11-17 00:30 ICT
+Review/claim fixes and eight-page build verified; see `docs/CVPR_REVIEW_2026-11-17_0030.md`. Next, existing queue owners supply clean baseline, WildReceipt oracle/MiB and class-order results; validate closest ports before stronger claims. Do not duplicate FUNSD directional controls (already in Table 11). Author must reconcile LLM disclosure with actual editing assistance. No new queue or publication authorized by this handoff.
+
 ## DIRECTION (2026-07-10): method-led "SLR" pivot CLOSED → back to diagnostic + falsification paper
 
 The 2026-07-10 method-led pivot (SLR = subspace-targeted latent replay) was tested to Gate 0 and
