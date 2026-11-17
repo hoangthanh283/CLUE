@@ -401,6 +401,47 @@ def fig_repairs() -> dict:
     return cells
 
 
+BUDGETS = (5, 10, 20, 25, 30, 40, 50, 100, 200)  # stored documents per session
+
+
+def fig_budget() -> dict:
+    """Full-label F1 on CIL-CORD against stored documents per session, for CoLaR-SBR and the
+    same memory under a shared softmax (dots: seeds, line: their mean). Reads whatever
+    ``cil_cord_colar[_sbr]_dN`` runs exist (50 is the default run); draws nothing below three
+    budgets of CoLaR-SBR. Dashed: joint training."""
+    pts = {}
+    for key, base in (("sbr", "cil_cord_colar_sbr"), ("colar", "cil_cord_colar")):
+        for n in BUDGETS:
+            d = load_seeds(CLEAN, base if n == 50 else f"{base}_d{n}", "full_label_f1")
+            if d:
+                pts[key, n] = d
+    if sum(k == "sbr" for k, _n in pts) < 3:
+        return pts
+    xs = sorted({n for _k, n in pts})
+    fig, ax = plt.subplots(figsize=(COL, 1.8))
+    for key, label in (("sbr", "CoLaR-SBR (ours)"), ("colar", "CoLaR, shared softmax")):
+        ns = [n for n in xs if (key, n) in pts]
+        for n in ns:
+            v = list(pts[key, n].values())
+            ax.scatter([xs.index(n)] * len(v), v, s=5, color=STYLE[key][1], zorder=3, linewidths=0)
+        ax.plot([xs.index(n) for n in ns], [np.mean(list(pts[key, n].values())) for n in ns],
+                color=STYLE[key][1], linewidth=1.0, marker="o", markersize=2.5, label=label)
+    joint = load_seeds(CLEAN, "cil_cord_joint_p10", "full_label_f1")
+    if joint:
+        ax.axhline(np.mean(list(joint.values())), color="black", linestyle="dashed",
+                   linewidth=0.7, label="joint training")
+    ax.set_xticks(range(len(xs)), [str(n) for n in xs])
+    ax.set_xlabel("stored documents per session")
+    ax.set_ylabel("full-label F1")
+    ax.set_ylim(0, 100)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    ax.legend(loc="center right", frameon=False, handlelength=1.4)
+    fig.subplots_adjust(left=0.13, right=0.995, top=0.97, bottom=0.2)
+    save(fig, "budget.pdf")
+    return pts
+
+
 DOT_KEYS = ("naive", "nobank", "colar", "oracle", "sbr", "recall", "joint")
 
 
@@ -1118,6 +1159,7 @@ def main() -> None:
     cols = fig_findings_b()
     pts = fig_findings_c()
     rep = fig_repairs()
+    fig_budget()
     for (head, key), vs in rep.items():  # the figure plots the cells of tab_repairs.tex
         if len(vs) == len(SEEDS):
             assert f"{np.mean(list(vs.values())):.1f}" in (OUT / "tab_repairs.tex").read_text(), (head, key)
