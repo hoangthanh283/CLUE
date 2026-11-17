@@ -44,6 +44,10 @@
 %% Local heading without the paper title (cvpr.sty untouched).
 \renewcommand{\maketitlesupplementary}{\newpage\twocolumn[\centering\Large\textbf{Supplementary Material}\vspace{1.0em}]}
 
+%% Run-in paragraph headings with a small gap above (the default leaves a blank line before each).
+\makeatletter
+\renewcommand\paragraph{\@startsection{paragraph}{4}{\z@}{0.7ex \@plus .3ex \@minus .1ex}{-1em}{\normalfont\normalsize\bfseries}}
+\makeatother
 \begin{document}
 \maketitlesupplementary
 \appendix

@@ -53,6 +53,10 @@
 \newcommand{\bodyref}[2]{\cref{#1}}  % appendix -> body pointer (supp.tex prints #2)
 \ifwithappendix\input{supp_vals}\input{supp_perclass_vals}\input{image_vals}\fi
 
+%% Run-in paragraph headings with a small gap above (the default leaves a blank line before each).
+\makeatletter
+\renewcommand\paragraph{\@startsection{paragraph}{4}{\z@}{0.7ex \@plus .3ex \@minus .1ex}{-1em}{\normalfont\normalsize\bfseries}}
+\makeatother
 \begin{document}
 \maketitle
 
@@ -180,14 +184,14 @@ p_b(\cdot\mid x)=\operatorname{softmax}\big([\,o_b,\,z_{\mathcal{T}_b}\,]\big)\b
 
 \section{Experiments}
 \label{sec:experiments}
-\subsection{Experimental setup}
+\subsection{Experimental details}
 \paragraph{Model and references.} Every run fine-tunes LayoutLMv3-base~\citep{huang2022layoutlmv3} with one linear token-classification head, on the OCR words and boxes provided with each dataset, page images at $224{\times}224$ and at most $512$ text tokens. We report two references: \emph{naive fine-tuning}, which trains on the sessions in turn with no continual-learning mechanism, and \emph{joint training}, which trains once on all documents with all of their labels.
 
 \paragraph{Baselines.} We benchmark against eight methods from five families (\cref{tab:main}): replay with raw documents (ER~\citep{rolnick2019er}, DER++~\citep{buzzega2020der}), regularization (LwF~\citep{li2017lwf}), prompts and low-rank adapters on a frozen encoder (CODA-Prompt~\citep{smith2023coda}, CL-LoRA~\citep{he2025cllora}), continual NER methods designed for the shift of the background label (CPFD~\citep{zhang2023cpfd}, IS3~\citep{qiu2024is3}) and merging (LCA~\citep{lca2026}). All of them are our re-implementations (ports) on the one growing token head that every row uses, and all of them keep the shared softmax (\cref{app:baselines}).
 
 \paragraph{Memory.} A memory is filled at the end of each session with documents of that session and the masked labels they had. CoLaR, i.e., the memory alone under a shared softmax, and CoLaR-SBR keep $50$ documents per session ($10$ on CIL-FUNSD, which has $149$ training forms) as rank-$128$ SVDs of their layer-$4$ activations; SBR-Recall keeps none. ER and DER++ keep raw documents, with the same budget as ours on CIL-CORD ($250$) and CIL-FUNSD ($20$). All memory methods replay four stored documents per current batch of two.
 
-\paragraph{Training protocol.}\label{sec:protocol} We use AdamW with learning rate $5{\times}10^{-5}$ (LCA: its own SGD recipe), full precision and batch size $2$. Every session is trained with early stopping on the $10\%$ of its \emph{training} set that was held out, with a patience of two epochs, and the weights of the best epoch are restored; hence, the test split never selects a model. Joint training follows the same rule, with a patience of ten epochs on CIL-CORD and CIL-FUNSD. Every cell is the mean and the standard deviation over three runs. Since tuning on the evaluated stream overstates CL methods~\citep{cha2025hyperparameters}, the memory settings were chosen on DIL, the claim threshold of SBR ($0.5$) was not tuned, and the baselines use the default hyperparameters of their methods (\cref{app:baselines}).
+\paragraph{Training protocol.}\label{sec:protocol} We trained all models on 6 NVIDIA RTX 4070 Ti GPUs using the AdamW optimizer with a learning rate of $5{\times}10^{-5}$ (LCA: its own SGD recipe), in full precision with a batch size of $2$. Every session is trained with early stopping on the $10\%$ of its \emph{training} set that was held out, with a patience of two epochs, and the weights of the best epoch are restored; hence, the test split never selects a model. Joint training follows the same rule, with a patience of ten epochs on CIL-CORD and CIL-FUNSD. Every cell is the mean and the standard deviation over three runs. Since tuning on the evaluated stream overstates CL methods~\citep{cha2025hyperparameters}, the memory settings were chosen on DIL, the claim threshold of SBR ($0.5$) was not tuned, and the baselines use the default hyperparameters of their methods (\cref{app:baselines}).
 
 \begin{table*}[t]
 \centering\small
