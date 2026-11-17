@@ -538,14 +538,19 @@ BUDGET_WORDS = {5: "Five", 10: "Ten", 20: "Twenty", 30: "Thirty", 40: "Forty", 5
 
 
 def write_budget_vals():
-    """budget_vals.tex: seed-42 full-label F1 of CoLaR-SBR (\\nBudSbr<N>) and of the shared softmax
-    (\\nBudColar<N>) per number of stored documents per session, for every run that exists."""
+    """budget_vals.tex: full-label F1 of CoLaR-SBR (\\nBudSbr<N>) and of the shared softmax
+    (\\nBudColar<N>) per number of stored documents per session: the mean of the available runs,
+    and its lowest and highest run (<N>Lo, <N>Hi) where more than one run exists."""
     t = HDR
     for key, base in (("Sbr", "cil_cord_colar_sbr"), ("Colar", "cil_cord_colar")):
         for n, word in BUDGET_WORDS.items():
-            v = load_seeds(CLEAN, base if n == 50 else f"{base}_d{n}", "full_label_f1").get(42)
-            if v is not None:
-                t += f"\\newcommand{{\\nBud{key}{word}}}{{{v:.1f}}}\n"
+            v = list(load_seeds(CLEAN, base if n == 50 else f"{base}_d{n}", "full_label_f1").values())
+            if not v:
+                continue
+            t += f"\\newcommand{{\\nBud{key}{word}}}{{{np.mean(v):.1f}}}\n"
+            if len(v) > 1:
+                t += f"\\newcommand{{\\nBud{key}{word}Lo}}{{{min(v):.1f}}}\n"
+                t += f"\\newcommand{{\\nBud{key}{word}Hi}}{{{max(v):.1f}}}\n"
     (OUT / "budget_vals.tex").write_text(t)
 
 

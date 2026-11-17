@@ -197,7 +197,7 @@ p_b(\cdot\mid x)=\operatorname{softmax}\big([\,o_b,\,z_{\mathcal{T}_b}\,]\big)\b
 \begin{table*}[t]
 \centering\small
 \setlength{\tabcolsep}{4pt}
-\caption{\textbf{Comparison with continual-learning baselines} on LayoutLMv3 over six streams. F1: full-label F1; AA and AF: average accuracy and forgetting (\cref{sec:setup}). AA and F1: mean $\pm$ s.d., single values when fewer runs; AF: mean; ``--'': not run. Bold: best of each column, Joint training aside; underlined: our best when a baseline is best. $^{n=k}$: $k$ runs; $^{b}$with the $50$-document memory; on CIL-WildReceipt and DIL-XFUND, ER keeps $200$ documents and DER++ $250$; on CIL-FUNSD both keep $20$, the memory of the CoLaR cells there; Ports and protocols: \cref{app:baselines}; what each method stores: \cref{tab:memcmp}.}
+\caption{\textbf{Comparison with continual-learning baselines} on LayoutLMv3 over six streams. F1: full-label F1; AA and AF: average accuracy and forgetting (\cref{sec:setup}). AA and F1: mean $\pm$ s.d.; AF: mean; ``--'': not run. Bold: best of each column, Joint training aside; underlined: our best when a baseline is best. $^{b}$with the $50$-document memory; on CIL-WildReceipt and DIL-XFUND, ER keeps $200$ documents and DER++ $250$; on CIL-FUNSD both keep $20$, the memory of the CoLaR cells there; Ports and protocols: \cref{app:baselines}; what each method stores: \cref{tab:memcmp}.}
 \label{tab:main}
 \resizebox{\linewidth}{!}{\input{tab_main_clean}}
 \end{table*}
@@ -231,7 +231,7 @@ To assess the contribution of each component of CoLaR-SBR, we conduct an ablatio
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/budget.pdf}
-\caption{\textbf{Impact of the memory size} on CIL-CORD: full-label F1 against stored documents per session (one run per size; dashed: joint training).}
+\caption{\textbf{Impact of the memory size} on CIL-CORD: full-label F1 against stored documents per session (dots: runs, one to three per size; line: their mean; dashed: joint training).}
 \label{fig:budget}
 \end{figure}
 
@@ -239,7 +239,7 @@ The baseline (I) forgets almost everything. The memory alone (II) lifts full-lab
 
 \paragraph{Memory format.}\label{sec:cost} Our readout is not limited to the latent memory: with raw documents (VI), it reaches $\vErSbrFull$ against $\vSbrFull$. Hence, the readout carries the gain. We keep the latent memory because it stores no pixels or token ids and trains only $\nMemTrainSbrPct\%$ of the parameters that raw replay trains (\cref{app:memory}).
 
-\paragraph{Memory size.} We vary the number of stored documents per session (\cref{fig:budget}). CoLaR-SBR needs a memory of sufficient size: with $5$ and $10$ documents it reaches only $\nBudSbrFive$ and $\nBudSbrTen$ full-label F1, and it improves quickly with more documents ($\nBudSbrTwenty$ with $20$, $\nBudSbrThirty$ with $30$, $\nBudSbrForty$ with $40$ and $\nBudSbrFifty$ with $50$). Beyond that, the improvement is small ($\nBudSbrHundred$ with $100$, $\nBudSbrTwoHundred$ with $200$). In contrast, the shared softmax does not benefit from a larger memory: it reaches $\nBudColarHundred$ with $100$ documents and $\nBudColarTwoHundred$ with $200$, against $\nBudColarFifty$ with $50$. Hence, a larger memory alone does not help under label growth, and we use $50$ documents per session.
+\paragraph{Memory size.} We vary the number of stored documents per session (\cref{fig:budget}). CoLaR-SBR needs a memory of sufficient size. With $5$ documents it reaches only $\nBudSbrFive$ full-label F1, and with $10$ documents it is unstable (from $\nBudSbrTenLo$ to $\nBudSbrTenHi$ between runs). The performance then improves quickly ($\nBudSbrTwenty$ with $20$, $\nBudSbrThirty$ with $30$, $\nBudSbrForty$ with $40$ and $\nBudSbrFifty$ with $50$). Beyond that, the improvement is small ($\nBudSbrHundred$ with $100$, $\nBudSbrTwoHundred$ with $200$). In contrast, the shared softmax does not benefit from a larger memory: it reaches $\nBudColarHundred$ with $100$ documents and $\nBudColarTwoHundred$ with $200$, against $\nBudColarFifty$ with $50$. Hence, a larger memory alone does not help under label growth, and we use $50$ documents per session.
 
 \paragraph{Memory-free variant.} SBR-Recall (VII) replaces the memory with per-session low-rank updates and reaches $\vRecallFull$ full-label F1, within $\nRecallJointGap$ points of joint training, at the price of one inference pass per session. However, on Mixed and on the domain-incremental streams it needs the memory (\cref{sec:beyond}). Hence, the deltas replace the memory on one schema only.
 
