@@ -479,6 +479,60 @@ def write_analysis():
     (OUT / "tab_analysis.tex").write_text(t)
 
 
+# The component ablation of the body (CIL-CORD): (index, memory, readout, learned background, run).
+COMPONENT_ROWS = (
+    ("I", "", "", "", "cil_cord_naive"),
+    ("II", "ck", "", "", "cil_cord_colar"),
+    ("III", "", "ck", "ck", "cil_cord_colar_sbr_noreplay"),
+    ("IV", "ck", "ck", "", "cil_cord_colar_sbr_const_o"),
+    ("V", "ck", "ck", "ck", "cil_cord_colar_sbr"),
+    ("VI", "raw", "ck", "ck", "cil_cord_er_sbr"),
+    ("VII", "deltas", "ck", "ck", "cil_cord_colar_sbr_recall_r64"),
+)
+
+
+def write_components():
+    """tab_components.tex: the component ablation as one table with check marks (rows I to V add
+    the memory, the blocked readout and the learned background; VI and VII replace the memory),
+    and components_vals.tex: the mean gains the text quotes. A cell needs three clean seeds."""
+    def cell(name, key):
+        d = load_seeds(CLEAN, name, key)
+        return [d[x] for x in SEEDS] if len(d) == len(SEEDS) else []
+
+    def ms(vs):
+        return f"${np.mean(vs):.1f}{{\\pm}}{np.std(vs, ddof=1):.1f}$" if vs else "--"
+
+    mark = {"": "--", "ck": "\\checkmark"}
+    t = HDR + ("\\begin{tabular}{@{}lccc ccc@{}}\n\\toprule\nIndex & Memory & Blocked readout & "
+               "Learned bg. & F1$\\uparrow$ & AA$\\uparrow$ & AF$\\downarrow$ \\\\\n\\midrule\n")
+    f1 = {}
+    for idx, mem, ro, bg, name in COMPONENT_ROWS:
+        f, aa, af = cell(name, "full_label_f1"), cell(name, "AA"), cell(name, "AF")
+        f1[idx] = float(np.mean(f)) if f else float("nan")
+        if idx == "VI":
+            t += "\\midrule\n"
+        best = idx == "V"
+        fs, aas = ms(f), ms(aa)
+        if best:
+            fs, aas = (x.replace("$", "$\\mathbf{", 1)[:-1] + "}$" for x in (fs, aas))
+        t += (f"{idx} & {mark.get(mem, mem)} & {mark[ro]} & {mark[bg]} & {fs} & {aas} & "
+              f"{_af(af)} \\\\\n")  # fmt: skip
+    j = cell("cil_cord_joint_p10", "full_label_f1")
+    t += (f"\\midrule\n\\multicolumn{{4}}{{@{{}}l}}{{Joint training (reference)}} & {ms(j)} & "
+          f"{ms(cell('cil_cord_joint_p10', 'AA'))} & -- \\\\\n\\bottomrule\n\\end{{tabular}}\n")
+    (OUT / "tab_components.tex").write_text(t)
+    ladder = (OUT / "tab_ladder.tex").read_text()
+    for idx in ("I", "II", "III", "IV", "V"):  # the same runs are rows of the hypothesis table
+        name = next(r[4] for r in COMPONENT_ROWS if r[0] == idx)
+        assert ms(cell(name, "full_label_f1")) in ladder, f"components row {idx} differs from tab_ladder"
+    g = {"AblMemGain": f1["II"] - f1["I"], "AblReadAlone": f1["III"] - f1["I"],
+         "AblReadoutGain": f1["IV"] - f1["II"], "AblBgGain": f1["V"] - f1["IV"],
+         "AblFullGain": f1["V"] - f1["I"]}  # fmt: skip
+    v = HDR + "".join(f"\\newcommand{{\\n{k}}}{{{x:+.1f}}}\n"
+                      for k, x in g.items())
+    (OUT / "components_vals.tex").write_text(v)
+
+
 BUDGET_WORDS = {5: "Five", 10: "Ten", 20: "Twenty", 30: "Thirty", 40: "Forty", 50: "Fifty",
                 100: "Hundred", 200: "TwoHundred"}
 
@@ -2625,6 +2679,7 @@ def main():
     write_ladder()
     write_repairs()
     write_analysis()
+    write_components()
     write_budget_vals()
     write_beyond()
 

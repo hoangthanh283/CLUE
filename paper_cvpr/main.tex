@@ -44,6 +44,7 @@
 %% Headline numbers: generated from the result files (never typed by hand).
 \input{vals}
 \input{budget_vals}
+\input{components_vals}
 %% Merged view: the appendix (supp_body.tex) follows the references in this PDF.
 %% CVPR 2027 kit practice: compile together, then split. make_submission.sh writes
 %% submission/main_paper.pdf (pages up to the references) and submission/supplementary.pdf.
@@ -217,21 +218,15 @@ Besides, the improvement is robust. It does not depend on the class order: with 
 
 \subsection{Ablation study}
 \label{sec:ablations}
+To assess the contribution of each component of CoLaR-SBR, we conduct an ablation study on CIL-CORD (\cref{tab:components}). Starting from naive fine-tuning (Index~I), we add the CoLaR memory, the session-blocked readout and the learned background logit.
+
 \begin{table}[t]
 \centering\small
 \setlength{\tabcolsep}{3pt}
-\caption{\textbf{The two components} on CIL-CORD (mean $\pm$ s.d.).}
-\label{tab:2x2}
-\resizebox{\linewidth}{!}{\input{tab_2x2}}
+\caption{\textbf{Ablation study of CoLaR-SBR} on CIL-CORD (F1: full-label F1; mean $\pm$ s.d.). Rows I to V add the components; rows VI and VII replace the latent memory with raw documents and with per-session deltas (SBR-Recall). Bold: the full CoLaR-SBR.}
+\label{tab:components}
+\resizebox{\linewidth}{!}{\input{tab_components}}
 \end{table}
-
-\paragraph{Ablation study for the two components.} \Cref{tab:2x2} crosses the memory with the readout on CIL-CORD. The memory alone lifts full-label F1 over naive training by $\nAblMemMin$ to $\nAblMemMax$ points, and the blocked readout alone by \nAblReadMin{} to \nAblReadMax; together they lift it by $\nAblBothMin$ to $\nAblBothMax$ points, far more than the two add up to.
-
-\paragraph{Ablation study for the background logit.} With every background logit fixed at zero, as in ICE-O, the readout recovers most of CoLaR-SBR's gain, while the learned background improves it further (\cref{tab:ladder}), also with BROS ($\vBrosSbrFull$ against $\vBrosConstOFull$).
-
-\paragraph{Ablation study for the memory-free variant.} On CIL-CORD, SBR-Recall reaches $\vRecallFull$ full-label F1 ($\vRecall$ AA) with no stored document, within $\nRecallJointGap$ points of joint training, at the price of one inference pass per session. However, on Mixed and on the domain-incremental streams it needs the memory (\cref{sec:beyond}). Hence, the deltas replace the memory on one schema only.
-
-\paragraph{Ablation study for the memory format.}\label{sec:cost} Our readout is not limited to the latent memory: raw documents under the same readout reach $\vErSbrFull$ against $\vSbrFull$. Hence, the readout carries the gain, while the latent memory stores no pixels or token ids and trains only $\nMemTrainSbrPct\%$ of the parameters that raw replay trains (\cref{app:memory}).
 
 \begin{figure}[t]
 \centering
@@ -240,7 +235,16 @@ Besides, the improvement is robust. It does not depend on the class order: with 
 \label{fig:budget}
 \end{figure}
 
-\paragraph{Impact of the number of stored documents.} We vary the number of stored documents per session on CIL-CORD (\cref{fig:budget}). As the results demonstrate, CoLaR-SBR needs a memory of sufficient size: with $5$ and $10$ documents per session it reaches only $\nBudSbrFive$ and $\nBudSbrTen$ full-label F1, and it improves quickly with more documents ($\nBudSbrTwenty$ with $20$, $\nBudSbrThirty$ with $30$, $\nBudSbrForty$ with $40$ and $\nBudSbrFifty$ with $50$). Beyond that, the improvement is small ($\nBudSbrHundred$ with $100$, $\nBudSbrTwoHundred$ with $200$). In contrast, the shared softmax does not benefit from a larger memory: it reaches $\nBudColarHundred$ with $100$ documents and $\nBudColarTwoHundred$ with $200$, against $\nBudColarFifty$ with $50$. Hence, a larger memory alone does not help under label growth, whereas our readout makes use of it. Thus, it is suggested that $40$ to $50$ documents per session ensure decent performance while avoiding additional memory cost.
+The baseline (I) forgets almost everything. The memory alone (II) lifts full-label F1 by only $\nAblMemGain$ points, since the shared softmax still counts every background label against all classes. The readout alone (III) does not help either ($\nAblReadAlone$), because the old blocks drift without a memory. Notably, adding the blocked readout to the memory (IV) yields the most substantial boost ($\nAblReadoutGain$ points over II). Finally, the learned background (V) further improves the result by $\nAblBgGain$ points, and by more with BROS ($\vBrosSbrFull$ against $\vBrosConstOFull$). Overall, the complete CoLaR-SBR surpasses naive fine-tuning by $\nAblFullGain$ points, far more than the memory and the readout add up to on their own, which confirms that they address two different causes.
+
+\paragraph{Memory format.}\label{sec:cost} Our readout is not limited to the latent memory: with raw documents (VI), it reaches $\vErSbrFull$ against $\vSbrFull$. Hence, the readout carries the gain. We keep the latent memory because it stores no pixels or token ids and trains only $\nMemTrainSbrPct\%$ of the parameters that raw replay trains (\cref{app:memory}).
+
+\paragraph{Memory size.} We vary the number of stored documents per session (\cref{fig:budget}). CoLaR-SBR needs a memory of sufficient size: with $5$ and $10$ documents it reaches only $\nBudSbrFive$ and $\nBudSbrTen$ full-label F1, and it improves quickly with more documents ($\nBudSbrTwenty$ with $20$, $\nBudSbrThirty$ with $30$, $\nBudSbrForty$ with $40$ and $\nBudSbrFifty$ with $50$). Beyond that, the improvement is small ($\nBudSbrHundred$ with $100$, $\nBudSbrTwoHundred$ with $200$). In contrast, the shared softmax does not benefit from a larger memory: it reaches $\nBudColarHundred$ with $100$ documents and $\nBudColarTwoHundred$ with $200$, against $\nBudColarFifty$ with $50$. Hence, a larger memory alone does not help under label growth, and we use $50$ documents per session.
+
+\paragraph{Memory-free variant.} SBR-Recall (VII) replaces the memory with per-session low-rank updates and reaches $\vRecallFull$ full-label F1, within $\nRecallJointGap$ points of joint training, at the price of one inference pass per session. However, on Mixed and on the domain-incremental streams it needs the memory (\cref{sec:beyond}). Hence, the deltas replace the memory on one schema only.
+
+Further ablations on the SVD rank, the injection layer and the number of replayed documents per batch are provided in the supplementary (\cref{tab:analysis}): our method needs a rank of $128$ and is not sensitive to the other two.
+
 \section{Limitations and Conclusions}
 \label{sec:limitations}
 \label{sec:conclusion}
