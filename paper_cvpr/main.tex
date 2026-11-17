@@ -85,12 +85,52 @@ We benchmark our method against two references and eight CL baselines on six str
 
 \section{Problem Formulation}
 \label{sec:setup}
-In the following, we first define continual key-information extraction and the streams we study. Then, we describe how a model is scored.
+In the following, we first define continual key-information extraction. Then, we show on one stream how a class-incremental session is built, list the streams we study, and describe how a model is scored.
 
-\paragraph{Continual key-information extraction.} A document is its OCR tokens, normalised boxes and page image; the model emits BIO tags per token, scored by entity-level F1 (\texttt{seqeval}). The documents arrive in $T$ sessions, and session $t$ brings a training set annotated with its own tag set $\mathcal{T}_t$: a token whose true tag is $y^{\ast}$ is labelled $y^{\ast}$ if $y^{\ast}\in\mathcal{T}_t$ and ``O'' otherwise. We consider three kinds of stream. In class-incremental learning (CIL), each session annotates new classes only: the head grows, and every entity outside the session, earlier or later, is labelled ``O''. A session keeps every training document that holds at least one of its entities, so a document can return in several sessions under different label masks, as in the overlapped protocol of class-incremental segmentation~\citep{cermelli2020mib}. In domain-incremental learning (DIL), the label space is fixed and the domain changes. In a Mixed stream both change, across annotation schemas. After the last session, the model is tested on the classes of all sessions without knowing the session of a document.
+\paragraph{Continual key-information extraction.} A document is its OCR tokens, their normalised boxes and the page image. The model labels every token with a BIO tag, and the entities are scored by entity-level F1 (\texttt{seqeval}). The documents arrive in $T$ sessions. Session $t$ brings a training set $\mathcal{D}_t$ that is annotated with its own tag set $\mathcal{T}_t$ only: a token whose true tag is $y^{\ast}$ is labelled
+\begin{equation}
+y=\begin{cases} y^{\ast} & y^{\ast}\in\mathcal{T}_t\\ \mathrm{O} & \text{otherwise.}\end{cases}
+\label{eq:mask}
+\end{equation}
+The model is trained on $\mathcal{D}_1,\dots,\mathcal{D}_T$ in turn and cannot return to an earlier session, except through what its method stores. After the last session, it is tested on the classes of all sessions, without knowing which session a document comes from.
 
-\paragraph{Streams.} We consider six streams over five public document datasets, FUNSD~\citep{jaume2019funsd}, CORD~\citep{park2019cord}, SROIE~\citep{huang2019sroie}, WildReceipt~\citep{sun2021sdmgr} and XFUND~\citep{xu2022xfund} (sessions and document counts: \cref{app:setup}). Three are class-incremental: CIL-CORD ($30$ receipt classes, six per session over five sessions), CIL-FUNSD (three entity types in two sessions) and CIL-WildReceipt ($24$ classes, six per session over four sessions). Two are domain-incremental under one fixed four-entity schema: DIL (FUNSD$\rightarrow$SROIE$\rightarrow$CORD) and DIL-XFUND (German, Spanish, French, Italian and Chinese forms in turn). Mixed has six sessions over three datasets and annotation schemas. LayoutLMv3-base~\citep{huang2022layoutlmv3} is the encoder unless stated.
-\paragraph{Evaluation protocol.} Our headline number is the \emph{full-label F1}: the final model on the complete, unmasked test set of the stream's dataset with all its classes, as in continual NER~\citep{ma2023learning}. To measure retention, we also test on per-session splits, whose labels show only that session's classes: from $R[i,j]$, the F1 on session $j$ after session $i$, we report the average accuracy AA $=\tfrac1T\sum_j R[T,j]$ and the average forgetting AF $=\tfrac1{T-1}\sum_{j<T}\big(R[j,j]-R[T,j]\big)$. Since raw scoring of such labels charges a model for every correct entity of another session, we score each session \emph{session-restricted}, mapping a predicted tag outside session $j$'s label set to ``O'' before span matching (\cref{app:setup}). A fixed label space has no masked split, so DIL and DIL-XFUND report AA only.
+\paragraph{How a class-incremental session is built.} We take CORD~\citep{park2019cord} as the running example (\cref{tab:cordsessions}). CORD has $800$ training receipts and $100$ test receipts, each annotated with $30$ entity classes such as the name and the price of a menu item, the subtotal, the tax and the total. We do not change the receipts; we change which of their labels a session can see. First, the $30$ classes are divided into five groups of six, one group per session. Then, the training set of session $t$ keeps every receipt that holds at least one entity of its group, and applies \cref{eq:mask}: the six classes of the session keep their labels, and every other entity on the receipt, of an earlier or of a later session, is labelled ``O''. Finally, $10\%$ of this training set is held out for early stopping. Three consequences follow. The classifier head grows by the tags of each new session. The same receipt returns in several sessions under different label masks, as in the overlapped protocol of class-incremental segmentation~\citep{cermelli2020mib}. And the same token receives contradicting labels over time: the total of a receipt is ``O'' in session~1 and \texttt{total.total\_price} in session~5, whereas the price of a menu item is \texttt{menu.price} in session~1 and ``O'' in session~5 (\cref{fig:conflict}). Joint training, our reference, sees every receipt once with all of its $30$ labels.
+
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{\textbf{The five sessions of CIL-CORD.} Each session annotates six of CORD's $30$ classes; every other entity is labelled ``O''. Receipts: the CORD training receipts that hold at least one entity of the session ($800$ in all).}
+\label{tab:cordsessions}
+\resizebox{\linewidth}{!}{\begin{tabular}{@{}clc@{}}
+\toprule
+Session & Classes annotated (others are ``O'') & Receipts \\
+\midrule
+1 & menu: cnt, discountprice, itemsubtotal, nm, num, price & 800 \\
+2 & menu: unitprice, vatyn, sub.cnt, sub.nm, sub.price, sub.unitprice & 382 \\
+3 & sub\_total: discount, etc, othersvc, service, subtotal, tax & 549 \\
+4 & total: cashprice, changeprice, creditcardprice, emoneyprice, menuqty\_cnt, menutype\_cnt & 723 \\
+5 & total: total\_etc, total\_price; void\_menu: nm, price; sub: nm, cnt & 780 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\paragraph{Streams.} We consider three kinds of stream, six streams in total, over five public document datasets: FUNSD~\citep{jaume2019funsd}, CORD~\citep{park2019cord}, SROIE~\citep{huang2019sroie}, WildReceipt~\citep{sun2021sdmgr} and XFUND~\citep{xu2022xfund} (\cref{tab:bench}).
+
+\emph{Class-incremental learning (CIL): the label set grows.} The three CIL streams are built as in the example above. CIL-CORD has five sessions of six classes. CIL-FUNSD has two sessions on the $149$ training forms of FUNSD: the first annotates headers and questions, the second annotates answers. CIL-WildReceipt has four sessions of six classes on the $1{,}267$ training receipts of WildReceipt, with its $24$ classes taken in the order of the dataset.
+
+\emph{Domain-incremental learning (DIL): the label set is fixed and the documents change.} All datasets are mapped to one schema of four classes (header, key, value and other), so no label is masked and the head never grows. In DIL, the model learns FUNSD forms, then SROIE receipts, then CORD receipts. In DIL-XFUND, it learns the XFUND forms in German, Spanish, French, Italian and Chinese in turn. Each session is a different set of documents, and the only shift is the domain or the language.
+
+\emph{Mixed: both change.} Mixed has six sessions over three datasets and their three annotation schemas: FUNSD headers and questions, FUNSD answers, the four fields of SROIE, two groups of CORD classes in two sessions, and finally FUNSD again with all of its labels and no new class (\cref{app:setup}).
+
+\begin{table*}[t]
+\centering\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\caption{\textbf{Benchmark settings}: six streams over five document datasets (sessions: \cref{app:setup}). Train/test documents: FUNSD 149/50, SROIE 626/347, CORD 800/100. AA: mean F1 of the final model over the sessions; full-label F1: on the unmasked test set of the stream's dataset (\cref{sec:setup}).}
+\label{tab:bench}
+\input{tab_bench}
+\end{table*}
+
+\paragraph{Evaluation protocol.} After the last session, the final model is scored in two ways. Our headline number on the class-incremental streams is the \emph{full-label F1}: the entity-level F1 on the complete test set of the dataset with all of its classes and no label masked ($100$ receipts and $30$ classes on CIL-CORD), as in continual NER~\citep{ma2023learning}. To measure retention, we also keep one test split per session, built like its training set and masked in the same way. From $R[i,j]$, the F1 on the test split of session $j$ after training session $i$, we report the average accuracy AA $=\tfrac1T\sum_j R[T,j]$ and the average forgetting AF $=\tfrac1{T-1}\sum_{j<T}\big(R[j,j]-R[T,j]\big)$, the F1 of a session right after it was learned minus its final F1. Since the labels of a session split show only the classes of that session, raw scoring would charge a model for every correct entity of another session. Hence, we score each session split \emph{session-restricted}: a predicted tag outside the label set of session $j$ is mapped to ``O'' before span matching (\cref{app:setup}). A fixed label space has no masked split and no growing head, so DIL and DIL-XFUND report AA and AF only, and so does Mixed.
 
 \section{Why Replay Fails under Label Growth}
 \label{sec:investigation}
@@ -199,11 +239,19 @@ We report its results in \cref{sec:ablations}.
 \section{Experiments}
 \label{sec:experiments}
 \subsection{Experimental setup}
-\paragraph{Baselines.} We benchmark against two references (naive fine-tuning, joint training) and eight methods from five families (\cref{tab:main}): ER~\citep{rolnick2019er}, DER++~\citep{buzzega2020der}, LwF~\citep{li2017lwf}, CODA-Prompt~\citep{smith2023coda}, CL-LoRA~\citep{he2025cllora}, LCA~\citep{lca2026}, and the continual-NER methods CPFD~\citep{zhang2023cpfd} and IS3~\citep{qiu2024is3}. All of them are our ports onto the one growing token head that every row uses (\cref{app:baselines}).
+\paragraph{Model and input.} Every run fine-tunes LayoutLMv3-base~\citep{huang2022layoutlmv3} with one linear token-classification head, which grows by the tags of each new session on the CIL and Mixed streams and is fixed on the DIL streams. We use the OCR words and boxes provided with each dataset, page images at $224{\times}224$ and at most $512$ text tokens per document.
 
-\paragraph{Training protocol.}\label{sec:protocol} We use AdamW with learning rate $5{\times}10^{-5}$ (LCA: its own SGD recipe), batch size $2$, which is a hardware limit, and seeds 42, 7 and 123; memory runs replay four stored documents per current batch of two. Every session trains in full precision for at most $10$ epochs and early-stops, with a patience of two epochs, on $10\%$ held out from its \emph{training} data; the test split never selects a model. Joint training has a $100$-epoch cap; patience is ten on CIL-CORD and CIL-FUNSD, two elsewhere. Cells marked $\dagger$ come from earlier runs that early-stopped on the test split (\emph{legacy protocol}); they are given for completeness (\cref{app:setup}).
+\paragraph{References.} We report two references. \emph{Naive fine-tuning} trains on the sessions in turn with no continual-learning mechanism, which is the lower reference. \emph{Joint training} trains once on all documents of the stream with all of their labels, which is the reference we compare the gap against.
 
-\paragraph{Hyperparameter tuning.} Tuning and evaluating on the same scenario overstates CL methods~\citep{cha2025hyperparameters}. Hence, the comparison set was fixed after a first grid on all three streams, the memory settings were chosen on DIL, SBR's claim threshold ($0.5$) was not tuned, and the one setting chosen on CIL-CORD is SBR-Recall's delta capacity (\cref{app:baselines,app:results}).
+\paragraph{Baselines.} We benchmark against eight methods from five families (\cref{tab:main}). \emph{Replay:} ER~\citep{rolnick2019er} keeps a reservoir of raw documents with their session labels and trains on them together with the current session, and DER++~\citep{buzzega2020der} also replays the logits stored with them. \emph{Regularization:} LwF~\citep{li2017lwf} distils the outputs of the previous model and stores no document. \emph{Prompts and low-rank adapters on a frozen encoder:} CODA-Prompt~\citep{smith2023coda} and CL-LoRA~\citep{he2025cllora}. \emph{Continual NER:} CPFD~\citep{zhang2023cpfd} and IS3~\citep{qiu2024is3}, which are designed for the shift of the ``O'' label. \emph{Merging:} LCA~\citep{lca2026}, which merges per-session backbones and realigns the classifier. All of them are our ports onto the one growing token head that every row uses, and all of them keep the shared softmax (\cref{app:baselines}).
+
+\paragraph{Our methods.} \emph{CoLaR} is the memory alone, with a shared softmax. \emph{CoLaR-SBR} adds the session-blocked readout, and \emph{SBR-Recall} replaces the memory with per-session low-rank deltas (\cref{sec:design}).
+
+\paragraph{Memory.} A memory is filled at the end of each session with documents of that session, stored with the masked labels they had in that session. CoLaR and CoLaR-SBR keep $50$ documents per session ($10$ on CIL-FUNSD, which has $149$ training forms), i.e., $250$ documents after the five sessions of CIL-CORD, as rank-$128$ SVDs of their layer-$4$ activations; the embeddings and layers $1$ to $4$ are frozen after the first session. ER and DER++ keep raw documents, with the same budget as ours on CIL-CORD ($250$) and on CIL-FUNSD ($20$). All memory methods replay four stored documents per current batch of two.
+
+\paragraph{Training protocol.}\label{sec:protocol} We use AdamW with learning rate $5{\times}10^{-5}$ (LCA: its own SGD recipe), full precision and batch size $2$, which is a hardware limit. Every session trains for at most $10$ epochs and stops early, with a patience of two epochs, on the $10\%$ of its \emph{training} set that was held out; the weights of the best epoch are restored, and the test split never selects a model. Joint training has a cap of $100$ epochs, with a patience of ten epochs on CIL-CORD and CIL-FUNSD and of two elsewhere. Every cell is the mean and the standard deviation over three seeds (42, 7 and 123), which change the initialisation of the head, the order of the batches and the stored documents, but not the sessions. Cells marked $\dagger$ come from earlier runs that stopped early on the test split (\emph{legacy protocol}); they are given for completeness (\cref{app:setup}).
+
+\paragraph{Hyperparameter tuning.} Tuning and evaluating on the same scenario overstates CL methods~\citep{cha2025hyperparameters}. Hence, the comparison set was fixed after a first grid on all three streams, the memory settings were chosen on DIL, the claim threshold of SBR ($0.5$) was not tuned, and the one setting chosen on CIL-CORD is the delta capacity of SBR-Recall (\cref{app:baselines,app:results}). The baselines use the default hyperparameters of their methods.
 
 \begin{table*}[t]
 \centering\small
