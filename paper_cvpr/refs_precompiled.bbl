@@ -1,4 +1,4 @@
-\begin{thebibliography}{53}
+\begin{thebibliography}{54}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -289,6 +289,13 @@ David Rolnick, Arun Ahuja, Jonathan Schwarz, Timothy~P. Lillicrap, and Greg
 \newblock Experience replay for continual learning.
 \newblock In \emph{Advances in Neural Information Processing Systems
   (NeurIPS)}, 2019.
+
+\bibitem[Rusu et~al.(2016)Rusu, Rabinowitz, Desjardins, Soyer, Kirkpatrick,
+  Kavukcuoglu, Pascanu, and Hadsell]{rusu2016pnn}
+Andrei~A. Rusu, Neil~C. Rabinowitz, Guillaume Desjardins, Hubert Soyer, James
+  Kirkpatrick, Koray Kavukcuoglu, Razvan Pascanu, and Raia Hadsell.
+\newblock Progressive neural networks.
+\newblock \emph{arXiv preprint arXiv:1606.04671}, 2016.
 
 \bibitem[Smith et~al.(2023)Smith, Karlinsky, Gutta, Cascante-Bonilla, Kim,
   Arbelle, Panda, Feris, and Kira]{smith2023coda}
