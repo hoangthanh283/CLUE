@@ -49,6 +49,6 @@
 \node[anchor=north, align=center, inner sep=1pt] at (\bx+1.90,0.68)
   {block $b$ learns only from documents that\\annotate it; ``O'' counts against its classes};
 \end{tikzpicture}
-\caption{\textbf{The background conflict on one pair of price tokens.} A receipt stored in session~1 labels its total ``O''; a current receipt of session~5 labels its item price ``O''. (a) With one shared softmax both ``O'' labels train the same background logit, against every class. (b) With one background per session (blocks 1 and 5 shown, each with its session's tags), an ``O'' is evidence only against the classes its annotator could see.}
+\caption{\textbf{The background conflict.} A stored receipt and a current receipt each label a price ``O''. (a) With one shared softmax, both ``O'' labels count against every class. (b) With one background per session, each ``O'' counts only against the classes of its own session.}
 \label{fig:conflict}
 \end{figure}

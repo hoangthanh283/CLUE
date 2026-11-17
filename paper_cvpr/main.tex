@@ -116,7 +116,7 @@ Every hypothesis is tested on CIL-CORD with LayoutLMv3 under the protocol of \cr
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/repairs.pdf}
-\caption{\textbf{Three repairs on three class-incremental streams} (full-label F1; bar: mean, dots: individual runs; dashed: joint training). Every repair trains with the same CoLaR memory, and the first three keep the shared softmax. True stored labels (an oracle: labels no continual learner has) close the gap on CIL-CORD only and the MiB-style loss on CIL-FUNSD only, whereas the per-session readout closes most of it on all three streams (values: \cref{tab:repairs}).}
+\caption{\textbf{Three repairs on three class-incremental streams} (full-label F1; dashed: joint training). Only the per-session readout closes most of the gap on all three streams (values: \cref{tab:repairs}).}
 \label{fig:repairs}
 \end{figure}
 \subsection{H0: only harder forgetting}
@@ -228,7 +228,7 @@ p_b(\cdot\mid x)=\operatorname{softmax}\big([\,o_b,\,z_{\mathcal{T}_b}\,]\big)\b
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/budget.pdf}
-\caption{\textbf{Impact of the memory size} on CIL-CORD (full-label F1 against stored documents per session). Line: one run per memory size; dots: individual runs. Dashed: joint training.}
+\caption{\textbf{Impact of the memory size} on CIL-CORD: full-label F1 against stored documents per session (one run per size; dashed: joint training).}
 \label{fig:budget}
 \end{figure}
 

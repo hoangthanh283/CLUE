@@ -42,6 +42,6 @@
 \draw[->, ourteal, densely dashed] (d2.north) -- ([xshift=0.1cm]o2.south);
 \draw[->, ourteal, densely dashed] (d5.north) -- ([xshift=0.1cm]o5.south);
 \end{tikzpicture}
-\caption{\textbf{The two readouts on one encoder and memory.} (a) One softmax over all tags and one background. (b) SBR: one background logit per session, trained only by documents that annotate it (\cref{eq:sbr}); the largest claim $e_b=1-p_b(\mathrm{O}_b)>0.5$ labels the token. SBR-Recall drops the memory and reads block $b$ under its session's delta $\Delta_b$ (\cref{eq:recall}).}
+\caption{\textbf{Overview of CoLaR-SBR.} (a) Shared softmax: one background for all tags. (b) SBR: one background per session. SBR-Recall replaces the memory with one low-rank update per session.}
 \label{fig:method}
 \end{figure}
