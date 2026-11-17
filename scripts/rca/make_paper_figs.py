@@ -406,7 +406,8 @@ BUDGETS = (5, 10, 20, 25, 30, 40, 50, 100, 200)  # stored documents per session
 
 def fig_budget() -> dict:
     """Full-label F1 on CIL-CORD against stored documents per session, for CoLaR-SBR and the
-    same memory under a shared softmax (dots: seeds, line: their mean). Reads whatever
+    same memory under a shared softmax (dots: every available seed, line: seed 42, the seed
+    the text quotes). Reads whatever
     ``cil_cord_colar[_sbr]_dN`` runs exist (50 is the default run); draws nothing below three
     budgets of CoLaR-SBR. Dashed: joint training."""
     pts = {}
@@ -424,7 +425,8 @@ def fig_budget() -> dict:
         for n in ns:
             v = list(pts[key, n].values())
             ax.scatter([xs.index(n)] * len(v), v, s=5, color=STYLE[key][1], zorder=3, linewidths=0)
-        ax.plot([xs.index(n) for n in ns], [np.mean(list(pts[key, n].values())) for n in ns],
+        ax.plot([xs.index(n) for n in ns],
+                [pts[key, n].get(42, np.mean(list(pts[key, n].values()))) for n in ns],  # seed 42, as in the text
                 color=STYLE[key][1], linewidth=1.0, marker="o", markersize=2.5, label=label)
     joint = load_seeds(CLEAN, "cil_cord_joint_p10", "full_label_f1")
     if joint:
