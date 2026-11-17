@@ -1013,7 +1013,7 @@ def write_ladder() -> None:
     # per intervention; the old three wrapped text columns took most of a page
     t = HDR + "\\begin{tabular*}{\\textwidth}{@{\\extracolsep{\\fill}}l c c c l@{}}\n\\toprule\n"
     t += ("Hypothesis (\\emph{prediction if true}) and intervention & "
-          "Full-label F1$\\uparrow$ & AA$\\uparrow$ & AF$\\downarrow$ & Verdict \\\\\n\\midrule\n")  # fmt: skip
+          "Full-label F1$\\uparrow$ & AA$\\uparrow$ & AF$\\downarrow$ & Outcome \\\\\n\\midrule\n")  # fmt: skip
     for rung, hyp, pred, interv, key, aa_s, full_s, kind, verdict, min_n in LADDER:
         if kind == "slot":
             full = pick_clean_only(full_s, "full_label_f1")

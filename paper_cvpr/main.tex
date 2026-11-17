@@ -134,7 +134,7 @@ The three CIL streams are built in this way. CIL-CORD has five sessions of six c
 
 \section{Why Replay Fails under Label Growth}
 \label{sec:investigation}
-Every hypothesis is tested on CIL-CORD with LayoutLMv3 under the protocol of \cref{sec:protocol} and changes one intervention against the run it is compared with, unless stated. \Cref{tab:ladder} lists the hypotheses and \cref{fig:forgetting} shows the forgetting session by session. A verdict is a sign statement over the three seeds, not a significance test: on every seed the prediction holds (\emph{supports}), fails (\emph{refutes}) or holds in part (\emph{partly}). The \emph{blocked readout} (\cref{sec:sbr}) gives each session's tags their own background logit and softmax, a \emph{block}. Unless stated, a memory is CoLaR (\cref{sec:memory}): $50$ documents per session stored as rank-$128$ SVDs of their layer-$4$ activations.
+Every hypothesis is tested on CIL-CORD with LayoutLMv3 under the protocol of \cref{sec:protocol} and changes one intervention against the run it is compared with, unless stated. \Cref{tab:ladder} lists the hypotheses and \cref{fig:forgetting} shows the forgetting session by session. For each hypothesis, we report whether its prediction holds on the three seeds: it holds on every seed (\emph{supports}), fails on every seed (\emph{refutes}) or holds in part (\emph{partly}). It is noted that this is a comparison of signs over three seeds, not a significance test. The \emph{blocked readout} (\cref{sec:sbr}) gives each session's tags their own background logit and softmax, a \emph{block}. Unless stated, a memory is CoLaR (\cref{sec:memory}): $50$ documents per session stored as rank-$128$ SVDs of their layer-$4$ activations.
 
 \begin{table*}[t]
 \centering\footnotesize
