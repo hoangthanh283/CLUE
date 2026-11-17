@@ -5,6 +5,7 @@
 %% keep the order of the sections and of the floats up to the findings figure.
 \input{analysis_vals}
 \input{qual_vals}
+\input{dil_check_vals}
 
 \noindent This appendix is organised as follows. \Cref{app:setup} details the six streams, the two metrics and the training protocol. \Cref{app:method} gives the details of CoLaR, SBR and SBR-Recall, together with the memory analysis and further ablations. \Cref{app:baselines} describes our re-implementations of the baselines. \Cref{app:results} provides extended results for the hypotheses of \bodyref{sec:investigation}{the main paper} and for CIL-FUNSD. \Cref{app:drift} shows the drift on four encoders, and \cref{app:image} examines our memory on image classification.
 
@@ -104,12 +105,12 @@ b^\star=\arg\max_b e_b.
 \end{figure}
 \runin{Memory analysis: size, fidelity and cost.} \Cref{fig:memory} plots full-label F1 against the stored size. The size does not separate the methods, whereas the readout does. Every memory that we ran with our readout (the rank-$128$ latent, raw documents or the deltas) ends within $\nSbrGapFullMax$ full-label F1 points of joint training in every run, whereas the same latent memory under a shared softmax stays at $\vColarFull$. Regarding the size, CoLaR at rank $128$ is $\nMemRawOverColar\times$ smaller than raw documents as our code holds them, but $\nMemColarOverRawEight\times$ larger than raw documents with 8-bit pixels ($\nMemErEightMB$\,MB). Hence, the benefit of the latent memory is not its size: it is a whole-document memory without pixels or token ids, and it trains only $\nMemTrainSbrPct\%$ of the parameters that our raw replay trains, with full-label F1 within $\nErSbrAbsFullMax$ points of raw replay (\bodyref{sec:ablations}{the ablation study}). Lastly, the cost of SBR-Recall grows with the number of sessions and not with their documents; thus, it is cheaper only when the documents of a session take more than its delta.
 
-\runin{Model analysis: the settings of CoLaR-SBR.}\label{app:analysis} In this section, we study the impact of each setting of CoLaR-SBR. We change one setting at a time around the default, i.e., rank $128$, injection at layer $4$ and four replayed documents per batch, and report the results on CIL-CORD in \cref{tab:analysis}. The impact of the number of stored documents is studied in \bodyref{sec:ablations}{the ablation study of the main paper}.
+\runin{Model analysis: the settings of CoLaR-SBR.}\label{app:analysis} In this section, we study the impact of each setting of CoLaR-SBR. We change one setting at a time around the default, i.e., rank $128$, injection at layer $4$ and four replayed documents per batch, and report the results on CIL-CORD in \cref{tab:analysis}. The impact of the number of stored documents is studied in \bodyref{sec:ablations}{the ablation study of the main paper}, and \cref{tab:budget} reports it with three runs per size.
 
 \begin{table}[h]
 \centering\small
 \setlength{\tabcolsep}{4pt}
-\caption{\textbf{Model analysis} of CoLaR-SBR on CIL-CORD: one setting changes at a time (bold: the default). Mean $\pm$ s.d.; $^{n=1}$: one run.}
+\caption{\textbf{Model analysis} of CoLaR-SBR on CIL-CORD: one setting changes at a time (bold: the default). Mean $\pm$ s.d.\ of three runs.}
 \label{tab:analysis}
 \resizebox{\linewidth}{!}{\input{tab_analysis}}
 \end{table}
@@ -228,6 +229,16 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 
 \runin{Qualitative example.} \Cref{fig:qualitative} shows one test receipt after the last session. We did not pick it by hand: it is the test receipt whose accuracy on the entity words is closest to the average of the test set for both models, which is $\qualColarAcc\%$ for CoLaR with a shared softmax and $\qualSbrAcc\%$ for CoLaR-SBR. With a shared softmax, only the cash and the change amounts are tagged; every other entity word (the items, the subtotal, the tax and the total) is predicted as background, i.e., the entities are not confused with each other but lost to the label ``O''. In contrast, CoLaR-SBR tags all but one of the entity words correctly, which agrees with the per-class results in \cref{fig:perclass}.
 
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\caption{\textbf{Memory size} on CIL-CORD (mean $\pm$ s.d.\ of three runs; bold: the default; ``--'': not run).}
+\label{tab:budget}
+\resizebox{\linewidth}{!}{\input{supp_budget}}
+\end{table}
+
+\runin{Memory size with three runs per size.} The memory-size figure of the main paper shows one to three runs per size. \Cref{tab:budget} completes it with three runs for every size. With $5$ documents per session, CoLaR-SBR reaches only $\nBudSbrFive$ full-label F1, and with $10$ documents it is still unstable (from $\nBudSbrTenLo$ to $\nBudSbrTenHi$ between runs). From $30$ documents on, it stays between $\nBudSbrThirty$ and $\nBudSbrTwoHundred$. In contrast, the shared softmax stays at $\nBudColarFifty$ to $\nBudColarTwoHundred$ from $50$ to $200$ documents, and its runs spread more as the memory grows. Hence, the conclusion of the main paper is unchanged: a larger memory alone does not close the gap under label growth.
+
 %% ============================================================================ E
 \begin{figure*}[t]
 \centering
@@ -265,7 +276,7 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 
 \runin{Where the drift sits.} Under naive fine-tuning on a fixed label space, every encoder forgets its earlier domains (\cref{tab:dil}). On the stream FUNSD, CORD and SROIE, where each dataset keeps its own labels, the drift of the representation grows with depth on all four encoders: it is smallest at the embeddings and largest at the last layer and the head (\cref{fig:cka}). That forgetting concentrates in the layers close to the output is known for image classifiers~\citep{ramasesh2021anatomy}; here we observe it for three multimodal document encoders and a text-only one.
 
-\runin{Replay against regularisation.} On every encoder of \cref{tab:dil}, replay (ER, DER++) comes close to joint training, whereas EWC and LwF stay near naive fine-tuning. This is the reason why we take replay as the starting point in the main paper. On images, the readout can also be repaired from class statistics (\cref{app:image}); on token-labelled documents, only replaying old documents repaired it in our experiments.
+\runin{Replay against regularisation.} On every encoder of \cref{tab:dil}, replay (ER, DER++) comes close to joint training, whereas EWC and LwF stay near naive fine-tuning. This is the reason why we take replay as the starting point in the main paper. The cells of \cref{tab:dil} were run under an earlier protocol. We repeated $\nDilCheckCells$ of the cells of LiLT, BROS and BERT with one run under the protocol of the main paper, and each differs from its cell by at most $\nDilCheckMaxDiff$ AA points; LwF on LiLT, which is missing in the table, reaches $\nDilLwfLilt$ AA. On images, the readout can also be repaired from class statistics (\cref{app:image}); on token-labelled documents, only replaying old documents repaired it in our experiments.
 
 %% ============================================================================ F
 \section{Image classification}
