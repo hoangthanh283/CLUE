@@ -414,7 +414,7 @@ def write_conflict():
 
 REPAIR_ROWS = (  # (label, run key per stream): the label-side repairs under one memory
     ("Shared softmax (CoLaR)", "colar"),
-    ("+ true stored labels (oracle)", "colar_r_oracle_pre"),
+    ("+ ground-truth stored labels", "colar_r_oracle_pre"),
     ("+ MiB-style loss", "colar_mib"),
     ("+ per-session readout (CoLaR-SBR)", "colar_sbr"),
     ("Joint training (reference)", "joint"),

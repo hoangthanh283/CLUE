@@ -355,7 +355,7 @@ def fig_heatmaps() -> dict:
 
 REPAIR_COLOR = {"colar": STYLE["colar"][1], "colar_r_oracle_pre": STYLE["oracle"][1],
                 "colar_mib": "#E69F00", "colar_sbr": "#0072B2"}  # fmt: skip
-REPAIR_LABEL = {"colar": "shared softmax", "colar_r_oracle_pre": "+ true stored labels (oracle)",
+REPAIR_LABEL = {"colar": "shared softmax", "colar_r_oracle_pre": "+ ground-truth stored labels",
                 "colar_mib": "+ MiB-style loss", "colar_sbr": "+ per-session readout (ours)"}  # fmt: skip
 
 
