@@ -582,6 +582,11 @@ def write_supp_vals():
     if all(v is not None for v in o2.values()):
         for k, v in o2.items():
             t += m(f"nOrderRev{k}", f"{v:.1f}")
+    o3 = {k: load_seeds(CLEAN, f"cil_cord_o3_{n}", "full_label_f1").get(42)
+          for k, n in (("Colar", "colar"), ("Sbr", "colar_sbr"), ("Recall", "colar_sbr_recall_r64"))}
+    if all(v is not None for v in o3.values()):  # sessions shuffled (cil_cord_o3), seed 42
+        for k, v in o3.items():
+            t += m(f"nOrderShuf{k}", f"{v:.1f}")
     (OUT / "supp_vals.tex").write_text(t)
 
 
