@@ -31,6 +31,8 @@ from make_clean_tables import (  # noqa: E402
     MECH_JSON,
     MECH_ROWS,
     OUT,
+    REPAIR_ROWS,
+    REPAIR_STREAMS,
     SEEDS,
     C,
     _mech_runs,
@@ -349,6 +351,54 @@ def fig_heatmaps() -> dict:
     fig.subplots_adjust(left=0.03, right=0.995, top=0.94, bottom=0.05, wspace=0.18, hspace=0.32)
     save(fig, "heatmaps.pdf")
     return means
+
+
+REPAIR_COLOR = {"colar": STYLE["colar"][1], "colar_r_oracle_pre": STYLE["oracle"][1],
+                "colar_mib": "#E69F00", "colar_sbr": "#0072B2"}  # fmt: skip
+REPAIR_LABEL = {"colar": "shared softmax", "colar_r_oracle_pre": "+ true stored labels (oracle)",
+                "colar_mib": "+ MiB-style loss", "colar_sbr": "+ per-session readout (ours)"}  # fmt: skip
+
+
+def repair_cells() -> dict:
+    """{(stream header, run key): {seed: full-label F1}}: the runs write_repairs() reads."""
+    out = {}
+    for head, sc, over in REPAIR_STREAMS:
+        for _label, key in REPAIR_ROWS:
+            name, sfx = over.get(key, (key, "*"))
+            out[head, key] = load_seeds(CLEAN, f"{sc}_{name}", "full_label_f1", sfx)
+    return out
+
+
+def fig_repairs() -> dict:
+    """The three-repairs result as grouped bars (bar: mean of three seeds, dots: seeds; a cell
+    with fewer than three seeds draws its dots only). Dashed: joint training on that stream."""
+    cells = repair_cells()
+    keys = [k for _l, k in REPAIR_ROWS if k != "joint"]
+    fig, ax = plt.subplots(figsize=(COL, 1.95))
+    w = 0.19
+    for i, (head, _sc, _o) in enumerate(REPAIR_STREAMS):
+        for j, k in enumerate(keys):
+            vs = cells[head, k]
+            x = i + (j - (len(keys) - 1) / 2) * w
+            if len(vs) == len(SEEDS):
+                ax.bar(x, np.mean(list(vs.values())), w * 0.92, color=REPAIR_COLOR[k],
+                       label=REPAIR_LABEL[k] if i == 0 else None, linewidth=0)
+            ax.scatter([x] * len(vs), list(vs.values()), s=3, color="black", zorder=3, linewidths=0)
+        jv = cells[head, "joint"]
+        if len(jv) == len(SEEDS):
+            ax.hlines(np.mean(list(jv.values())), i - 0.42, i + 0.42, colors="black",
+                      linestyles="dashed", linewidth=0.7, label="joint training" if i == 0 else None)
+    ax.set_xticks(range(len(REPAIR_STREAMS)), [h for h, _s, _o in REPAIR_STREAMS])
+    ax.set_ylabel("full-label F1")
+    ax.set_ylim(0, 100)
+    ax.tick_params(axis="x", length=0)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.46, 1.42), ncol=2, frameon=False,
+              handlelength=1.2, columnspacing=1.0, handletextpad=0.4)
+    fig.subplots_adjust(left=0.13, right=0.995, top=0.72, bottom=0.11)
+    save(fig, "repairs.pdf")
+    return cells
 
 
 DOT_KEYS = ("naive", "nobank", "colar", "oracle", "sbr", "recall", "joint")
@@ -1067,6 +1117,10 @@ def main() -> None:
     cells = fig_findings_a()
     cols = fig_findings_b()
     pts = fig_findings_c()
+    rep = fig_repairs()
+    for (head, key), vs in rep.items():  # the figure plots the cells of tab_repairs.tex
+        if len(vs) == len(SEEDS):
+            assert f"{np.mean(list(vs.values())):.1f}" in (OUT / "tab_repairs.tex").read_text(), (head, key)
     means = fig_heatmaps()
     dots = fig_perseed()
     traj = fig_trajectory()
