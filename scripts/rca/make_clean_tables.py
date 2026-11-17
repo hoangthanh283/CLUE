@@ -179,6 +179,7 @@ D = {  # DIL (scoring unaffected by the restriction; legacy = fp32 grid, test-sp
     "joint": src("dil_joint", ("results", "dil_joint", "")),
     "er": src("dil_er", ("results", "dil_er", "")),
     "slot": src(None, (GATE, "dil_colar_sbr_slot")),
+    "recall": src("dil_colar_sbr_recall_r64"),  # no memory; a fixed label space has one block (2026-11-17)
 }
 BASE = [  # (label, rescore/grid method key, drop exact-zero collapses)
     ("LwF", "lwf", True),
