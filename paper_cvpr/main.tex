@@ -287,21 +287,7 @@ We report its results in \cref{sec:ablations}.
 
 \paragraph{Ablation study for the memory (H4).} On CIL-CORD, SBR-Recall reaches $\vRecallFull$ full-label F1 ($\vRecall$ AA) with no stored document, within $\nRecallJointGap$ points of joint training on every seed, at the price of one inference pass per session. Our port of ICE-O (frozen encoder, constant Other logit) forgets nothing but reaches only $\vIceOFull$, below SBR-Recall on every seed. On Mixed without a memory, SBR-Recall scores $\nRecallMixNoMem$ AA, below naive fine-tuning (\cref{tab:main}): as predicted, the blocks of the other schemas fall silent until their domain returns, and with the $50$-document memory restored it scores $\nRecallMixMem$ on one seed (\cref{app:results}).
 
-\paragraph{Memory analysis.}\label{sec:cost} In this section, we study how the memory is used (\cref{tab:memcmp,tab:memory}). First, a memory is needed: without it, our readout reaches only $\vNoBankFull$ full-label F1. Second, a memory alone is not enough: the same CoLaR memory under a shared softmax stays at $\vColarFull$, and raw replay of the same $250$ documents is no better (ER: $\vErFull$). Third, our readout is not limited to the latent memory: raw documents under the same readout reach $\vErSbrFull$ against $\vSbrFull$, with seed-matched differences of \nErSbrDiffFullMin{} to \nErSbrDiffFullMax{} points. Hence, the readout carries the gain, while the latent memory stores no pixels or token ids and trains only $\nMemTrainSbrPct\%$ of the parameters that raw replay trains. Regarding the size, CoLaR keeps the $250$ documents in $\nMemColarMB$\,MB, compared to $\nMemRawMB$\,MB for raw documents as our code holds them and $\nMemRawEightMB$\,MB with 8-bit pixels.
-\subsection{Model analysis}
-\label{sec:analysis}
-In this section, we study the impact of each setting of CoLaR-SBR. We change one setting at a time around the default, i.e., $50$ stored documents per session, rank $128$, injection at layer $4$, four replayed documents per batch and a claim threshold of $0.5$, and report the results on CIL-CORD in \cref{tab:analysis}.
-
-\begin{table}[t]
-\centering\small
-\setlength{\tabcolsep}{4pt}
-\caption{\textbf{Model analysis} of CoLaR-SBR on CIL-CORD: one setting changes at a time (bold: the default). Mean $\pm$ s.d. over three seeds; $^{n=1}$: one seed.}
-\label{tab:analysis}
-\input{tab_analysis}
-\end{table}
-
-\paragraph{Impact of the SVD rank.} The rank decides how faithfully a stored document is kept. As the results demonstrate, a smaller rank hurts our method: at rank $64$ CoLaR-SBR falls to $\vSbrRankSixtyFourFull$ full-label F1 and becomes unstable across seeds, and at rank $32$ it falls to $\vSbrRankThirtyTwoFull$. This indicates the importance of keeping the whole document faithfully. Thus, it is suggested that a rank of $128$ ensures decent performance.
-
+\paragraph{Memory analysis.}\label{sec:cost} In this section, we study how the memory is used (\cref{tab:memcmp,tab:memory}). First, a memory is needed: without it, our readout reaches only $\vNoBankFull$ full-label F1. Second, a memory alone is not enough: the same CoLaR memory under a shared softmax stays at $\vColarFull$, and raw replay of the same $250$ documents is no better (ER: $\vErFull$). Third, our readout is not limited to the latent memory: raw documents under the same readout reach $\vErSbrFull$ against $\vSbrFull$, with seed-matched differences of \nErSbrDiffFullMin{} to \nErSbrDiffFullMax{} points. Hence, the readout carries the gain, while the latent memory stores no pixels or token ids and trains only $\nMemTrainSbrPct\%$ of the parameters that raw replay trains. CoLaR keeps the $250$ documents in $\nMemColarMB$\,MB (\cref{app:memory}).
 \section{Conclusion}
 \label{sec:limitations}
 \label{sec:conclusion}
