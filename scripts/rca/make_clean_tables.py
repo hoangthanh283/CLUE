@@ -1645,20 +1645,20 @@ def write_main(cell, mix, dil, full) -> None:
 # Static dataset facts of the benchmark settings (supp.tex App. A: Datasets, tab:cilsessions,
 # tab:mixsessions, DIL unified schema; CIL-FUNSD: doccl/data/scenarios.py build_cil_funsd and the
 # tab:beyond caption). Typed once here, never in the paper.
-BENCH_ROWS = ("Datasets", "Sessions", "Label space", "Classes (BIO tags)",
+BENCH_ROWS = ("Datasets", "Sessions", "Label space", "Classes (tags)",
               "At a boundary", "Reported")  # fmt: skip
 BENCH = {
     "CIL-CORD": ("CORD", "5", "grows, 6 per session", "30 (61)", "new classes",
                  "full-label F1, AA"),
-    "DIL": ("FUNSD, SROIE, CORD in turn", "3", "fixed, unified", "4 (9)", "new domain", "AA"),
+    "DIL": ("FUNSD, SROIE, CORD", "3", "fixed, unified", "4 (9)", "new domain", "AA"),
     "Mixed": ("FUNSD, SROIE, CORD", "6", "grows, 3 schemas", "12 (25)",
-              "new classes, domain or schema", "AA"),
+              "class, domain, schema", "AA"),
     "CIL-FUNSD": ("FUNSD", "2", "grows", "3 (7)", "new classes", "full-label F1, AA"),
     # doccl/data/scenarios.py: build_cil_wildreceipt (24 entity classes, 4 sessions) and
     # build_dil_xlingual (configs/scenario/dil_xlingual.yaml: de, es, fr, it, zh; DIL schema)
     "CIL-WildReceipt": ("WildReceipt", "4", "grows, 6 per session", "24 (49)", "new classes",
                         "full-label F1, AA"),  # full_eval_dataset since f0b9bd3
-    "DIL-XFUND": ("XFUND: de, es, fr, it, zh in turn", "5", "fixed, unified", "4 (9)",
+    "DIL-XFUND": ("XFUND (5 languages)", "5", "fixed, unified", "4 (9)",
                   "new language", "AA"),
 }  # fmt: skip
 
@@ -1675,7 +1675,7 @@ def write_bench() -> None:
     t += " & " + " & ".join(cols) + " \\\\\n\\midrule\n"
     for i, name in enumerate(BENCH_ROWS):
         t += f"{name} & " + " & ".join(BENCH[c][i] for c in cols) + " \\\\\n"
-    t += "Documents (train/test) & " + " & ".join(bench_docs(c) for c in cols) + " \\\\\n"
+    t += "Train/test & " + " & ".join(bench_docs(c) for c in cols) + " \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_bench.tex").write_text(t)
 
@@ -1743,9 +1743,9 @@ def write_baseline_card_short() -> None:
         return "--" if not vs else f"{len(vs)}" + ("" if clean else "$^{\\dagger}$")
 
     rag = ">{\\raggedright\\arraybackslash}p"
-    t = HDR + f"\\begin{{tabular}}{{@{{}}l{rag}{{1.9cm}}{rag}{{7.4cm}}{rag}{{3.1cm}}ccc@{{}}}}\n"
-    t += ("\\toprule\n & & & & \\multicolumn{3}{c}{Seeds} \\\\\n\\cmidrule(l){5-7}\n"
-          "Method & Family & What our port changes & Memory & CIL-CORD & Mixed & DIL \\\\\n"
+    t = HDR + f"\\begin{{tabular}}{{@{{}}l{rag}{{1.9cm}}{rag}{{8.6cm}}{rag}{{3.6cm}}@{{}}}}\n"
+    t += ("\\toprule\n"
+          "Method & Family & What our re-implementation changes & Memory \\\\\n"
           "\\midrule\n")  # fmt: skip
     for label, key, _venue, _keeps, changes, _hkeys in CARD:
         cil, mixs, dils = _card_sources(key)
@@ -1754,8 +1754,8 @@ def write_baseline_card_short() -> None:
         if "buffer_size" in hp:
             mem = f"{hp['buffer_size']} {mem}"
         dz = dzs.get(key, False)
-        t += (f"{label} & {fam} & {changes} & {mem} & {seeds(cil, dz)} & {seeds(mixs, dz)} & "
-              f"{seeds(dils)} \\\\\n")  # fmt: skip
+        assert {seeds(cil, dz), seeds(mixs, dz), seeds(dils)} == {"3"}, label  # every cell: three clean runs
+        t += f"{label} & {fam} & {changes} & {mem} \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_baselines_short.tex").write_text(t)
 
@@ -1769,8 +1769,6 @@ ABL_EXT = (  # (group heading or None, row label, source)
     (None, "rank 64, Q/K/V + dense, no memory", (GATE, DELTA_RUNS[2][1], DELTA_RUNS[2][2])),
     ("SBR-Recall across schemas, Mixed (rank 64)", "no memory", MIX_RECALL_NOMEM),
     (None, "$50$-document memory", MIX_RECALL_MEM),
-    ("Head slots on CoLaR-SBR, CIL-CORD", "CoLaR-SBR", SLOT_PAIRS[0][1]),
-    (None, "+ LexSlot", SLOT_PAIRS[0][2]),
 )  # fmt: skip
 
 

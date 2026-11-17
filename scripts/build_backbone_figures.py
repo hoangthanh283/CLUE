@@ -131,27 +131,30 @@ def plot_cka_gradient(df: pd.DataFrame, out: Path) -> None:
     cka = _canonical(df[(df["metric"] == "cka") & (df["boundary"] == "0_to_1")]).copy()
     cka["depth"] = cka["layer"].map(_depth_of)
     cka = cka.dropna(subset=["depth"])
-    fig, ax = plt.subplots(figsize=(7, 4.5))
-    xs = list(range(len(DEPTH_ORDER)))
-    for cond, label in BACKBONES.items():
-        sub = cka[cka["condition"] == cond]
-        if sub.empty:
-            continue
-        m = sub.groupby("depth")["value"].mean()
-        ys = [m.get(d, np.nan) for d in DEPTH_ORDER]
-        ax.plot(xs, ys, marker="o", lw=2, label=label, color=COLORS[cond])
-    ax.set_xticks(xs)
-    ax.set_xticklabels(DEPTH_ORDER, rotation=15)
-    ax.set_ylabel("Linear CKA  (1.0 = no drift)")
-    ax.set_xlabel("Network depth")
-    ax.set_title("Representational drift by depth, per backbone (FUNSD$\\rightarrow$CORD)")
-    ax.set_ylim(0, 1.05)
-    ax.axhline(1.0, ls=":", c="0.7", lw=1)
-    ax.grid(True, axis="y", alpha=0.3)
-    ax.legend(title="Backbone", frameon=False)
-    fig.tight_layout()
-    fig.savefig(out, bbox_inches="tight")
-    plt.close(fig)
+    with plt.rc_context({"font.size": 7, "axes.labelsize": 7, "xtick.labelsize": 6.5,
+                         "ytick.labelsize": 6.5, "legend.fontsize": 6.5, "pdf.fonttype": 42}):
+        fig, ax = plt.subplots(figsize=(3.25, 1.75))  # one CVPR column, as the other paper figures
+        xs = list(range(len(DEPTH_ORDER)))
+        for cond, label in BACKBONES.items():
+            sub = cka[cka["condition"] == cond]
+            if sub.empty:
+                continue
+            m = sub.groupby("depth")["value"].mean()
+            ys = [m.get(d, np.nan) for d in DEPTH_ORDER]
+            ax.plot(xs, ys, marker="o", ms=2.5, lw=1.0, label=label, color=COLORS[cond])
+        ax.set_xticks(xs)
+        ax.set_xticklabels(DEPTH_ORDER)
+        ax.set_ylabel("linear CKA")
+        ax.set_xlabel("network depth", labelpad=1)
+        ax.set_ylim(0, 1.05)
+        ax.axhline(1.0, ls=":", c="0.7", lw=0.7)
+        ax.tick_params(length=1.5, pad=1)
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
+        ax.legend(frameon=False, handlelength=1.4, loc="lower left")
+        fig.subplots_adjust(left=0.13, right=0.995, top=0.97, bottom=0.2)
+        fig.savefig(out)
+        plt.close(fig)
     print(f"Wrote {out}")
 
 

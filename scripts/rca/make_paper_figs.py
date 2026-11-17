@@ -191,13 +191,12 @@ def fig_findings_a() -> list[dict]:
          plt.Rectangle((0, 0), 1, 1, fc="#666666", alpha=0.45, ec="black", lw=0.4),
          plt.Rectangle((0, 0), 1, 1, fc="white", ec="black", lw=0.4, hatch=HATCH)]  # fmt: skip
     labs = ["full-label F1", "AA", r"legacy$\dagger$ (AA)"]
-    fig.legend([h[0], refs[0][0], h[1], refs[1][0], h[2]],
-               [labs[0], refs[0][1], labs[1], refs[1][1], labs[2]], loc="upper left",
-               bbox_to_anchor=(0.1, 1.0), ncol=3, frameon=False, handlelength=1.4,
-               columnspacing=1.0, borderaxespad=0.1, labelspacing=0.15)  # fmt: skip
-    fig.subplots_adjust(
-        left=0.115, right=0.995, top=0.84, bottom=0.38
-    )  # P28: longer relabel labels
+    hh, ll = [h[0], h[1], refs[0][0], refs[1][0]], [labs[0], labs[1], refs[0][1], refs[1][1]]
+    if not all(c["aa_clean"] for c in cells):  # the hatched entry only when such a bar is drawn
+        hh, ll = hh + [h[2]], ll + [labs[2]]
+    fig.legend(hh, ll, loc="upper center", bbox_to_anchor=(0.55, 1.0), ncol=len(hh), frameon=False,
+               handlelength=1.2, columnspacing=0.8, borderaxespad=0.1, handletextpad=0.3)  # fmt: skip
+    fig.subplots_adjust(left=0.115, right=0.995, top=0.88, bottom=0.38)
     save(fig, "findings_a.pdf")
     return cells
 
@@ -300,7 +299,7 @@ def fig_findings_c() -> dict:
     ax.set_xticks([0, 50, 100])
     ax.set_yticks([0, 50, 100])
     ax.set_xlabel("newest session F1", labelpad=1)
-    ax.set_ylabel("mean F1, old sessions", labelpad=1)
+    ax.set_ylabel("old-session F1", labelpad=1)
     ax.tick_params(length=1.5, pad=1)
     # legend above the axes (as in panels a and b): inside, it sat on the diagonal and the points
     hs, ls = (
@@ -341,8 +340,7 @@ def fig_heatmaps() -> dict:
                     v = shown[i, j]
                     ax.text(j, i, f"{v:.1f}", ha="center", va="center", fontsize=6.5,
                             color="black" if v > 45 else "white")  # fmt: skip
-        proto = "clean" if clean else r"legacy $\dagger$"
-        ax.set_title(f"{STYLE[k][0]} ({proto}, n={len(by_seed)})", pad=2)
+        ax.set_title(STYLE[k][0] + ("" if clean else r" $\dagger$"), pad=2)
         ax.set_xticks(range(n), [str(j + 1) for j in range(n)])
         ax.set_yticks(range(n), [str(i + 1) for i in range(n)])
         ax.tick_params(length=0, pad=1)
@@ -678,7 +676,7 @@ def fig_perclass() -> dict:
             color=STYLE.get(k, ("", "#999999"))[1],
             ec="black",
             lw=0.3,
-            label=f"{STYLE.get(k, (k,))[0]} (seed {v['seed']}; {v['dump_f1']:.1f})",
+            label=f"{STYLE.get(k, (k,))[0]} ({v['dump_f1']:.1f})",
         )
     edges = np.cumsum([len(s) for s in res["session_types"]])[:-1] - 0.5
     for e in edges:
@@ -874,14 +872,9 @@ def fig_memory() -> dict:
                                   (forms["recall32"]["total"], f1(RECALL_NAME), False)], 0),
     ]  # fmt: skip
     jv = float(np.mean(pick_clean_only(C["joint"], "full_label_f1")[0]))
-    ys = [v for _, _, pts, _ in series for _, d, _ in pts for v in d.values()]
-    hi_v, lo_v = [v for v in ys if v >= 50] + [jv], [v for v in ys if v < 50]
-    # broken y: the methods that retain sit within a few points of each other, the rest far below
-    top = (5 * np.floor((min(hi_v) - 1) / 5), 5 * np.ceil((max(hi_v) + 1) / 5))
-    bot = (0, 10 * np.ceil((max(lo_v, default=0) + 3) / 10))
-    fig, axes = plt.subplots(2, 2, figsize=(COL, 2.45), sharex="col", sharey="row",
-                             gridspec_kw={"width_ratios": (0.55, 5), "height_ratios": (1.7, 1),
-                                          "wspace": 0.05, "hspace": 0.2})  # fmt: skip
+    # one plain y-axis (a narrow "0" panel for the memory-free runs, then a log x-axis in MB)
+    fig, axes = plt.subplots(1, 2, figsize=(COL, 2.3), sharey="row", squeeze=False,
+                             gridspec_kw={"width_ratios": (0.55, 5), "wspace": 0.05})  # fmt: skip
     out = {}
     for key, _label, pts, off in series:
         col = STYLE[key][1]
@@ -914,46 +907,35 @@ def fig_memory() -> dict:
         ax.grid(axis="y", alpha=0.25, lw=0.3)
         ax.tick_params(length=1.5, pad=1)
         ax.spines["top"].set_visible(False)
-    for r, lim in ((0, top), (1, bot)):
-        axes[r, 0].set_ylim(*lim)
-        axes[r, 1].spines["left"].set_visible(False)
-        axes[r, 1].tick_params(axis="y", left=False)
-        axes[r, 0].spines["right"].set_visible(False)
-    axes[0, 0].set_yticks(np.arange(top[0], top[1] + 1, 5))
-    axes[1, 0].set_yticks(np.arange(0, bot[1] + 1, 10))
-    for ax in axes[0]:
-        ax.spines["bottom"].set_visible(False)
-        ax.tick_params(axis="x", which="both", bottom=False)
-    axes[0, 1].spines["right"].set_visible(False)
-    axes[1, 1].spines["right"].set_visible(False)
-    axes[1, 0].set_xlim(-1, 1)
-    axes[1, 0].set_xticks([0], ["0"])
-    a1 = axes[1, 1]
+    a0, a1 = axes[0]
+    a0.set_ylim(0, 100)
+    a0.set_yticks(range(0, 101, 20))
+    a0.spines["right"].set_visible(False)
+    a1.spines["left"].set_visible(False)
+    a1.spines["right"].set_visible(False)
+    a1.tick_params(axis="y", left=False)
+    a0.set_xlim(-1, 1)
+    a0.set_xticks([0], ["0"])
     a1.set_xscale("log")
     a1.set_xlim(20, 330)
     a1.set_xticks([25, 50, 100, 200], ["25", "50", "100", "200"])
     a1.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
     a1.set_xlabel("stored memory (MB)", labelpad=1)
-    fig.supylabel("full-label F1, CIL-CORD", x=0.01, fontsize=7)
-    axes[0, 1].text(21, jv + 0.3, "joint training", ha="left", va="bottom", fontsize=6)
+    a0.set_ylabel("full-label F1", labelpad=1)
+    a1.text(21, jv + 0.8, "joint training", ha="left", va="bottom", fontsize=6)
     kw = {"color": "black", "lw": 0.5, "clip_on": False}
-    for ax, xs, ys_ in (
-        (axes[1, 0], (1, 1), (-0.03, 0.03)),
-        (axes[1, 1], (0, 0), (-0.03, 0.03)),
-        (axes[0, 0], (-0.04, 0.04), (0, 0)),
-        (axes[1, 0], (-0.04, 0.04), (1, 1)),
-    ):
-        ax.plot(xs, ys_, transform=ax.transAxes, **kw)  # axis-break marks  # fmt: skip
+    for ax, xs in ((a0, (1, 1)), (a1, (0, 0))):
+        ax.plot(xs, (-0.03, 0.03), transform=ax.transAxes, **kw)  # x-axis break marks
     h = [plt.Line2D([], [], marker="o", ls="", ms=3.3, mfc=STYLE[k][1], mec="black", mew=0.3)
          for k, *_ in series]  # fmt: skip
     h += [
         plt.Line2D([], [], marker="_", ls="", ms=6, color="black", mew=1.1),
         plt.Line2D([], [], marker="o", ls="", ms=3.3, mfc="white", mec="#555555", mew=0.7),
     ]
-    labs = [s[1] for s in series] + ["mean of the seeds", "size computed, not run"]
+    labs = [s[1] for s in series] + ["mean of the runs", "size computed, not run"]
     fig.legend(h, labs, loc="lower center", ncol=2, frameon=False, handletextpad=0.2,
                columnspacing=0.8, labelspacing=0.2, borderaxespad=0.1)  # fmt: skip
-    fig.subplots_adjust(left=0.12, right=0.985, top=0.98, bottom=0.37)
+    fig.subplots_adjust(left=0.11, right=0.985, top=0.97, bottom=0.40)
     save(fig, "memory.pdf")
     return out
 
