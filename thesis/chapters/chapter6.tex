@@ -17,8 +17,124 @@ LayoutLMv3 under the protocol of Section~\ref{sec:e-protocol}.
 
 \section{Cause 1: Representation Drift}
 \label{sec:c6-s1}
-% SOURCE: old ch6 38-507 condensed; paper App. E; E1 four-encoder grid; E3 drift under the methods
-\todo{to be written}
+% E1 (four-encoder DIL grid under the protocol of Chapter 5, three runs) replaces Table tab:dil;
+% E3 (CKA by depth under the methods) adds one paragraph and one figure.
+
+In this section, we apply the analysis of Section~\ref{sec:m-drift}. We first measure where
+the model changes when it is fine-tuned naively, and then examine which family of methods
+removes the forgetting when drift is its only cause.
+
+\subsection{Where the Drift Sits}
+\label{sec:r-drift-where}
+
+We fine-tune each encoder naively on the stream FUNSD, CORD and SROIE, where each dataset
+keeps its own labels, and compare the checkpoints before and after the second dataset
+(Table~\ref{tab:drift}). Every encoder forgets heavily on this stream, with an \gls{af}
+between $\nDriftAfMin$ and $\nDriftAfMax$.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Drift by depth under naive fine-tuning]{\textbf{Drift by depth under naive
+  fine-tuning} (FUNSD$\rightarrow$CORD, mean over the runs). Linear \gls{cka} between the
+  checkpoints before and after the second dataset, at the embeddings, at layers~1, 7 and
+  12 and at the head ($1$: no drift). Encoder share: the Fisher-weighted displacement of
+  the four encoder groups in percent of their sum. Head ratio: the displacement of the head
+  over that of the largest encoder group. \gls{af}: forgetting after the three datasets.}
+  \label{tab:drift}
+  \resizebox{\textwidth}{!}{\input{generated/paper/supp_drift}}
+\end{table}
+
+\paragraph{The representation drifts more with depth.} As shown in
+Figure~\ref{fig:cka}, the drift of the representation grows with depth on all four
+encoders. The embeddings are almost unchanged (\gls{cka} of at least $\nDriftCkaEmbMin$),
+and the first layer changes little. From there the similarity falls steadily, to
+$\nDriftCkaLastMin$ to $\nDriftCkaLastMax$ at the last layer and to $\nDriftCkaHeadMin$ to
+$\nDriftCkaHeadMax$ at the head. That forgetting concentrates in the layers close to the
+output is known for image classifiers~\citep{ramasesh2021anatomy}; here we observe it for
+three multimodal document encoders and a text-only one.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{paper/backbone_cka_gradient.pdf}
+  \caption[Drift by depth on four encoders]{\textbf{Drift by depth}: linear \gls{cka}
+  between the checkpoints before and after the second dataset (FUNSD$\rightarrow$CORD)
+  under naive fine-tuning on four encoders ($1.0$: no drift).}
+  \label{fig:cka}
+\end{figure}
+
+\paragraph{The parameters that mattered move in the head and in the lower layers.} The
+Fisher-weighted displacement of Equation~\eqref{eq:displacement} gives a second view
+(Figure~\ref{fig:displacement}). The head carries by far the largest value: at least
+$\nDriftHeadRatioMin$ times that of the largest encoder group on every encoder. It is
+noted that this ratio is expected in part, since the head carries the largest gradients of
+a token classifier. Within the encoder, the displacement is not concentrated in the late
+layers: they hold at most $\nDriftLateShareMax\%$ of it, and most of it sits in the early
+and middle layers. Hence, the two views do not measure the same thing. The features change
+the most close to the output, whereas the parameters that mattered for the old dataset and
+were moved sit in the head and in the lower half of the encoder. This hints that the drift
+of the late features is accumulated from the changes below them, and not produced by the
+late layers alone.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{paper/pilot_displacement_bars.pdf}
+  \caption[Fisher-weighted displacement by depth]{\textbf{Fisher-weighted displacement by
+  depth} at the first boundary (FUNSD$\rightarrow$CORD; log scale; bar: mean of the runs).
+  The head dominates on every encoder and with every input.}
+  \label{fig:displacement}
+\end{figure}
+
+\paragraph{Impact of the inputs.} On LayoutLMv3, we repeat the analysis with some of the
+inputs masked, so that the architecture is fixed and only the inputs differ
+(Table~\ref{tab:drift}; the text-only condition has $\nDriftTextOnlyRuns$ runs, since one
+run did not learn). The profile is the same with every input: the \gls{cka} falls with
+depth, and the head dominates the displacement. Hence, the drift is not tied to one
+modality.
+
+\paragraph{Outcome.} Under naive fine-tuning, the representation of every encoder drifts,
+more so with depth, and the head that was fitted on the old features is displaced the
+most. The representation of the lowest layers stays close to its state before the session,
+which is what a
+memory of low-layer activations relies on (Section~\ref{sec:m-colar}).
+
+\subsection{What Removes the Drift}
+\label{sec:r-drift-remedy}
+
+To examine what removes the drift, we compare the main families of continual learning on
+the DIL stream, where the label space is fixed and drift is the only cause
+(Table~\ref{tab:dil}).
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Drift and its remedy on four encoders]{\textbf{Drift and its remedy on four
+  encoders} (DIL, AA, mean $\pm$ s.d.; ``--'': not run). The runs of this table follow an
+  earlier protocol, which stopped early on the test split, used a different epoch cap per
+  method and partly ran in mixed precision.}
+  \label{tab:dil}
+  \input{generated/paper/tab_dil_grid}
+\end{table}
+
+\paragraph{Replay against regularization.} On every encoder, replay (ER, DER++) comes
+close to joint training, whereas EWC and LwF stay near naive fine-tuning. Hence, showing
+old documents to the model again removes the drift on a fixed label space, whereas
+constraining the parameters or the outputs does not. The cells of Table~\ref{tab:dil} were
+run under an earlier protocol. To examine whether this matters, we repeated
+$\nDilCheckCells$ of the cells of LiLT, BROS and BERT with one run under the protocol of
+Section~\ref{sec:e-protocol}, and each differs from its cell by at most $\nDilCheckMaxDiff$
+AA points; LwF on LiLT, which is missing in the table, reaches $\nDilLwfLilt$ AA. On
+LayoutLMv3, the comparison under the protocol of this thesis is part of
+Table~\ref{tab:main}: naive fine-tuning reaches $\vNaiveDil$ AA and LwF does not improve
+on it, whereas ER reaches $\vErDil$ against $\vJointDil$ for joint training.
+
+\paragraph{A compressed memory is sufficient.} The memory does not need to hold raw
+documents. With the CoLaR memory, which stores compressed activations of $50$ documents
+per session, the model reaches $\vColarDil$ AA, within $\nColarDilGapMax$ points of joint
+training in every run (Section~\ref{sec:c6-s3}).
+
+\paragraph{Outcome.} Drift is the first cause of forgetting, and replay removes it on a
+fixed label space. This is the reason why we take a replay memory as the starting point of
+our method. The next section shows that the same memory fails when the label set grows,
+which is the second cause.
 
 % =============================================================================
 \section{Cause 2: The Background-Label Conflict}
