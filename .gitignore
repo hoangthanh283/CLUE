@@ -118,3 +118,9 @@ PLAN.md
 /BUGFIX_REPORT.md
 /EXPLORE.md
 /README.md
+
+# Result archives and the old ICLR draft — local only, never commit
+# (/results/ is already ignored above)
+/results_3ep_archive/
+/results_doccl_oldstop_archive/
+/paper/
