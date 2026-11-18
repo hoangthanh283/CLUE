@@ -75,7 +75,8 @@ class CoLaR(LatentReplay):
             ),
             "labels": torch.stack([doc["labels"] for doc in docs]),
         }
-        for k in ("bbox", "attention_mask", "input_ids"):  # document keys; absent for images
+        # document keys; absent for images ("layout_hidden": LiLT's second stream)
+        for k in ("bbox", "attention_mask", "input_ids", "layout_hidden"):
             if k in docs[0]:
                 replay[k] = torch.stack([doc[k] for doc in docs])
         return replay
@@ -90,6 +91,7 @@ class CoLaR(LatentReplay):
         total = 0
         for d in self.store:
             total += (d["us"].numel() + d["v"].numel()) * 2  # fp16 factors
+            total += d["layout_hidden"].numel() * 2 if "layout_hidden" in d else 0
             total += sum(
                 d[k].numel() * 8
                 for k in ("bbox", "attention_mask", "labels", "input_ids")

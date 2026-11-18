@@ -64,6 +64,10 @@ class LatentReplay(NaiveFineTune):
         self.store: list[dict[str, torch.Tensor]] = []
         self._inject: torch.Tensor | None = None
         self._capture: list[torch.Tensor] | None = None
+        # LiLT only: its layers take a second, layout stream that shares attention scores with
+        # the text stream, so it must be stored and injected at layer k as well.
+        self._inject_layout: torch.Tensor | None = None
+        self._capture_layout: torch.Tensor | None = None
         self._pixel_shape: tuple[int, ...] | None = None
         n_layers = len(self._encoder_layers())
         if not 0 < self.split_layer_k <= n_layers:
@@ -99,19 +103,25 @@ class LatentReplay(NaiveFineTune):
         Fires on module ``__call__`` and therefore also under the wrapper's
         per-layer gradient-checkpointing wrap (which only replaces ``forward``).
 
-        Captures/injects ``args[0]`` (the text-stream hidden state). Single-stream
-        backbones (LayoutLMv3 — unified sequence — BERT, BROS) are exact; LiLT's
-        parallel layout stream is NOT stored, so LiLT latent replay is approximate
-        (its layout stream re-derives from the stored bbox below k). The thesis
-        experiment runs on LayoutLMv3.
+        Captures/injects ``args[0]`` (the text-stream hidden state). On LiLT, whose layers
+        are called as ``layer(hidden_states, layout_inputs, ...)``, ``args[1]`` (the layout
+        stream) is captured and injected too: the two streams share attention scores in every
+        layer, so a layout stream recomputed from the dummy token ids below k would corrupt
+        the replayed features above k (tests/methods/test_latent_replay_lilt.py).
         """
+        two_stream = type(module).__name__ == "LiltLayer" and len(args) > 1
         if self._capture is not None:
             hidden = args[0] if args else kwargs["hidden_states"]
             self._capture.append(hidden.detach().to("cpu", torch.float16))
+            if two_stream:
+                self._capture_layout = args[1].detach().to("cpu", torch.float16)
             return None
         if self._inject is not None:
             hidden = args[0] if args else kwargs["hidden_states"]
             injected = self._inject.to(device=hidden.device, dtype=hidden.dtype)
+            if two_stream and self._inject_layout is not None:
+                layout = self._inject_layout.to(device=args[1].device, dtype=args[1].dtype)
+                return (injected, layout, *args[2:]), kwargs
             if args:
                 return (injected, *args[1:]), kwargs
             kwargs = dict(kwargs, hidden_states=injected)
@@ -293,6 +303,7 @@ class LatentReplay(NaiveFineTune):
             else None
         )
         self._inject = replay["hidden"]
+        self._inject_layout = replay.get("layout_hidden")
         try:
             return self.model(
                 input_ids=input_ids,
@@ -303,6 +314,7 @@ class LatentReplay(NaiveFineTune):
             )
         finally:
             self._inject = None
+            self._inject_layout = None
 
     def _sample_replay(self) -> dict[str, torch.Tensor] | None:
         if not self.store:
@@ -401,6 +413,7 @@ class LatentReplay(NaiveFineTune):
                     hidden = self._capture[0]
                 finally:
                     self._capture = None
+                    layout, self._capture_layout = self._capture_layout, None
                 for i in range(hidden.shape[0]):
                     if len(candidates) >= quota:
                         break
@@ -416,6 +429,10 @@ class LatentReplay(NaiveFineTune):
                             candidate[k] = batch[k][i].cpu()
                     if self.config.get("store_input_ids", False):
                         candidate["input_ids"] = batch["input_ids"][i].cpu()
+                    if layout is not None:  # LiLT: raw fp16, (seq, d/4)
+                        # ponytail: stored uncompressed; factorise like "hidden" if its
+                        # bytes matter (a quarter of the text width, so little to gain)
+                        candidate["layout_hidden"] = layout[i]
                     candidates.append(candidate)
                 if len(candidates) >= quota:
                     break
@@ -476,6 +493,7 @@ class LatentReplay(NaiveFineTune):
         total = 0
         for d in self.store:
             total += d["hidden"].numel() * 2  # fp16 activations
+            total += d["layout_hidden"].numel() * 2 if "layout_hidden" in d else 0
             total += sum(d[k].numel() for k in ("bbox", "attention_mask", "labels") if k in d) * 8
             if "input_ids" in d:
                 total += d["input_ids"].numel() * 8
