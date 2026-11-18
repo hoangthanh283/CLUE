@@ -95,3 +95,11 @@ PLAN.md
 .dolt/
 *.db
 .beads-credential-key
+
+# Agent / tooling folders — local only, never commit
+.agents/
+.beads/
+.claude/
+.github/workflows/
+.qwen/
+.serena/
