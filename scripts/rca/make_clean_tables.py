@@ -2621,9 +2621,8 @@ def write_bros() -> str:
         for stem, _l, run in BROS_B1
     }
     v, out = {}, ""
-    t = HDR + "\\begin{tabular}{@{}lccccc@{}}\n\\toprule\n"
-    t += " & & & \\multicolumn{3}{c}{Full-label F1, seed} \\\\\n\\cmidrule(l){4-6}\n"
-    t += "Method & Full-label F1 & AA & 42 & 7 & 123 \\\\\n\\midrule\n"
+    t = HDR + "\\begin{tabular}{@{}lcc@{}}\n\\toprule\n"
+    t += "Method & Full-label F1 & AA \\\\\n\\midrule\n"
     for stem, label, _run in BROS_B1:
         aa, fl = d[stem]
         ok = len(aa) == len(SEEDS) and len(fl) == len(SEEDS)
@@ -2634,11 +2633,7 @@ def write_bros() -> str:
             if ok
             else [_pending(fl), _pending(aa)]
         )
-        t += (
-            f"{label} & "
-            + " & ".join(cells + [f"{fl[x]:.1f}" if x in fl else "--" for x in SEEDS])
-            + " \\\\\n"
-        )
+        t += f"{label} & " + " & ".join(cells) + " \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_bros.tex").write_text(t)
     for gname, a, b in BROS_GAPS:
@@ -2654,6 +2649,26 @@ def write_bros() -> str:
         _warn(f"BROS b1 runs disagree on batch / replay batch: {hp}")
     v["nBrosRecipe"] = f"batch size {min(hp)[0]}, replay batch {min(hp)[1]}" if hp else "--"
     return out + _defs(v)
+
+
+def write_robust():
+    """supp_order.tex (CIL-CORD with the sessions reversed and shuffled, full-label F1) and
+    supp_patience.tex (the four weakest baselines on CIL-FUNSD with a patience of 2 and 10, AA).
+    A cell is mean +- s.d. with three runs, else the values of the runs it has."""
+    cell = lambda name, key, sfx="*": fmt(load(CLEAN, name, key, sfx), True)  # noqa: E731
+    t = HDR + "\\begin{tabular}{@{}lccc@{}}\n\\toprule\n"
+    t += "Session order & CoLaR & CoLaR-SBR & SBR-Recall \\\\\n\\midrule\n"
+    for lab, pre in (("Original", "cil_cord"), ("Reversed", "cil_cord_o2"), ("Shuffled", "cil_cord_o3")):
+        t += (f"{lab} & {cell(pre + '_colar', 'full_label_f1')} & "
+              f"{cell(pre + '_colar_sbr', 'full_label_f1', '')} & "
+              f"{cell(pre + '_colar_sbr_recall_r64', 'full_label_f1', '')} \\\\\n")  # fmt: skip
+    (OUT / "supp_order.tex").write_text(t + "\\bottomrule\n\\end{tabular}\n")
+    t = HDR + "\\begin{tabular}{@{}lcc@{}}\n\\toprule\n"
+    t += "Method & Patience 2 & Patience 10 \\\\\n\\midrule\n"
+    for lab, k in (("CODA-Prompt", "coda_prompt"), ("CPFD", "cpfd"), ("IS3", "is3"), ("LCA", "lca")):
+        t += f"{lab} & {cell('cil_funsd_' + k, 'AA', '')} & {cell('cil_funsd_' + k + '_p10', 'AA', '')} \\\\\n"
+    t += f"\\midrule\nCoLaR-SBR & {cell('cil_funsd_colar_sbr_d10', 'AA', '')} & -- \\\\\n"
+    (OUT / "supp_patience.tex").write_text(t + "\\bottomrule\n\\end{tabular}\n")
 
 
 def rank_seed_macros() -> str:
@@ -2751,6 +2766,7 @@ def main():
     write_ablation_ext()
     write_dil_grid()
     write_dil_check()
+    write_robust()
     write_supp()
 
     for k in C:

@@ -136,6 +136,8 @@ b^\star=\arg\max_b e_b.
 
 \runin{Choice of the baselines.} We fixed the set of baselines after a first comparison on CIL-CORD, Mixed and DIL. EWC~\citep{kirkpatrick2017ewc}, L2P~\citep{wang2022l2p} and DualPrompt~\citep{wang2022dualprompt} did not learn sessions~4 and~5 of CIL-CORD in any run; hence, we dropped them, and O-LoRA~\citep{wang2023olora} was not completed under the final protocol. CPFD and IS3 also fail on this stream; however, we kept them because they are designed for the shift of the background label. It is noted that the baselines differ in what they learn as well as in what they forget: CPFD reaches $\nCpfdLateMax$ F1 on its best later session right after it is learned, whereas IS3, CODA-Prompt and LCA each have a later session that is learned to at most $\nBaseWorstLateMax$ F1 in every run. In contrast, naive fine-tuning learns every session to at least $\nNaiveDiagMin$.
 
+\runin{Patience of the baselines.} One may ask whether the weak baselines on CIL-FUNSD only stop too early. To examine this, we repeat CODA-Prompt, CPFD, IS3 and LCA on CIL-FUNSD with a patience of ten epochs instead of two (\cref{tab:patience}). More patience does not close the gap: every one of them stays far below CoLaR-SBR.
+
 %% ============================================================================ D
 \section{Extended results and ablations}
 \label{app:results}
@@ -238,6 +240,34 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 \end{table}
 
 \runin{Memory size with three runs per size.} The memory-size figure of the main paper shows one to three runs per size. \Cref{tab:budget} completes it with three runs for every size. With $5$ documents per session, CoLaR-SBR reaches only $\nBudSbrFive$ full-label F1, and with $10$ documents it is still unstable (from $\nBudSbrTenLo$ to $\nBudSbrTenHi$ between runs). From $30$ documents on, it stays between $\nBudSbrThirty$ and $\nBudSbrTwoHundred$. In contrast, the shared softmax stays at $\nBudColarFifty$ to $\nBudColarTwoHundred$ from $50$ to $200$ documents, and its runs spread more as the memory grows. Hence, the conclusion of the main paper is unchanged: a larger memory alone does not close the gap under label growth.
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\caption{\textbf{Session order} on CIL-CORD (full-label F1; mean $\pm$ s.d.\ of three runs, single values: one run).}
+\label{tab:order}
+\input{supp_order}
+\end{table}
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\caption{\textbf{A second backbone}: BROS on CIL-CORD (mean $\pm$ s.d.\ of three runs). $^{r}$Uses the ground-truth labels.}
+\label{tab:bros}
+\resizebox{\linewidth}{!}{\input{supp_bros}}
+\end{table}
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\caption{\textbf{Patience of the baselines} on CIL-FUNSD (AA; mean $\pm$ s.d.\ of three runs, single values: one run; ``--'': not run).}
+\label{tab:patience}
+\input{supp_patience}
+\end{table}
+
+\runin{Session order.} \Cref{tab:order} reports CIL-CORD with its five sessions reversed and shuffled. The gap between the shared softmax and the per-session readout does not depend on the order: CoLaR-SBR reaches $\nOrderRevSbr$ and $\nOrderShufSbr$ full-label F1, against $\nOrderRevColar$ and $\nOrderShufColar$ for CoLaR. SBR-Recall also holds under both orders.
+
+\runin{A second backbone.} To examine whether the result depends on LayoutLMv3, we repeat the main rows of the hypothesis table on CIL-CORD with BROS, which has no image input (\cref{tab:bros}; \nBrosRecipe, since BROS needs more memory per document). The picture is the same: with the same memory, the shared softmax stays at $\vBrosColarFull$ full-label F1, whereas CoLaR-SBR reaches $\vBrosSbrFull$. Besides, the two rows in between show the same order as on LayoutLMv3: the ground-truth stored labels help but are unstable, and a constant background logit is below the learned one.
 
 %% ============================================================================ E
 \begin{figure*}[t]
