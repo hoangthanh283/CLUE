@@ -1,6 +1,11 @@
 # ROADMAP
 
-### CVPR submission build — 2026-11-17 16:15 ICT
+### Next Up (thesis rewrite, 2026-11-18)
+1. Supplement upload Nov 22 (user); image stages A to D results into Appendix F.
+2. Thesis Ch. 3 and Ch. 5 prose (week 1), Ch. 6.2 to 6.5 (week 2), Ch. 6.1/6.6/6.7 with E1/E2 (week 3), Ch. 6.8 to 6.10 + statistics (week 4), Ch. 2 (week 5), Ch. 1/7/abstract/4/appendices (week 6), reviewer read + audit (week 7).
+3. Code owed: E3 CKA-by-depth dumps; image Stage B (balanced readout refit) only if Stage A passes its go/no-go.
+
+## CVPR submission build — 2026-11-17 16:15 ICT
 Submission PDF built (`paper_cvpr/submission/main_paper.pdf`, 11 pages, main text ends on page 8); title is now "Memory Is Not Enough: Resolving the Background-Label Conflict in Continual Document Understanding". Next up for the supplement (due Nov 23): (1) consistency read of the appendix running text against the rewritten body (hypothesis numbers, wording); (2) fold the remaining memory-size runs (5, 30, 200 documents, third runs) into the chart; (3) optional: one qualitative figure on a real receipt; (4) the image-classification table was not covered by the independent number audit.
 
 ### CVPR evidence review — 2026-11-17 06:40 ICT
