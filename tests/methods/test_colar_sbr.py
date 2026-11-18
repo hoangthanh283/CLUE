@@ -3,7 +3,12 @@
 import torch
 import torch.nn.functional as F
 
-from doccl.methods.colar_sbr import aggregate_blocks, block_targets, supervision_plan
+from doccl.methods.colar_sbr import (
+    aggregate_blocks,
+    balanced_batch,
+    block_targets,
+    supervision_plan,
+)
 
 
 def test_block_targets_maps_o_inblock_and_other_block():
@@ -89,3 +94,9 @@ def test_supervision_plan_exclusive_sessions_train_every_other_block_as_backgrou
         (1, "full"),
         (2, "neg"),
     ]
+
+
+def test_balanced_batch_draws_every_session_equally_whatever_its_size():
+    sessions = [0] * 50 + [1] * 5 + [2] * 1  # very uneven memory
+    drawn = [sessions[i] for step in range(30) for i in balanced_batch(sessions, 4, step)]
+    assert {s: drawn.count(s) for s in (0, 1, 2)} == {0: 40, 1: 40, 2: 40}

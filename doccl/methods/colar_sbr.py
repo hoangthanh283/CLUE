@@ -24,6 +24,7 @@ where each session's data is the full population so every block sees true negati
 from __future__ import annotations
 
 import logging
+import random
 
 import torch
 import torch.nn as nn
@@ -96,6 +97,18 @@ def block_scores(
     return torch.stack(es, -1), torch.stack(tags, -1)
 
 
+def balanced_batch(sessions: list[int], batch_size: int, step: int) -> list[int]:
+    """Store indices for one refit batch: the sessions take turns, so every session is drawn
+    equally often however many samples each one stored."""
+    by: dict[int, list[int]] = {}
+    for i, s in enumerate(sessions):
+        by.setdefault(s, []).append(i)
+    order = sorted(by)
+    return [
+        random.choice(by[order[(step * batch_size + j) % len(order)]]) for j in range(batch_size)
+    ]
+
+
 def aggregate_blocks(
     block_logits: list[torch.Tensor],
     block_idx: list[torch.Tensor],
@@ -145,6 +158,12 @@ class CoLaRSBR(CoLaR):
         # never shows a block a negative and its background logit stays untrained. Off by
         # default -> every document run is unchanged.
         self.exclusive_sessions = bool(config.get("sbr_exclusive_sessions", False))
+        # AGENT IMPL (2026-11-18): balanced readout refit. After a session is stored, the head
+        # and the background logits are retrained for sbr_refit_steps steps on the memory alone,
+        # every session drawn equally often, with the encoder untouched (the role classifier
+        # alignment plays in SLCA, here on stored samples). 0 = off -> prior runs unchanged.
+        self.refit_steps = int(config.get("sbr_refit_steps", 0))
+        self.refit_lr = float(config.get("sbr_refit_lr", 1e-3))
         self.blocks: list[torch.Tensor] = []
         self.block_domains: list[str] = []
         self.sessions: list[tuple[set[int], str]] = []  # (annotated head ids, schema domain)
@@ -197,6 +216,37 @@ class CoLaRSBR(CoLaR):
         super()._capture_task(train_loader)
         for d in self.store[n_before:]:
             d["session"] = torch.tensor(self._cur_session)
+
+    def _after_task_impl(self, task: TaskInfo, train_loader: DataLoader) -> None:
+        super()._after_task_impl(task, train_loader)
+        if self.refit_steps > 0 and len(self.blocks) > 1 and self.store:
+            self._refit_readout()
+
+    def _refit_readout(self) -> None:
+        """Retrain only the head and the background logits on a session-balanced memory."""
+        params = [*self.model.model.classifier.parameters(), *self.model.sbr_o.parameters()]
+        opt = torch.optim.AdamW(params, lr=self.refit_lr, weight_decay=0.0)
+        sessions = [int(d["session"]) for d in self.store]
+        was_training = self.model.training
+        self.model.eval()  # no dropout: the encoder only provides features here
+        try:
+            for step in range(self.refit_steps):
+                docs = [
+                    self.store[i] for i in balanced_batch(sessions, self.replay_batch_size, step)
+                ]
+                self.model.zero_grad(set_to_none=True)
+                with self._amp_autocast():
+                    loss = self._replay_forward(self._stack_replay(docs)).loss
+                self._amp_backward_step(loss, opt, params, self.config.get("max_grad_norm", 1.0))
+        finally:
+            self.model.zero_grad(set_to_none=True)
+            if was_training:
+                self.model.train()
+        log.info(
+            "colar_sbr: readout refit, %d balanced steps, last loss %.4f",
+            self.refit_steps,
+            float(loss),
+        )
 
     def _stack_replay(self, docs):
         replay = super()._stack_replay(docs)
