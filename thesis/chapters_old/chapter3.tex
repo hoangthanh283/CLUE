@@ -1,0 +1,850 @@
+% =====================================================================
+\chapter{Methodology}
+\label{ch:methodology}
+% =====================================================================
+
+This chapter presents the methods that answer the two research questions of
+\S\ref{sec:intro-problem}. For RQ1 it builds a \emph{per-component forgetting diagnostic} for
+tri-modal document encoders (\S\ref{sec:method-diagnostic}). For RQ2 it derives, from that
+diagnosis, where a remedy may attach (\S\ref{sec:method-remedy}), designs LexSlot, a
+lexically-gated slot memory at the diagnosed site (\S\ref{sec:method-lexslot}), and joins
+LexSlot's gate to a compressed per-document latent memory as a replay router, a hypothesis
+the results retire (\S\ref{sec:method-routed}). The ordering is deliberate: the diagnosis comes first and
+constrains every remedy that follows.
+
+\section{Problem Formulation}
+\label{sec:method-formulation}
+
+We study continual \gls{kie} as token-level sequence labelling. It is useful to
+separate three layers of ``input/output'' that are easily conflated: at the
+\emph{user} level the input is a document scan and the output is extracted
+information; at the \emph{machine-learning} level the input is a stream of
+datasets $(\mathcal{D}_1,\mathcal{D}_2,\dots)$ and the output is the trained
+parameters; at the \emph{technical} level, the one we formalise, the input is a
+document tuple and the output is a label sequence. (All symbols introduced here
+are collected in the List of Notations.)
+
+A document is a triple $D = (W, B, I)$ where $W = (w_1,\dots,w_N)$ is a sequence of
+$N$ \gls{ocr} tokens, $B = (b_1,\dots,b_N)$ with $b_i \in [0,1000]^4$ are
+normalised bounding boxes, and $I \in \mathbb{R}^{3\times224\times224}$ is the page
+image. The model $f_\theta$ produces \gls{bio} labels $Y = (y_1,\dots,y_N)$ with
+$y_i \in \mathcal{L}_{\text{task}}$, trained by token-level cross-entropy $\ell$
+with ignored positions masked out. Performance is measured by entity-level F1 with
+\gls{bio}-aware span matching.
+
+In the continual setting the model sees a sequence of tasks $\mathcal{T}_1, \dots,
+\mathcal{T}_T$, each with its own data and (in \gls{cil}) its own growing label
+space. Let $\theta$ denote the encoder parameters and $\theta^{(t)}$ the parameters
+after training task $t$; the learner may access only $\mathcal{D}_t$ and (if any) a
+memory $M$ at task $t$. The continual objective minimises the summed risk over all
+tasks,
+\[
+  \theta_T = \arg\min_{\theta}\ \sum_{t=1}^{T}
+    \mathbb{E}_{(x,y)\sim\mathcal{D}_t}\big[\ell(f_\theta(x), y)\big]
+  \quad \text{s.t.}\quad |M| \le M_{\max},\ \ \lVert\Delta\theta\rVert \le P,
+\]
+under a bounded memory $M$ (at most $M_{\max}$ exemplars) and a parameter budget
+$P$ (both relevant because the document setting favours memory-light,
+privacy-preserving methods). The object of
+study is how performance on earlier tasks degrades as later tasks are learned,
+and, uniquely here, how that degradation is distributed across the
+\emph{components} of $\theta$.
+
+The stream follows one of three regimes. In \gls{cil} the label space grows,
+$\mathcal{L}_1 \subset \mathcal{L}_2 \subset \cdots$, and the head is expanded at each
+session; in \gls{dil} the label space is fixed and only the document distribution shifts, so
+forgetting is pure representation drift; the mixed regime combines both. The memory $M$ never
+holds the full past data: in this thesis it holds either a small set of exemplars or, for
+latent replay, the layer-$k$ activations of past documents, stored in compressed form, so no
+raw page is retained. The two research questions then read, in this notation: \textbf{RQ1}
+asks how the loss on $\mathcal{T}_{<t}$ after training on $\mathcal{T}_t$ is distributed over
+the components of $\theta$ defined below; \textbf{RQ2} asks what $M$ must contain at the
+diagnosed component for the loss on $\mathcal{T}_{<t}$ to stay near its joint-training value,
+and how the entries of $M$ should be chosen for replay given the current input $x$.
+
+\subsection{Defining a Component}
+\label{sec:method-components}
+
+We partition the encoder parameters into groups that are \emph{genuinely
+separable} in the backbone. A caveat governs this partition and is central to the
+honesty of the analysis: LayoutLMv3 is a \emph{single-stream} encoder. Only the
+\emph{input} embeddings are modality-specific; from the first encoder layer
+onward, text and visual patch tokens are concatenated and share the \emph{same}
+query/key/value projections. There is therefore no identifiable
+``text-attention'' versus ``visual-attention'' versus ``cross-modal fusion''
+\emph{parameter} group: those projections are one shared set. We do not pretend
+otherwise. We group instead by what the architecture actually separates:
+
+\begin{itemize}
+  \item \textbf{Text word embeddings}: the token embedding table
+        (\texttt{text\_word\_embed}).
+  \item \textbf{Layout embeddings}: the 2D position embeddings encoding
+        bounding-box geometry (\texttt{layout\_2d\_pos\_embed}).
+  \item \textbf{Visual patch embedding}: the image-patch projection
+        (\texttt{image\_patch\_embed}).
+  \item \textbf{Shared self-attention}: the (single-stream) query/key/value
+        projections (\texttt{attn\_qkv}) and the attention output projection
+        (\texttt{attn\_out}), reported separately rather than folded into the
+        feed-forward block.
+  \item \textbf{Feed-forward and normalisation}: the position-wise
+        feed-forward blocks (\texttt{ffn}) and layer norms (\texttt{layernorm}).
+  \item \textbf{Task head}: the token-classification layer
+        (\texttt{classifier}), tracked separately as it is expanded for new
+        labels.
+\end{itemize}
+
+These groups are exhaustive and every one is populated; a residual catch-all is
+verified empty for the stock backbone. The modalities' \emph{behavioural}
+contributions are recovered separately, by the input-masking conditions of
+\S\ref{sec:method-diag-ablation}, and forgetting is additionally localised by
+\emph{depth} (input / early / mid / late encoder layers / head), the axis along
+which a single-stream encoder is most naturally heterogeneous. For CKA tracking we
+probe six depth-matched points (embeddings, patch embedding, early/mid/late
+encoder layers, and the classifier) so the gradient can be compared across
+backbones, including the unimodal BERT baseline.
+
+\section{A Per-Component Forgetting Diagnostic}
+\label{sec:method-diagnostic}
+
+\subsection{Motivation}
+\label{sec:method-diag-motivation}
+
+If forgetting concentrates in a particular component, a continual-learning method
+should spend its stability budget there; if it is uniform, uniform methods are
+justified. Either way the answer is informative. To obtain it we need (i) a way to
+isolate each modality's contribution without confounds, and (ii) metrics that
+attribute forgetting to components.
+
+\subsection{Controlled Modality Ablation}
+\label{sec:method-diag-ablation}
+
+We use two complementary controls. First, to isolate the modalities
+\emph{behaviourally} without confounding architecture, we hold the architecture
+fixed and mask the input streams of a \emph{single} LayoutLMv3, defining four
+apples-to-apples conditions C1--C4 (Table~\ref{tab:diagnostic-conditions}): text
+only (C1), image+layout (C2), text+layout (C3), and the full tri-modal input (C4).
+Because only the inputs differ, any difference in forgetting is attributable to the
+modalities in play rather than to the network. Critically, the text-only condition
+(C1) keeps the real text tokens and zeroes \emph{only} the image and layout
+streams: it is a genuine text-only LayoutLMv3, not a null input.
+
+Second, because a same-architecture mask cannot tell us whether a multimodal
+encoder forgets \emph{differently} from a unimodal one, we add an \emph{external}
+unimodal baseline Cb: a true BERT-base text encoder, tokenised with its own
+WordPiece vocabulary on the same documents and run through the same instrument
+(per-token CKA, per-group importance, displacement, forgetting metrics). The
+within-architecture conditions answer ``which stream/depth forgets''; the Cb
+contrast answers ``is this multimodal-specific?''.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[The diagnostic conditions]{The diagnostic conditions. C1--C4 are the
+  \emph{same} LayoutLMv3 architecture under different input-stream masks (only the
+  active inputs differ); Cb is an external true-unimodal baseline. C1 keeps real
+  text (image and layout zeroed); it is not a null-input condition.}
+  \label{tab:diagnostic-conditions}
+  \begin{tabular}{cll}
+    \toprule
+    \textbf{ID} & \textbf{Model / active inputs} & \textbf{Purpose} \\
+    \midrule
+    Cb & BERT-base, text only          & external true-unimodal contrast \\
+    C1 & LayoutLMv3, text only         & real text-only (image + layout zeroed) \\
+    C2 & LayoutLMv3, image + layout    & isolate visual+layout-only forgetting \\
+    C3 & LayoutLMv3, text + layout     & isolate text+layout-only forgetting \\
+    C4 & LayoutLMv3, full tri-modal    & main subject of analysis \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Figure~\ref{fig:diagnostic-conditions} depicts the LayoutLMv3 conditions as the same
+network with different input pathways switched on or off.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{diagnostic_conditions.pdf}
+  \caption[The diagnostic conditions as active and zeroed pathways]{The LayoutLMv3
+  conditions C1--C4 realised on a single fixed architecture. Each panel shows the
+  same LayoutLMv3 with a different subset of input pathways active (text, image,
+  layout) and the remainder zeroed at the input: real text only (C1), image and
+  layout (C2), text and layout (C3), and the full tri-modal input (C4). The external
+  unimodal baseline Cb (BERT-base) is a separate model, not a mask. Because only the
+  inputs differ across C1--C4, any difference in forgetting is attributable to the
+  modalities in play rather than to the network.}
+  \label{fig:diagnostic-conditions}
+\end{figure}
+
+\subsection{Forgetting Decomposition Metrics}
+\label{sec:method-diag-metrics}
+
+We measure forgetting with three complementary instruments, following the
+multiple-instrument principle motivated in \S\ref{sec:bg-superficial-essential}.
+
+\paragraph{Representational drift (per-token linear CKA).} For each tracked layer
+we compute the linear CKA~\citep{kornblith2019similarity} between activations of
+the model after task $t-1$ and after task $t$ on a fixed probe set. Given two
+centred activation matrices $X \in \mathbb{R}^{n\times p}$ and $Y \in
+\mathbb{R}^{n\times q}$,
+\[
+  \mathrm{CKA}(X,Y) = \frac{\lVert Y^\top X \rVert_F^2}
+  {\lVert X^\top X \rVert_F \, \lVert Y^\top Y \rVert_F}.
+\]
+A drop of CKA below $1$ at a layer marks it as a drift hotspot. Two design choices
+matter for validity. First, token classification lives in the \emph{per-token}
+representation, so we compute CKA over \emph{individual valid tokens} (the
+classifier-relevant first-subword positions), not over a document-mean vector that
+would average $\sim$500 token vectors per page and could read ``no drift'' while
+the token geometry has reorganised. Second, the probe collects up to $n=2000$ distinct
+tokens (well above the hidden width $p=768$), so the estimate is not in the
+high-variance $n<p$ regime; activations are captured \emph{under the condition's
+modality mask} so each condition is probed on the inputs it was trained on.
+
+\paragraph{Where forgetting lives: importance vs.\ displacement.} We separate two
+distinct quantities that are easily conflated. The empirical Fisher
+\emph{importance} of a group $g$ on a task's own data,
+\[
+  F_g = \frac{1}{|\mathcal{D}|}\sum_{(x,y)\in\mathcal{D}}
+        \sum_{\phi\in g}\Big(\frac{\partial \log p_\theta(y\mid x)}{\partial \phi}\Big)^2 ,
+\]
+measures how \emph{sensitive} the loss is to $g$ \emph{for that task}. It is
+\emph{not} a forgetting signal: the classifier head carries the largest such
+gradients for \emph{any} token classifier (BERT included) by the geometry of the
+cross-entropy output layer, regardless of whether those parameters were
+\emph{moved}. To localise \emph{forgetting} we use the old-task-Fisher-weighted
+\emph{displacement} between the checkpoint before and after a task,
+\[
+  D_g = \sum_{\phi\in g} F^{(t-1)}_\phi\,
+        \big(\theta^{(t)}_\phi - \theta^{(t-1)}_\phi\big)^2 ,
+\]
+which is large precisely where parameters that mattered for the \emph{previous}
+task ($F^{(t-1)}$) have been overwritten. We report $D_g$ per component group and
+per depth bucket (input/early/mid/late/head) as the primary forgetting localiser,
+with Fisher \emph{importance} reported alongside but never labelled forgetting.
+Fisher is computed under each condition's modality mask.
+
+\paragraph{Forgetting matrix.} We record the standard accuracy matrix
+$R[i,j]$, the entity-F1 on task $j$ after training task $i$, from which we derive
+average accuracy, backward transfer, and average forgetting
+(\S\ref{sec:eval-metrics}). Its structure is annotated in
+Figure~\ref{fig:forgetting-matrix}: the diagonal holds just-learned accuracy, the
+lower triangle holds retained accuracy on earlier tasks (the source of backward
+transfer and forgetting), and the upper triangle, unused here as tasks arrive
+sequentially, would hold zero-shot forward transfer. This is the conventional,
+component-agnostic view that the per-component metrics refine.
+
+\begin{figure}[!htbp]
+  \centering
+  \makebox[\textwidth][c]{%
+    \includegraphics[width=1.18\textwidth,height=0.66\textheight,keepaspectratio]{forgetting_matrix_schematic.pdf}}
+  \caption[Annotated structure of the forgetting matrix]{Schematic structure of the
+  accuracy matrix $R[i,j]$ (entity-F1 on task $j$ after training task $i$); symbolic
+  labels only, with no measured values. The diagonal $R[i,i]$ records just-learned
+  accuracy; the lower triangle $R[i,j]$ for $j<i$ records retained accuracy on
+  earlier tasks, from which average accuracy, backward transfer, and average
+  forgetting are derived; the upper triangle is unevaluated under sequential
+  arrival.}
+  \label{fig:forgetting-matrix}
+\end{figure}
+
+\subsection{Diagnostic Protocol}
+\label{sec:method-diag-protocol}
+
+For each condition C1--C4 and each seed we train naively and sequentially on
+FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE with no continual-learning
+strategy, expanding the classifier head at each task. At every task boundary we
+capture per-layer CKA, per-group Fisher, and the forgetting matrix.
+Algorithm~\ref{alg:forgetting-decomposition} summarises the procedure and
+Figure~\ref{fig:diagnostic-pipeline} shows it as a data-flow diagram.
+
+\begin{algorithm}[t]
+  \caption{Per-component forgetting decomposition}
+  \label{alg:forgetting-decomposition}
+  \begin{algorithmic}[1]
+    \Require condition $c \in \{C1,C2,C3,C4\}$, task sequence $\mathcal{T}_{1:T}$,
+             probe set $\mathcal{P}$, layer set $\mathcal{G}_{\text{CKA}}$,
+             parameter groups $\mathcal{G}_{\text{F}}$
+    \State initialise $\theta^{(0)}$ from the pre-trained backbone
+    \For{$t = 1$ \textbf{to} $T$}
+      \State expand classifier head to $\mathcal{L}_{\mathcal{T}_t}$
+      \State $A_{t-1} \gets \textsc{Activations}(\theta^{(t-1)}, \mathcal{P})$
+      \State $\theta^{(t)} \gets \textsc{FineTune}(\theta^{(t-1)}, \mathcal{T}_t)$
+        \Comment{naive, modality mask $c$}
+      \State $A_{t} \gets \textsc{Activations}(\theta^{(t)}, \mathcal{P})$
+      \ForAll{$\ell \in \mathcal{G}_{\text{CKA}}$}
+        \State $\mathrm{CKA}_{t,\ell} \gets \textsc{LinearCKA}(A_{t-1}[\ell], A_t[\ell])$
+      \EndFor
+      \ForAll{$g \in \mathcal{G}_{\text{F}}$}
+        \State $F_{t,g} \gets \textsc{Fisher}(\theta^{(t)}, g, \mathcal{T}_t)$
+      \EndFor
+      \ForAll{$j \le t$}
+        \State $R[t,j] \gets \textsc{EvalF1}(\theta^{(t)}, \mathcal{T}_j)$
+      \EndFor
+    \EndFor
+    \State \Return $\{\mathrm{CKA}_{t,\ell}\}, \{F_{t,g}\}, R$
+  \end{algorithmic}
+\end{algorithm}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{diagnostic_pipeline.pdf}
+  \caption[The per-component diagnostic pipeline]{Data flow of the per-component
+  diagnostic. The model is fine-tuned sequentially on
+  FUNSD\,$\rightarrow$\,CORD\,$\rightarrow$\,SROIE under a fixed modality mask, and
+  at each task boundary three instruments are captured: per-layer linear CKA between
+  the pre- and post-task checkpoints on a fixed probe set, per-group empirical
+  Fisher importance, and a row of the accuracy matrix $R[i,j]$ over all seen tasks.
+  The procedure is repeated for every condition C1--C4 and every seed.}
+  \label{fig:diagnostic-pipeline}
+\end{figure}
+
+\subsection{Hypotheses and Decision Rule}
+\label{sec:method-diag-hypotheses}
+
+We test a null hypothesis $H_0$ that forgetting is uniform across the network
+against $H_1$ that it concentrates along depth (in particular at the classifier
+head and late encoder layers). The test uses the per-group displacement $D_g$ and
+per-depth displacement of \S\ref{sec:method-diag-metrics}, aggregated \emph{per
+seed first} (the per-seed statistic is the mean over that seed's boundaries) so the
+unit of analysis is the seed. For the dominant (largest mean) bucket we compare its
+seed-level displacements against the pooled remaining buckets with a one-sided
+Mann--Whitney U test, rejecting $H_0$ for a bucket when $p_g < 0.05/(K-1)$ for $K$
+buckets.
+
+\paragraph{Statistical power (a hard constraint on the design).} A rank test on
+small samples has a \emph{minimum achievable} two-sided $p$-value of
+$2/\binom{n_1+n_2}{n_2}$ even under perfect separation. With three seeds per group
+this floor is $2/\binom{6}{3}=0.10$, far above any Bonferroni threshold: such a
+test \emph{cannot} reject $H_0$ regardless of the data, so a ``failure to reject''
+would be an artefact of sample size, not evidence. We therefore run \emph{at least
+five seeds} per condition (and pool the alternate task order), which lowers the
+floor for the cross-condition contrast to $2/\binom{10}{5}=0.0079$, below the
+corrected threshold. Every reported non-rejection is accompanied by its power
+floor, and any comparison whose floor exceeds $\alpha$ is labelled
+\emph{inconclusive by construction} rather than evidence for $H_0$.
+
+\paragraph{Location, not just magnitude.} Asking whether a multimodal encoder
+forgets \emph{differently} is a question about the \emph{distribution} of
+forgetting across components, which a scalar test on total backward-transfer
+magnitude cannot answer. We therefore add a distribution-targeting test: for each
+condition we form the per-depth displacement \emph{profile} (an $L_1$-normalised
+vector over buckets) and compare the profile of C4 against each unimodal reference
+(C1 and the external Cb) with a permutation test on the cosine distance between
+mean profiles. This directly tests ``do they forget in a different \emph{place}?''.
+
+The diagnostic outcome maps to the remedy through the measurable branches of
+Table~\ref{tab:subhypotheses} and Figure~\ref{fig:selection-tree}. We deliberately
+restrict the decision to signals the instrument can actually produce: because
+LayoutLMv3 is single-stream, ``fusion-dominant'' or ``visual-attention-dominant''
+branches are \emph{not realisable} and are excluded; the admissible outcomes are a
+head/late-layer concentration, a uniform-across-depth pattern, or no concentration.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Diagnostic outcomes and the remedy each selects]{Measurable diagnostic
+  outcomes and the remedy each selects. Only outcomes the single-stream instrument
+  can realise are admitted; the decision is a function of the pilot
+  (\S\ref{sec:method-selection}).}
+  \label{tab:subhypotheses}
+  \begin{tabularx}{\textwidth}{l L l}
+    \toprule
+    \textbf{Pattern} & \textbf{Signature} & \textbf{Triggers} \\
+    \midrule
+    $H_a$ head/late-dominant & Displacement concentrates at the head and late layers & LexSlot: isolated slots at head/late (\S\ref{sec:method-lexslot}) \\
+    $H_b$ uniform-across-depth & Displacement broadly even across depth buckets & Uniform consolidation \\
+    $H_0$ no concentration & No bucket separates after correction (with adequate power) & Characterisation-only (\S\ref{sec:method-fallback}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The mapping from diagnostic outcome to remedy is made explicit in
+Figure~\ref{fig:selection-tree}: the decision is a function of the pilot, so the
+mechanism is not committed to in advance, and the no-concentration branch leads to
+the characterisation-only fallback rather than to a method.
+
+\begin{figure}[!htbp]
+  \centering
+  \begin{tikzpicture}[
+      font=\small,
+      box/.style={draw, rounded corners, align=center, inner sep=4pt, minimum height=8mm},
+      diag/.style={box, fill=gray!12},
+      rem/.style={box, fill=blue!8},
+      fall/.style={box, fill=gray!5},
+      edge/.style={-{Latex[length=2mm]}, thick},
+      lbl/.style={midway, fill=white, inner sep=1pt, font=\scriptsize}]
+    \node[diag] (root) {Per-component diagnosis\\(Fisher-weighted displacement by depth)};
+    \node[rem]  (ha) [below left=12mm and 6mm of root]  {\textbf{LexSlot}\\isolated slots at\\head/late site};
+    \node[box]  (hb) [below=14mm of root]               {uniform\\mechanism};
+    \node[fall] (h0) [below right=12mm and 6mm of root] {characterisation-\\only fallback};
+    \draw[edge] (root) -- (ha) node[lbl, near end] {$H_a$: head/late-dominant};
+    \draw[edge] (root) -- (hb) node[lbl] {$H_b$: uniform};
+    \draw[edge] (root) -- (h0) node[lbl, near end] {$H_0$: no concentration};
+  \end{tikzpicture}
+  \caption[Decision tree mapping diagnostic outcomes to the remedy]{The decision
+  rule as a tree over \emph{measurable} outcomes. A head/late-layer concentration
+  ($H_a$, the outcome the diagnosis returns) selects a head/late-targeted remedy, here
+  \textbf{LexSlot}, an isolated slot memory at that site; a uniform-across-depth pattern
+  ($H_b$) would instead select a uniform mechanism; no significant concentration (at adequate
+  power, $H_0$) selects the characterisation-only fallback. Unrealisable branches
+  (fusion- or visual-attention-dominant) are excluded because a single-stream
+  encoder cannot produce those signals.}
+  \label{fig:selection-tree}
+\end{figure}
+
+\section{Mechanism-Targeted Continual Learning}
+\label{sec:method-remedy}
+
+The diagnosis localises forgetting to a specific region of the network, the classifier
+head and late encoder layers (Chapter~\ref{ch:results}), without prescribing how to protect
+it. This thesis derives one remedy from that measurement: \textbf{LexSlot}
+(\S\ref{sec:method-lexslot}), a parameter-efficient, isolated \emph{slot memory} placed at the
+diagnosed head/late site, paired in its headline configuration with a compact 200-exemplar
+replay buffer. The motivation, design-space analysis,
+and selection criterion below (\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection})
+fix \emph{where} a mechanism should attach; LexSlot is the mechanism we put there.
+
+\subsection{Why Component-Agnostic Continual Learning Is Insufficient}
+\label{sec:method-remedy-motivation}
+
+Generic continual-learning methods treat the encoder uniformly. EWC penalises all
+important parameters with a single Fisher-weighted term regardless of which
+component they belong to; LW-AFT freezes layers by a fixed heuristic. If
+forgetting concentrates in one component, both spend stability budget where it is
+not needed and may under-protect where it is. The hypothesis this thesis tests is that
+\emph{concentrating} the continual-learning mechanism (here, a learnable slot
+memory placed only where forgetting lives) on the dominant-forgetting component
+improves the stability--plasticity trade-off at negligible extra cost.
+
+\subsection{Design Space: Where a Mechanism Can Attach in a Single-Stream Encoder}
+\label{sec:method-design-space}
+
+The three continual-learning families of \S\ref{sec:bg-cl-families}, regularisation,
+replay, and distillation, each leave one design choice open for a document encoder:
+\emph{where} in the network the mechanism concentrates its effort. This is precisely
+the choice that existing methods make blindly. EWC weights every parameter by its
+Fisher importance but applies the \emph{same} quadratic form everywhere; replay
+re-exposes whole inputs without regard to which layers most need grounding;
+distillation matches the full output without asking which representations have
+drifted. The contribution of this thesis is not a new family but a principled,
+\emph{measured} answer to the ``where'' question, and the honest constraint on that
+answer is the single-stream caveat of \S\ref{sec:method-components}.
+
+That caveat rules out an entire class of otherwise-appealing designs. One might wish
+to place per-modality low-rank adapters on a ``text'', ``visual'', and ``fusion''
+bank, or to route per-modality prompt sub-pools by a layout-aware query, both natural
+ideas, and both presupposing separable text-, visual-, and fusion-attention parameter
+groups. LayoutLMv3 has none: from the first encoder layer the streams share one set of
+query/key/value projections (\S\ref{sec:method-components}). We therefore do not
+pursue modality-partitioned adapters or routers here; they are reserved for a
+genuinely two-stream backbone where the streams physically exist
+(Chapter~\ref{ch:conclusions}). What the architecture \emph{does} separate is
+\emph{depth}: input embeddings, early/mid/late encoder blocks, and the task
+head, and depth is the axis along which the diagnosis (\S\ref{sec:method-diagnostic})
+can actually localise forgetting. The remedy is therefore built on the one axis the
+instrument can measure.
+
+Within that constraint, a mechanism can attach to the diagnosed depth in different ways: by
+spending a Fisher penalty there (a depth-scaled version of regularisation), by re-exposing old
+classes at the drifting head (a targeted version of replay), or by inserting dedicated learnable
+capacity there and freezing the rest (a structural, parameter-efficient option). This thesis
+takes the last route: \textbf{LexSlot} places small, isolated slot adapters at the head and late
+layers over a frozen backbone (\S\ref{sec:method-lexslot}). The components it uses, low-rank
+adapters and a frozen backbone, are established; what is novel is that \emph{where} they attach
+is fixed by measurement, not by a hand-tuned heuristic or a uniform default, and that each task's
+slots are write-once isolated so old knowledge is structurally protected.
+
+\subsection{Testable Component Hypotheses}
+\label{sec:method-component-hypotheses}
+
+Two method-level hypotheses are pre-registered and map one-to-one to the
+component-targeting ablation in Chapter~\ref{ch:results}:
+
+\begin{itemize}
+  \item \textbf{H\textsubscript{target}.} Placing the slot memory at the diagnosed site
+        (the classifier head and late encoder layers, \texttt{slot\_depth=head\_late})
+        outperforms spreading slots uniformly across every depth (the \emph{uniform}
+        ablation) on the domain-incremental scenario.
+  \item \textbf{H\textsubscript{head}.} Head-only slot placement recovers most of the
+        gain of the full head/late configuration; adding late-layer slots provides at most
+        a small further improvement (the \emph{head-only} vs.\ \emph{head/late} ablation).
+\end{itemize}
+
+A rejected hypothesis remains informative and is reported as such.
+
+\subsection{Selection Criterion}
+\label{sec:method-selection}
+
+The remedy follows directly from the measurable diagnostic outcome
+(Table~\ref{tab:subhypotheses}): a head/late-layer concentration selects a mechanism that
+concentrates its effort there: LexSlot with head/late slot placement
+(\S\ref{sec:method-lexslot}); a uniform-across-depth pattern would instead select a
+uniform mechanism; no concentration (at adequate power) selects the characterisation-only
+fallback (\S\ref{sec:method-fallback}). Beyond alignment with the diagnosis, the method must
+be implementable within the compute budget, defensible under reviewer scrutiny, and
+parameter-efficient enough to add no fragile new infrastructure.
+
+\subsection{Pre-Registered Fallback (Not Triggered)}
+\label{sec:method-fallback}
+
+For completeness we record the contingency registered before the diagnosis was run:
+had forgetting \emph{not} concentrated ($H_0$ not rejected at adequate power), the
+diagnostic of \S\ref{sec:method-diagnostic} and the FCS-CL benchmark would have become
+the headline contributions and the remedy would have been withheld. The diagnosis did
+concentrate forgetting at the head and late layers (Chapter~\ref{ch:results}), so this
+branch was \emph{not} taken: a head/late-targeted remedy is justified, and
+\S\S\ref{sec:method-lexslot}--\ref{sec:method-routed} build the one this thesis proposes. We state the fallback
+explicitly because pre-registering it, rather than choosing the form after seeing which
+design won, is what licenses the claim that the remedy's \emph{target} was
+\emph{derived from} the measurement; and because the diagnostic's value stands
+independently of the remedy's margin regardless.
+
+\section{Lexical-Slot Head-Memory Continual Learning (LexSlot)}
+\label{sec:method-lexslot}
+
+\paragraph{Role in the proposed method.} The thesis proposes one method, compressed latent
+replay with live labels (CoLaR-R), with three parts: \emph{where} it acts (the diagnosed
+head/late site), \emph{what} it stores (compressed per-document latents, CoLaR), and
+\emph{which} labels the replay loss may touch (those that existed when a document was
+banked). A fourth candidate, \emph{which} stored documents to replay (a lexical gate,
+\S\ref{sec:method-routed}), is tested and retired. This section develops the
+gate. It does so inside LexSlot, a slot memory at the diagnosed site that was designed and
+evaluated first; LexSlot's results (Chapter~\ref{ch:results}) are the evidence that the
+lexical signature is a usable, drift-immune routing signal at the head. Its slot memory is
+then replaced by CoLaR's latent memory, and its signature is kept as the gate.
+
+The diagnosis fixes \emph{where} a remedy should act, the classifier head and late encoder
+layers (\S\S\ref{sec:method-remedy-motivation}--\ref{sec:method-selection}), and LexSlot is the
+mechanism this thesis puts there. The guiding question is whether the diagnosed site can be
+protected by a \emph{parameter-efficient structured memory that stores no past inputs at all},
+rather than by a consolidation budget that keeps a frozen teacher in memory and rehearses stored
+inputs. LexSlot answers it with an \emph{isolated, write-once slot memory}: small additive slot
+adapters placed at the head and late layers over a partially-frozen backbone (lower encoder
+frozen, head and late layers trainable), where each task writes its own slots and a drift-immune
+lexical signature gates both updates and activations so earlier tasks are protected
+structurally: the slot mechanism itself needs no rehearsal buffer and no consolidation
+penalty to tune (Figure~\ref{fig:lexslot-arch}); its headline configuration adds a compact
+200-exemplar buffer (Chapter~\ref{ch:results}). The lexical signature that gates the slots is
+the part of LexSlot that carries over to replay (\S\ref{sec:method-routed}).
+
+\subsection{Slot Memories at the Diagnosed Site}
+\label{sec:method-lexslot-slots}
+
+LexSlot freezes the lower encoder and inserts small additive \emph{slot} modules exactly
+where the diagnosis places forgetting, leaving the late blocks and the classifier head
+trainable. Two kinds of slot are used. \textbf{Head logit-slots} attach to the
+classifier: a slot bank of $n_{\text{head}}$ learnable value vectors produces a per-token logit
+shift $\Delta\ell = \big(f V^\top\big)P$ from the per-token features $f\in\mathbb{R}^{d}$ entering
+the head (value matrix $V\in\mathbb{R}^{n_{\text{head}}\times d}$, so $fV^\top\in\mathbb{R}^{n_{\text{head}}}$
+are the slot activations; projection $P\in\mathbb{R}^{n_{\text{head}}\times|\mathcal{L}|}$ maps them
+to a shift over the $|\mathcal{L}|$ label logits), added to the head's output and zero-initialised
+through $P$. \textbf{Late-layer
+representation-slots} attach to each encoder block in the diagnosed \emph{late} third: a
+rank-$r$ adapter adds $\Delta h = (h\,D)\,U$ to the block's hidden state ($D\in\mathbb{R}^{d\times
+r}$ down, $U\in\mathbb{R}^{r\times d}$ up). All slot up-projections are \emph{zero-initialised}
+(LoRA-style), so an untrained slot is an exact no-op and adding slots never perturbs the
+network until they are trained. Placement is governed by a \texttt{slot\_depth} control
+(\emph{head\_only}, \emph{head\_late}, \emph{uniform}); the canonical setting is
+\emph{head\_late} (head $+$ late third), matching the diagnosed site, and \emph{uniform}
+(slots on every layer) is the targeting ablation. Crucially the freeze boundary coincides
+with the slot boundary: the layers that carry slots are exactly the layers that stay
+trainable, so stable pretrained features flow into the slots without drifting while the
+slot-bearing site remains plastic.
+
+\begin{figure}[!htbp]
+  \centering
+  \begin{tikzpicture}[
+      font=\small, node distance=3.5mm,
+      blk/.style={draw, rounded corners, minimum width=34mm, minimum height=7mm, align=center},
+      frozen/.style={blk, fill=gray!15},
+      train/.style={blk, fill=blue!8},
+      slot/.style={draw, rounded corners, fill=pink!40, minimum width=18mm, minimum height=6mm, align=center, font=\scriptsize},
+      gate/.style={draw, rounded corners, fill=yellow!25, minimum width=26mm, minimum height=8mm, align=center, font=\scriptsize},
+      lbl/.style={font=\scriptsize, align=left},
+      flow/.style={-{Latex[length=2mm]}, thick},
+      tap/.style={-{Latex[length=1.6mm]}, pink!70!black, thick},
+      gfl/.style={-{Latex[length=1.6mm]}, yellow!55!black, thick}]
+    % backbone stack (bottom to top): frozen lower 2/3, trainable late + head
+    \node[frozen] (emb)  {input embeddings\\(text $+$ layout $+$ vision)};
+    \node[frozen, above=of emb] (early) {early/mid encoder blocks};
+    \node[train, above=of early] (late) {\textbf{late} encoder blocks};
+    \node[train, above=of late] (head) {classifier \textbf{head}};
+    \node[above=of head] (out) {per-token labels};
+    \draw[flow] (emb) -- (early); \draw[flow] (early) -- (late);
+    \draw[flow] (late) -- (head); \draw[flow] (head) -- (out);
+    % freeze boundary: dashed line between early and late (the slot boundary)
+    \draw[dashed, gray!70] ([xshift=-19mm,yshift=1mm]late.south west) -- ([xshift=19mm,yshift=1mm]late.south west);
+    \node[lbl, gray!70, anchor=west, xshift=2mm, yshift=1mm] at ([xshift=19mm,yshift=1mm]late.south west)
+      {freeze boundary};
+    % inline frozen/trainable tags (left, compact)
+    \node[lbl, anchor=east] at ([xshift=-2mm]early.west) {\textbf{frozen} (grey)};
+    \node[lbl, anchor=east] at ([xshift=-2mm]late.west) {\textbf{trainable} (white)};
+    % slot modules as additive residual taps at head + late
+    \node[slot, right=10mm of late] (rslot) {repr-slots\\$+\Delta h{=}(hD)U$};
+    \node[slot, right=10mm of head] (hslot) {logit-slots\\$+\Delta\ell{=}(fV^{\!\top})P$};
+    \draw[tap] (rslot) -- (late);
+    \draw[tap] (hslot) -- (head);
+    % inference lexical gate (forward-time routing; train + eval consistent)
+    \node[gate, right=10mm of hslot.north east, anchor=west, yshift=-2mm] (gt)
+      {lexical gate\\$g_s{=}\cos(\mathrm{sig}(x),\mathrm{sig}_{t(s)})$};
+    \draw[gfl] (gt.west) -- (hslot.east);
+    \draw[gfl] (gt.west) -- (rslot.east);
+  \end{tikzpicture}
+  \caption[LexSlot architecture]{LexSlot places small additive slot adapters at the
+  diagnosed forgetting site over a \emph{partially-frozen} backbone. The lower $2/3$
+  encoder (grey) is frozen so stable pretrained features flow into the slots without
+  drifting; the late blocks and the classifier head (white) stay trainable and carry the
+  slots, the trainable set is exactly the slot-bearing set, and the dashed line marks the
+  freeze boundary. \textbf{Logit-slots} add a per-token bias $\Delta\ell$ at the head;
+  \textbf{repr-slots} add a low-rank shift $\Delta h$ in the late blocks. Up-projections
+  are zero-initialised, so an untrained slot is an exact no-op. The \emph{inference lexical
+  gate} (yellow) scales each slot's activation at forward time by the cosine between the
+  document's signature and the slot's owner-task signature, routing the right memory to the
+  right document at prediction time (active in both training and inference;
+  \S\ref{sec:method-lexslot-gate}).}
+  \label{fig:lexslot-arch}
+\end{figure}
+
+\subsection{Per-Task Isolation: Write-Once Slots}
+\label{sec:method-lexslot-isolation}
+
+Each task \emph{owns} a fixed, disjoint budget of $n_{\text{slots}}/T$ slots, claimed from the
+unclaimed pool when the task begins ($T$ the expected number of tasks). In the canonical
+configuration each task updates its own slots fully and co-trains a lexically similar prior
+task's slots in proportion to their signature similarity: a per-slot gradient mask scales every
+slot's update by that similarity, so a dissimilar new task can never meaningfully overwrite the
+parameters a previous task wrote. Because the lower encoder is frozen and low-similarity slots
+are masked, earlier tasks are \emph{structurally} protected: there is no consolidation penalty
+to tune and no replay buffer to store. Protection is reinforced at \emph{forward} time by the
+inference lexical gate (\S\ref{sec:method-lexslot-gate}), which routes each document to the
+slots of its signature-matching task. This is the sense in which LexSlot is
+\emph{write-once}: knowledge for a task is written into its own slots once and, gated by a
+drift-immune signature, never disturbed (Figure~\ref{fig:lexslot-isolation}).
+
+\begin{figure}[!htbp]
+  \centering
+  % ── Panel (a): train-time gradient isolation ──
+  \begin{tikzpicture}[
+      font=\small,
+      own/.style={draw, minimum width=9mm, minimum height=7mm, font=\scriptsize, align=center},
+      t0/.style={own, fill=blue!18}, t1/.style={own, fill=orange!25}, t2/.style={own, fill=green!18},
+      free/.style={own, fill=gray!8},
+      lbl/.style={font=\scriptsize},
+      pan/.style={font=\small\bfseries},
+      upd/.style={-{Latex[length=1.6mm]}, thick}]
+    \node[pan] at (2.1,1.6) {(a) Train-time gradient isolation};
+    \node[lbl] at (-1.6,0) {Slot bank:};
+    \foreach \i in {0,1} {\node[t0] (a\i) at ({\i*0.95},0) {$0$};}
+    \foreach \i in {0,1} {\node[t1] (b\i) at ({2.1+\i*0.95},0) {$1$};}
+    \foreach \i in {0,1} {\node[t2] (c\i) at ({4.2+\i*0.95},0) {$2$};}
+    \node[free] (free0) at (6.3,0) {$\cdot$};
+    \node[lbl, right=1mm of free0, text width=18mm] {unclaimed\\(free)};
+    \node[lbl] at (0.5,0.7)  {task 0};
+    \node[lbl] at (2.6,0.7)  {task 1};
+    \node[lbl] at (4.7,0.7)  {task 2};
+    \node[lbl, align=left] at (2.1,-1.2)
+      {\textbf{Training task 2:} grad mask $=1$ on own, $S_{2,\tau}$-graded on task $\tau$ (\emph{soft}), $0$ on \emph{off}};
+    \draw[upd, green!50!black] (2.1,-0.75) -- (c0.south);
+    \draw[upd, green!50!black] (2.1,-0.75) -- (c1.south);
+    \node[lbl] at (0.5,-0.55) {mask $= S_{20}$};
+    \node[lbl] at (2.6,-0.55) {mask $= S_{21}$};
+  \end{tikzpicture}
+
+  \vspace{2mm}
+  % ── Panel (b): inference-time lexical gate ──
+  \begin{tikzpicture}[
+      font=\small,
+      own/.style={draw, minimum width=9mm, minimum height=7mm, font=\scriptsize, align=center},
+      t0/.style={own, fill=blue!18}, t1/.style={own, fill=orange!25}, t2/.style={own, fill=green!18},
+      free/.style={own, fill=gray!8},
+      lbl/.style={font=\scriptsize},
+      pan/.style={font=\small\bfseries},
+      upd/.style={-{Latex[length=1.6mm]}, thick}]
+    \node[pan] at (2.1,1.6) {(b) Inference-time lexical gate};
+    \node[lbl] at (-1.6,0) {Slot bank:};
+    \foreach \i in {0,1} {\node[t0] (d\i) at ({\i*0.95},0) {$0$};}
+    \foreach \i in {0,1} {\node[t1] (e\i) at ({2.1+\i*0.95},0) {$1$};}
+    \foreach \i in {0,1} {\node[t2] (f\i) at ({4.2+\i*0.95},0) {$2$};}
+    \node[free] (free1) at (6.3,0) {$\cdot$};
+    \node[lbl, right=1mm of free1, text width=18mm] {unclaimed\\($g{=}1$)};
+    \node[lbl] at (0.5,0.7)  {task 0};
+    \node[lbl] at (2.6,0.7)  {task 1};
+    \node[lbl] at (4.7,0.7)  {task 2};
+    \node[lbl, align=left] at (2.1,-1.2)
+      {\textbf{Eval on task-1 doc:} gate $g_s{=}\cos(\mathrm{sig}(x),\mathrm{sig}_{t(s)})$};
+    \draw[upd, orange!80!black] (2.6,-0.75) -- (e0.south);
+    \draw[upd, orange!80!black] (2.6,-0.75) -- (e1.south);
+    \node[lbl] at (0.5,-0.55) {$g{\approx}0$};
+    \node[lbl] at (2.6,-0.55) {$g{\approx}1$};
+    \node[lbl] at (4.7,-0.55) {$g{\approx}0$};
+  \end{tikzpicture}
+
+  \vspace{1mm}
+  {\scriptsize\itshape Both mechanisms are driven by the same drift-immune lexical
+  signature $S$: the gradient mask protects \emph{parameters} at train time; the gate
+  routes \emph{activations} at forward time.}
+
+  \caption[Two consistent lexical isolation mechanisms]{LexSlot isolates tasks through
+  two mechanisms driven by the same drift-immune lexical signature. (a)~At \emph{train}
+  time a per-slot gradient mask scales each slot's update: a task trains its own slots
+  fully and, under the canonical \emph{soft} setting, co-trains a prior task $\tau$'s
+  slots in proportion to $S_{t,\tau}$ (\emph{off} zeroes them, the isolated ablation).
+  (b)~At \emph{forward} time (train and inference) a per-document lexical gate
+  $g_s=\cos(\mathrm{sig}(x),\mathrm{sig}_{t(s)})$ scales each slot's activation, so on a
+  task-$\tau$ document the task-$\tau$ slots fire strongly and foreign slots are
+  suppressed, routing the right memory to the right document, which the gradient mask
+  alone cannot do. The two are consistent: the signature that gates updates also gates
+  activations.}
+  \label{fig:lexslot-isolation}
+\end{figure}
+
+\subsection{The Lexical Gate and the Sharing Ablation}
+\label{sec:method-lexslot-gate}
+
+Isolation is one extreme of a more general gate. LexSlot computes, for each task, a sparse
+\emph{lexical signature} (a TF-IDF bag-of-tokens over the task's OCR input tokens) and the
+cosine similarity $S_{ij}$ between task signatures. This signature is purely input-derived and
+therefore \emph{drift-immune}: it does not depend on any learned, forgettable parameter. The
+signature drives \emph{two} consistent mechanisms (Figure~\ref{fig:lexslot-isolation}).
+\textbf{At train time} the \texttt{slot\_sharing} control sets the per-slot gradient mask on a
+prior task's slots when training a new one: \emph{soft} (the canonical setting) makes them
+trainable in proportion to $S_{ij}$, so lexically similar tasks co-train shared slots;
+\emph{hard} unlocks them above a similarity threshold; \emph{off} zeroes them (the isolated
+ablation). \textbf{At forward time}, in both training and inference, an \emph{inference
+lexical gate} $g_s=\cos(\mathrm{sig}(x),\mathrm{sig}_{t(s)})$ scales each slot's activation by
+the cosine between the document's signature and the slot's owner-task signature, so on a
+task-$\tau$ document the task-$\tau$ slots fire strongly and foreign slots are suppressed.
+The gradient mask protects \emph{parameters}; the gate routes \emph{activations}; both use the
+same signature, so the train-time and forward-time decisions are consistent. The motivation for
+graded sharing is that on this benchmark the lexical overlap is itself label-bearing: the
+receipt tasks SROIE and CORD share the \texttt{total}/\texttt{tax}/\texttt{cash} vocabulary
+($S\!\approx\!0.31$) while the form task FUNSD is an outlier ($S\!\approx\!0.10$), so high-$S$
+tasks might \emph{help} each other by refining a shared lexical-to-label rule, and the
+inference gate ensures a document only ever activates the slots whose owner task is
+lexically close. Whether that putative transfer outweighs the interference of letting two
+tasks write the same slots is an empirical question, and the \texttt{slot\_sharing} axis is the
+controlled ablation that answers it (Chapter~\ref{ch:results}). We present \emph{soft} with the
+inference gate as the method (it lets lexically related tasks share what is shared and isolates
+what is not); \emph{off} and \emph{hard} are reported as the ablation that justifies the choice.
+
+\subsection{Implementation Notes}
+\label{sec:method-lexslot-impl}
+
+The slot memory adds no fragile new infrastructure: the head logit-slots and the low-rank
+late-layer adapters are standard modules attached by forward hooks, the per-slot gradient mask is a
+single element-wise multiply at the backward pass, the inference lexical gate is one cosine per
+slot installed by a forward pre-hook, and the lexical signature is one sparse pass over input
+tokens. In the canonical configuration the protection of old tasks comes entirely from the
+lexical gradient mask and inference gate: no Fisher penalty, no distillation teacher, and no
+rehearsal buffer, so the method's standing cost is just the small slot parameters
+($\sim$1--2\% over the frozen lower encoder, plus the trainable late blocks and head). Slot
+counts, ranks, and the per-task budget are listed in Appendix~\ref{app:hyperparameters}.
+
+\section{Lexical Routing of the Replay Memory: Hypothesis and Test}
+\label{sec:method-routed}
+
+The diagnosis says \emph{where} old-task evidence must be re-supplied (the head and late
+layers); the negative results of Chapter~\ref{ch:results} say \emph{what form} it must
+take (whole documents, whose feature, position, and label stay bound together). Lexical
+routing was the remaining candidate decision: \emph{which} stored documents to replay for the
+document currently being learned. The results chapter retires it
+(\S\ref{sec:results-abl-which}); it is kept here as the tested hypothesis. It has two parts.
+
+\paragraph{The memory: compressed per-document latents (CoLaR).} The encoder is split at
+layer $k$; layers below $k$ are frozen after the first task. For each of up to $d$ documents per
+task, the layer-$k$ activation matrix $H \in \mathbb{R}^{n \times h}$ ($n$ positions, hidden
+size $h$) is stored as truncated SVD factors $H \approx U_r \Sigma_r V_r^\top$, together with the
+document's bounding boxes, attention mask, and labels. Because a single document is low-rank
+even though the pooled feature space is not, rank $r$ keeps the whole-document binding at a
+fraction of the raw size. During training on task $t$, each step adds a replay loss: stored
+latents are reconstructed and injected at layer $k$, run through the upper layers and the
+head, and scored against their stored labels.
+
+\paragraph{The gate: lexical routing.} Each stored document $j$ keeps a sparse bag-of-token-ids
+signature $\sigma_j$ computed from its \gls{ocr} tokens at capture time, the same input-derived,
+drift-immune signal that gates LexSlot's slots. For the current batch, with mean signature
+$\sigma(x)$, the similarity to each stored document is $s_j = \sigma(x)^\top \sigma_j$, and replay
+indices are drawn from
+\[
+  p_j \;=\; \operatorname{softmax}_j\!\big(\pm s_j / \tau\big),
+\]
+where the sign selects \emph{near} routing ($+$, replay the stored documents whose vocabulary is
+closest to the current one, where interference is most likely) or \emph{far} routing ($-$,
+replay the least similar ones, where the current task gives no support), and $\tau$ is a
+temperature. A third mode, \emph{task} routing, first averages $s_j$ within each past task,
+applies the softmax over tasks, and then samples uniformly within the chosen task. Uniform
+sampling of the store ($p_j = 1/|M|$) is the CoLaR baseline that every routing mode is compared
+against. Routing changes only which latents are replayed: the memory, its size, and the replay
+loss are identical, so any difference is attributable to the gate alone.
+
+\section{Session-Blocked Readout for Label Growth (CoLaR-SBR)}
+\label{sec:method-sbr}
+
+The memory of \S\ref{sec:method-routed} fixes \emph{what} is retained. Under class-incremental
+label growth the results chapter finds that the remaining loss is not in the memory but in the
+readout (\S\ref{sec:results-sbr}): a document from session $t$ labels every entity introduced
+after $t$ as background, a current document labels every earlier entity as background, and
+both are scored by one shared softmax whose single background logit is therefore pushed in
+opposite directions on the same surface forms. Keeping the stored labels live (CoLaR-R)
+removes one side of the contradiction and recovers a third of the gap to the oracle; the other
+side is irreducible as long as the background is shared.
+
+\paragraph{Blocks.} CoLaR-SBR un-shares the background. Each session $b$ that introduces tags
+owns a readout block $[\mathrm{O}_b, \text{tags}_b]$ with its own background logit and a
+block-local softmax. A token labelled ``O'' in session-$t$ data is \emph{truly} $\mathrm{O}_t$,
+so within its own block every session's annotation is complete and correct. A session that
+introduces no tag (every domain-incremental step, the FUNSD revisit of the mixed stream) creates
+no block, so on DIL the method reduces to CoLaR with a single block.
+
+\paragraph{Supervision rule.} For a document of session $S$ (dataset schema $d$) and a block
+$b$ with tag set $\mathcal{T}_b$ and schema $d_b$:
+\begin{itemize}
+  \item if $\mathcal{T}_b \subseteq \mathcal{T}_S$, the document trains $b$ \emph{fully}
+        (every tag of $b$ is annotated; an annotated tag of another class is a true negative);
+  \item else if $d_b \neq d$, the document trains $b$ as \emph{all-background} (no entity of
+        another schema can occur on it);
+  \item otherwise the document does not train $b$: its ``O'' labels are stale for that block.
+\end{itemize}
+Banked documents replayed from the CoLaR memory follow the same rule with their own session.
+The trunk is shared, trained by every block, and kept stable by whole-document latent replay
+exactly as in CoLaR; the second clause supplies the cross-schema negatives without which a
+block trained only on receipts claims form tokens (the failure of the first version on DIL,
+\S\ref{sec:results-sbr}).
+
+\paragraph{Task-agnostic inference.} For each block $e_b = 1 - p_b(\mathrm{O}_b)$ is the mass the
+block assigns to its own entities. The block with the largest $e_b$ claims the token with its
+best in-block tag if $e_b > \tau$ ($\tau{=}0.5$), otherwise the token is background. No task
+identifier is used at training or test time. The closest prior designs are ICE
+\citep{liu2023ice}, which trains individual per-session classifiers on a frozen language model,
+and SpanKL \citep{zheng2023spankl}, which uses per-type sigmoid span heads without replay; SBR
+is the blocked readout on a \emph{trained} trunk with whole-document replay, in a setting where
+every session's documents are the full population so each block sees true negatives.
+
+\paragraph{SBR-Recall: recalling the session's trunk state.} The bank is write-only at test
+time: the model never reads memory while labelling a new document. SBR-Recall stores, next to
+each session's latents, a low-rank LoRA delta \citep{hu2022lora} $\Delta_b$ of the upper trunk
+(layers $\ge k$; rank $64$ on the attention projections and feed-forward layers) and evaluates
+block $b$ \emph{under} $\Delta_b$, so $e_b$ is computed by the network state that learned those
+tags. The base trunk is frozen after the first session and all later plasticity lives in the
+deltas, so earlier sessions are forgetting-free by construction and a stored delta can never go
+stale. Inference costs one forward of the upper layers per distinct delta; routing is unchanged.
+This is parameter isolation in the HAT/Expert-Gate sense, made task-agnostic on documents by the
+per-session background class that every document supervises completely; it differs from
+CL-LoRA \citep{he2025cllora}, which trains per-task adapters but reads them through one shared
+softmax and inherits exactly the contradiction above.
+
+\section{Summary}
+\label{sec:method-summary}
+
+We have defined the genuinely separable components of a single-stream tri-modal
+document encoder, a controlled modality-ablation protocol with an external unimodal
+contrast, and complementary metrics (per-token CKA, per-group importance, an
+old-task-Fisher-weighted displacement (the forgetting localiser), and the
+forgetting matrix) that together localise forgetting by depth, stream, and head.
+From that measurement we derive where a remedy may attach, and two remedies that attach
+there: \textbf{LexSlot}, an isolated slot memory at the diagnosed site, gated by a
+drift-immune lexical signature and paired with a compact 200-exemplar replay buffer in its
+headline configuration; and \textbf{lexical routing of the replay memory}, which keeps
+LexSlot's signature as a gate over compressed per-document latents (CoLaR) at layer $k$, so
+the gate decides which stored documents are replayed---a component the results retire; and
+\textbf{CoLaR-SBR} (\S\ref{sec:method-sbr}), which reads the same memory through one readout
+block per session so that label growth never contradicts a shared background logit, with
+SBR-Recall adding a stored per-session trunk delta under which each block is read. The next chapter describes how this methodology is realised in
+software.

@@ -52,6 +52,23 @@ TABLES = [
 ]
 
 
+def ingest_paper(paper_dir: Path, thesis_dir: Path) -> int:
+    """One source for paper and thesis: copy every generated .tex of the paper (its first
+    line says so) to thesis/generated/paper/ and its figures to thesis/figures/paper/."""
+    gen, figs = thesis_dir / "generated" / "paper", thesis_dir / "figures" / "paper"
+    gen.mkdir(parents=True, exist_ok=True)
+    figs.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for f in sorted(paper_dir.glob("*.tex")):
+        if "generated" in f.read_text(errors="ignore").split("\n", 1)[0].lower():
+            shutil.copy2(f, gen / f.name)
+            n += 1
+    for f in sorted(paper_dir.glob("figures/*.pdf")):
+        shutil.copy2(f, figs / f.name)
+        n += 1
+    return n
+
+
 def ingest(results_dir: Path, thesis_dir: Path) -> tuple[list[str], list[str]]:
     (thesis_dir / "figures").mkdir(parents=True, exist_ok=True)
     (thesis_dir / "generated").mkdir(parents=True, exist_ok=True)
@@ -73,6 +90,8 @@ def main():
     parser.add_argument("--thesis_dir", type=Path, default=Path("thesis"))
     args = parser.parse_args()
 
+    parser_paper = Path("paper_cvpr")
+    print(f"Ingested {ingest_paper(parser_paper, args.thesis_dir)} generated paper file(s)")
     copied, missing = ingest(args.results_dir, args.thesis_dir)
     print(f"Ingested {len(copied)} artifact(s) into {args.thesis_dir}:")
     for c in copied:

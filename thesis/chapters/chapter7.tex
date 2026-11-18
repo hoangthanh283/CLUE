@@ -1,180 +1,20 @@
-% =====================================================================
+% Chapter 7 (two-cause rewrite, 2026-11). Stub: headings and sources only.
+% Old text: chapters_old/chapter7.tex (git tag thesis-pre-two-causes).
 \chapter{Conclusions and Future Work}
-\label{ch:conclusions}
-% =====================================================================
-
-\section{Limitations}
-\label{sec:concl-limitations}
-
-This study is deliberately scoped, and several limitations should be read
-alongside its findings. First, the controlled diagnosis centres on a primary
-backbone, LayoutLMv3-base, but its central claim, that forgetting concentrates at
-the head and late layers, has been confirmed on three further architectures: the
-unimodal BERT baseline and the LiLT and BROS secondary backbones all reproduce the
-same head-dominant displacement and depth gradient, and a permutation test cannot
-separate their forgetting profiles from LayoutLMv3's ($p=0.38$, $0.51$). What stays
-scoped to LayoutLMv3 is now narrower than at first writing: the full retention sweep has
-since been completed on the text-only BERT backbone (three seeds on CIL-CORD, DIL, and
-Mixed), where the replay-dominant ordering reproduces (\S\ref{sec:results-backbone}), and
-partially on LiLT (classical methods on DIL and Mixed); its extension to BROS and the
-remaining LiLT cells is a compute-bound follow-up; the cross-backbone \emph{amount} of forgetting is also left open, as the
-three-seed $|\mathrm{BWT}|$ comparison is underpowered, so the generalisation claim
-is about the \emph{location} of forgetting rather than its magnitude. A second
-architectural limit is orthogonal: because LayoutLMv3 is single-stream, the analysis
-localises forgetting by depth, input stream, and head rather than by a separable
-visual-attention or fusion component, which that architecture does not provide. A
-genuinely per-stream \emph{attention} decomposition would require a two-stream
-backbone and is left to future work.
-Second, the task sequence comprises three public datasets (FUNSD, CORD, SROIE);
-while they span forms and receipts and a wide range of label-space sizes, they are
-modest in scale and do not cover every document genre, and the unified DIL schema
-is VALUE-dominant (KEY present only in FUNSD/SROIE), which is why DIL results are
-reported with per-class F1. Third, the modalities' contribution is read
-behaviourally from the input-masking conditions (C1--C4) and against an external
-unimodal BERT baseline; the within-architecture conditions cannot, on their own,
-attribute forgetting to attention sub-blocks the single-stream encoder shares.
-Fourth, the work targets token-level key-information extraction and does not
-address entity linking, relation extraction, or generative document IE. Fifth, all
-results use the OCR transcriptions and bounding boxes supplied with the benchmark
-datasets and never re-run a recogniser; this is a deliberate choice that removes OCR
-quality as a confounder for the diagnosis, but it also means the findings are
-established under clean, dataset-provided text and layout. A deployed pipeline would
-introduce its own OCR engine, whose recognition and layout-detection errors differ
-across document genres and could interact with the per-component forgetting picture;
-quantifying that interaction is left to future work. Sixth, each task is trained to
-convergence by early stopping on a validation signal, but FUNSD and SROIE provide no
-native validation split, so for those datasets the task's evaluation set serves as both
-the stopping signal and the reporting set, a mild optimistic selection bias, bounded by
-the short patience and the same rule applied to every method, and disclosed in
-\S\ref{sec:exp-checkpointing}; a held-out split carved from training data would remove it
-and is a camera-ready refinement. Seventh, LexSlot's lexical gate is expected to be ineffective on class-incremental learning, where
-same-dataset sessions collapse the signature contrast the gate relies on, so its claims are
-deliberately confined to the domain-shift setting, which is why we frame it as promising rather
-than established. Ninth, lexical routing of the replay memory was evaluated on the
-domain-incremental scenario and LayoutLMv3 at two memory sizes and retired there, so no claim
-about it is made for other scenarios or backbones. Finally, results rest on three
-seeds; more seeds would tighten the confidence intervals around the smaller
-effects.
+\label{ch:conclusion}
 
 \section{Conclusions}
-\label{sec:concl-conclusions}
+\label{sec:c7-s1}
+% SOURCE: one paragraph per research question
+\todo{to be written}
 
-This thesis studied a stream of key-information-extraction tasks learned sequentially by a
-pre-trained tri-modal document encoder, under class-incremental, domain-incremental, and mixed
-regimes, with a bounded memory and no access to past raw documents. It asked two questions:
-\emph{where} in the encoder forgetting concentrates (RQ1), and \emph{what} a memory-bounded
-remedy must supply at that site, and \emph{which} stored evidence it should re-expose (RQ2).
-
-\paragraph{RQ1: where forgetting lives.} A per-component diagnostic (controlled modality
-masking of a single LayoutLMv3, read out by per-token CKA drift, per-group Fisher information,
-and old-task-Fisher-weighted displacement, and repeated on LiLT, BROS, and a text-only BERT)
-gives three answers. Forgetting is \emph{output-side}: under naive sequential fine-tuning an
-earlier task that scores $88$ entity-F1 collapses to $\sim$2 F1 after one further task, the head
-has over ten times the Fisher importance of any other parameter group, and CKA
-drift rises monotonically with depth (from $1.00$ at the input encoders to $0.25$ at the late
-layers and $0.16$ at the head). It is \emph{architecture-general}: every backbone, the unimodal
-one included, reproduces the site, so it is not a multimodal artefact; because LayoutLMv3 is
-single-stream we do not claim a fusion-specific effect. And it is \emph{conserved}: freezing the
-diagnosed head and late layers leaves naive-level forgetting (BWT $-76.8$) and moves the drift
-into the previously stable early and mid layers (CKA $\approx 1.0 \rightarrow 0.19$), while a fixed
-consolidation budget is usable only when concentrated on the site ($\sim$85 AA) and under-fits
-when spread uniformly ($42.6$ AA).
-
-\paragraph{RQ2: what the remedy must supply.} The benchmark ordering follows the diagnosis:
-replay $\gg$ regularisation $\gg$ distillation. Replay re-exercises old targets at the head and
-reaches the joint upper bound on domain-incremental learning (AA $\approx 88$ vs the oracle's
-$88.7$, BWT $\approx 0$); EWC curbs forgetting under a domain shift at an accuracy cost; LwF and
-the prompt/LoRA families track the naive bound. The buffer-free methods fail for one reason: the
-head's output marginal on old tasks snaps to the newest task's label marginal while the
-representation beneath it drifts, and pre-registered eval-time and marginal-level corrections
-recover nothing, because the old-class probability mass is destroyed before any correction can
-act. What replay must then preserve is \emph{whole-document consistency}: replaying intact
-documents retains $87.3$ AA, while every summary that breaks the binding of feature, position,
-and label (a rank-16 projection, per-class Gaussians, even real $k$-means centroids) collapses to
-the naive level. CoLaR, which stores each document as its own rank-$r$ SVD factors, respects that
-law and reaches $87.6$ AA with a $60$\,MB memory, $2.7\times$ smaller than raw replay, without
-retaining any raw page.
-
-\paragraph{RQ2: which evidence to re-expose.} LexSlot, an isolated slot memory at the diagnosed
-site, approaches replay-level accuracy on domain-incremental learning (AA $87.3 \pm 1.0$, BWT
-$-2.3$ versus $-2.8$/$-3.4$ for plain replay) with a compact 200-exemplar buffer; its lasting
-element is the drift-immune \gls{ocr}-vocabulary signature that gates it. Lexical routing
-of the replay memory joined that gate to CoLaR's memory: for each incoming document it replays the stored
-latents chosen by lexical similarity rather than uniformly, with the memory and loss held fixed so
-that any change is the gate's alone. Routing towards the lexically nearest stored documents
-does not pass the pre-registered one-point rule once three seeds are in (best arm $+0.5$ AA,
-two of three seeds agreeing), so the gate is retired as a component and the memory is sampled
-uniformly. What moves the class-incremental scenarios is the readout: once each session is scored on its own label set the oracle reads $92$ while every shared-softmax method stays near $20$--$30$, and giving each session its own readout block and background logit (CoLaR-SBR) reaches $88.0\pm1.9$ on CIL-CORD and $89.7$ on Mixed, at the oracle; reading each block under a stored per-session trunk delta (SBR-Recall) reaches $92.8\pm0.5$ over three seeds with exact retention.
-
-Taken together, the diagnosis decides \emph{where} a remedy attaches, the negative results decide
-\emph{what form} its memory must take, and the lexical gate decides \emph{what} it replays. The
-diagnostic protocol, the benchmark, and the tooling stand independently of the remedy, as an
-instrument for designing continual-learning methods for multimodal document encoders that the
-prior, fragmented literature lacked.
+\section{Limitations}
+\label{sec:c7-s2}
+% SOURCE: each with its way forward
+\todo{to be written}
 
 \section{Future Work}
-\label{sec:concl-future}
+\label{sec:c7-s3}
+% SOURCE: longer streams, new baselines, document LLMs
+\todo{to be written}
 
-The convergence-trained grid is now complete, and the measured result is that
-the head/late-targeted LexSlot approaches replay with a compact 200-exemplar buffer on the domain shift, forgetting
-less than the plain replay methods, competitive with but not beating the strongest replay
-variant, while the depth-targeting probe and LexSlot's placement ablation support
-H\textsubscript{target} and H\textsubscript{head}. The
-benchmark now spans five scenarios, including large-scale class-incremental learning
-(WildReceipt) and cross-lingual domain-incremental learning (XFUND); the cross-lingual
-result, near-zero forgetting under pure language shift (naive BWT only $-6.6$), further
-corroborates the output-side thesis. Beyond that, several extensions
-follow naturally; each is a future direction rather than part of the present scope.
-
-\emph{Scaling and broadening the diagnosis.} The controlled diagnosis is
-established for an encoder-only, base-scale backbone. A natural next step is to
-re-run the same per-component protocol on larger and architecturally different
-backbones: LayoutLMv3-large, the multilingual LayoutXLM, and decoder-based or
-instruction-tuned document MLLMs such as InternVL3, to test whether the
-dominant-forgetting site is a property of the LayoutLMv3-base design or a more
-general feature of tri-modal document encoders. A particularly important extension
-is to a \emph{two-stream} backbone (for example LiLT, whose text and layout streams
-are physically separate parameter blocks): there the per-stream \emph{attention}
-decomposition that a single-stream encoder cannot support becomes identifiable, so
-the modality-partitioned mechanisms set aside in \S\ref{sec:method-design-space}, component-banked
-LoRA and modality-routed prompts, could be evaluated on signals that genuinely
-exist. Decoder-based encoders are especially interesting because their generative
-objective and tokenisation differ markedly from the sequence-labelling setup used
-here.
-
-\emph{Additional continual scenarios.} The three studied scenarios cover
-class-incremental and domain-incremental shifts. Future work could add
-task-incremental learning, where a task identifier is available at inference, and
-combined class-and-domain shifts that vary the label space and the document genre
-simultaneously; both would stress the components differently and test whether a
-single mechanism-targeted remedy transfers across regimes.
-
-\emph{Cross-lingual continual document IE.} The benchmark now includes a
-cross-lingual domain-incremental scenario over XFUND
-(de\,$\rightarrow$\,es\,$\rightarrow$\,fr\,$\rightarrow$\,it\,$\rightarrow$\,zh,
-\S\ref{sec:exp-extended}) and a larger-scale class-incremental scenario over
-WildReceipt, so language shift and corpus scale are now first-class axes rather than
-gaps. The open question these enable, left for deeper analysis, is whether the
-per-component diagnosis itself shifts under language change: when script and
-vocabulary change while layout statistics stay comparatively stable, does forgetting
-move toward the text pathway, or does it remain output-side as in the English
-setting? Running the full per-component diagnostic (CKA, per-group Fisher) inside the
-cross-lingual scenario, and extending it to a wider language set, is the natural
-continuation.
-
-\emph{Richer, layout-aware remedies.} The diagnosis points to a specific component;
-a complementary direction is to enrich the remedy on the data side with a
-document-aware structural replay that rehearses not raw tokens but layout-structured
-exemplars (for example region- or block-level representations), exploiting the very
-spatial structure that distinguishes document IE from plain-text IE. Such a replay
-could be combined with the mechanism-targeted approach rather than replacing it.
-
-\emph{Joint multi-task continual IE.} Finally, learning token-level extraction
-together with relation extraction (and, eventually, entity linking) in one
-continual framework is an open and high-value direction: it would move the
-benchmark from single-task sequence labelling towards the joint document
-understanding that downstream applications ultimately require.
-
-These extensions are intentionally outside the present scope, which prioritises a
-rigorous diagnosis and a single well-justified, diagnosis-derived remedy over breadth; they
-sketch the trajectory for a fuller follow-up study.

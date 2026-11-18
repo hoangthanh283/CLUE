@@ -1,0 +1,713 @@
+% =====================================================================
+\chapter{Background Theory and Literature Review}
+\label{ch:background}
+% =====================================================================
+
+This chapter establishes the foundations on which the thesis builds. It proceeds
+from the application domain (document understanding and \gls{ie}), through the
+\gls{cl} problem and its method families, to the specific and still-nascent
+literature on \gls{cl} for \gls{ie}. It then reviews what is known about
+\emph{where} forgetting occurs in multimodal models, surveys the backbones
+relevant to continual document \gls{ie}, and closes by isolating the research gaps
+that motivate the contributions of Chapter~\ref{ch:methodology}.
+
+\section{Document Understanding and Information Extraction}
+\label{sec:bg-document-ie}
+
+\subsection{Information-Extraction Tasks}
+\label{sec:bg-ie-tasks}
+
+\Gls{ie} converts unstructured content into structured records. Its canonical
+sub-tasks are \gls{ner}, which labels spans with semantic types; \gls{re}, which
+links entity pairs; \gls{ee}, which identifies event triggers and their argument
+roles; and \gls{kie}, which populates schema fields from forms, invoices, and
+receipts. Standard benchmarks differ markedly in label-space size: \gls{ner}
+corpora range from the four types of CoNLL-2003 to the eighteen of OntoNotes,
+\gls{re} from the forty-one relations of TACRED to the ninety-six,
+cross-sentence relations of DocRED, which is itself a source of difficulty when
+such tasks are learned in sequence.
+
+In the document setting these tasks differ from their sentence-level counterparts
+in three ways that matter for \gls{cl}. First, documents are \emph{spatially
+structured}: the role of a token (a form's question versus its answer, a
+receipt's label versus its total) is often signalled by position and typography
+rather than by surrounding words. Second, documents are \emph{multimodal}: text,
+layout, and image jointly determine meaning. Third, document schemas are
+\emph{diverse and evolving}: a forms dataset and a receipts dataset share little
+vocabulary and almost no label space, so a system that learns them sequentially
+faces large distribution and output-space shifts. A further document-specific
+difficulty is \emph{cross-sentence context} (coreference and multi-hop
+reasoning), which sentence-level methods ignore entirely.
+
+This thesis adopts the dominant framing of \gls{kie} as token-level sequence
+labelling with the \gls{bio} tagging scheme, where each \gls{ocr} token is
+assigned a Begin/Inside/Outside tag for its entity type and the model is trained
+with token-level cross-entropy. This framing aligns with the mainstream \gls{vrdu}
+literature, yields a unified output format across datasets, and is directly
+compatible with the encoder-only backbones used here.
+
+\subsection{Multimodal Document Encoders}
+\label{sec:bg-multimodal-encoders}
+
+A multimodal document encoder ingests three streams (\gls{ocr} tokens, their
+bounding boxes (2D position embeddings), and image patches) and fuses them
+through transformer self-attention. LayoutLMv3 is the most widely adopted
+encoder-only backbone in the \gls{vrdu}
+literature~\citep{huang2022layoutlmv3}: it dispenses with a convolutional vision
+front-end, instead consuming raw $16\times16$ image patches in the manner of a
+\gls{vit}, and is pre-trained with three objectives: \gls{mlm} over text,
+\gls{mim} over image patches, and \gls{wpa}, an explicit cross-modal supervision
+that aligns words with the patches that contain them. It reports strong
+single-task results (entity-level F1 of roughly $92$ on FUNSD and $97$ on CORD).
+LiLT~\citep{wang2022lilt} decouples layout from text so that a language-agnostic
+layout transformer can be paired with different text encoders;
+BROS~\citep{hong2022bros} emphasises relative spatial encoding and an
+area-masking objective; and DocFormer~\citep{appalaraju2021docformer}, an earlier
+design, couples modalities through a shared spatial attention. A key structural
+feature shared by these models, and central to this thesis, is that they contain
+\emph{distinguishable components} (a text stream, a visual stream, layout
+embeddings, and cross-modal fusion) whose individual behaviour under \gls{cl} has
+not previously been measured. Figure~\ref{fig:layoutlmv3-components} annotates
+these four components on the LayoutLMv3 architecture.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth,height=0.55\textheight,keepaspectratio]{layoutlmv3_components.pdf}
+  \caption[LayoutLMv3 tri-modal architecture and its four components]{The
+  LayoutLMv3 tri-modal architecture. OCR tokens, 2D bounding-box position
+  embeddings, and image patches are projected into a shared sequence and fused by
+  transformer self-attention. The four components diagnosed in this thesis (text
+  stream, visual stream, layout embeddings, and cross-modal fusion) are
+  highlighted; their individual susceptibility to forgetting is the object of
+  Chapter~\ref{ch:methodology}.}
+  \label{fig:layoutlmv3-components}
+\end{figure}
+
+\section{Catastrophic Forgetting and Continual Learning}
+\label{sec:bg-cl}
+
+\subsection{The Stability--Plasticity Dilemma}
+\label{sec:bg-stability-plasticity}
+
+\Gls{cl} trains a model on a sequence of tasks while retaining performance on
+those seen earlier. Its central obstacle is \gls{cf}~\citep{mccloskey1989catastrophic}:
+gradient-based optimisation on a new task overwrites the weight configuration that
+encoded earlier tasks, and prior performance collapses. \Gls{cf} is governed by
+the \emph{stability--plasticity dilemma}: a model must remain \emph{plastic}
+enough to acquire new tasks yet \emph{stable} enough to retain old ones. Pure
+fine-tuning maximises plasticity and suffers \gls{cf}; freezing the network
+maximises stability but prevents learning. Every \gls{cl} method is, in effect, a
+particular operating point on this trade-off
+(Figure~\ref{fig:stability-plasticity}), and a recurring theme of this thesis
+is that the right operating point may differ \emph{per component} of a multimodal
+encoder. Forgetting also has more than one face: it can be \emph{superficial}
+(the output format drifts while knowledge is intact) or \emph{essential} (the
+underlying knowledge is lost), a distinction made precise in
+\S\ref{sec:bg-superficial-essential}.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{stability_plasticity.pdf}
+  \caption[The stability--plasticity trade-off]{Illustrative schematic of the
+  stability--plasticity trade-off (no measured data). Pure fine-tuning sits at the
+  high-plasticity, low-stability extreme and suffers catastrophic forgetting;
+  freezing the backbone sits at the opposite extreme and cannot acquire new tasks.
+  Continual-learning methods occupy intermediate operating points. A central
+  hypothesis of this thesis is that the optimal operating point is not a single
+  global setting but may differ across the components of a multimodal encoder.}
+  \label{fig:stability-plasticity}
+\end{figure}
+
+\subsection{Continual-Learning Scenarios}
+\label{sec:bg-cl-scenarios}
+
+The literature distinguishes three canonical scenarios by what changes across the
+task sequence and what is known at test time. In \gls{til} the task identity is
+available at inference, so a separate head can be selected: the easiest case. In
+\gls{dil} the input distribution shifts but the label space is shared and task
+identity is unknown. In \gls{cil} new classes are introduced over time and the
+model must discriminate among all classes seen so far without task identity;
+\gls{cil} is generally the hardest because the output space itself grows.
+
+For document \gls{kie} cast as \gls{bio} sequence labelling, \gls{cil} additionally
+provokes the \emph{semantic shift of the ``O'' tag}, a form of structural
+interference that has no counterpart in image-classification \gls{cl}. Let
+$\mathcal{L}_t$ denote the foreground (entity) label set introduced up to session
+$t$. Under class incremental learning these sets grow monotonically,
+\begin{equation}
+  \mathcal{L}_1 \subset \mathcal{L}_2 \subset \dots \subset \mathcal{L}_T ,
+  \qquad
+  O_t = \mathcal{Y} \setminus \mathcal{L}_t ,
+  \label{eq:otag-shift}
+\end{equation}
+where $\mathcal{Y}$ is the universe of foreground types and $O_t$ is the background
+(``O'') class, defined as the \emph{shrinking complement} of $\mathcal{L}_t$. Because
+$\mathcal{L}_s \subset \mathcal{L}_t$ for $s<t$, a token labelled O in session $s$
+may carry a genuine entity label in a later session $t>s$; the same surface token is
+therefore a negative example in one session and a positive example in another.
+Consequently the conditional $p(y=O \mid x)$ is \emph{non-stationary} across the
+session sequence, and the supervision the model received for old spans becomes
+inconsistent with what later sessions demand. This moving decision boundary, rather
+than mere distribution shift, is the structural difficulty unique to continual
+sequence labelling, and it is amplified in documents where a single entity type
+recurs across many tokens. This thesis studies \gls{cil},
+\gls{dil}, and a mixed scenario, and explicitly leaves \gls{til} to future work.
+
+\subsection{The Five Method Families}
+\label{sec:bg-cl-families}
+
+Following the widely-used taxonomy of~\citet{wang2024survey}, \gls{cl} methods
+fall into five families summarised in Table~\ref{tab:cl-families} and
+Figure~\ref{fig:cl-taxonomy}.
+
+\paragraph{Regularisation-based.} These penalise changes to parameters deemed
+important for past tasks. \Gls{ewc}~\citep{kirkpatrick2017ewc} weights a quadratic
+penalty by the diagonal of the \gls{fim}, optimising
+\begin{equation}
+  \mathcal{L} \;=\; \mathcal{L}_{\text{new}}
+  \;+\; \lambda \sum_i F_i \,\bigl(\theta_i - \theta_i^{\ast}\bigr)^2 ,
+  \label{eq:ewc}
+\end{equation}
+where $\theta^{\ast}$ are the parameters at the end of the previous task, $F_i$ is
+the Fisher diagonal estimating the importance of parameter $\theta_i$, and $\lambda$
+sets the stability--plasticity balance. \Gls{si}~\citep{zenke2017si} accumulates
+importance online from the path integral of parameter change, and
+\gls{mas}~\citep{aljundi2018mas} estimates importance from output sensitivity
+without labels; both can be read as alternative estimators of the same per-parameter
+weights $F_i$. A known failure mode, noted by later analyses rather than the original
+work, is that this importance accumulates across many tasks until the penalty
+effectively freezes the network~\citep{schwarz2018progresscompress}. A related
+\emph{function}-space regulariser, \gls{lwf}~\citep{li2017lwf}, instead distils the
+previous model's outputs on new-task inputs, so we group it here as output-side
+regularisation rather than as a parameter-importance penalty.
+\emph{Implication for document \gls{ie}.} The per-parameter importance $F_i$
+aggregates naturally into the named component groups of a tri-modal encoder,
+making regularisation a natural vehicle for a \emph{component-targeted} remedy;
+and because token-level supervision provides a label at every position of a
+512-token page, the Fisher estimate is populated from few documents.
+
+\paragraph{Replay-based.} These store and re-present a memory of past exemplars.
+\Gls{gem}~\citep{lopezpaz2017gem} projects the new-task gradient $g$ so that it does
+not increase the loss on the stored memory, enforcing the inequality constraint
+\begin{equation}
+  \langle g,\, g_{\text{ref}} \rangle \;\ge\; 0 ,
+  \label{eq:gem-constraint}
+\end{equation}
+where $g_{\text{ref}}$ is the gradient evaluated on the memory of a past task; an
+update that violates this is projected onto the nearest gradient that satisfies it.
+\Gls{gem} also introduced the now-standard backward- and forward-transfer metrics.
+\gls{agem}~\citep{chaudhry2019agem} relaxes this to a single averaged constraint;
+\gls{er}~\citep{rolnick2019er} simply interleaves replayed examples; DER++
+\citep{buzzega2020der} adds a logit-distillation term; and
+iCaRL~\citep{rebuffi2017icarl} combines herding-based exemplar selection with
+nearest-mean classification. Replay is empirically among the strongest
+families~\citep{masana2022class, wang2024survey} but stores raw data.
+\emph{Implication for document \gls{ie}.} Documents carry \gls{pii} under
+\gls{gdpr}, so buffering raw scans is problematic in deployment; and with
+document training sets of only 149--800 pages
+(Chapter~\ref{ch:experimental-setup}), a fixed-size buffer can cover a large
+fraction of, or even exceed, a past task, blurring the line between replay and
+joint training (\S\ref{sec:eval-fewshot}).
+
+\paragraph{Optimisation-based.} These constrain the geometry of updates.
+\Gls{gpm}~\citep{saha2021gpm} computes, by \gls{svd} of layer activations, the
+subspace spanned by past tasks and projects new gradients orthogonally to it.
+Concretely, after each task \gls{gpm} collects the layer-$\ell$ activations into
+a matrix $R^{\ell}$, computes its \gls{svd} $R^{\ell} = U \Sigma V^{\top}$, and
+retains the leading left-singular vectors whose retained energy exceeds a
+threshold $\epsilon_{\text{th}}$; these accumulate across tasks into a
+column-orthonormal basis $M_{\ell}$. Subsequent updates are projected onto the
+orthogonal complement of this basis,
+\begin{equation}
+  \nabla_{W_\ell}\mathcal{L} \;\leftarrow\; \nabla_{W_\ell}\mathcal{L}
+  - \bigl(\nabla_{W_\ell}\mathcal{L}\bigr) M_\ell M_\ell^{\top} ,
+  \label{eq:gpm-projection}
+\end{equation}
+where $M_\ell$ spans the core gradient space of past tasks at layer $\ell$ and
+$\epsilon_{\text{th}}$ controls how much of the past subspace is
+protected~\citep{saha2021gpm}. \Gls{ogd}~\citep{farajtabar2020ogd} follows the
+same orthogonality principle directly in gradient space. Such methods are stable
+but the protected subspace grows until its capacity is exhausted. A complementary
+recent line targets the \emph{geometry} of the minimum rather than the gradient
+subspace: C-Flat~\citep{bian2024cflat} adds a sharpness-aware, zeroth-order
+flatness penalty on top of any \gls{cl} method, steering optimisation toward flat
+minima that empirically forget less, a plug-and-play optimiser-side remedy we adopt
+as the family's 2025 representative.
+\emph{Implication for document \gls{ie}.} Projection methods are inherently
+per-layer, implicit evidence that forgetting is not uniform across depth, but
+the \gls{svd} of 512-token tri-modal activations is costly, and the protected
+subspace is defined per layer, not per modality; measuring which component needs
+protection is the cheaper, more interpretable first step.
+
+\paragraph{Representation-based.} The dominant 2024--2026 paradigm freezes a large
+\gls{ptm} backbone and learns small task-specific modules.
+RanPAC~\citep{mcdonnell2023ranpac} lifts frozen features by a random projection
+and fits class prototypes in closed form; SAFE~\citep{zhou2024safe} couples a slow
+and a fast learner. Prompt-based methods learn a pool of soft prompts and a set of
+learnable keys $\{k_i\}$, retrieving for an input $x$ the subset of prompts whose
+keys are most similar to a query $q(x)$ extracted from the frozen backbone,
+\begin{equation}
+  K_x \;=\; \operatorname*{top\text{-}K}_{i}\; \mathrm{sim}\bigl(q(x),\, k_i\bigr) ,
+  \label{eq:prompt-retrieval}
+\end{equation}
+so that knowledge is partitioned across the pool rather than overwritten
+\citep{wang2022l2p}. DualPrompt~\citep{wang2022dualprompt} separates task-shared
+from task-specific prompts; CODA-Prompt~\citep{smith2023coda} replaces this hard
+$\operatorname{top\text{-}K}$ selection with a differentiable decomposed attention
+weighting; and S-Prompt~\citep{wang2022sprompt} learns independent prompts per
+domain for \gls{dil}. \Gls{lora}-based methods instead inject a trainable low-rank
+update into frozen weight matrices,
+\begin{equation}
+  W \;=\; W_0 + BA ,
+  \qquad B \in \mathbb{R}^{d\times r},\; A \in \mathbb{R}^{r\times d},\;
+  r \ll d ,
+  \label{eq:lora}
+\end{equation}
+so each task adds only $2dr$ parameters while $W_0$ stays fixed
+\citep{hu2022lora}. \gls{olora}~\citep{wang2023olora} keeps the per-task
+subspaces $BA$ orthogonal across tasks, and InfLoRA~\citep{liang2024inflora}
+constrains new adapters to be orthogonal to the input subspaces of old tasks. Its
+2025 successor CL-LoRA~\citep{he2025cllora} pairs a \emph{task-shared} adapter that
+retains cross-task knowledge by distillation with an orthogonality-constrained
+\emph{task-specific} adapter, the dual-adapter design we adopt as the family's
+current member.
+That such adapters can be allocated \emph{per layer} rather than uniformly is
+exploited by D-MoLE~\citep{ge2025dmole}, which dynamically routes a budget of
+low-rank experts to the layers where adaptation is most needed: direct evidence
+that the capacity a continual learner should spend is not distributed uniformly
+across a network.
+\emph{Implication for document \gls{ie}.} Frozen-\gls{ptm} methods presume that
+the pre-trained features suffice for all future tasks, plausible for
+ImageNet-scale \glspl{vit}, less obviously so for document encoders whose layout
+and visual streams are pre-trained on a narrower corpus; and D-MoLE's per-layer
+budget routing supports measuring first and allocating second.
+
+\paragraph{Architecture-based.} These allocate separate parameters per task by
+masking (PackNet~\citep{mallya2018packnet}) or growth (Dynamically Expandable
+Networks~\citep{yoon2018den}), trading parameter count for isolation.
+\emph{Implication for document \gls{ie}.} Per-task parameter growth is
+unattractive for deployed \gls{kie} parsers that accrue dozens of schema
+versions, and hard parameter isolation sits awkwardly with the shared,
+non-stationary O tag of Equation~\eqref{eq:otag-shift}.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[The five continual-learning method families]{The five continual-learning
+  method families~\citep{wang2024survey}, their core mechanism, and representative
+  methods. Methods in bold are used as baselines in this thesis
+  (Chapter~\ref{ch:experimental-setup}).}
+  \label{tab:cl-families}
+  \begin{tabularx}{\textwidth}{l l L}
+    \toprule
+    \textbf{Family} & \textbf{Core mechanism} & \textbf{Representative methods} \\
+    \midrule
+    Regularisation & Parameter-importance penalties (EWC/SI/MAS) or function/output distillation (LwF) & \textbf{EWC}, \textbf{LwF}, SI, MAS \\
+    Replay         & Store and replay past exemplars & GEM, \textbf{ER}, \textbf{DER++}, A-GEM, iCaRL \\
+    Optimisation   & Gradient projection/constraints & GPM, OGD, A-GEM \\
+    Representation & Frozen PTM + prompts/adapters & \textbf{L2P}, \textbf{DualPrompt}, \textbf{CODA-Prompt}, \textbf{O-LoRA}, RanPAC, SAFE \\
+    Architecture   & Separate parameters per task & PackNet, Progressive Nets \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{cl_taxonomy.pdf}
+  \caption[Taxonomy of continual-learning method families]{Taxonomy of the five
+  continual-learning method families and their representative methods. Methods
+  set in bold are used as baselines in this thesis. The families are not mutually
+  exclusive: several state-of-the-art methods combine mechanisms (for example,
+  DER++ pairs replay with logit distillation, and O-LoRA adds an orthogonality
+  constraint to low-rank adaptation), but the grouping organises the design space
+  by the primary mechanism each method uses to resist forgetting.}
+  \label{fig:cl-taxonomy}
+\end{figure}
+
+\subsection{Measuring Forgetting Inside the Network}
+\label{sec:bg-measurement}
+
+Three measurement tools recur across the families above and underpin the
+diagnostic of Chapter~\ref{ch:methodology}. The first is the \gls{fim}, defined
+together with its diagonal as
+\begin{equation}
+\begin{aligned}
+  F(\theta) &= \mathbb{E}_{x\sim\mathcal{D}}\,
+  \mathbb{E}_{y\sim p_\theta(\cdot\mid x)}\!\left[
+    \nabla_\theta \log p_\theta(y\mid x)\,
+    \nabla_\theta \log p_\theta(y\mid x)^{\top}\right], \\
+  F_i &= \mathbb{E}\!\left[\bigl(\partial \log p_\theta(y\mid x)
+  \,/\, \partial \theta_i\bigr)^{2}\right],
+\end{aligned}
+\label{eq:fim-diag}
+\end{equation}
+where $\mathcal{D}$ is the task data distribution and $p_\theta$ the model's
+predictive distribution. The \gls{fim} measures the local curvature of the
+Kullback--Leibler divergence around $\theta$, how sharply the predictive
+distribution changes when $\theta_i$ moves, and its diagonal estimates
+per-parameter importance, the basis of \gls{ewc}
+(Equation~\eqref{eq:ewc})~\citep{kirkpatrick2017ewc, amari1998natural}. The
+\emph{empirical} Fisher replaces the samples $y \sim p_\theta$ with the
+ground-truth labels; this is the variant used by practical \gls{ewc}
+implementations and by the per-group estimator of Chapter~\ref{ch:methodology}
+and Appendix~\ref{app:metric-definitions}. \Gls{svd} of layer
+activations identifies the task-critical subspace and underlies \gls{gpm}
+(Equation~\eqref{eq:gpm-projection}). Finally,
+\gls{cka}~\citep{kornblith2019similarity} measures the similarity of two
+\emph{representations} rather than two weight vectors, enabling detection of
+representational drift that weight-space measures miss
+(\S\ref{sec:bg-cka}). Together they make it possible to ask not merely \emph{how
+much} a model forgets but \emph{where}.
+
+\section{Continual Learning for Information Extraction}
+\label{sec:bg-cl-ie}
+
+\Gls{cl} for \gls{ie} is real but nascent, fragmented, and almost entirely
+sentence-level. Table~\ref{tab:cl-ie-landscape} maps the landscape.
+
+The dominance of the sentence-level setting is not incidental: it reflects what the
+surveyed \gls{cner} and \gls{cre} methods were designed for, and it is precisely why
+they transfer poorly to documents. Five structural reasons explain the failure when
+the unit of extraction grows from a sentence to a page:
+\begin{enumerate}
+  \item \textbf{Cross-sentence entity and coreference resolution.} A field and its
+        value, or repeated mentions of the same entity, routinely span several lines
+        or text blocks; a sentence-windowed model cannot link them.
+  \item \textbf{Multi-hop relations.} Document-level relations (the DocRED setting)
+        chain evidence across sentences, so the reasoning a continual learner must
+        preserve is not captured by any single local context.
+  \item \textbf{Layout and visual context loss.} Sentence-level methods discard
+        bounding boxes and image patches, yet in forms and receipts the role of a
+        token is signalled by position and typography rather than neighbouring words.
+  \item \textbf{O-tag shift amplified across many mentions.} The non-stationary
+        background class of Equation~\eqref{eq:otag-shift}
+        (\S\ref{sec:bg-cl-scenarios}) is far more damaging at
+        document scale, where one entity type recurs across dozens of tokens, so a
+        single session's inconsistent supervision corrupts many spans at once.
+  \item \textbf{Unknown task identity at document scale.} A real document stream
+        does not announce which session or schema a page belongs to, ruling out the
+        \gls{til} assumption on which several sentence-level methods (for example,
+        the prompt-pool \gls{cre} approaches) implicitly rely.
+\end{enumerate}
+These five reasons motivate the document-level, multimodal framing adopted
+throughout this thesis.
+
+\subsection{Continual NER and the O-Label Problem}
+\label{sec:bg-continual-ner}
+
+The \emph{semantic shift of the ``O'' tag} is the defining difficulty of
+\gls{cner}: spans labelled as entities in a future session appear as background in
+the current session's data, creating conflicting supervision. Methods address it
+in two ways. \emph{Distillation/pseudo-labelling} approaches keep the schema
+discriminative: CPFD~\citep{zhang2023cpfd} combines pooled-feature distillation
+with confidence-based pseudo-labelling of old entities, reporting roughly a
+$6.3$-point Micro-F1 gain over prior \gls{cner} methods; CFNER~\citep{zheng2022cfner}
+distils the causal effect of the Other class; ICE~\citep{liu2023ice} freezes the
+feature extractor and adds an individual classifier per session; and
+SpanKL~\citep{zheng2023spankl} reformulates the task at the span level with
+multi-label \gls{kd} to sidestep the token-level O conflict. \emph{Generative}
+approaches eliminate the O label by construction: GenCNER~\citep{gencner}
+reformulates \gls{ner} as entity-span generation, so old types are simply not
+emitted. A separate,
+practically-motivated line, ProtoNER~\citep{kumar2024protoner}, studies few-shot
+class-incremental \gls{ner} with prototypical networks \emph{directly on
+LayoutLM-family encoders}, underscoring how costly adding entity types to deployed
+\gls{kie} models is. The shared limitation of all of these is that they operate at
+sentence level and ignore layout and vision.
+
+\subsection{Continual Relation Extraction}
+\label{sec:bg-continual-re}
+
+The dominant \gls{cre} paradigm combines episodic memory with relation
+prototypes: a small set of exemplars is stored per relation, and a prototype
+distilled from those exemplars anchors the relation's representation as new
+relations arrive. EMAR~\citep{han2020emar} instantiates this with a two-step
+procedure of memory activation and reconsolidation, replaying stored exemplars
+and then re-anchoring each old relation to its prototype so that its decision
+region survives the new-task update. RP-CRE~\citep{cui2021rpcre} refines sample
+embeddings with prototype attention, conditioning each replayed example's
+representation on the stored relation prototypes so that replayed relations
+resist drift. CRL~\citep{zhao2022crl} adds contrastive replay with distillation,
+a consistency objective that keeps old relation embeddings stable while the
+encoder adapts. A second, rehearsal-free line uses prompts:
+WAVE-CRE~\citep{le2025wavecre} tackles \gls{cre} with task-specific prompt pools
+in a \gls{moe} style under a \gls{til} setting on TACRED and FewRel, achieving
+rehearsal-free state-of-the-art. The few-shot regime is addressed by shaping
+discriminative representations within clusters of similar
+relations~\citep{le2025fscre}. All of these methods operate on sentence-level
+benchmarks (TACRED, FewRel) with gold entity pairs; none confronts
+cross-sentence evidence (the DocRED setting) or layout signals, the second
+structural failure mode identified in the introduction to this section
+(\S\ref{sec:bg-cl-ie}).
+
+\subsection{Document-Level Continual Learning}
+\label{sec:bg-doc-cl}
+
+Document-level \gls{cl} is the least explored and most relevant to this thesis.
+GDI-Bench, together with the LW-AFT method~\citep{gdibench}, provides the first
+document-intelligence
+\gls{cl} benchmark ($2.3$k images, nineteen tasks, with visual and reasoning
+difficulty decoupled) and shows that supervised fine-tuning of a large \gls{mllm}
+(InternVL3-8B) causes measurable forgetting, worst on the harder reasoning tasks;
+LW-AFT mitigates this by \emph{heuristically} freezing layers. Separately,
+continual table detection~\citep{minouei2022table} demonstrates \gls{cl} for a
+document detection task with simple \gls{er}, recovering roughly $15\%$ of the
+lost performance. The crucial
+gap is that these works either use a heuristic remedy or address detection rather
+than \gls{ie}, and none diagnoses \emph{which component} of the backbone
+forgets: the question this thesis answers.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[The continual-learning-for-IE landscape]{The continual-learning-for-IE
+  landscape and the gap each line leaves open. Sentence-level, text-only, and
+  heuristic approaches dominate; no prior work provides a per-component forgetting
+  diagnosis for a tri-modal document encoder.}
+  \label{tab:cl-ie-landscape}
+  \begin{tabularx}{\textwidth}{l L L}
+    \toprule
+    \textbf{Setting} & \textbf{Method} & \textbf{Gap remaining} \\
+    \midrule
+    Continual NER  & CPFD / CFNER / ICE / SpanKL & Class-IL only; text-only; sentence-level \\
+    Continual NER  & GenCNER            & Small backbone; no document/layout context \\
+    Continual NER  & ProtoNER           & Few-shot only; no full-grid CL evaluation \\
+    Continual RE   & EMAR / RP-CRE / CRL & Replay + prototypes; sentence-level; closed-world \\
+    Continual RE   & WAVE-CRE           & Task-IL; closed-world; sentence-level \\
+    Continual RE   & Similar-cluster FS-CRE & Few-shot; no document-level relations \\
+    Document CL    & GDI-Bench + LW-AFT & Heuristic freezing; no IE tasks; no diagnosis \\
+    Document CL    & CL Table Detection & Detection only; simple replay; no IE \\
+    Multimodal CL  & CL-CrossVQA / CLiMB / CLOVE & VQA/VL only; no document IE \\
+    Multimodal CL  & SEFE               & Instruction tuning; not IE; no per-component view \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Multimodal and Component-Level Forgetting}
+\label{sec:bg-multimodal-forgetting}
+
+\subsection{Where Forgetting Lives: Text vs.\ Visual vs.\ Fusion}
+\label{sec:bg-where-forgetting}
+
+Evidence from multimodal \gls{cl} benchmarks suggests that forgetting is not
+uniform, but the picture is incomplete. CL-CrossVQA~\citep{zhang2025clcrossvqa}
+finds across five \gls{vqa} datasets that dual-stream models forget less than
+single-stream ones and that deeper layers forget more, hinting that architectural
+structure shapes forgetting. CLiMB~\citep{srinivasan2022climb} observes that
+\gls{cl} can prevent forgetting on vision-and-language tasks yet fails to enable
+positive transfer. CLOVE~\citep{lei2023clove} and the \gls{kbqa} method
+DAHR~\citep{zhao2024dahr} converge on a sharper point: continual \emph{reasoning}
+is not continual \emph{classification}: preserving a reasoning mechanism requires
+different machinery than preserving a feature representation, which matters for the
+structured outputs of \gls{ee} and multi-hop \gls{re}. These findings concern
+\gls{vqa}/\gls{kbqa} rather than document \gls{ie} and, crucially, do not localise
+forgetting to specific \emph{components} of a single encoder. The methodological
+inspiration for this thesis comes instead from analyses of forgetting in unimodal
+networks: the ``anatomy of catastrophic forgetting''~\citep{ramasesh2021anatomy}
+shows that forgetting concentrates in higher layers and can be probed
+layer-by-layer, and the study of forgetting in \glspl{mllm}~\citep{zhai2023investigating}
+adapts such diagnostics to the multimodal setting.
+
+Their methodologies are worth stating precisely, since this thesis builds on
+both. Ramasesh et al.~\citep{ramasesh2021anatomy} study sequential pairs of split
+image-classification tasks and localise forgetting by resetting or freezing
+individual blocks of layers to their pre-second-task values and measuring how
+much first-task performance returns, complemented by layer-wise probes; they
+conclude that forgetting is driven predominantly by the deeper layers nearest
+the output, while early representations remain largely reusable. Zhai et
+al.~\citep{zhai2023investigating} evaluate multimodal large language models as
+image classifiers, fine-tuning on one dataset while tracking accuracy on
+held-out datasets, and show that the unimodal forgetting picture carries over to
+multimodal models and worsens with longer fine-tuning. This thesis borrows the
+checkpoint-pair, per-layer probing stance of both works but extends the unit of
+analysis from depth to modality-specific components (text, layout, visual, and
+cross-modal fusion) within a single tri-modal encoder, a question neither work
+addresses.
+
+\subsection{Superficial versus Essential Forgetting}
+\label{sec:bg-superficial-essential}
+
+SEFE~\citep{chen2024sefe} formalises a distinction between \emph{superficial}
+forgetting (loss of the expected answer format) and \emph{essential}
+forgetting (loss of the underlying knowledge), and addresses them with answer-style
+diversification and a regularised \gls{lora}. The distinction matters for
+\gls{kie}, where a model may retain the ability to localise entities yet lose the
+correct label mapping (or vice versa). It motivates measuring forgetting with
+multiple, complementary instruments rather than a single accuracy number, a
+principle adopted in Chapter~\ref{ch:methodology}.
+
+\subsection{Measuring Representational Drift: CKA}
+\label{sec:bg-cka}
+
+To attribute forgetting to components, this thesis measures how internal
+representations change between checkpoints. \Gls{cka}~\citep{kornblith2019similarity}
+compares two activation matrices $X$ and $Y$ (samples $\times$ neurons) and returns a
+similarity $\mathrm{CKA}(X,Y) \in [0,1]$, the precise estimator of which is given in
+Chapter~\ref{ch:methodology}. Two invariance properties make it the appropriate
+instrument here. First, linear \gls{cka} is invariant to \emph{orthogonal
+transformations} of the representation: for any orthogonal $Q$, $\mathrm{CKA}(XQ,Y)=
+\mathrm{CKA}(X,Y)$, so a mere rotation or permutation of neurons, which leaves the
+function computed by a layer unchanged, is correctly scored as no drift. Second, it
+is invariant to \emph{isotropic scaling}, $\mathrm{CKA}(\alpha X,Y)=\mathrm{CKA}(X,Y)$
+for $\alpha\neq 0$, so a uniform change in activation magnitude is likewise ignored.
+These are exactly the symmetries a representation-level measure should respect, and
+they are why \gls{cka} is preferable to a naive cosine similarity between weight
+vectors: cosine similarity in weight space is \emph{not} invariant to neuron
+permutation or rotation, so two functionally identical networks can register as
+maximally dissimilar simply because their hidden units are reordered. A \gls{cka} of
+one indicates unchanged representations; a low value indicates genuine
+reorganisation. Per-layer \gls{cka} between the model before and after a task thus
+localises the ``forgetting hotspots,'' and is one of the two primary diagnostic
+metrics used here, alongside per-group \gls{fim}.
+
+\section{Backbones for Continual Document IE}
+\label{sec:bg-backbones}
+
+The choice of backbone determines both the cost and the interpretability of the
+diagnosis.
+
+\paragraph{Selection criteria.} Five criteria govern the choice.
+\textbf{(i) Component separability:} distinguishable text, layout, visual, and
+fusion pathways, the prerequisite for a per-component diagnosis.
+\textbf{(ii) Document-specific pre-training:} layout and image objectives rather
+than text-only pre-training. \textbf{(iii) Scale within compute budget:} the
+full grid of methods $\times$ scenarios $\times$ seeds must run on a single GPU.
+\textbf{(iv) Ecosystem maturity:} a maintained reference implementation and
+processor, so the diagnosis runs on the canonical model rather than a
+re-implementation. \textbf{(v) Single-task strength:} strong FUNSD/CORD F1 so
+that forgetting is measured from a competent base
+(cf.\ \S\ref{sec:bg-multimodal-encoders}).
+
+\paragraph{Justification.} LayoutLMv3-base ($\approx$\,133M parameters,
+encoder-only) satisfies all five. It exposes clearly-separable text, visual,
+layout, and fusion components (i); it is pre-trained with document-specific
+objectives (\gls{mlm}, \gls{mim}, and \gls{wpa};
+\S\ref{sec:bg-multimodal-encoders}) rather than text alone (ii); it is small
+enough to run the full grid of methods $\times$ scenarios $\times$ seeds on a
+single GPU, where multi-billion-parameter \glspl{mllm} would not be (iii); it has
+a maintained reference implementation and processor (iv); and it reports strong
+single-task F1 on FUNSD and CORD (v). The instantiation-level comparison of
+candidate backbones is given in Table~\ref{tab:backbone-comparison}
+(Chapter~\ref{ch:implementation}).
+
+\paragraph{Secondary backbones and excluded alternatives.} To test that the
+diagnosis generalises beyond a single architecture, LiLT-base and BROS-base are
+used as secondary backbones on a reduced method subset. Large \glspl{mllm} such
+as InternVL3-8B are used in document \gls{cl} benchmarks (GDI-Bench) but their
+scale and decoder-based design make a controlled per-component study expensive
+and harder to interpret; they are noted as a comparison target rather than a
+primary subject.
+
+\section{Research Gaps and Opportunities}
+\label{sec:bg-gaps}
+
+The survey above exposes four gaps the thesis addresses; each is developed in
+turn below.
+
+\subsection{Gap 1: No Per-Component Forgetting Diagnosis for Tri-Modal Encoders}
+\label{sec:bg-gap-component}
+
+Prior diagnostic work measures forgetting at the level of whole tasks or, at
+most, layers. The anatomy of catastrophic forgetting~\citep{ramasesh2021anatomy}
+localises forgetting by depth, but in unimodal image-classification networks.
+The \gls{mllm} study of~\citet{zhai2023investigating} measures forgetting at the
+whole-model level only. CL-CrossVQA~\citep{zhang2025clcrossvqa} compares
+forgetting \emph{across} architectures (dual-stream versus single-stream) rather
+than \emph{within} one encoder. D-MoLE~\citep{ge2025dmole} implicitly assumes
+non-uniform capacity needs across layers but never measures forgetting per
+component. \emph{What is missing:} an attribution of forgetting to the text,
+layout, visual, and fusion components of a single tri-modal document encoder.
+
+\subsection{Gap 2: Sentence-Level Bias of Continual Information Extraction}
+\label{sec:bg-gap-sentence}
+
+Continual \gls{ner} methods (distillation and pseudo-labelling
+approaches~\citep{zhang2023cpfd, zheng2022cfner, liu2023ice, zheng2023spankl} and
+generative reformulations~\citep{gencner}) operate on sentence-level, text-only
+corpora, as do the continual \gls{re} lines~\citep{le2025wavecre, le2025fscre}.
+ProtoNER~\citep{kumar2024protoner} reaches LayoutLM-family encoders but only in
+a few-shot regime, without a full continual evaluation. None of these confronts
+the structural failure modes that arise when the unit of extraction grows from a
+sentence to a page (\S\ref{sec:bg-cl-ie}). \emph{What is missing:} continual
+\gls{ie} methods designed for, and evaluated on, document-level multimodal
+inputs.
+
+\subsection{Gap 3: Heuristic Rather than Measurement-Driven Remedies}
+\label{sec:bg-gap-heuristic}
+
+Where remedies do exist, their targeting is heuristic. LW-AFT freezes layers by
+a heuristic schedule rather than by a measurement of where forgetting
+occurs~\citep{gdibench}. \Gls{gpm} protects per-layer subspaces but never
+attributes them to semantic components of the network~\citep{saha2021gpm}. The
+open question is whether a remedy \emph{targeted by measurement} beats uniform
+or heuristic treatment. \emph{What is missing:} a remedy whose targeting is
+derived from a per-component forgetting diagnosis rather than from a
+predetermined schedule.
+
+\subsection{Gap 4: Fragmented Evaluation for Continual Document IE}
+\label{sec:bg-gap-evaluation}
+
+Existing results are scattered across incompatible protocols. Continual \gls{ner}
+and \gls{re} use disjoint, text-only benchmarks; document \gls{cl} uses
+GDI-Bench~\citep{gdibench} or detection tasks~\citep{minouei2022table}; and the
+image-\gls{cl} prompt methods~\citep{wang2022l2p, wang2022dualprompt,
+smith2023coda} have never been compared against \gls{ie}-specific methods on
+document \gls{kie} under one protocol. \emph{What is missing:} a shared continual
+benchmark for document \gls{ie} that compares image-\gls{cl} baselines and
+\gls{ie}-specific methods on equal footing.
+
+\section{Positioning of the Current Research}
+\label{sec:bg-positioning}
+
+This thesis is a \emph{diagnostic-plus-remedy} study in the spirit
+of~\citet{ramasesh2021anatomy} and~\citet{zhai2023investigating}: it first
+characterises how forgetting distributes across the components of a tri-modal
+document encoder, then proposes one method, compressed latent replay with live labels (CoLaR-R), whose
+memory attaches at the dominant-forgetting component. The measurement contribution stands on its own; it
+is informative even if forgetting turns out to be uniform, while the remedy is
+explicitly derived from, and validated against, the measurement. The four gaps
+of \S\ref{sec:bg-gaps} map onto the contributions of this thesis as follows.
+
+\paragraph{Gap 1 $\rightarrow$ Contribution 1 (the per-component forgetting
+diagnostic).} The missing per-component diagnosis
+(\S\ref{sec:bg-gap-component}) is supplied by controlled modality ablation of a
+single backbone, read out by per-layer \gls{cka}, per-group \gls{fim}, and
+standard forgetting metrics (Chapter~\ref{ch:methodology}).
+
+\paragraph{Gap 2 $\rightarrow$ the benchmark's document-level framing.} The
+sentence-level bias (\S\ref{sec:bg-gap-sentence}) is countered by casting every
+task with tri-modal inputs and \gls{bio} \gls{kie} at page scale, with the O-tag
+shift retained rather than engineered away
+(Chapter~\ref{ch:experimental-setup}).
+
+\paragraph{Gap 3 $\rightarrow$ Contributions 2--3 (why remedies fail, and
+compressed latent replay with live labels).} The reliance on heuristic remedies
+(\S\ref{sec:bg-gap-heuristic}) is answered by a remedy whose every part is derived from
+measurement: the diagnosis fixes \emph{where} it attaches (the head/late site), the tests
+of the failing remedies fix \emph{what} its memory must keep (whole documents, stored as
+compressed per-document latents, CoLaR), and LexSlot's drift-immune lexical signature
+decides \emph{which} stored documents are replayed (Chapter~\ref{ch:methodology}).
+
+\paragraph{Gap 4 $\rightarrow$ Contribution 4 (the FCS-CL benchmark).} The
+fragmented evaluation (\S\ref{sec:bg-gap-evaluation}) is resolved by unified
+scenarios, ten baselines spanning the method families plus image-\gls{cl} prompt
+methods, a shared interface, three seeds, and statistical testing
+(Chapters~\ref{ch:implementation} and~\ref{ch:experimental-setup}).
+
+The work is
+deliberately scoped to encoder-only document \gls{kie} on three public datasets,
+with larger backbones, additional scenarios, and multilingual extensions left as
+future directions (Chapter~\ref{ch:conclusions}).
+
+\section{Chapter Summary}
+\label{sec:bg-summary}
+
+Document \gls{ie} is a multimodal, spatially-structured, schema-diverse problem
+solved by tri-modal encoders such as LayoutLMv3. \Gls{cl} of such tasks is
+obstructed by \gls{cf}, for which five method families offer remedies, but almost
+all treat the network uniformly and were validated on unimodal benchmarks. \Gls{cl}
+for \gls{ie} exists only in fragmented, sentence-level, mostly text-only form, and
+the one document-level remedy is heuristic. Crucially, no prior work measures
+\emph{which component} of a multimodal document encoder forgets. Four gaps
+follow: component attribution, sentence-level bias, heuristic remedies, and
+fragmented evaluation (\S\ref{sec:bg-gaps}). The next chapter
+develops a diagnostic to answer that question and a mechanism-targeted remedy
+derived from the answer.
