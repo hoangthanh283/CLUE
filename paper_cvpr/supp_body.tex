@@ -136,7 +136,7 @@ b^\star=\arg\max_b e_b.
 
 \runin{Choice of the baselines.} We fixed the set of baselines after a first comparison on CIL-CORD, Mixed and DIL. EWC~\citep{kirkpatrick2017ewc}, L2P~\citep{wang2022l2p} and DualPrompt~\citep{wang2022dualprompt} did not learn sessions~4 and~5 of CIL-CORD in any run; hence, we dropped them, and O-LoRA~\citep{wang2023olora} was not completed under the final protocol. CPFD and IS3 also fail on this stream; however, we kept them because they are designed for the shift of the background label. It is noted that the baselines differ in what they learn as well as in what they forget: CPFD reaches $\nCpfdLateMax$ F1 on its best later session right after it is learned, whereas IS3, CODA-Prompt and LCA each have a later session that is learned to at most $\nBaseWorstLateMax$ F1 in every run. In contrast, naive fine-tuning learns every session to at least $\nNaiveDiagMin$.
 
-\runin{Patience of the baselines.} One may ask whether the weak baselines on CIL-FUNSD only stop too early. To examine this, we repeat CODA-Prompt, CPFD, IS3 and LCA on CIL-FUNSD with a patience of ten epochs instead of two (\cref{tab:patience}). More patience does not close the gap: every one of them stays far below CoLaR-SBR.
+\runin{Patience of the baselines.} One may ask whether the weak baselines on CIL-FUNSD only stop too early. To examine this, we repeat CODA-Prompt, CPFD, IS3 and LCA on CIL-FUNSD with a patience of ten epochs instead of two (\cref{tab:patience}). More patience does not close the gap: with three runs each, every one of them stays far below CoLaR-SBR, and LCA even falls.
 
 %% ============================================================================ D
 \section{Extended results and ablations}
@@ -260,7 +260,7 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 \begin{table}[t]
 \centering\small
 \setlength{\tabcolsep}{5pt}
-\caption{\textbf{Patience of the baselines} on CIL-FUNSD (AA; mean $\pm$ s.d.\ of three runs, single values: one run; ``--'': not run).}
+\caption{\textbf{Patience of the baselines} on CIL-FUNSD (AA; mean $\pm$ s.d.\ of three runs; ``--'': not run).}
 \label{tab:patience}
 \input{supp_patience}
 \end{table}
