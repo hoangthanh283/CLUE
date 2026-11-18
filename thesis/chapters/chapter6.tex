@@ -357,16 +357,16 @@ CoLaR-SBR or its memory-free variant achieves the best result on the three
 class-incremental streams and on Mixed.
 
 \begin{landscape}
-\begin{table}[p]
   \centering
-  \caption[Comparison with the baselines on six streams]{\textbf{Comparison with
+  % no float inside the landscape page: a [p] float left an empty rotated page before it
+  \captionof{table}[Comparison with the baselines on six streams]{\textbf{Comparison with
   continual-learning baselines} on six streams. F1: full-label F1; AA and AF: average
   accuracy and forgetting. AA and F1: mean $\pm$ s.d.; AF: mean; ``--'': not applicable.
   Bold: best AA and F1 of each column, joint training aside; underlined: our best when a
   baseline is best. $^{b}$With the $50$-document memory.}
   \label{tab:main}
+  \par\vspace{6pt}
   \resizebox{\linewidth}{!}{\input{generated/paper/tab_main_clean}}
-\end{table}
 \end{landscape}
 
 \paragraph{Results on the class-incremental streams.} On CIL-CORD, CoLaR-SBR achieves
