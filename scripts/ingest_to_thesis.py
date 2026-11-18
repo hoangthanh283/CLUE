@@ -63,6 +63,11 @@ def ingest_paper(paper_dir: Path, thesis_dir: Path) -> int:
         if "generated" in f.read_text(errors="ignore").split("\n", 1)[0].lower():
             shutil.copy2(f, gen / f.name)
             n += 1
+    for f in sorted(paper_dir.glob("fig/*.tex")):  # schematics: keep the picture, drop the float
+        drop = ("\\begin{figure", "\\end{figure", "\\caption", "\\label", "\\centering")
+        body = [ln for ln in f.read_text().splitlines() if not ln.lstrip().startswith(drop)]
+        (figs / f"tikz_{f.name}").write_text("\n".join(body) + "\n")
+        n += 1
     for f in sorted(paper_dir.glob("figures/*.pdf")):
         shutil.copy2(f, figs / f.name)
         n += 1

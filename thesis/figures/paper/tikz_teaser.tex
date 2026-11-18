@@ -1,0 +1,58 @@
+% Former teaser (moved to the appendix in P11): (a) the strict memory x readout 2x2 on CIL-CORD
+% plus SBR-Recall as a separate, memory-free bar; bar heights read from the generated vals.tex;
+% (b) SBR / SBR-Recall schematic.
+\begin{tikzpicture}[font=\footnotesize, >=Stealth,
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=3pt, minimum height=0.66cm}]
+% ==== (a) bars
+\def\ys{0.030}
+\draw[black!60] (0,0) -- (6.5,0);
+\draw[black!60] (0,0) -- (0,3.25);
+\foreach \t in {0,25,50,75,100} {
+  \draw[black!60] (0,\t*\ys) -- (-0.06,\t*\ys) node[left, inner sep=1.5pt] {\scriptsize \t};
+}
+\node[rotate=90, anchor=south] at (-0.55,1.55) {full-label F1, CIL-CORD};
+% Dashed joint line first, so tall bars cover it; its value label sits at the right end only.
+\draw[densely dashed, black!70] (0,\nJointFull*\ys) -- (6.5,\nJointFull*\ys)
+  node[right, inner sep=2pt, align=left] {\scriptsize joint\\[-2pt]\scriptsize \nJointFull};
+% Bar values: inside the top of the bar when the bar is tall (> 50), above it otherwise, so the
+% labels never meet the joint line whatever the generated values are.
+\foreach \x/\v/\c/\lc in {0.60/\nNaiveFull/black!28/black, 1.28/\nNoBankFull/ourteal/white,
+                          2.80/\nColarFull/black!28/black, 3.48/\nSbrFull/ourteal/white,
+                          5.55/\nRecallFull/ourteal/white} {
+  \fill[fill=\c] (\x-0.29,0) rectangle (\x+0.29,\v*\ys);
+  \pgfmathtruncatemacro{\tall}{\v>50 ? 1 : 0}
+  \ifnum\tall=1
+    \node[below=1pt, inner sep=1pt, text=\lc] at (\x,\v*\ys) {\scriptsize\bfseries \v};
+  \else
+    \node[above=1pt, inner sep=1pt] at (\x,\v*\ys) {\scriptsize \v};
+  \fi
+}
+% SBR-Recall is not a cell of the 2x2: a separator and its own label mark it as the memory-free variant.
+\draw[black!45, densely dotted] (4.55,0) -- (4.55,3.0);
+\node[below, align=center] at (0.94,-0.03) {no memory};
+\node[below, align=center] at (3.14,-0.03) {whole-document\\memory (CoLaR)};
+\node[below, align=center] at (5.55,-0.03) {SBR-Recall\\(no memory)};
+\fill[black!28] (0.25,3.55) rectangle (0.55,3.75); \node[right, inner sep=2pt] at (0.58,3.65) {shared softmax};
+\fill[ourteal] (2.95,3.55) rectangle (3.25,3.75); \node[right, inner sep=2pt] at (3.28,3.65) {session-blocked readout};
+\node[anchor=north west] at (-0.8,-0.95) {\textbf{(a)}};
+% ==== (b) schematic
+\begin{scope}[xshift=7.75cm]
+\node[box, minimum width=2.3cm] (tok) at (1.15,0.15) {tokens, boxes, page};
+\node[box, minimum width=2.3cm, draw=black!45, pattern=north east lines, pattern color=black!15]
+  (low) at (1.15,1.25) {layers $1..k$\\frozen after session 1};
+\node[box, minimum width=2.3cm, draw=ourteal, very thick] (up) at (1.15,2.55)
+  {layers $k{+}1..12$\\base $+$ delta $\Delta_b$};
+\draw[->] (tok) -- (low); \draw[->] (low) -- (up);
+\node[box, minimum width=2.7cm, draw=memgreen, thick] (bank) at (4.75,1.25)
+  {memory: per-document\\SVD of layer-$k$ latents};
+\draw[->, memgreen, thick] (bank.west) -- (low.east) node[midway, above, inner sep=1.5pt] {\scriptsize replay};
+\node[box, draw=ourteal, thick] (b1) at (3.45,2.55) {$[\mathrm{O}_1\,|\,\text{tags}_1]$};
+\node[box, draw=ourteal, thick] (b2) at (5.05,2.55) {$[\mathrm{O}_2\,|\,\text{tags}_2]$};
+\node at (6.05,2.55) {$\cdots$};
+\node[box, draw=ourteal, thick] (b3) at (7.1,2.55) {$[\mathrm{O}_B\,|\,\text{tags}_B]$};
+\draw[->] (up) -- (b1);
+\node[align=center] at (5.25,3.45) {$e_b = 1 - p_b(\mathrm{O}_b)$; the block with the\\largest $e_b>0.5$ claims the token};
+\node[align=left, anchor=west] at (2.75,0.15) {\textcolor{memgreen}{\textbf{memory}} answers drift; \textcolor{ourteal}{\textbf{SBR}} un-shares the\\background; \textcolor{ourteal}{\textbf{SBR-Recall}} reads block $b$ under $\Delta_b$.};
+\node[anchor=north west] at (-0.2,-0.5) {\textbf{(b)}};
+\end{scope}
+\end{tikzpicture}

@@ -1,50 +1,653 @@
-% Chapter 3 (two-cause rewrite, 2026-11). Stub: headings and sources only.
+% Chapter 3 (two-cause rewrite, 2026-11). No result number in this chapter: results are in Ch. 6.
 % Old text: chapters_old/chapter3.tex (git tag thesis-pre-two-causes).
 \chapter{Methodology}
 \label{ch:methodology}
 
+This chapter presents how we study forgetting in continual \gls{kie} and how we address it.
+In the following, we first formalize the problem and the metrics
+(Section~\ref{sec:m-formulation}). Then, we describe how we analyse the two causes of
+forgetting that this thesis separates: the drift of the representation
+(Section~\ref{sec:m-drift}) and the conflict on the background label
+(Section~\ref{sec:m-conflict}). After that, we detail the proposed method, CoLaR-SBR, and its
+variant SBR-Recall (Sections~\ref{sec:m-overview} to~\ref{sec:m-recall}). Finally, we account
+for its memory and compute cost (Section~\ref{sec:m-accounting}). All results are reported in
+Chapter~\ref{ch:results}.
+
+% =============================================================================
 \section{Problem Formulation and Metrics}
-\label{sec:c3-s1}
-% SOURCE: paper Sec. 3, App. A scoring; old ch3 15-105
-\todo{to be written}
+\label{sec:m-formulation}
 
+\paragraph{Continual key-information extraction.} A document is defined as
+$x=(w_{1:L},\,b_{1:L},\,I)$, where $w_{1:L}$ are its \gls{ocr} tokens, $b_{1:L}$ their
+normalised bounding boxes and $I$ the page image. A model $f_\theta$ labels every token with
+a \gls{bio} tag, and the entities are scored by entity-level F1~\citep{tjong2003conll}. The
+model consists of an encoder, which maps the document to one feature vector $h(x_i)\in
+\mathbb{R}^{d}$ per token, and a linear head, which maps the feature to the tag logits
+$z(x_i)$.
+
+The documents arrive in $T$ sessions. Session $t$ brings a training set $\mathcal{D}_t$ that
+is annotated with its own tag set $\mathcal{T}_t$ only. Specifically, a token whose true tag
+is $y^{\ast}$ is labelled
+\begin{equation}
+  y=\begin{cases} y^{\ast} & y^{\ast}\in\mathcal{T}_t,\\ \mathrm{O} & \text{otherwise.}\end{cases}
+  \label{eq:mask}
+\end{equation}
+In the \gls{bio} scheme, ``O'' is the tag of every token that belongs to no annotated entity.
+From now on, we call it the \emph{background label}: we write ``O'' when we refer to the tag in
+the data, and background label when we refer to its role in training. Under
+Equation~\eqref{eq:mask}, the background label of session $t$ covers two kinds of tokens: the
+tokens that are truly not entities, and the entities that session $t$ does not annotate. While
+the model learns session $t$, it has no access to the training sets of the earlier sessions,
+except for what a bounded memory keeps. After the last session, the model is tested on the
+classes of all sessions, without knowing which session a document comes from.
+
+\paragraph{Three settings.} We study three settings, which differ in what changes between
+two sessions. In \gls{cil}, the tag set grows and the documents stay in one domain. This is
+the setting where the background label changes its meaning from one session to the next;
+hence, it is where our main claims are tested. In \gls{dil}, the tag set is fixed and the
+documents change, e.g., from forms to receipts. Since every session annotates all classes,
+Equation~\eqref{eq:mask} masks nothing; thus, forgetting can only come from the change of the
+model itself, and \gls{dil} serves as the control without the conflict. In the \emph{Mixed}
+setting, both change, which tests the two causes together. The six streams that instantiate
+these settings on five public datasets are described in Chapter~\ref{ch:experimental-setup}.
+
+\paragraph{Retention matrix.} To measure what the model keeps, we hold one test split per
+session, masked like its training set. Let $R[i,j]$ be the F1 on the test split of session
+$j$ after the model has been trained on session $i$. From this matrix, we report the
+\gls{aa} and the \gls{af}:
+\begin{equation}
+  \mathrm{AA}=\frac{1}{T}\sum_{j=1}^{T}R[T,j],\qquad
+  \mathrm{AF}=\frac{1}{T-1}\sum_{j=1}^{T-1}\big(R[j,j]-R[T,j]\big).
+  \label{eq:aa-af}
+\end{equation}
+\gls{aa} is the mean F1 of the final model over the sessions. \gls{af} is the F1 of a session
+right after it was learned minus its final F1, averaged over the sessions before the last
+one. It is noted that the diagonal $R[j,j]$ matters on its own: it tells whether a session
+was learned at all, which a single final number cannot show.
+
+\paragraph{Session-restricted scoring.} The test labels of session $j$ show only its own
+classes. Hence, raw scoring would charge a model for every correct entity of another
+session: such an entity is labelled ``O'' in the split of session $j$, so predicting it
+counts as a false positive. To avoid this, we score each split \emph{session-restricted}: a
+predicted tag outside $\mathcal{T}_j$ is mapped to ``O'' before the spans are matched. As a
+result, a predicted entity can be a false positive only in its own session, and a missed
+entity is counted only in its own session.
+
+\paragraph{Full-label F1.} Session-restricted scoring has two limits. The test split of a
+session keeps only the documents that contain one of its entities, and \gls{aa} weights all
+sessions equally, although they hold different numbers of entities. Hence, on the
+class-incremental streams we also report the \emph{full-label F1}: the entity-level F1 of
+the final model on the complete test set with all classes and no label masked, as in
+continual named entity recognition~\citep{ma2023learning}. The full-label F1 is our headline
+number on the class-incremental streams, and \gls{aa} and \gls{af} describe retention on
+every stream. Table~\ref{tab:notation} summarises the notation of this chapter.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Notation of the methodology]{\textbf{Notation.} Symbols used in this chapter.}
+  \label{tab:notation}
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    Symbol & Meaning \\
+    \midrule
+    $T$, $t$ & number of sessions; index of the current session \\
+    $\mathcal{D}_t$, $\mathcal{T}_t$ & training set and tag set of session $t$ \\
+    $h(x)\in\mathbb{R}^{d}$, $z(x)$ & feature and tag logits of a token $x$ \\
+    $R[i,j]$ & F1 on the test split of session $j$ after training session $i$ \\
+    $k$, $r$ & layer where the memory is injected; rank of its compression \\
+    $H_j\in\mathbb{R}^{L\times d}$ & layer-$k$ activations of the stored document $j$ \\
+    $b$, $\mathcal{T}_b$ & a readout block and the tags it holds \\
+    $o_b(x)$, $p_b(\cdot\mid x)$ & background logit and distribution of block $b$ \\
+    $m_{sb}$ & whether a document of session $s$ supervises block $b$ \\
+    $e_b(x)$ & claim of block $b$ on a token, $1-p_b(\mathrm{O}_b\mid x)$ \\
+    $\theta_0$, $\Delta_b$ & frozen encoder state and the low-rank update of block $b$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% =============================================================================
 \section{Analysing Cause 1: Representation Drift}
-\label{sec:c3-s2}
-% SOURCE: old ch3 106-391 condensed: CKA, Fisher, displacement protocol
-\todo{to be written}
+\label{sec:m-drift}
 
+The first cause of forgetting is the drift of the model. When the encoder is trained on a
+new session, the features that it computes for the documents of the old sessions change, and
+the head that was fitted on the old features no longer reads them correctly. This cause does
+not depend on the labels; it is present even when the label space is fixed. In this section,
+we describe how we measure the drift and how we test what removes it.
+
+\paragraph{Representational drift.} To measure how much the representation of a layer
+changes, we use linear \gls{cka}~\citep{kornblith2019similarity}. Given two centred
+activation matrices $X\in\mathbb{R}^{n\times p}$ and $Y\in\mathbb{R}^{n\times q}$ of the same
+$n$ inputs,
+\begin{equation}
+  \mathrm{CKA}(X,Y)=\frac{\lVert Y^{\top}X\rVert_F^{2}}
+  {\lVert X^{\top}X\rVert_F\,\lVert Y^{\top}Y\rVert_F}.
+  \label{eq:cka}
+\end{equation}
+We compute it between the activations of the model before and after a session on a fixed
+probe set; a value of $1$ means that the layer did not drift. Two choices matter here.
+First, token classification reads one feature per token; hence, we compute \gls{cka} over
+individual tokens and not over the mean vector of a document, which could report no drift
+while the features of the tokens have been reorganised. Second, the probe set holds more
+tokens than the width of the layer, so that the estimate is stable.
+
+\paragraph{Importance and displacement.} \gls{cka} tells where the features change. To tell
+where the \emph{parameters} that mattered for an old session are overwritten, we use two
+quantities per parameter group $g$. The empirical Fisher importance on the data
+$\mathcal{D}$ of a session,
+\begin{equation}
+  F_g=\frac{1}{|\mathcal{D}|}\sum_{(x,y)\in\mathcal{D}}\;\sum_{\phi\in g}
+  \Big(\frac{\partial\log p_\theta(y\mid x)}{\partial\phi}\Big)^{2},
+  \label{eq:fisher}
+\end{equation}
+measures how sensitive the loss of that session is to the group. It is noted that importance
+alone is not a sign of forgetting: the head carries the largest gradients of any token
+classifier, whether or not its parameters are moved later. Hence, we weight the change of the
+parameters between two checkpoints by the importance of the old session,
+\begin{equation}
+  D_g=\sum_{\phi\in g}F^{(t-1)}_{\phi}\,\big(\theta^{(t)}_{\phi}-\theta^{(t-1)}_{\phi}\big)^{2},
+  \label{eq:displacement}
+\end{equation}
+which is large exactly where parameters that mattered before session $t$ have been changed
+by session $t$. We report the three quantities by depth, in five groups: the input
+embeddings, the early, middle and late layers, and the head.
+
+\paragraph{Protocol.} We fine-tune the model naively on a stream, i.e., one session after the
+other with no continual-learning method, and keep a checkpoint at every session boundary.
+At each boundary, we compute \gls{cka}, the Fisher importance and the displacement between
+the two checkpoints, together with one row of the retention matrix
+(Algorithm~\ref{alg:drift}). To examine whether the picture depends on the encoder, we repeat
+the analysis on four encoders: LayoutLMv3~\citep{huang2022layoutlmv3}, which reads text,
+layout and the page image; LiLT~\citep{wang2022lilt} and BROS~\citep{hong2022bros}, which
+read text and layout; and BERT~\citep{devlin2019bert}, which reads text only. On LayoutLMv3,
+we additionally repeat it with some of the inputs masked (text only, text and layout, image
+and layout), so that the architecture is fixed and only the inputs differ.
+
+\begin{algorithm}[!htbp]
+  \caption{Drift analysis at the session boundaries}
+  \label{alg:drift}
+  \begin{algorithmic}[1]
+    \Require sessions $\mathcal{D}_{1:T}$, probe set $\mathcal{P}$, layers $\mathcal{G}$, parameter groups $\mathcal{G}_F$
+    \State initialise $\theta^{(0)}$ from the pre-trained encoder
+    \For{$t=1$ \textbf{to} $T$}
+      \State grow the head by the tags $\mathcal{T}_t$
+      \State $\theta^{(t)}\gets\textsc{FineTune}(\theta^{(t-1)},\mathcal{D}_t)$ \Comment{naive, no memory}
+      \ForAll{$\ell\in\mathcal{G}$}
+        \State $\mathrm{CKA}_{t,\ell}\gets\textsc{LinearCKA}\big(\textsc{Act}_\ell(\theta^{(t-1)},\mathcal{P}),\,\textsc{Act}_\ell(\theta^{(t)},\mathcal{P})\big)$
+      \EndFor
+      \ForAll{$g\in\mathcal{G}_F$}
+        \State $F_{t,g}\gets\textsc{Fisher}(\theta^{(t)},g,\mathcal{D}_t)$;\quad
+               $D_{t,g}\gets\sum_{\phi\in g}F^{(t-1)}_{\phi}(\theta^{(t)}_{\phi}-\theta^{(t-1)}_{\phi})^{2}$
+      \EndFor
+      \State $R[t,j]\gets\textsc{F1}(\theta^{(t)},\text{test split of session } j)$ for all $j\le t$
+    \EndFor
+    \State \Return $\mathrm{CKA}$, $F$, $D$, $R$
+  \end{algorithmic}
+\end{algorithm}
+
+\paragraph{What removes the drift.} The measurement tells where the drift sits, not what
+removes it. To examine the latter, we compare the main families of continual learning on the
+domain-incremental stream, where drift is the only cause: regularisation of the
+parameters~\citep{kirkpatrick2017ewc}, distillation from the previous
+model~\citep{li2017lwf} and replay of old documents~\citep{rolnick2019er,buzzega2020der},
+against naive fine-tuning and joint training. If drift is what a method must counter, then a
+method that shows old documents to the model again should come close to joint training on
+this stream, whereas a method that only constrains the parameters may not. This comparison is
+repeated on the four encoders (Section~\ref{sec:c6-s1}), and its outcome decides the starting
+point of our method.
+
+% =============================================================================
 \section{Analysing Cause 2: The Background-Label Conflict}
-\label{sec:c3-s3}
-% SOURCE: paper Sec. 4: H1-H3, gradient argument on the shared background logit
-\todo{to be written}
+\label{sec:m-conflict}
 
+The second cause appears only when the tag set grows. In this section, we first show where
+the conflict comes from, and then state the series of hypotheses with which we test it.
+
+\subsection{Where the Conflict Comes From}
+\label{sec:m-conflict-origin}
+
+Consider the usual readout, one softmax over the background label and all classes seen so
+far,
+\begin{equation}
+  p(c\mid x)=\frac{\exp z_c(x)}{\exp z_{\mathrm{O}}(x)+\sum_{c'\in\mathcal{T}_{1:t}}\exp z_{c'}(x)},
+  \qquad c\in\{\mathrm{O}\}\cup\mathcal{T}_{1:t},
+  \label{eq:shared}
+\end{equation}
+where $\mathcal{T}_{1:t}=\bigcup_{s\le t}\mathcal{T}_s$. We refer to it as the \emph{shared
+softmax}. For a token that is labelled ``O'', the gradient of the cross-entropy with respect
+to the logits is
+\begin{equation}
+  \frac{\partial\mathcal{L}}{\partial z_{\mathrm{O}}}=p(\mathrm{O}\mid x)-1\le 0,\qquad
+  \frac{\partial\mathcal{L}}{\partial z_c}=p(c\mid x)\ge 0\quad\text{for every } c\in\mathcal{T}_{1:t}.
+  \label{eq:grad}
+\end{equation}
+Thus, one background token raises the background logit and lowers the logit of \emph{every}
+class in the head, including the classes that its session did not annotate. Under
+Equation~\eqref{eq:mask}, this happens on two sides (Figure~\ref{fig:conflict}).
+
+\begin{itemize}
+  \item \textbf{Current side.} A document of the current session $t$ labels every entity of
+        an earlier session as ``O''. Hence, each training step lowers the logits of the old
+        classes on tokens that truly belong to them.
+  \item \textbf{Stored side.} A document that was stored at session $s<t$ labels every entity
+        of a later session as ``O''. Hence, each replay step lowers the logits of the new
+        classes on tokens that truly belong to them. The stored labels are \emph{stale}: they
+        were complete when the document was stored and became wrong when the head grew.
+\end{itemize}
+
+\noindent As a result, the same token receives contradicting labels over time, and the
+single background logit $z_{\mathrm{O}}$ is trained by documents that disagree on what the
+background is. It is noted that a memory does not remove this conflict. On the contrary,
+replay adds the stored side to it; this is why we treat the conflict as a cause of its own
+and not as a harder form of drift. The shift of the background label is known from continual
+semantic segmentation~\citep{cermelli2020mib} and continual named entity
+recognition~\citep{zhang2023cpfd,ma2023learning}, and its two sides were named in continual
+object detection~\citep{liu2023abr,mo2024bpf}. However, it is unclear which side matters in
+document streams, and whether repairing the labels is enough.
+
+\begin{figure}[!htbp]
+  \centering
+  \papertikz{0.8}{figures/paper/tikz_conflict}
+  \caption[The background conflict]{\textbf{The background conflict.} A stored receipt and
+  a current receipt each label a price ``O''. (a) With one shared softmax, both ``O'' labels
+  count against every class. (b) With one background per session, an ``O'' counts only
+  against the classes that its session annotated.}
+  \label{fig:conflict}
+\end{figure}
+
+\subsection{A Series of Hypotheses}
+\label{sec:m-hypotheses}
+
+We examine the failure of replay under label growth with three hypotheses. Each one makes a
+prediction, and each is tested by changing one intervention against the run it is compared
+with (Table~\ref{tab:hypotheses}). For each hypothesis, we report whether its prediction
+holds, fails or holds in part.
+
+\paragraph{H1: only harder forgetting.} We first hypothesize that label growth only makes
+forgetting harder, i.e., that the failure is still caused by drift. If so, a memory that
+works under domain shift should also work under label growth, and a larger memory should
+close the remaining gap. To examine it, we take the same memory with the shared softmax from
+the domain-incremental stream to the class-incremental one, we vary its size, and we replace
+the stored activations by raw documents. We also read the diagonal of the retention matrix:
+under drift alone, a session is learned well and lost later, whereas under the conflict the
+session that is being trained may not be learned in the first place.
+
+\paragraph{H2: the labels are the cause.} We next hypothesize that the labels are the cause,
+on the two sides above. If so, repairing the labels should close the gap with the shared
+softmax unchanged. On the stored side, we repair the labels with the ground-truth labels,
+which a continual learner does not have, in two ways: every stored document receives the
+true labels of all classes in the grown head before each session; or the stale tokens are
+masked in the replay loss, which removes the false background label without adding a label.
+On the current side, we use two repairs that need no additional annotation. The first one
+follows the unbiased cross-entropy of MiB~\citep{cermelli2020mib}: a background token is
+allowed to be the background \emph{or} any class that its document could not annotate,
+\begin{equation}
+  \mathcal{L}_{\mathrm{MiB}}(x,\mathrm{O},s)=-\log\Big(p(\mathrm{O}\mid x)
+  +\sum_{c\,\in\,\mathcal{T}_{1:t}\setminus\mathcal{T}_s}p(c\mid x)\Big),
+  \label{eq:mib}
+\end{equation}
+where $s$ is the session of the document, so that the sum runs over the earlier classes for
+a current document and over the later classes for a stored one. The second one slices the
+softmax: the loss of a stored document is normalised over the classes that were known when it
+was stored, and, in a further control inspired by SS-IL~\citep{ahn2021ssil}, the loss of the
+current background tokens is normalised without the old classes.
+
+\paragraph{H3: the shared normalisation.} Finally, we hypothesize that the conflict lives in
+the shared normalisation itself: one background logit that is trained by documents which
+disagree on the background. If so, giving each session its own background logit, normalised
+with the tags of that session only, should close most of the gap without any additional
+annotation. This is the diagnosis of SS-IL for a shared softmax~\citep{ahn2021ssil} with a
+background label added, and the readout of ICE-O~\citep{liu2023ice} without its frozen
+encoder. We test it with and without the memory, in order to separate what the readout
+contributes from what replay contributes.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[The series of hypotheses and their tests]{\textbf{The series of hypotheses.}
+  Each hypothesis is tested by one change against the memory with a shared softmax.
+  $^{r}$Uses the ground-truth labels of the stored documents.}
+  \label{tab:hypotheses}
+  \begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}p{4.3cm}L@{}}
+    \toprule
+    Hypothesis & Intervention & Prediction if the hypothesis holds \\
+    \midrule
+    H1 only harder forgetting & same memory as on \gls{dil}; larger memory; raw documents &
+      the gap to joint training closes as on \gls{dil}; every session is learned when it is trained \\
+    \addlinespace
+    H2 the labels (stored side) & true labels before each session$^{r}$; stale tokens masked$^{r}$ &
+      the shared softmax reaches joint training on every stream \\
+    H2 the labels (current side) & MiB-style loss (Equation~\ref{eq:mib}); softmax slices &
+      the gap closes without ground-truth labels \\
+    \addlinespace
+    H3 the shared normalisation & one background logit per session, with and without the memory &
+      most of the gap closes on every stream, with no additional annotation \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\noindent The three hypotheses are tested on the three class-incremental streams in
+Section~\ref{sec:c6-s2}. The outcome of H3 motivates the readout of our method.
+
+% =============================================================================
 \section{Overview of the Proposed Method}
-\label{sec:c3-s4}
-% SOURCE: paper Sec. 5 opening + fig/method.tex full width
-\todo{to be written}
+\label{sec:m-overview}
 
+In this work, we aim to remove the two causes: the drift of the encoder and the conflict on
+the background label. The workflow of the proposed method, CoLaR-SBR, is shown in
+Figure~\ref{fig:method}. Given the documents of a session, the model is trained on them as
+usual. After the session, we store a few of its documents as compressed activations of an
+intermediate layer (step~1). Then, while the model learns a new session, we replay the
+stored documents to remind the model of the past sessions (step~2); this addresses the
+drift. Finally, every session reads its tokens with its own background logit (step~3), so
+that the background label of one session is never counted against the classes of another;
+this addresses the conflict. A variant, SBR-Recall, keeps one low-rank update of the encoder
+per session in place of the memory.
+
+\begin{figure}[!htbp]
+  \centering
+  \papertikz{0.95}{figures/paper/tikz_method}
+  \caption[Overview of CoLaR-SBR]{\textbf{Overview of CoLaR-SBR.} Documents are (1) stored
+  and (2) replayed as layer-$k$ activations; (3) each session reads its tokens with its own
+  background logit (b), not with a shared one (a). SBR-Recall keeps one low-rank update per
+  session and no memory.}
+  \label{fig:method}
+\end{figure}
+
+\paragraph{The principle.} We argue that a token labelled as background in session $s$ means
+``none of the classes annotated in session $s$''. It is evidence against those classes and
+silent about every other class, as in training on partially annotated
+data~\citep{greenberg2018marginal}. Hence, we \emph{supervise each class only with negatives
+from documents that annotated it, and normalise together only the classes that were annotated
+together}. The repairs of H2 follow the same principle on the side of the labels or of the
+loss; our readout follows it in the normalisation, where no label needs to be repaired.
+
+% =============================================================================
 \section{CoLaR: Compressed Latent Replay}
-\label{sec:c3-s5}
-% SOURCE: paper Sec. 5, App. B
-\todo{to be written}
+\label{sec:m-colar}
 
+The readout of Section~\ref{sec:m-sbr} needs stored documents that keep the label of each
+token at its position, together with the session that wrote the labels. Hence, our memory
+keeps \emph{whole documents}, not statistics of classes. Inspired by latent
+replay~\citep{hayes2020remind,pellegrini2020latent}, CoLaR (Compressed Latent Replay) stores a
+document as the activations of an intermediate layer and not as its raw page. It works in
+three steps.
+
+\paragraph{Freezing the lower layers.} First, after the first session, we freeze the input
+embeddings and the layers $1..k$ of the encoder. A stored activation stays valid only while
+the layers below it do not change; with these layers frozen, an activation that was stored at
+any session is exactly what the current model would compute for the same document.
+
+\paragraph{Storing.} Then, at the end of each session, we draw $N$ documents at random from
+its training set. For each document $j$, we take its layer-$k$ activations
+$H_j\in\mathbb{R}^{L\times d}$, where $L$ is the number of positions of the document, and
+compress them with a truncated \gls{svd} of rank $r$,
+\begin{equation}
+  H_j\approx U_j\Sigma_jV_j^{\top},\qquad U_j\in\mathbb{R}^{L\times r},\;
+  \Sigma_j\in\mathbb{R}^{r\times r},\;V_j\in\mathbb{R}^{d\times r}.
+  \label{eq:svd}
+\end{equation}
+We store the factors $U_j\Sigma_j$ and $V_j$ in half precision, with the boxes, the attention
+mask, the labels and the session of the document. It is noted that the compression is
+applied to one document at a time. The features of all documents together are close to full
+rank, whereas the activations of a single document are not, since its tokens share one
+layout and one vocabulary; thus, a per-document factorisation keeps the document faithfully
+at a rank far below $d$. No pixel and no token id is kept.
+
+\paragraph{Replaying.} Finally, at every training step, we draw stored documents, rebuild
+their activations $H_j$ from the factors and inject them at layer $k{+}1$, where the boxes
+and the mask of the document drive the layout biases and the attention mask as for a current
+document. The upper layers and the head are then trained on the current batch and on the
+replayed documents together. We use $k{=}4$, $r{=}128$ and $N{=}50$ documents per session;
+the impact of each setting is studied in Section~\ref{sec:c6-s5}.
+
+\paragraph{Why activations and not raw documents.} A memory of raw documents would serve the
+readout as well, and we compare both in Section~\ref{sec:c6-s4}. We choose the latent memory
+for two reasons. First, it holds neither pixels nor token ids. Second, a replayed document
+passes only through the layers above $k$; hence, replay trains fewer parameters than raw
+replay does. We do not claim that it is smaller than a raw document in every encoding
+(Section~\ref{sec:m-accounting}).
+
+% =============================================================================
 \section{SBR: Session-Blocked Readout}
-\label{sec:c3-s6}
-% SOURCE: paper Sec. 5, App. B: supervision rule, training, inference
-\todo{to be written}
+\label{sec:m-sbr}
 
+SBR (Session-Blocked Readout) is our instantiation of a readout with one background per
+session~\citep{liu2023ice,kim2022more}. In the following, we describe its blocks, its
+training rule and its inference rule.
+
+\paragraph{Blocks.} Every session that brings new tags opens a \emph{block} $b$ that holds
+those tags $\mathcal{T}_b$. Whereas the shared softmax of Equation~\eqref{eq:shared}
+normalises over the background label and all classes, SBR gives every block its own
+background logit, a linear map of the token feature,
+\begin{equation}
+  o_b(x)=w_b^{\top}h(x)+c_b,
+  \label{eq:olog}
+\end{equation}
+and normalises each block separately:
+\begin{equation}
+  p_b(\cdot\mid x)=\operatorname{softmax}\big([\,o_b(x),\,z_{\mathcal{T}_b}(x)\,]\big),
+  \label{eq:block}
+\end{equation}
+where $z_{\mathcal{T}_b}(x)$ are the entries of the tag logits for the tags in
+$\mathcal{T}_b$. We write $\mathrm{O}_b$ for the background of block $b$. A session that only
+re-annotates known tags opens no block; hence, SBR has a single block on a fixed label
+space. The tag logits come from the usual linear head, so SBR adds only one vector $w_b$ and
+one bias $c_b$ per session.
+
+\paragraph{Training.} For a token $x$ with label $y$ in a document of session $s$, the loss
+sums the cross-entropy of the blocks that the document can supervise:
+\begin{equation}
+  \mathcal{L}(x,y,s)=\sum_{b}m_{sb}\,\mathrm{CE}\big(p_b(\cdot\mid x),\,y_b\big),\qquad
+  y_b=\begin{cases} y & y\in\mathcal{T}_b,\\ \mathrm{O}_b & \text{otherwise.}\end{cases}
+  \label{eq:sbr}
+\end{equation}
+The mask $m_{sb}$ decides whether the labels of the document say anything about block $b$.
+It follows three cases.
+\begin{enumerate}
+  \item \emph{Full.} $m_{sb}=1$ when session $s$ annotates every tag of $\mathcal{T}_b$. Its
+        background labels are then true negatives for the classes of block $b$, and its
+        entity labels are positives.
+  \item \emph{All-background.} $m_{sb}=1$ with $y_b=\mathrm{O}_b$ on every token when block
+        $b$ belongs to a different annotation schema than session $s$, e.g., a block of form
+        fields and a receipt. No entity of block $b$ can occur in such a document; hence,
+        every token is a negative for $b$.
+  \item \emph{Skipped.} $m_{sb}=0$ otherwise, because the background labels of the document
+        say nothing about block $b$: an ``O'' may hide one of its entities.
+\end{enumerate}
+A stored document follows the rule of the session that stored it, which is why the memory
+keeps the session of each document. Table~\ref{tab:supervision} gives examples. On a
+class-incremental stream within one schema, a document trains only the block of its own
+session, so neither a current nor a stored background label can count against the classes of
+another session; this removes both sides of the conflict of
+Section~\ref{sec:m-conflict-origin}. Across schemas, the all-background case keeps a block
+from claiming the tokens of another dataset. It is noted that the shared softmax is the
+special case of a single block that every session supervises.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[The supervision rule of SBR on examples]{\textbf{The supervision rule of SBR.}
+  Which blocks a document trains, and how. ``--'': the block does not exist yet or is
+  skipped.}
+  \label{tab:supervision}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{2.9cm}L@{}}
+    \toprule
+    Document & Own block & Other blocks, same schema & Blocks of another schema \\
+    \midrule
+    \multicolumn{4}{@{}l}{\emph{Class-incremental stream (one schema)}} \\
+    Current document of session 3 & block 3: full & blocks 1, 2: skipped & -- \\
+    Stored document of session 1, replayed in session 3 & block 1: full & blocks 2, 3: skipped & -- \\
+    \addlinespace
+    \multicolumn{4}{@{}l}{\emph{Mixed stream (three schemas)}} \\
+    Receipt of a new dataset & its block: full & -- & form blocks: all-background \\
+    Form of the last session, all form labels & both form blocks: full & -- & receipt blocks: all-background \\
+    \addlinespace
+    \multicolumn{4}{@{}l}{\emph{Domain-incremental stream (fixed label space)}} \\
+    Any document & the single block: full & -- & -- \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Inference.} At test time, each block reports its \emph{claim} on a token, the
+probability that the token is one of its entities,
+\begin{equation}
+  e_b(x)=1-p_b(\mathrm{O}_b\mid x).
+  \label{eq:claim}
+\end{equation}
+The block with the largest claim labels the token with its best tag if the claim passes a
+threshold $\tau$; otherwise, the token is ``O'':
+\begin{equation}
+  \hat y(x)=\begin{cases}\arg\max_{c\in\mathcal{T}_{b^{\star}}}p_{b^{\star}}(c\mid x) & e_{b^{\star}}(x)>\tau,\\[2pt]
+  \mathrm{O} & \text{otherwise,}\end{cases}\qquad b^{\star}=\arg\max_b e_b(x).
+  \label{eq:infer}
+\end{equation}
+Hence, no session identity is needed at test time: the blocks decide among themselves which
+one owns a token. We set $\tau=0.5$ and do not tune it. Since each block is a softmax of its
+tags against its own background, $e_b>0.5$ means that the block finds an entity more likely
+than its background, which is the decision the block was trained to make.
+Algorithm~\ref{alg:colarsbr} summarises one session of CoLaR-SBR.
+
+\begin{algorithm}[!htbp]
+  \caption{One session of CoLaR-SBR}
+  \label{alg:colarsbr}
+  \begin{algorithmic}[1]
+    \Require session $t$ with training set $\mathcal{D}_t$ and tags $\mathcal{T}_t$; memory $\mathcal{M}$; layer $k$, rank $r$, $N$ documents
+    \If{$\mathcal{T}_t$ holds new tags} open block $t$: grow the head by $\mathcal{T}_t$, add $(w_t,c_t)$ \EndIf
+    \If{$t=2$} freeze the embeddings and the layers $1..k$ \EndIf
+    \For{each training step}
+      \State draw a batch $B\subset\mathcal{D}_t$ and stored documents $B_{\mathcal{M}}\subset\mathcal{M}$
+      \State $\mathcal{L}_{\text{cur}}\gets$ mean of Equation~\eqref{eq:sbr} over the tokens of $B$, with $s=t$
+      \State rebuild $H_j=U_j\Sigma_jV_j^{\top}$ for $j\in B_{\mathcal{M}}$ and run the layers $k{+}1..12$ on them
+      \State $\mathcal{L}_{\text{rep}}\gets$ mean of Equation~\eqref{eq:sbr} over their tokens, with $s$ the session that stored $j$
+      \State update the trainable parameters with $\mathcal{L}_{\text{cur}}+\mathcal{L}_{\text{rep}}$
+    \EndFor
+    \State draw $N$ documents of $\mathcal{D}_t$; store their rank-$r$ factors of layer $k$ with boxes, mask, labels and $t$ in $\mathcal{M}$
+  \end{algorithmic}
+\end{algorithm}
+
+\paragraph{Relation to prior readouts.} Separated softmaxes were proposed for image
+classification, where SS-IL~\citep{ahn2021ssil} normalises old and new classes apart and
+ER-ACE~\citep{caccia2022erace} restricts the loss of the current batch to its classes. In
+these settings there is no background label. ICE-O~\citep{liu2023ice} adds a constant
+background logit to each step of a class-incremental tagger with a frozen encoder, and
+MORE~\citep{kim2022more} trains one head per task with an out-of-distribution output.
+Unlike them, SBR learns the background logit of each block from the token feature, trains
+the encoder with a memory, and decides from the annotation of a document which blocks it may
+supervise. The contribution of each of these choices is measured in
+Section~\ref{sec:c6-s4}.
+
+% =============================================================================
 \section{SBR-Recall: Per-Session Deltas}
-\label{sec:c3-s7}
-% SOURCE: paper Sec. 5, App. B
-\todo{to be written}
+\label{sec:m-recall}
 
+SBR-Recall is a variant of our method that keeps no memory. Without the conflict, the memory
+is needed only against drift, and the task-identity view of class-incremental
+learning~\citep{kim2022theoretical} states when it can be removed: if each block is read
+under the encoder state that learned it, nothing drifts for that block, provided that the
+model can tell which state a token needs. SBR-Recall realises this in three steps.
+
+\paragraph{Per-session deltas.} First, the model is trained on the first session as usual,
+and the encoder is then frozen; we denote this state by $\theta_0$. Then, for each later
+session $b$, we train a low-rank update $\Delta_b$~\citep{hu2022lora} of the layers above
+$k$, together with the head and the background logits, and store it ($\Delta_1=0$). Every
+linear layer of the attention and of the feed-forward part carries one such update per
+session, initialised so that a new update starts as the identity.
+
+\paragraph{Reading each block under its own state.} Finally, every term of the loss and
+every claim of block $b$ is computed under the state that learned the block:
+\begin{equation}
+  p_b(\cdot\mid x)=\operatorname{softmax}\big([\,o_b,\,z_{\mathcal{T}_b}\,]\big)
+  \big(x;\,\theta_0+\Delta_b\big).
+  \label{eq:recall}
+\end{equation}
+During training, the blocks that a document supervises are grouped by their update, and one
+forward pass is run per update, so that each term is computed under the encoder state of its
+own block. At test time, the claims $e_b$ of Equation~\eqref{eq:claim} are computed in the
+same way and select the block, and with it the state, by Equation~\eqref{eq:infer}. Since the
+state $\theta_0+\Delta_b$ never changes after session $b$, the predictions of block $b$ on a
+given token do not change either; a later session can only change which block wins.
+
+\paragraph{When the memory can be removed.} This selection relies on the background logit of
+each block being trained on true negatives. Under label growth within one schema, this
+holds: the documents of a session contain the entities of the other sessions labelled ``O'',
+so each block learns to reject them. In contrast, across schemas or on a fixed label space, a
+block never sees the tokens of the other sessions during its own session; hence, we expect
+SBR-Recall to need the stored documents there, in which case the memory of
+Section~\ref{sec:m-colar} is kept beside the updates. Both cases are examined in
+Sections~\ref{sec:c6-s3} and~\ref{sec:c6-s4}.
+
+% =============================================================================
 \section{Memory and Compute Accounting}
-\label{sec:c3-s8}
-% SOURCE: paper App. B
-\todo{to be written}
+\label{sec:m-accounting}
 
+In this section, we state how the cost of the method is counted, so that the comparisons of
+Section~\ref{sec:c6-s7} can be checked.
+
+\paragraph{Memory of CoLaR.} A stored document holds the two factors in half precision and
+its boxes, mask and labels. With $L$ positions and width $d$, the factors take $2r(L+d)$
+bytes. For instance, LayoutLMv3 has $L=709$ positions ($512$ text tokens and $197$ image
+patches) and $d=768$; with $r=128$, the factors take $2\cdot128\cdot(709+768)=378{,}112$
+bytes, and the boxes, mask and labels add $24{,}576$ bytes, i.e., about $0.4$\,MB per
+document. A stream of $T$ sessions with $N$ documents each therefore stores $TN$ documents,
+plus one byte per document for its session under SBR. For comparison, the uncompressed
+activations of a document take $2Ld$ bytes, and a raw document as our code holds it takes
+$3\cdot224^{2}$ pixels at four bytes each plus its tokens; we also report the size of a raw
+document with 8-bit pixels, an encoding that we did not run.
+
+\paragraph{Memory of SBR-Recall.} A rank-$\rho$ update of a linear layer with $n_{\text{in}}$
+inputs and $n_{\text{out}}$ outputs has $\rho\,(n_{\text{in}}+n_{\text{out}})$ parameters. One
+encoder layer carries updates on its query, key, value and attention-output maps
+($d\rightarrow d$) and on its two feed-forward maps ($d\rightarrow 4d$ and $4d\rightarrow
+d$); hence, an update over the $12-k$ upper layers has
+\begin{equation}
+  (12-k)\,\big[\,4\cdot 2\rho d+2\cdot 5\rho d\,\big]=18\,\rho\,d\,(12-k)
+  \label{eq:delta-params}
+\end{equation}
+parameters. The cost grows with the number of sessions and not with the number of their
+documents; thus, the updates are cheaper than a memory only when the documents of a session
+take more than its update.
+
+\paragraph{Training cost.} After the first session, CoLaR-SBR trains the layers above $k$,
+the head and the background logits; the lower layers are frozen. A method that replays raw
+documents trains the whole network. SBR-Recall trains one update, the head and the
+background logits at a time.
+
+\paragraph{Inference cost.} CoLaR-SBR needs one forward pass; the blocks share the encoder
+and differ only in the last linear map. SBR-Recall needs one pass per session, since each
+block is read under its own state. As the lower $k$ layers are shared by all states, an
+implementation that caches them repeats only the $12-k$ upper layers; with $T$ sessions, the
+cost is $1+(T-1)(12-k)/12$ times that of one pass.
+
+% =============================================================================
 \section{Summary}
-\label{sec:c3-s9}
-% SOURCE: 
-\todo{to be written}
+\label{sec:m-summary}
 
+This chapter separated forgetting in continual \gls{kie} into two causes and assigned one
+instrument and one component to each (Table~\ref{tab:mapping}). The drift of the
+representation is measured by \gls{cka}, importance and displacement at the session
+boundaries, and is addressed by replaying whole documents from a compressed latent memory
+(CoLaR), or removed by reading each block under its own frozen state (SBR-Recall). The
+conflict on the background label is tested by a series of three hypotheses, and is addressed
+at the readout, where each session receives its own background logit (SBR). The next two
+chapters describe the implementation and the experimental setup, and
+Chapter~\ref{ch:results} reports the outcome of each analysis and the comparison with the
+baselines.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Causes, tests and components]{\textbf{From the causes to the method.} Each cause
+  has its test and the component that answers it.}
+  \label{tab:mapping}
+  \begin{tabularx}{\textwidth}{@{}lLL@{}}
+    \toprule
+    Cause & How it is tested & Component that answers it \\
+    \midrule
+    Drift of the representation & \gls{cka}, importance and displacement by depth; replay
+      against regularisation on \gls{dil} & CoLaR: whole documents replayed as compressed
+      activations; SBR-Recall: one frozen state per session \\
+    \addlinespace
+    Conflict on the background label & H1 to H3 on three class-incremental streams &
+      SBR: one background logit per session, supervised only by the documents that
+      annotated its classes \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
