@@ -2701,6 +2701,50 @@ def write_bros() -> str:
     return out + _defs(v)
 
 
+# CoLaR against CoLaR-SBR on CIL-CORD per encoder. (stem, label, CoLaR run, CoLaR-SBR run)
+ENC_RUNS = (("Lmv", "LayoutLMv3", "cil_cord_colar", "cil_cord_colar_sbr"),
+            ("Lilt", "LiLT", "cil_cord_colar_lilt", "cil_cord_colar_sbr_lilt"),
+            ("Bros", "BROS", "cil_cord_colar_bros_b1", "cil_cord_colar_sbr_bros_b1"),
+            ("Bert", "BERT", "cil_cord_colar_bert", "cil_cord_colar_sbr_bert"))  # fmt: skip
+
+
+def write_encoders() -> None:
+    """supp_encoders.tex (full-label F1 of CoLaR and CoLaR-SBR per encoder, with the batch size the
+    runs recorded and the smallest per-run gain) + encoders_vals.tex: \\vEnc<E>{Colar,Sbr}Full,
+    \\nEnc<E>GainFullMin, \\nEncGainFullMin (over the complete encoders), \\nEncDone."""
+    v, out, gains = {}, "", []
+    t = HDR + "\\begin{tabular}{@{}lcccc@{}}\n\\toprule\n"
+    t += "Encoder & Batch & CoLaR, shared softmax & CoLaR-SBR & Smallest gain \\\\\n\\midrule\n"
+    for stem, label, colar, sbr in ENC_RUNS:
+        c, s = (load_seeds(CLEAN, r, "full_label_f1") for r in (colar, sbr))
+        ok = len(c) == len(s) == len(SEEDS)
+        out += macro(f"Enc{stem}ColarFull", list(c.values()) if ok else [])
+        out += macro(f"Enc{stem}SbrFull", list(s.values()) if ok else [])
+        gain = min(s[k] - c[k] for k in SEEDS) if ok else None
+        v[f"nEnc{stem}GainFullMin"] = _signed(gain, True) if ok else "--"
+        gains += [gain] if ok else []
+        bs = {json.loads(f.read_text())["training_hparams"]["batch_size"]
+              for r in (colar, sbr) for sd in SEEDS if (f := _run_file(CLEAN, r, sd, "*", "metrics.json"))}  # fmt: skip
+        if len(bs) > 1:
+            _warn(f"{label}: CoLaR and CoLaR-SBR runs disagree on the batch size: {bs}")
+        cells = (
+            [
+                fmt(list(c.values()), True),
+                fmt(list(s.values()), True),
+                f"${v[f'nEnc{stem}GainFullMin']}$",
+            ]
+            if ok
+            else [_pending(c), _pending(s), "--"]
+        )
+        t += f"{label} & {min(bs) if bs else '--'} & " + " & ".join(cells) + " \\\\\n"
+    t += "\\bottomrule\n\\end{tabular}\n"
+    (OUT / "supp_encoders.tex").write_text(t)
+    v["nEncGainFullMin"] = _signed(min(gains), True) if gains else "--"
+    v["nEncDone"] = str(len(gains))
+    (OUT / "encoders_vals.tex").write_text(HDR + out + _defs(v))
+    print(f"encoders: {len(gains)}/{len(ENC_RUNS)} complete")
+
+
 def write_robust():
     """supp_order.tex (CIL-CORD with the sessions reversed and shuffled, full-label F1) and
     supp_patience.tex (the four weakest baselines on CIL-FUNSD with a patience of 2 and 10, AA).
@@ -2861,6 +2905,7 @@ def main():
     write_budget_vals()
     write_budget_table()
     write_cost()
+    write_encoders()
     write_beyond()
 
     # ---- tab_2x2.tex
