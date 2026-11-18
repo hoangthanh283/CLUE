@@ -2,9 +2,10 @@
 classification inside the session, from the block scores a run saved for its final model
 (``eval_dump.pt`` of colar_sbr / colar_sbr_recall on ViT).
 
-For a test image of session j: *identified* = the block with the largest claim is block j;
-*classified* = the best class of block j is the gold class (what the readout would answer if it
-were told the session). An image is correct when both hold and the claim passes the threshold.
+For a test image of session j: *classified* = the best class of block j is the gold class (what
+the readout would answer if it were told the session); *correct* = the final accuracy of the
+session. Their difference is what the choice of the session costs; the difference between a
+session trained alone and *classified* is what is lost inside the session.
 
 Writes paper_cvpr/image_analysis_vals.tex and paper_cvpr/figures/image_readout.pdf. CPU only.
 
@@ -31,32 +32,26 @@ DATASETS = (("Cifar", "cil_cifar100", "CIFAR-100"), ("Imnr", "cil_imagenet_r", "
 # macro stem -> run-dir template; a method is skipped until all its seeds have a dump
 METHODS = (("Sbr", "{sc}_colar_sbr500r128_seed{sd}_vit", "CoLaR-SBR"),
            ("Recall", "{sc}_colar_sbr_recall500_seed{sd}_vit", "SBR-Recall"))  # fmt: skip
-BLUE, ORANGE, GREY = "#0072B2", "#E69F00", "#555555"
+BLUE, GREY = "#0072B2", "#555555"
 
 
 def run_stats(run: Path) -> dict[str, np.ndarray]:
-    """Per session: identified, classified (given the session), correct; all in percent."""
+    """Per session, in percent: classified (the best class of the right block is the gold class,
+    i.e. the accuracy if the session were given) and correct (final row of the retention matrix).
+    Both are exact; the block scores of the older dumps are fp16 and tie, so the share of
+    identified sessions is not recomputed from them."""
     d = torch.load(run / "eval_dump.pt", map_location="cpu", weights_only=False)
     n_sess = len(d)
     per = d[0]["n_head"] // n_sess
-    ident, clas, corr = [], [], []
+    clas = []
     for j in range(n_sess):
-        e, tag, gold = d[j]["e"].float(), d[j]["tag"].long(), d[j]["gold"].long()
+        tag, gold = d[j]["tag"].long(), d[j]["gold"].long()
         assert ((gold // per) == j).all(), f"{run.name}: session {j} holds foreign classes"
-        best_e, best_b = e.max(-1)
-        idf = best_b == j
-        cls = tag[:, j] == gold
-        ident.append(idf.float().mean().item())
-        clas.append(cls.float().mean().item())
-        corr.append((idf & cls & (best_e > d[j]["threshold"])).float().mean().item())
-    out = {k: 100 * np.array(v) for k, v in (("ident", ident), ("clas", clas), ("corr", corr))}
+        clas.append((tag[:, j] == gold).float().mean().item())
+    corr = np.load(run / "matrix.npy")[-1]
     aa = json.loads((run / "metrics.json").read_text())["AA"]
-    assert abs(out["corr"].mean() - aa) < 0.5, (
-        run.name,
-        out["corr"].mean(),
-        aa,
-    )  # the dump is the run
-    return out
+    assert abs(corr.mean() - aa) < 1e-6, (run.name, corr.mean(), aa)  # the matrix is the run
+    return {"clas": 100 * np.array(clas), "corr": np.asarray(corr, dtype=float)}
 
 
 def alone(sc: str, n_sess: int) -> np.ndarray:
@@ -75,21 +70,24 @@ def main() -> None:
             if not all((r / "eval_dump.pt").exists() for r in runs):
                 continue
             st = [run_stats(r) for r in runs]
-            mean = {k: np.mean([s[k] for s in st], axis=0) for k in ("ident", "clas", "corr")}
+            mean = {k: np.mean([s[k] for s in st], axis=0) for k in ("clas", "corr")}
             al = alone(sc, len(mean["corr"]))
             old = slice(0, -1)  # every session but the last
-            v += m(f"{mk}{dk}Ident", mean["ident"].mean()) + m(f"{mk}{dk}Clas", mean["clas"].mean())
-            v += m(f"{mk}{dk}IdentOld", mean["ident"][old].mean())
+            v += m(f"{mk}{dk}Clas", mean["clas"].mean())
             v += m(f"{mk}{dk}ClasOld", mean["clas"][old].mean())
-            v += m(f"{mk}{dk}ClasLast", mean["clas"][-1]) + m(
-                f"{mk}{dk}IdentLast", mean["ident"][-1]
-            )
+            v += m(f"{mk}{dk}ClasLast", mean["clas"][-1])
+            v += m(f"{mk}{dk}CorrFirst", mean["corr"][0]) + m(f"{mk}{dk}CorrLast", mean["corr"][-1])
             v += m(f"{mk}{dk}Acc", mean["corr"].mean()) + m(f"{dk}Alone", al.mean())
             v += m(f"{mk}{dk}DriftLoss", al.mean() - mean["clas"].mean())  # lost inside the session
             v += m(
                 f"{mk}{dk}IdentLoss", mean["clas"].mean() - mean["corr"].mean()
             )  # lost to the session choice
             panels.append((f"{mname}, {dname}", mean, al))
+    neg = RES / "cil_cifar100_colar_sbrx500r128_nw010_seed42_vit" / "metrics.json"
+    ref = RES / "cil_cifar100_colar_sbr500r128_seed42_vit" / "metrics.json"
+    if neg.exists():  # negatives from the other sessions, weight 0.1, one run, against its twin
+        v += m("NegCifar", json.loads(neg.read_text())["AA"])
+        v += m("NegRefCifar", json.loads(ref.read_text())["AA"])
     (OUT / "image_analysis_vals.tex").write_text(v)
 
     fig, axes = plt.subplots(
@@ -101,7 +99,6 @@ def main() -> None:
         ax.plot(
             x, mean["clas"], "-o", color=BLUE, ms=2.5, lw=1.0, label="classified, session given"
         )
-        ax.plot(x, mean["ident"], "-s", color=ORANGE, ms=2.5, lw=1.0, label="session identified")
         ax.plot(x, mean["corr"], "-", color="black", lw=1.2, label="correct")
         ax.set_title(title, fontsize=7.5, pad=3)
         ax.set_xlabel("session", fontsize=7)
@@ -113,7 +110,7 @@ def main() -> None:
             ax.spines[s].set_visible(False)
     axes[0][0].set_ylabel("test images (%)", fontsize=7)
     h, lab = axes[0][0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="lower center", ncol=4, frameon=False, fontsize=6.5, handlelength=1.6,
+    fig.legend(h, lab, loc="lower center", ncol=3, frameon=False, fontsize=6.5, handlelength=1.6,
                columnspacing=1.2)  # fmt: skip
     fig.subplots_adjust(left=0.08, right=0.99, top=0.9, bottom=0.34, wspace=0.08)
     fig.savefig(OUT / "figures" / "image_readout.pdf")

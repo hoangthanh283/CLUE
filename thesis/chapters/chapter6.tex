@@ -708,8 +708,95 @@ and SBR-Recall when the classes grow within one schema and no document may be ke
 
 \section{Beyond Documents: Image Classification}
 \label{sec:c6-s8}
-% SOURCE: paper App. F; E4
-\todo{to be written}
+% E4: further image runs (balanced session choice, SBR-Recall on ViT) extend the last paragraphs.
+
+To examine whether the two components of our method transfer beyond documents, we run them
+on class-incremental image classification. An image has one label and no background class,
+and the label of a stored image never becomes stale; hence, the conflict of
+Section~\ref{sec:c6-s2} does not arise, and this setting tests the memory and the
+separation of the sessions on their own.
+
+\paragraph{Setup.} We use CIFAR-100 and ImageNet-R in ten sessions, with the class order of
+SLCA and RanPAC, and a ViT-B/16 pre-trained on ImageNet-21k with a linear head on the CLS
+token. We train with AdamW at $5\times10^{-5}$ (SLCA and LCA: SGD at $0.01$), a batch size
+of $16$ and at most $100$ epochs (SLCA: $20$) with early stopping, in full precision (mixed
+precision for the latent memory and CoLaR). ER and DER++ keep $2{,}000$ raw images and SLCA
+keeps class Gaussians, whereas the latent memory, CoLaR and CoLaR-SBR keep $500$ images
+per session as layer-$4$ activations. SLCA~\citep{zhang2023slca} and
+RanPAC~\citep{mcdonnell2023ranpac} take the place of CPFD and IS3, which are designed for
+sequence labelling. CoLaR-SBR runs unchanged, with one block per session. It is noted that
+our recipe differs from the published ones (in particular the batch size); hence, our
+numbers are not comparable with the published ones.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Image class-incremental learning with ViT-B/16]{\textbf{Image class-incremental
+  learning} with ViT-B/16 (AA, mean $\pm$ s.d.). Bold: best of each column, joint training
+  aside; underlined: our best when a baseline is best.}
+  \label{tab:image}
+  \input{generated/paper/tab_image_core}
+\end{table}
+
+\paragraph{Results of the memory.} As shown in Table~\ref{tab:image}, SLCA leads on both
+datasets, and RanPAC is above the latent memory and CoLaR. Nevertheless, the latent memory
+is competitive with raw replay: on CIFAR-100 the latent memory and CoLaR are above ER and
+DER++, and on ImageNet-R they are within $\imgBankErGapImnr$ and $\imgColarErGapImnr$
+points of ER. It is noted that they store no pixel but more items ($\imgBankMB$ and
+$\imgColarMB$\,MB against $\imgErTwoKMB$\,MB for $2{,}000$ raw images); with $200$ raw
+images, ER falls to $\imgErTwoHCifar$ and $\imgErTwoHImnr$. The rank-$128$ compression
+changes \gls{aa} by at most $\imgColarBankGapMax$ points. Hence, the compressed latent
+memory transfers to images as a replacement for raw replay.
+
+\paragraph{Results of the readout.} On ImageNet-R, CoLaR-SBR reaches $\imgSbrImnr$ \gls{aa},
+which is \imgSbrMinusColarImnrMin{} to \imgSbrMinusColarImnrMax{} points above CoLaR with a
+shared softmax, and above RanPAC, ER and the latent memory, while SLCA remains higher. On
+CIFAR-100 it reaches $\imgSbrCifar$, within \imgSbrMinusColarCifarMin{} to
+\imgSbrMinusColarCifarMax{} points of CoLaR. This hints that separating the sessions in
+the readout can help beyond the background label. However, our method stays below SLCA on
+both datasets and below joint training ($\imgJointCifar$ and $\imgJointImnr$).
+
+\paragraph{Where the readout loses.} To understand the remaining gap, we split the error
+of CoLaR-SBR into two parts (Figure~\ref{fig:image-readout}). For every test image, we ask
+whether the block of its own session ranks the right class first, i.e., what the readout
+would answer if the session were given. On CIFAR-100, this accuracy is $\iaSbrCifarClas$,
+only $\iaSbrCifarDriftLoss$ points below the accuracy of the sessions when each is trained
+alone ($\iaCifarAlone$). The measured \gls{aa} is $\iaSbrCifarAcc$; hence,
+$\iaSbrCifarIdentLoss$ points are lost to the choice of the session. On ImageNet-R, the
+accuracy with the session given is $\iaSbrImnrClas$ against $\iaImnrAlone$ for the sessions
+alone, and $\iaSbrImnrIdentLoss$ points are lost to the choice of the session
+($\iaSbrImnrAcc$ measured). The loss falls on the early sessions: on CIFAR-100 the first
+session ends at $\iaSbrCifarCorrFirst$ and the last one at $\iaSbrCifarCorrLast$.
+Therefore, the encoder with the memory keeps the classes of every session, and most of the
+remaining error comes from assigning an image to the wrong session.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{paper/image_readout.pdf}
+  \caption[Where the per-session readout loses on images]{\textbf{Where the per-session
+  readout loses on images} (CoLaR-SBR, final model, per session). Dotted: the session
+  trained alone. Blue: accuracy when the session is given. Black: measured accuracy. The
+  gap between blue and black is what the choice of the session costs.}
+  \label{fig:image-readout}
+\end{figure}
+
+\paragraph{Why the session choice is weak on images.} On documents, the background logit of
+a block is trained on real negatives: the tokens of its own documents that are not
+entities, and, across schemas, the tokens of other documents. On images, every training
+image is a positive for the block of its session, and under the supervision rule of
+Table~\ref{tab:supervision} it says nothing about the other blocks. Hence, a block never
+sees an input for which its answer should be the background, and its claim is not
+calibrated against the claims of the other blocks. As a first attempt, we treat every
+image as a negative for the blocks of all other sessions, with a weight of $0.1$ on these
+terms. In one run on CIFAR-100, this reaches $\iaNegCifar$ \gls{aa} against
+$\iaNegRefCifar$ for the unchanged readout in the matching run, i.e., it does not help.
+This can be due to the imbalance of the terms: with ten sessions, every image is a
+negative for nine blocks and a positive for one.
+
+\paragraph{Outcome.} The compressed latent memory transfers to images, and the per-session
+readout brings a gain on ImageNet-R without any change. However, the choice of the session,
+which the background label trains on documents, has no training signal on images and
+becomes the main source of error. We make no state-of-the-art claim for images; a
+calibrated choice of the session is left for future work (Chapter~\ref{ch:conclusion}).
 
 % =============================================================================
 \section{Qualitative and Error Analysis}
