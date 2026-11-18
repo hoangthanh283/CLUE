@@ -559,8 +559,7 @@ Thus, the memory-free variant depends on its first session more than CoLaR-SBR d
 \begin{table}[!htbp]
   \centering
   \caption[Session order on CIL-CORD]{\textbf{Session order} on CIL-CORD (full-label F1;
-  mean $\pm$ s.d.; values separated by a slash: the runs of a cell with fewer than three
-  runs).}
+  mean $\pm$ s.d.).}
   \label{tab:order}
   \input{generated/paper/supp_order}
 \end{table}
@@ -963,8 +962,8 @@ these methods are on other benchmarks, and we did not verify our re-implementati
 against them. All baselines use the default hyper-parameters of their method, and the
 capacity of the per-session updates of SBR-Recall was chosen on CIL-CORD. Second, every cell has three runs, which is
 too few for a significance test; hence, we rely on the per-run rule and on the bootstrap
-over the test documents (Section~\ref{sec:e-eval}), and a few cells that are marked hold
-fewer runs. Third, the main encoder is LayoutLMv3; the conflict and its repair are
+over the test documents (Section~\ref{sec:e-eval}), and the per-class and the qualitative
+analyses use one run per method. Third, the main encoder is LayoutLMv3; the conflict and its repair are
 confirmed on BROS for one stream only. Fourth, the comparison of the method families on
 four encoders (Table~\ref{tab:dil}) follows an earlier protocol, which we checked on a
 part of its cells. Lastly, the streams are built from public datasets and hold at most a
