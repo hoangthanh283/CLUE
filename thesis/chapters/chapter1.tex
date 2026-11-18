@@ -1,30 +1,154 @@
-% Chapter 1 (two-cause rewrite, 2026-11). Stub: headings and sources only.
+% Chapter 1 (two-cause rewrite, 2026-11). Result numbers are generated macros.
 % Old text: chapters_old/chapter1.tex (git tag thesis-pre-two-causes).
 \chapter{Introduction}
 \label{ch:intro}
 
 \section{Background and Context}
 \label{sec:c1-s1}
-% SOURCE: old ch1 6-75; paper Sec. 1
-\todo{to be written}
+
+Administrative documents such as forms, invoices and receipts are one of the most widely
+used media to exchange information, which raises the need for systems that extract their
+key fields automatically. The recent literature has shown the high potential of multimodal
+encoders such as LayoutLMv3~\citep{huang2022layoutlmv3}, LiLT~\citep{wang2022lilt} and
+BROS~\citep{hong2022bros} in \gls{kie}, where each \gls{ocr} token of a visually-rich
+document is labelled using its words, its two-dimensional layout and the page image.
+However, these models are trained once, on a fixed set of documents and with a classifier
+sized to a fixed set of labels.
+
+In practice, documents arrive in a streaming fashion. For instance, a company that
+processes invoices receives the layouts of new vendors every month, a service that was
+built for one language is extended to other languages, and a customer asks for a field
+that the earlier annotation did not cover. When a model is simply trained further on the
+new documents, it suffers from catastrophic forgetting~\citep{mccloskey1989catastrophic}:
+its accuracy on the earlier documents falls sharply. Retraining on all the history at every
+change is costly, and it is often not possible, since the earlier documents contain
+personal or business data that may not be kept. Thus, a deployed \gls{kie} model has to
+learn continually: it must learn each new session and keep what it learned before, while it
+stores little of the past.
+
+There exist many continual-learning methods to cope with catastrophic forgetting, and the
+strongest ones in the class-incremental setting keep stored
+samples~\citep{masana2022class,wang2024survey}. Unfortunately, they are mainly designed for
+image classification, where a sample has one label. A document differs: it holds hundreds
+of tokens, most of which carry the tag ``O'' of the \gls{bio} scheme, i.e., they belong to
+no annotated entity. We call this tag the \emph{background label}. This thesis studies what
+happens to continual learning when most of the supervision is a background label whose
+meaning changes from session to session.
 
 \section{Problem Statement: Two Causes of Forgetting}
 \label{sec:c1-s2}
-% SOURCE: paper Sec. 1, 3; teaser fig/conflict.tex
-\todo{to be written}
+
+On documents, replay looks sufficient at first. When new domains arrive under one fixed
+label space, i.e., \gls{dil}, replaying a small memory of stored documents keeps the model
+close to joint training: with our compressed memory, LayoutLMv3 stays within
+$\nColarDilGapMax$ \gls{aa} points of it. Unfortunately, when the label space grows session
+by session, i.e., \gls{cil}, the same memory ends far below joint training: on a
+class-incremental stream built from CORD, it reaches only $\vColarFull$ F1 against
+$\vJointFull$. A class-incremental stream is expected to be harder. Nevertheless, it is
+unclear why a memory that holds the old documents together with their labels does not help.
+
+We argue that two different causes are at work, and that a memory addresses only the first
+one.
+
+\paragraph{Cause 1: representation drift.} When the encoder is trained on a new session,
+the features that it computes for the old documents change, and the classifier that was
+fitted on the old features no longer reads them. This cause does not depend on the labels.
+Replaying old documents counters it.
+
+\paragraph{Cause 2: the background-label conflict.} When each session annotates only its
+own classes, an entity of another session is labelled ``O''. A document stored in session 1
+labels the entities of session 3 as background, and a document of session 3 labels the
+entities of session 1 as background. With one softmax over all classes, every such label
+counts against the class that it hides (Figure~\ref{fig:conflict}a). A memory does not
+remove this conflict; on the contrary, it adds the stored labels to it. The shift of the
+background label is known from class-incremental
+segmentation~\citep{cermelli2020mib,douillard2021plop}, incremental
+detection~\citep{liu2023abr,mo2024bpf} and continual named-entity
+recognition~\citep{monaikul2021extendner,zhang2023cpfd}, and separated
+softmaxes~\citep{ahn2021ssil,kim2022more,liu2023ice} already undo the shared
+normalisation. However, to our knowledge, no prior work examines, on token-labelled
+documents, which part of the failure a memory repairs and which part remains.
+
+\begin{figure}[!htbp]
+  \centering
+  \papertikz{0.8}{figures/paper/tikz_conflict}
+  \caption[The background conflict]{\textbf{The background conflict.} A stored receipt and
+  a current receipt each label a price ``O''. (a) With one shared softmax, both ``O'' labels
+  count against every class. (b) With one background per session, an ``O'' counts only
+  against the classes that its session annotated.}
+  \label{fig:conflict}
+\end{figure}
 
 \section{Research Questions and Objectives}
 \label{sec:c1-s3}
-% SOURCE: RQ1 causes; RQ2 what a memory must keep; RQ3 resolving the conflict; RQ4 how far it holds
-\todo{to be written}
+
+The goal of this thesis is to understand why continual \gls{kie} models forget and to
+propose a method that addresses each cause. Specifically, we ask four research questions.
+
+\begin{itemize}
+  \item \textbf{RQ1: What causes forgetting in continual \gls{kie}?} We aim to separate
+        the forgetting that comes from the drift of the representation from the failure
+        that comes from the background label, on the same model and the same streams.
+  \item \textbf{RQ2: What must a memory keep?} We aim to find whether a memory needs raw
+        documents, and how much of a document it must keep to counter the drift.
+  \item \textbf{RQ3: How can the background conflict be resolved without additional
+        annotations?} Correcting the stored labels needs the ground truth, which a
+        continual learner does not have. We aim to find a repair that uses only the labels
+        that each session provides.
+  \item \textbf{RQ4: How far does the result hold?} We aim to examine the result on other
+        streams, session orders and encoders, and beyond documents on image
+        classification.
+\end{itemize}
+
+\noindent To answer them, we set four objectives: (i) to build an analysis protocol that
+measures the drift inside the encoder and tests hypotheses on the background conflict with
+one intervention at a time; (ii) to design a method from the outcome of this analysis;
+(iii) to build a benchmark of continual \gls{kie} streams on public datasets with one
+protocol for all methods; and (iv) to evaluate the method against recent baselines, with
+ablations, robustness checks and an account of its cost.
 
 \section{Contributions}
 \label{sec:c1-s4}
-% SOURCE: paper contribution list, expanded to four
-\todo{to be written}
+
+The contributions of this thesis are as follows:
+
+\begin{itemize}
+  \item \textbf{An analysis of the two causes.} We measure the drift of four
+        encoders by depth and show that replay removes it on a fixed label space, whereas
+        regularization does not. Then, we investigate why replay fails under label growth
+        with three hypotheses and controlled interventions, and find that replay can
+        reduce drift while retaining the background-label conflict, with different label
+        repairs succeeding on different streams (Sections~\ref{sec:c6-s1}
+        and~\ref{sec:c6-s2}).
+  \item \textbf{A novel method, CoLaR-SBR.} We propose a method that takes a compressed
+        latent memory of whole documents (CoLaR) to address the drift and a
+        session-blocked readout (SBR), with one learned background per session, to address
+        the conflict without additional annotations. We also show when per-session
+        low-rank updates (SBR-Recall) can replace the memory
+        (Chapter~\ref{ch:methodology}).
+  \item \textbf{A benchmark for continual \gls{kie}.} We build six streams over five
+        public document datasets that cover the class-incremental, the domain-incremental
+        and a mixed setting, and re-implement eight continual-learning baselines on them
+        under one protocol, in which the test split never selects a model
+        (Chapter~\ref{ch:experimental-setup}).
+  \item \textbf{Extensive experiments.} On the three class-incremental streams, our method
+        achieves significant improvement over the baselines and comes close to joint
+        training: on the stream built from CORD it reaches $\vSbrFull$ F1 against
+        $\vColarFull$ for the same memory with a shared softmax. Our ablation study
+        further shows that the memory and the readout address two different causes and are
+        both needed, and we report the robustness, the cost and the errors of the method,
+        and its behaviour on image classification (Chapter~\ref{ch:results}).
+\end{itemize}
 
 \section{Overview of the Dissertation}
 \label{sec:c1-s5}
-% SOURCE: one paragraph per chapter
-\todo{to be written}
 
+The rest of the thesis is organized as follows. Chapter~\ref{ch:background} gives the
+background on document understanding and continual learning and reviews the related
+studies. Chapter~\ref{ch:methodology} formulates the problem, describes how we analyse the
+two causes, and details the proposed method. Chapter~\ref{ch:implementation} describes the
+implementation and how every reported number is produced.
+Chapter~\ref{ch:experimental-setup} presents the datasets, the streams, the baselines and
+the protocol. Chapter~\ref{ch:results} reports the analyses and the evaluation and
+discusses the findings. Finally, Chapter~\ref{ch:conclusion} concludes the thesis, states
+its limitations and outlines future work.

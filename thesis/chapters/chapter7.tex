@@ -1,20 +1,107 @@
-% Chapter 7 (two-cause rewrite, 2026-11). Stub: headings and sources only.
+% Chapter 7 (two-cause rewrite, 2026-11). Result numbers are generated macros.
 % Old text: chapters_old/chapter7.tex (git tag thesis-pre-two-causes).
 \chapter{Conclusions and Future Work}
 \label{ch:conclusion}
 
 \section{Conclusions}
 \label{sec:c7-s1}
-% SOURCE: one paragraph per research question
-\todo{to be written}
+
+In this thesis, we investigated why key-information extraction models forget when
+documents and labels arrive in sequence, and we proposed a novel method called CoLaR-SBR.
+We answer the four research questions of Section~\ref{sec:c1-s3} as follows.
+
+\paragraph{RQ1: What causes forgetting in continual \gls{kie}?} Two causes. The first is
+the drift of the representation: under naive fine-tuning, the features of all four
+encoders change, more so with depth, and the head that was fitted on the old features is
+displaced the most. Replay removes this cause on a fixed label space, whereas
+regularization does not. The second is the conflict on the background label: when the
+label set grows, the stored documents and the current documents each label the entities
+of the other sessions as background, and a shared softmax counts every such label against
+the class that it hides. A memory does not remove this cause: on CIL-CORD, the memory
+alone reaches only $\vColarFull$ full-label F1 against $\vJointFull$ for joint training,
+and a larger memory does not close the gap.
+
+\paragraph{RQ2: What must a memory keep?} Whole documents, kept faithfully, but not their
+pixels or their token ids. A memory of compressed layer-$4$ activations of $50$ documents
+per session is close to raw replay on the domain-incremental stream and, under our
+readout, within $\nErSbrAbsFullMax$ full-label F1 points of raw replay on CIL-CORD, while
+it trains only $\nMemTrainSbrPct\%$ of the parameters. The fidelity matters more than the
+size: a lower rank makes the method unstable, whereas the number of documents saturates
+early.
+
+\paragraph{RQ3: How can the background conflict be resolved without additional
+annotations?} By normalising each session separately. A repair of the labels closes the
+gap on one stream each, and the best of them needs the ground-truth labels. In contrast,
+the session-blocked readout, with one learned background per session and a supervision
+rule that lets a background label train only the blocks that its document could annotate,
+closes most of the gap on all three class-incremental streams with the labels that each
+session provides. On CIL-CORD, CoLaR-SBR reaches $\vSbrFull$ full-label F1, and its
+memory-free variant SBR-Recall reaches $\vRecallFull$, within $\nRecallJointGap$ points of
+joint training.
+
+\paragraph{RQ4: How far does the result hold?} The gap between the shared softmax and the
+per-session readout holds on three class-incremental streams, under three session orders
+and on a second encoder, and it is not explained by the patience of the baselines or by
+the choice of the test documents. On the Mixed stream, CoLaR-SBR is on par with joint
+training. The result has limits as well: on the domain-incremental streams the readout
+brings nothing, as expected, SBR-Recall needs the memory when the schema changes and
+depends on its first session, and on images the choice of the session becomes the main
+source of error.
+
+Overall, the experiments show that the memory and the readout address two different causes
+and are both needed, and that our method achieves significant improvement over eight
+continual-learning baselines on the class-incremental streams of five public document
+datasets.
 
 \section{Limitations}
 \label{sec:c7-s2}
-% SOURCE: each with its way forward
-\todo{to be written}
+
+Our study has several limitations. We state each one with a way forward.
+
+\paragraph{Session information at training time.} The readout opens one block per session
+and needs to know, for every training and stored document, which session annotated it. No
+such information is needed at test time. In a real stream, the boundaries can be taken
+from the change of the label set; detecting them when the schema changes silently is left
+open.
+
+\paragraph{Growth with the number of sessions.} The memory grows by a fixed number of
+documents per session, and SBR-Recall adds one update and one forward pass per session.
+Our streams hold at most a handful of sessions. For longer streams, a memory of fixed
+total size and a merging of old updates are natural next steps.
+
+\paragraph{Remaining gaps.} On CIL-WildReceipt, CoLaR-SBR stays below joint training
+($\vWildSbr$ against $\vWildJoint$ \gls{aa}), and on DIL-XFUND it stays below raw replay
+($\vXfundSbr$ against $\vXfundEr$), which hints that the frozen lower layers limit the
+adaptation to a new language. Training the lower layers slowly instead of freezing them,
+as in latent replay for devices~\citep{pellegrini2020latent}, is the first thing to try.
+
+\paragraph{The memory-free variant.} SBR-Recall replaces the memory only when the classes
+grow within one schema. Besides, it depends on its first session: in one of three runs
+under the reversed session order, the first session was not learned, and no later session
+recovered. A longer patience for the first session, or a first session trained with
+several restarts, may remove this failure.
+
+\paragraph{Encoders and tasks.} Most results are on LayoutLMv3, with one stream on BROS.
+We study \gls{kie} as token labelling only; generative document models and multimodal
+language models, which produce the fields as text, have no background label in this form,
+and whether a related conflict exists for them is unknown.
+
+\paragraph{Privacy.} The latent memory stores no pixels and no token ids. However, we make
+no privacy claim, since activations can still leak content; a study of what can be
+reconstructed from the stored factors is needed before the memory is used on sensitive
+documents.
 
 \section{Future Work}
 \label{sec:c7-s3}
-% SOURCE: longer streams, new baselines, document LLMs
-\todo{to be written}
 
+Our work is a first step toward continual \gls{kie} that addresses each cause of forgetting
+on its own. In the future, we wish to extend it in four directions. First, we will examine
+longer streams with dozens of sessions and with recurring schemas, where the number of
+blocks and the size of the memory must be bounded. Second, we will study a calibrated
+choice of the session for inputs without a background label, which is what limits the
+readout on images. Third, we will extend the analysis to generative document models and
+multimodal language models, where forgetting after fine-tuning has been
+reported~\citep{zhai2023investigating}, and to other extraction tasks such as relation
+extraction. Lastly, we will study the privacy of the latent memory, i.e., how much of a
+document can be recovered from its compressed activations, and whether the compression can
+be designed to prevent it.

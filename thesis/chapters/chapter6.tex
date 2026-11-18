@@ -899,6 +899,73 @@ stream.
 
 \section{Discussion}
 \label{sec:c6-s10}
-% SOURCE: answers to RQ1-RQ4; relation to prior work
-\todo{to be written}
 
+In this section, we interpret the findings of the chapter, relate them to prior work, and
+state what limits their validity.
+
+\paragraph{Two causes, two remedies.} The results support the separation of the two causes.
+On a fixed label space, a memory alone comes close to joint training
+(Section~\ref{sec:c6-s1}), and the readout brings nothing (Section~\ref{sec:c6-s3}). Under
+label growth, the memory alone adds only $\nAblMemGain$ points to naive fine-tuning and the
+readout alone adds nothing, whereas the readout on top of the memory adds
+$\nAblReadoutGain$ points (Section~\ref{sec:c6-s4}). A single cause would not show this
+pattern: if the failure under label growth were only a harder form of drift, a larger or a
+more faithful memory would reduce it, and it does not (Section~\ref{sec:c6-s5}). The error
+analysis gives the same picture from the side of the predictions: with a shared softmax the
+old entities end as background, and with the readout but without the memory the sessions
+are confused with each other (Section~\ref{sec:c6-s9}).
+
+\paragraph{Why no label repair is general.} The repairs of the labels succeed on one
+stream each: the ground-truth stored labels on CIL-CORD, and the MiB-style loss on
+CIL-FUNSD. This agrees with the studies that name a stored side and a current side of the
+shift in incremental detection~\citep{liu2023abr,mo2024bpf}: the share of the two sides
+depends on the stream, and a repair of one side leaves the other. The per-session readout
+does not repair a side. It removes the place where the two sides meet, i.e., the single
+background logit that all documents train. It is noted that the marginal loss of
+MiB~\citep{cermelli2020mib} follows the same principle in a weaker form: it stops a
+background label from counting against the old classes, but it keeps one normalisation over
+all classes.
+
+\paragraph{Relation to separated readouts.} A background output per session is known from
+ICE-O~\citep{liu2023ice}, which keeps the encoder frozen, uses no memory and sets the
+background logit to a constant. In our re-implementation on CIL-CORD, it reaches
+$\vIceOFull$ full-label F1 (Table~\ref{tab:ladder}), far below CoLaR-SBR. Our ablation
+tells which of the differences matter: the memory, without which the blocks drift, and the
+learned background logit, which adds $\nAblBgGain$ points over a constant one. Besides, the
+decomposition of class-incremental learning into the prediction within a session and the
+identification of the session~\citep{kim2022theoretical} explains our results on images.
+On documents, the tokens that are not entities train every block to say when a token is
+not its own, and the owning block claims $\mSbrOwnerMin$ to $\mSbrOwnerMax\%$ of the old
+entity tokens. On images there is no such token; the prediction within a session stays
+accurate, and the identification of the session becomes the main source of error
+(Section~\ref{sec:c6-s8}). Hence, the background label, which causes the conflict under a
+shared softmax, is also what makes the per-session readout work on documents.
+
+\paragraph{Relation to studies of drift.} That the layers close to the output change the
+most is known for image classifiers~\citep{ramasesh2021anatomy}. We observe the same
+profile of the representation on four document encoders and with every input, while the
+parameters that mattered and were moved sit in the head and in the lower half of the
+encoder. For the method, the consequence is practical: the lowest layers can be frozen
+after the first session, and a memory of their activations stays valid.
+
+\paragraph{Practical guidance.} The results suggest a simple rule for a deployed system.
+When the label set is fixed and only the documents change, a compressed memory is
+sufficient, and the readout is not needed. When new fields are added over time, the memory
+should be combined with the per-session readout; $30$ to $50$ stored documents per session
+at rank $128$ are enough on our streams (Section~\ref{sec:c6-s5}). When no document may be
+kept and the classes grow within one schema, the per-session updates of SBR-Recall can
+replace the memory, at the price of one forward pass per session and of a dependence on the
+first session (Sections~\ref{sec:c6-s6} and~\ref{sec:c6-s7}).
+
+\paragraph{Threats to validity.} Several points limit the conclusions. First, every
+baseline is our re-implementation on one growing token head; the published numbers of
+these methods are on other benchmarks, and we did not verify our re-implementations
+against them. All baselines use the default hyper-parameters of their method, and the
+capacity of the per-session updates of SBR-Recall was chosen on CIL-CORD. Second, every cell has three runs, which is
+too few for a significance test; hence, we rely on the per-run rule and on the bootstrap
+over the test documents (Section~\ref{sec:e-eval}), and a few cells that are marked hold
+fewer runs. Third, the main encoder is LayoutLMv3; the conflict and its repair are
+confirmed on BROS for one stream only. Fourth, the comparison of the method families on
+four encoders (Table~\ref{tab:dil}) follows an earlier protocol, which we checked on a
+part of its cells. Lastly, the streams are built from public datasets and hold at most a
+handful of sessions; longer streams may behave differently.

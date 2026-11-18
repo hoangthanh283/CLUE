@@ -245,16 +245,6 @@ recognition~\citep{zhang2023cpfd,ma2023learning}, and its two sides were named i
 object detection~\citep{liu2023abr,mo2024bpf}. However, it is unclear which side matters in
 document streams, and whether repairing the labels is enough.
 
-\begin{figure}[!htbp]
-  \centering
-  \papertikz{0.8}{figures/paper/tikz_conflict}
-  \caption[The background conflict]{\textbf{The background conflict.} A stored receipt and
-  a current receipt each label a price ``O''. (a) With one shared softmax, both ``O'' labels
-  count against every class. (b) With one background per session, an ``O'' counts only
-  against the classes that its session annotated.}
-  \label{fig:conflict}
-\end{figure}
-
 \subsection{A Series of Hypotheses}
 \label{sec:m-hypotheses}
 

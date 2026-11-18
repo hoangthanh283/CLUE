@@ -1,69 +1,32 @@
 % =====================================================================
 %  Abstract  (rendered via the class \abstractpage command).
-%  Flow: problem and challenges -> setting and questions -> diagnosis ->
-%  why other remedies fail -> the proposed method. Keep aligned with Ch.1.
+%  Order: the issue -> what the analysis finds -> the method -> the evidence.
+%  No result numbers and no citations here; keep aligned with Chapter 1.
 % =====================================================================
 \abstractpage{
-Deployed document-understanding systems must absorb new document types, schemas, and
-domains over time without forgetting what they already know, and they usually cannot keep
-the raw documents they were trained on. Multimodal document encoders such as LayoutLMv3
-meet the demand for multimodal understanding by fusing text, layout, and visual pathways
-into a single network, yet it remains unknown which part of this heterogeneous network
-drives catastrophic forgetting. Prevailing continual-learning methods do not ask: they
-regularise the network uniformly or freeze layers by hand-tuned heuristics, and even
-parameter-efficient and modular adaptation presupposes knowing where to intervene. The
-document setting adds two difficulties of its own, since key-information extraction is dense
-token-level sequence labelling rather than the classification most continual-learning
-methods were built for, and document features are close to full rank, so past tasks cannot
-be compressed into a small summary.
+We study catastrophic forgetting issues in document understanding as key-information
+extraction (KIE) models must adapt to new documents arriving in a streaming fashion, which
+often leads them to forget what they learned from previous ones. Whereas prior studies
+primarily measure how much such models forget, we investigate why they forget. In this
+thesis, we find two causes. The first one is the drift of the representation: on four
+document encoders, the features of old documents change when the model is trained on new
+ones, and replaying stored documents shows competitive performance against joint training
+when only the domain changes. The second one appears when the label space grows, known as
+class-incremental learning (CIL), where replay suffers from a big gap. We find that replay
+can reduce drift while retaining conflicting supervision through the background label,
+which marks every token that is not an annotated entity: a shared softmax treats each
+background label as evidence against all classes, while it is evidence only against the
+classes its annotator could see.
 
-This thesis studies a stream of key-information-extraction tasks, in which scanned documents
-arrive as page images, OCR tokens, and bounding boxes with BIO entity labels, under
-class-incremental, domain-incremental, and mixed regimes. A pre-trained tri-modal encoder
-learns them in sequence with a bounded memory and no access to past raw documents, and must
-end as a single model that extracts entities from every task seen so far. We first locate
-where in the encoder forgetting concentrates, then use that answer to decide what a
-memory-bounded remedy must retain and which of its stored evidence it should re-expose,
-arriving at a single method, \textbf{compressed latent replay with live labels (CoLaR-R)}, in which each of these
-choices follows from a measurement.
-
-The diagnosis masks the input modalities of a single LayoutLMv3, holding the architecture
-fixed, and reads forgetting out through linear CKA drift, per-group Fisher information, and
-Fisher-weighted parameter displacement at every task boundary, with LiLT, BROS, and a
-text-only BERT as contrasts. It shows that forgetting is output-side: the classifier head
-has over ten times the Fisher importance of any other parameter group, and CKA
-drift rises monotonically with depth, from $1.00$ at the input encoders to $0.25$ at the late
-layers and $0.16$ at the head. The same site recurs on every backbone, including the unimodal
-one, so it is not a multimodal artefact. Protecting it does not help, however: freezing the
-head and late layers merely moves the drift to whatever remains plastic, which suggests that a
-remedy should re-supply old-task evidence at this site rather than protect its parameters.
-
-A ten-method comparison over three seeds bears this out. Regularisation, distillation, and
-prompt- or LoRA-based methods fail for a common reason, as the head's output marginal snaps
-to the newest task while the representation beneath it drifts, and pre-registered eval-time
-and marginal-level corrections recover nothing. Replay alone closes the gap, reaching an
-average entity-F1 of about $88$ on domain-incremental learning against the joint oracle's
-$88.7$, but only when it replays whole documents: every summary that breaks the binding of
-feature, position, and label collapses to the naive level, even when built from real
-activations. Individual documents, unlike the pooled feature space, are nevertheless low-rank,
-so storing each past document as its own low-rank factors at an intermediate layer (CoLaR)
-preserves that binding and reaches $87.6$ with a $60$\,MB memory, $2.7\times$ smaller than raw
-replay and without keeping any raw page.
-
-Where the label space grows, the memory is not the bottleneck. Scoring each
-class-incremental session on its own label set, as the per-task matrix of the literature
-assumes, lifts the oracle from $33$ to $92$ AA while every replay method stays near $20$--$30$:
-current documents label old entities as background and replayed documents label new ones as
-background, and both move the one shared background logit on the same surface forms. The
-proposed method, \textbf{CoLaR-SBR}, un-shares it: each session owns a readout block with its
-own background logit, trained only where its annotation is complete, and tokens are routed per
-block by their non-background mass with no task identifier. On the same bank it reaches
-$88.0\pm1.9$ AA on class-incremental CORD and $89.7$ on the mixed stream, at the joint oracle;
-storing a per-session low-rank delta of the upper trunk beside the bank and reading each block
-under its own delta (SBR-Recall) reaches $92.8\pm0.5$ over three seeds with exact retention. Together
-with the diagnostic protocol, the benchmark, and the tooling released with the thesis, the
-method offers a measurement-driven route to continual learning for multimodal document
-encoders.\footnote{Source code:
+Based on this finding, we propose a novel method called CoLaR-SBR. Inspired by latent
+replay and per-session readouts, our method maintains a Compressed Latent Replay (CoLaR)
+memory of whole documents to remind the model of past sessions, and uses a Session-Blocked
+Readout (SBR) that gives each session its own background logit to remove this conflict
+without additional annotations. Furthermore, we show that per-session low-rank updates can
+replace the memory when the classes grow within one annotation schema. We build a benchmark
+of six streams over 5 public document datasets, benchmark our method against 8 continual
+learning baselines under one protocol, and achieve significant improvement in the
+class-incremental setting, with competitive performance against joint training.\footnote{Source code:
 \url{https://github.com/hoangthanh283/doccl} (\texttt{doccl} branch); experiments tracked on
 Weights \& Biases at \url{https://wandb.ai/thanh-workspace/doccl-aaai2027}.}
 
