@@ -1,132 +1,94 @@
-% =====================================================================
-\chapter{Supplementary Material}
+% Appendix A (two-cause rewrite, 2026-11): settings and baselines. Settings are not results;
+% the baseline tables are generated.
+\chapter{Settings and Baselines}
 \label{app:supplementary}
-% =====================================================================
 
-\section{Key Hyperparameters}
+\section{Training Settings}
 \label{app:hyperparameters}
 
-Table~\ref{tab:hyperparameters} lists the default training hyperparameters shared
-across runs. Method-specific hyperparameters (e.g.\ the EWC penalty $\lambda$, the
-replay-buffer size, the prompt-pool size, the LoRA rank) are set per method and
-recorded in the corresponding configuration files.
+Table~\ref{tab:hyperparameters} lists the settings shared by all runs and the settings of
+our method. The protocol is described in Section~\ref{sec:e-protocol}.
 
 \begin{table}[!htbp]
   \centering
-  \caption[Default hyperparameters]{Shared training defaults (top) and the main
-  method-specific hyperparameters with their sweep ranges (bottom). Scenario-specific
-  values are recorded in the released configurations.}
+  \caption[Training settings]{\textbf{Training settings.} Top: shared by all methods.
+  Bottom: the proposed method.}
   \label{tab:hyperparameters}
-  \begin{tabular}{ll}
+  \small
+  \begin{tabular}{@{}l >{\raggedright\arraybackslash}p{9.6cm}@{}}
     \toprule
-    \textbf{Hyperparameter} & \textbf{Value} \\
+    Setting & Value \\
     \midrule
-    \multicolumn{2}{l}{\emph{Shared}} \\
-    Backbone               & LayoutLMv3-base (12 layers, hidden 768) \\
-    Optimiser              & AdamW (weight decay $0.01$) \\
-    Learning rate          & $5\times10^{-5}$ \\
-    LR schedule            & constant (no warmup) \\
-    Gradient clipping       & max-norm $1.0$ \\
-    Batch size             & 8 \\
-    Gradient accumulation  & 1 \\
-    Epochs per task        & 10 \\
-    Precision              & fp32 (fp16 flag available, off by default) \\
-    Image resolution       & $224\times224$ \\
-    Box coordinate range   & $[0,1000]^4$ \\
-    Seeds                  & 42, 123, 7 \\
-    Determinism            & fixed seeds; deterministic cuDNN \\
+    \multicolumn{2}{@{}l}{\emph{Shared}} \\
+    Main encoder & LayoutLMv3-base ($12$ layers, width $768$) \\
+    Optimizer & AdamW, learning rate $5\times10^{-5}$, weight decay $0.01$ \\
+    Gradient clipping & norm $1.0$ \\
+    Batch size & $2$ documents, gradient checkpointing \\
+    Precision & full precision \\
+    Epochs per session & at most $10$ ($100$ for joint training) \\
+    Early stopping & $10\%$ of the session held out; patience $2$ epochs; minimum gain $0.1$ F1 \\
+    Input & $512$ tokens, $224\times224$ image, boxes in $[0,1000]$ \\
+    Runs per cell & $3$ \\
     \midrule
-    \multicolumn{2}{l}{\emph{Method-specific (default; sweep)}} \\
-    EWC penalty $\lambda$  & $1000$; $\{10^2,10^3,10^4\}$ \\
-    EWC online decay $\gamma$ & $1$ \\
-    Fisher estimation samples & $200$ \\
-    LwF $\alpha$, temp.\ $T$ & $1.0$, $2.0$; $\alpha\in\{0.5,1,2\}$ \\
-    Replay buffer          & $200$; $\{200,500\}$ \\
-    ER replay batch size   & $8$ \\
-    DER++ $\alpha$, $\beta$ & $0.5$, $0.5$; logit weight $\in\{0.1,0.5,1\}$ \\
-    LexSlot head / late slots & $48$ / $18$ (per-task budget $n_{\text{slots}}/T$) \\
-    LexSlot repr-slot rank $r$ & $16$ \\
-    LexSlot sharing; depth & off (isolated); head\_late \\
-    L2P pool / length / top-$K$ & $10$ / $5$ / $5$ \\
-    L2P key-loss weight $\lambda_{\text{key}}$ & $0.5$ \\
-    LoRA rank / $\alpha$ / dropout & $8$ / $16$ / $0.1$; rank $\in\{4,8,16\}$ \\
-    O-LoRA targets / $\lambda_{\text{ortho}}$ & Q, K, V / $0.5$ \\
-    CKA probe set          & 500 samples (mean-pooled) \\
+    \multicolumn{2}{@{}l}{\emph{CoLaR-SBR}} \\
+    Injection layer $k$ & $4$ (layers $1$ to $4$ frozen after the first session) \\
+    Rank $r$ of the stored factors & $128$, half precision \\
+    Stored documents & $50$ per session ($10$ on CIL-FUNSD) \\
+    Replayed documents per batch & $4$ \\
+    Claim threshold & $0.5$ \\
+    \midrule
+    \multicolumn{2}{@{}l}{\emph{SBR-Recall}} \\
+    Rank of an update & $64$, scale $\alpha=128$ \\
+    Updated maps & query, key, value, attention output and both feed-forward maps of layers $5$ to $12$ \\
+    Stored documents & none on one schema; $50$ per session across schemas \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\subsection{CIL-CORD Session Class Lists}
-\label{app:cil-classes}
+\section{Baselines}
+\label{app:baselines}
 
-Table~\ref{tab:cil-classes} records the exact six CORD fine-grained classes
-introduced at each session of the CIL-CORD scenario
-(\S\ref{sec:exp-cil}, Table~\ref{tab:cil-split}). Class names follow CORD's
-native \texttt{category.field} naming; each class contributes a B- and an I-
-tag to the BIO label space.
+Table~\ref{tab:baselinecard-full} gives the full card of the eight baselines: what our
+re-implementation keeps from the published method, what it changes, and what it keeps
+across the sessions. Table~\ref{tab:baseline-hp} lists their hyper-parameters as recorded
+by the runs; they are the defaults of each method. LCA keeps its published optimizer
+instead of AdamW, i.e., SGD with momentum.
+
+\begin{landscape}
+\begin{table}[p]
+  \centering
+  \caption[Baseline card]{\textbf{Baseline card}: the published method, what our
+  re-implementation keeps and changes, and its memory on CIL-CORD.}
+  \label{tab:baselinecard-full}
+  \resizebox{\linewidth}{!}{\input{generated/paper/supp_baselines}}
+\end{table}
+\end{landscape}
 
 \begin{table}[!htbp]
   \centering
-  \caption[CIL-CORD per-session class lists]{The six CORD fine-grained classes
-  introduced at each CIL-CORD session. Shared prefixes are factored for
-  compactness.}
-  \label{tab:cil-classes}
-  \small
-  \begin{tabular}{cp{10.5cm}}
-    \toprule
-    \textbf{Session} & \textbf{Classes introduced} \\
-    \midrule
-    0 & \texttt{menu.\{cnt, discountprice, itemsubtotal, nm, num, price\}} \\
-    1 & \texttt{menu.\{unitprice, vatyn\}};
-        \texttt{menu.sub.\{cnt, nm, price, unitprice\}} \\
-    2 & \texttt{sub\_total.\{discount\_price, etc, othersvc\_price,
-        service\_price, subtotal\_price, tax\_price\}} \\
-    3 & \texttt{total.\{cashprice, changeprice, creditcardprice, emoneyprice,
-        menuqty\_cnt, menutype\_cnt\}} \\
-    4 & \texttt{total.\{total\_etc, total\_price\}};
-        \texttt{void\_menu.\{nm, price\}}; \texttt{sub.\{nm, cnt\}} \\
-    \bottomrule
-  \end{tabular}
+  \caption[Hyper-parameters of the baselines]{\textbf{Hyper-parameters of the baselines}
+  as recorded by the runs on CIL-CORD. The last three columns give the protocol and the
+  number of runs per stream (clean: the protocol of Section~\ref{sec:e-protocol}).}
+  \label{tab:baseline-hp}
+  \resizebox{\textwidth}{!}{\input{generated/paper/supp_baselines_hp}}
 \end{table}
 
-\section{Per-Component Metric Definitions}
-\label{app:metric-definitions}
+\paragraph{Choice of the baselines.} We fixed the set of baselines after a first comparison
+on CIL-CORD, Mixed and DIL. EWC~\citep{kirkpatrick2017ewc}, L2P~\citep{wang2022l2p} and
+DualPrompt~\citep{wang2022dualprompt} did not learn sessions~4 and~5 of CIL-CORD in any
+run (Table~\ref{tab:dropped}); hence, we dropped them. CPFD and IS3 also fail on this
+stream; however, we kept them because they are designed for the shift of the background
+label. It is noted that the baselines differ in what they learn as well as in what they
+forget: CPFD reaches $\nCpfdLateMax$ F1 on its best later session right after it is
+learned, whereas IS3, CODA-Prompt and LCA each have a later session that is learned to at
+most $\nBaseWorstLateMax$ F1 in every run. In contrast, naive fine-tuning learns every
+session to at least $\nNaiveDiagMin$.
 
-\paragraph{Linear CKA.} For centred activation matrices $X\in\mathbb{R}^{n\times
-p}$ and $Y\in\mathbb{R}^{n\times q}$ collected on a fixed probe set,
-\[
-  \mathrm{CKA}(X,Y) = \frac{\lVert Y^\top X\rVert_F^2}
-  {\lVert X^\top X\rVert_F\,\lVert Y^\top Y\rVert_F},
-\]
-which is invariant to orthogonal transforms and isotropic
-scaling~\citep{kornblith2019similarity}. Layer-wise CKA between checkpoints
-quantifies representational drift.
-
-\paragraph{Per-group Fisher information.} For parameter group $g$ and data
-$\mathcal{D}$,
-\[
-  F_g = \frac{1}{|\mathcal{D}|}\sum_{(x,y)\in\mathcal{D}}
-        \sum_{\phi\in g}\Big(\frac{\partial\log p_\theta(y\mid x)}{\partial\phi}\Big)^2 .
-\]
-Parameters are aggregated into the eight groups of \S\ref{sec:method-components}.
-
-\paragraph{Continual-learning metrics.} Average accuracy, backward transfer,
-forward transfer, and average forgetting are defined in \S\ref{sec:eval-metrics}.
-
-\section{Extended Per-Task Result Tables}
-\label{app:extended-results}
-
-Once the full experimental grid completes, this section will report the detailed
-tables underlying the aggregate numbers in the main text: the per-task accuracy
-matrix $R[i,j]$ (accuracy on task $j$ after training through task $i$) for each
-method, scenario, and seed, from which average accuracy, backward transfer, and
-average forgetting are derived; the per-condition layer-wise CKA and per-group
-Fisher values that support the diagnosis; and per-seed breakdowns with means and
-standard deviations. All values will be regenerated from the tracked logs so that
-they remain consistent with the figures and summary tables.
-
-% TODO: full per-task accuracy matrices R[i,j] for each method, scenario, and
-% seed; per-condition CKA and Fisher tables. Fill from results/ once experiments
-% complete.
-\textbf{[To be added once the full grid completes: per-task accuracy matrices,
-per-condition CKA and Fisher tables, and per-seed breakdowns.]}
+\begin{table}[!htbp]
+  \centering
+  \caption[Baselines that were dropped]{\textbf{Baselines that were dropped} (CIL-CORD,
+  first comparison, earlier protocol; AA per run). Unlearned sessions: the sessions whose
+  F1 right after training stays near zero.}
+  \label{tab:dropped}
+  \small\input{generated/paper/supp_dropped}
+\end{table}

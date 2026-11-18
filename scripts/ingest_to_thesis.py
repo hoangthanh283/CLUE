@@ -62,7 +62,9 @@ def ingest_paper(paper_dir: Path, thesis_dir: Path) -> int:
     for f in sorted(paper_dir.glob("*.tex")):
         if "generated" in f.read_text(errors="ignore").split("\n", 1)[0].lower():
             # thesis wording: the paper's table labels say 'port'
-            (gen / f.name).write_text(f.read_text().replace("(our port)", "(our re-implementation)"))
+            t = f.read_text().replace("(our port)", "(our re-implementation)")
+            t = t.replace("Our port keeps", "Kept from the method")
+            (gen / f.name).write_text(t.replace("Our port changes", "Changed in our version"))
             n += 1
     for f in sorted(paper_dir.glob("fig/*.tex")):  # schematics: keep the picture, drop the float
         drop = ("\\begin{figure", "\\end{figure", "\\caption", "\\label", "\\centering")

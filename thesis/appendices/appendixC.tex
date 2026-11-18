@@ -1,0 +1,117 @@
+% Appendix C (two-cause rewrite, 2026-11): extended results. Every table is generated.
+\chapter{Extended Results}
+\label{app:extended-results}
+
+This appendix gives the values behind the summaries of Chapter~\ref{ch:results}: the
+results of every run, the retention matrices, the slices of the softmax on CIL-FUNSD and
+the design choices of SBR-Recall.
+
+\section{Results of Every Run}
+\label{app:per-run}
+
+Table~\ref{tab:perseed} lists the \gls{aa} of every run behind the main cells on CIL-CORD,
+Mixed and DIL, with the mean training time of a run. Table~\ref{tab:newstreams-runs} does
+the same for CIL-WildReceipt and DIL-XFUND.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[AA of every run on CIL-CORD, Mixed and DIL]{\textbf{AA of every run} on
+  CIL-CORD, Mixed and DIL (columns: the three runs; h/run: mean training time in hours).
+  Source: \emph{clean} is the protocol of Section~\ref{sec:e-protocol}; the rows marked
+  $^{\dagger}$ follow an earlier protocol and belong to Appendix~\ref{app:earlier}.}
+  \label{tab:perseed}
+  \footnotesize\input{generated/paper/supp_perseed}
+\end{table}
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Results of every run on CIL-WildReceipt and DIL-XFUND]{\textbf{Results of every
+  run} on CIL-WildReceipt and DIL-XFUND.}
+  \label{tab:newstreams-runs}
+  \footnotesize\input{generated/paper/supp_newstreams}
+\end{table}
+
+\section{Retention Matrices}
+\label{app:matrices}
+
+Tables~\ref{tab:mat-cord} and~\ref{tab:mat-mixed} give the retention matrices behind
+Figure~\ref{fig:heatmaps} and behind the Mixed results (mean over the three runs; row $i$:
+after training session $i$; column $j$: session $j$). On CIL-CORD, the diagonal of CoLaR
+with a shared softmax falls from session~3 on, whereas CoLaR-SBR and SBR-Recall learn
+every session and keep it. On Mixed without a memory, SBR-Recall loses the first two
+sessions as soon as the schema changes and does not recover them when FUNSD returns in
+session~6.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Retention matrices on CIL-CORD]{\textbf{Retention matrices on CIL-CORD}
+  (session-restricted F1).}
+  \label{tab:mat-cord}
+  \footnotesize
+  \input{generated/paper/supp_mat_colar}\\[8pt]
+  \input{generated/paper/supp_mat_sbr}\\[8pt]
+  \input{generated/paper/supp_mat_recall}
+\end{table}
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Retention matrices on Mixed]{\textbf{Retention matrices on Mixed}
+  (session-restricted F1).}
+  \label{tab:mat-mixed}
+  \footnotesize
+  \input{generated/paper/supp_mat_sbr_mix}\\[8pt]
+  \input{generated/paper/supp_mat_recall_mix_mem}\\[8pt]
+  \input{generated/paper/supp_mat_recall_mix_nomem}
+\end{table}
+
+\section{Slicing the Softmax on CIL-FUNSD}
+\label{app:funsd}
+
+On CIL-FUNSD, the question, answer and header types of FUNSD arrive in two sessions, and
+the forms of session~2 also contain questions, which are labelled ``O''.
+Table~\ref{tab:funsd} reports the repairs of Section~\ref{sec:r-h2} on this stream
+together with two slices of the softmax. The replay-side slice keeps, for a stored
+document, all classes that were known when it was stored. The current-side slice removes
+the logits of the old classes only for the tokens labelled ``O''; the tokens with an
+entity label still use the full softmax. Combining both slices is a partial-label control
+inspired by SS-IL~\citep{ahn2021ssil} and ER-ACE~\citep{caccia2022erace}, and not a full
+reproduction of them. As shown in Table~\ref{tab:funsd}, CoLaR-SBR is level with joint
+training, whereas the memory relabelled with the ground-truth labels stays at the level
+of the shared softmax, even with fifty stored forms. In contrast, slicing both losses
+closes most of the gap on this stream, and slicing only the current loss closes a part of
+it.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[CIL-FUNSD]{\textbf{CIL-FUNSD} ($10$ stored forms per session; mean $\pm$ s.d.).
+  $R[2,1]$: F1 of session~1 after session~2 (range over the runs). $^{r}$Uses the
+  ground-truth labels of the stored forms.}
+  \label{tab:funsd}
+  \small\input{generated/paper/supp_funsd}
+\end{table}
+
+\section{Design Choices of SBR-Recall}
+\label{app:recall-design}
+
+Table~\ref{tab:ablext} gathers two design choices of SBR-Recall. \emph{Capacity of the
+updates.} An update of rank $8$ on the query, key and value maps learns its weakest
+session only to the value in the column min $R[j,j]$, and adding the memory does not
+repair it. In contrast, at rank $64$ with the attention output and the feed-forward maps,
+every session is learned. Hence, the capacity of the update was the limit, and we use rank
+$64$; this is the one setting that we chose on CIL-CORD. \emph{Across schemas.} Without a
+memory on Mixed, an old block is trained towards its background on every token of the
+documents of another schema, and nothing trains it towards its own tags; hence, it stops
+claiming its entities and does not recover when its dataset returns: both minima of this
+row are zero. Since the encoder is frozen, this is an effect of the readout and not of
+drift. In contrast, with the $50$-document memory, SBR-Recall reaches $\nRecallMixMem$
+\gls{aa} against $\nRecallMixNoMem$ without it. Thus, the updates do not replace the
+memory across schemas.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Design choices of SBR-Recall]{\textbf{Design choices of SBR-Recall} (AA, mean
+  $\pm$ s.d.). Min $R[j,j]$: the lowest F1 of a session right after it is learned; min
+  $R[T,j]$: the lowest final F1 of a session, both over all runs.}
+  \label{tab:ablext}
+  \small\input{generated/paper/supp_ablation_ext}
+\end{table}

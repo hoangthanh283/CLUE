@@ -1,30 +1,182 @@
-% Chapter 4 (two-cause rewrite, 2026-11). Stub: headings and sources only.
+% Chapter 4 (two-cause rewrite, 2026-11).
 % Old text: chapters_old/chapter4.tex (git tag thesis-pre-two-causes).
 \chapter{Implementation and Integration}
 \label{ch:implementation}
 
+This chapter describes how the methods of Chapter~\ref{ch:methodology} are implemented and
+how the numbers of Chapter~\ref{ch:results} are produced. In the following, we first
+summarize the software stack (Section~\ref{sec:c4-s1}) and the architecture of the system
+(Section~\ref{sec:c4-s2}). Then, we detail the path from a training run to a number in
+this thesis (Section~\ref{sec:c4-s3}) and what is needed to reproduce the results
+(Section~\ref{sec:c4-s4}).
+
+% =============================================================================
 \section{Framework and Software Stack}
 \label{sec:c4-s1}
-% SOURCE: old ch4 15-125 trimmed
-\todo{to be written}
 
+All experiments run in one code base, which is written in Python on top of PyTorch and the
+Hugging Face Transformers library (Table~\ref{tab:software-stack}). Existing
+continual-learning libraries are mainly designed for image classification with one label
+per sample. Our setting needs a head that grows by \gls{bio} tags, a loss over the tokens
+of whole documents, a scorer over entities and a retention matrix with a session
+restriction. Hence, we implemented the training loop, the streams and all methods
+ourselves, so that every method runs through the same loop, the same data and the same
+scorer.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Software stack]{\textbf{Software stack} of the experiments.}
+  \label{tab:software-stack}
+  \small
+  \begin{tabularx}{\textwidth}{@{}l l >{\raggedright\arraybackslash}X@{}}
+    \toprule
+    Component & Library & Role \\
+    \midrule
+    Models & PyTorch ($\geq 2.2$), Transformers $4.48$ & encoders, pre-trained weights,
+      tokenizers \\
+    Low-rank updates & PEFT $0.13$ & adapters of the LoRA baselines; the per-session
+      updates of SBR-Recall are our own modules \\
+    Configuration & Hydra $1.3$ & one configuration group each for the stream, the method,
+      the encoder and the training recipe \\
+    Scoring & seqeval $1.2$ & entity-level F1 over \gls{bio} tags \\
+    Tracking & Weights \& Biases, TensorBoard & curves and run records \\
+    Environment & uv & locked Python environment \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% =============================================================================
 \section{System Architecture}
 \label{sec:c4-s2}
-% SOURCE: old ch4 183-432
-\todo{to be written}
 
+A run is assembled from four parts: a stream, an encoder, a method and a training recipe.
+The entry point reads the configuration, builds the stream, wraps the encoder, creates the
+method and runs the continual loop (Algorithm~\ref{alg:cl-loop}). Two registries map the
+name of an encoder and the name of a method to their classes; adding an encoder or a method
+therefore needs one class, one registry entry and one configuration file.
+
+\begin{algorithm}[!htbp]
+  \caption{The continual loop shared by all methods}
+  \label{alg:cl-loop}
+  \begin{algorithmic}[1]
+    \Require stream of sessions $\mathcal{D}_{1:T}$ with test splits, encoder, method $M$
+    \For{$t=1$ \textbf{to} $T$}
+      \State grow the head by the new tags of session $t$ (old rows are kept)
+      \State $M.\textsc{BeforeSession}(t)$
+      \State hold out $10\%$ of $\mathcal{D}_t$ for early stopping
+      \State $M.\textsc{TrainSession}(t)$ \Comment{restores the weights of the best epoch}
+      \State $M.\textsc{AfterSession}(t)$ \Comment{e.g., write the memory of session $t$}
+      \For{$j=1$ \textbf{to} $t$}
+        \State $R[t,j]\gets M.\textsc{Evaluate}(\text{test split of session } j)$
+      \EndFor
+    \EndFor
+    \State score the final model on the unmasked test set (full-label F1)
+    \State \Return $R$, \gls{aa}, \gls{af}, full-label F1
+  \end{algorithmic}
+\end{algorithm}
+
+\paragraph{Streams.} A stream builder returns the sessions with their training and test
+splits and, for joint training, one pool that holds every document once with all its
+labels. In the class-incremental streams, a remapper translates the tags of a dataset into
+the positions of the growing head and masks the tags outside the session to ``O'', as in
+Equation~\eqref{eq:mask}. It is noted that joint training must use the pool with all
+labels: concatenating the masked copies of the sessions would show the same document with
+contradicting labels. Every dataset is tokenized for the encoder of the run, and the page
+images are decoded only when a batch needs them.
+
+\paragraph{Encoders.} Every encoder is wrapped in a class with one interface: grow the
+head, run a forward pass from the input or from the activations of a given layer, return
+the parameters by depth group (for the analysis of Section~\ref{sec:m-drift}), and freeze
+or unfreeze a range of layers. The head is a single linear layer for all encoders. The
+wrapper of LayoutLMv3 keeps the image input; those of LiLT, BROS and BERT share one base
+class without it.
+
+\paragraph{Methods.} Every method implements the same four steps of
+Algorithm~\ref{alg:cl-loop}. The base class provides what all methods share, i.e., the
+optimizer, gradient clipping, early stopping with the restoration of the best epoch and
+optional mixed precision. Hence, a baseline and our method differ only in what they add
+to the loss and what they keep across the sessions. The eight baselines are
+re-implemented on this interface (Section~\ref{sec:e-baselines}).
+
+\paragraph{The proposed method.} CoLaR-SBR consists of three modules. The memory module
+runs the frozen lower layers on the documents selected at the end of a session, computes
+the truncated \gls{svd} of the layer-$k$ activations of each document and stores the two
+factors in half precision with the boxes, the mask, the labels and the session of the
+document. At training time, it rebuilds the activations of a stored document and feeds
+them into layer $k{+}1$. The readout module holds one background vector and bias per
+block, builds the supervision plan of a batch from the session of each document
+(Table~\ref{tab:supervision}) and applies the inference rule of
+Equation~\eqref{eq:infer}. SBR-Recall adds the per-session low-rank updates as modules on
+the linear layers above $k$; its loss groups the blocks of a document by the update that
+each block is read under and runs one forward pass per update.
+
+\paragraph{Analysis tools.} The drift analysis keeps a checkpoint at every session
+boundary and computes linear \gls{cka} over individual tokens, the Fisher importance and
+the displacement per group (Algorithm~\ref{alg:drift}). For the error analysis, a run can
+save its predictions on the unmasked test set and the scores of every block; the tables of
+Section~\ref{sec:c6-s9} are computed from these files.
+
+% =============================================================================
 \section{From Runs to Tables: A Single Source of Numbers}
 \label{sec:c4-s3}
-% SOURCE: NEW: generators, ingest, audit
-\todo{to be written}
 
+A thesis with several hundred runs is exposed to a simple risk: a number that is copied by
+hand can become stale when a run is repeated. To exclude it, no result number of this
+thesis is typed by hand.
+
+\paragraph{Run records.} Every run writes its retention matrix, a record with \gls{aa},
+\gls{af}, the full-label F1, the training time, the number of trainable parameters, the
+peak GPU memory and the size of its memory, and its configuration. The records are files
+on disk; the tracking services are used for monitoring only.
+
+\paragraph{Generators.} A small set of scripts reads the run records and writes every
+table as a LaTeX file, every figure as a PDF and every number that the text quotes as a
+LaTeX macro. A cell is the mean and the standard deviation (with $n{-}1$ in the
+denominator) of the runs of its family; a cell with fewer than three runs prints its runs
+instead. The text then uses the macro and not the number. For instance, the sentence ``a
+gain of at least \dots{} points in every run'' is written with a macro that the generator
+computes as the smallest gain over the runs, rounded towards the weaker claim.
+
+\paragraph{Checks.} The generators stop with an error when a table would be wrong. For
+instance, the memory sizes of Section~\ref{sec:c6-s7} are computed from the tensor shapes
+and compared with the size that each run recorded, and the figures are checked against
+the tables that show the same runs. After each change of the results, an audit
+recomputes the cells of the main tables from the run records independently of the
+generators.
+
+\paragraph{One source for all documents.} The generated files are copied unchanged into
+this thesis. Hence, a table here and the same table in a publication of this work cannot
+disagree, and a repeated run changes all of them at once.
+
+% =============================================================================
 \section{Reproducibility}
 \label{sec:c4-s4}
-% SOURCE: old ch4 433-460
-\todo{to be written}
 
+\paragraph{Randomness and configuration.} Every cell is run with three fixed random seeds,
+which control the initialization of the head, the order of the documents and the choice of
+the held-out documents. The configuration files of the streams, the methods and the
+recipes are never edited once a run has used them; a new setting is a new file or an
+override that the run record stores. The name of a run encodes its stream, method, setting
+and seed, so that a table cell can be traced back to its runs.
+
+\paragraph{Protocol.} All methods share the recipe of Section~\ref{sec:e-protocol}. In
+particular, early stopping uses documents that are held out from the training set of the
+session; the test split never selects a model or a hyper-parameter.
+
+\paragraph{Compute.} A run of five sessions takes a few hours on one consumer GPU
+(Table~\ref{tab:cost}). With a batch size of two and gradient checkpointing, the peak
+memory on CIL-CORD stays below $5$\,GB for every method; hence, the experiments can be repeated on a
+single card with $6$\,GB of memory.
+
+\paragraph{Availability.} The code, the configuration files, the generators and the run
+records behind the tables are released with the thesis (see the footnote of the abstract).
+All datasets are public.
+
+% =============================================================================
 \section{Summary}
 \label{sec:c4-s5}
-% SOURCE: 
-\todo{to be written}
 
+All methods run through one loop, one data pipeline and one scorer, so that they differ
+only in what they add to the loss and what they keep. Every number of the thesis is
+written by a generator from the run records, with checks that stop a wrong table. The next
+chapter describes the datasets, the streams and the protocol.
