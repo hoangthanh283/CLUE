@@ -1,35 +1,320 @@
-% Chapter 5 (two-cause rewrite, 2026-11). Stub: headings and sources only.
+% Chapter 5 (two-cause rewrite, 2026-11). Setup only: no result number.
 % Old text: chapters_old/chapter5.tex (git tag thesis-pre-two-causes).
 \chapter{Experimental Setup}
 \label{ch:experimental-setup}
 
+This chapter describes the setting in which the analyses and the method of
+Chapter~\ref{ch:methodology} are evaluated. In the following, we first present the five
+datasets (Section~\ref{sec:e-datasets}) and the six continual streams built from them
+(Section~\ref{sec:e-streams}). Then, we detail the models and the training protocol
+(Section~\ref{sec:e-protocol}) and the baselines (Section~\ref{sec:e-baselines}). Finally, we
+describe how the results are scored and reported (Section~\ref{sec:e-eval}).
+
+% =============================================================================
 \section{Datasets}
-\label{sec:c5-s1}
-% SOURCE: old ch5 12-98; five datasets
-\todo{to be written}
+\label{sec:e-datasets}
 
+We consider five public document datasets (Table~\ref{tab:datasets}). All of them provide
+the \gls{ocr} words and their bounding boxes, which we use as they are; hence, no \gls{ocr}
+engine enters the experiments, and the input pipeline is the same for every run.
+
+\begin{itemize}
+  \item \textbf{FUNSD}~\citep{jaume2019funsd} consists of noisy scanned forms. Each word
+        belongs to a header, a question, an answer or to none of them. It is small, with
+        $149$ training and $50$ test forms, but a form holds several hundred words.
+  \item \textbf{CORD}~\citep{park2019cord} consists of receipts with $30$ fine-grained
+        entity classes in five groups (menu, sub-total, total, void menu and sub-item). Its
+        large label space makes it our main host for label growth. We also use its five
+        groups as super-classes when CORD is combined with other datasets.
+  \item \textbf{SROIE}~\citep{huang2019sroie} consists of scanned receipts with four fields:
+        company, date, address and total. It has the largest test set.
+  \item \textbf{WildReceipt}~\citep{sun2021sdmgr} is a larger receipt dataset with $24$
+        entity classes, which are the keys and the values of twelve fields. It tests label
+        growth on more documents and on a different schema than CORD.
+  \item \textbf{XFUND}~\citep{xu2022xfund} is the multilingual counterpart of FUNSD with the
+        same three entity types. We use five of its languages: German, Spanish, French,
+        Italian and Chinese.
+\end{itemize}
+
+\begin{table}[!htbp]
+  \centering
+  \caption[The five document datasets]{\textbf{The five document datasets.} Tags count the
+  \gls{bio} tags including ``O''. XFUND is counted per language.}
+  \label{tab:datasets}
+  \begin{tabular}{@{}llrrrr@{}}
+    \toprule
+    Dataset & Documents & Train & Test & Classes & Tags \\
+    \midrule
+    FUNSD & scanned forms & 149 & 50 & 3 & 7 \\
+    CORD & receipts & 800 & 100 & 30 & 61 \\
+    SROIE & scanned receipts & 626 & 347 & 4 & 9 \\
+    WildReceipt & receipts & 1267 & 472 & 24 & 49 \\
+    XFUND & forms, five languages & 149 & 50 & 3 & 7 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% =============================================================================
 \section{Continual Streams}
-\label{sec:c5-s2}
-% SOURCE: paper App. A: six streams; old ch5 99-303
-\todo{to be written}
+\label{sec:e-streams}
 
+From the five datasets, we build six streams that instantiate the three settings of
+Section~\ref{sec:m-formulation}: three class-incremental streams, two domain-incremental
+streams and one Mixed stream (Table~\ref{tab:streams}). In the following, we describe each
+of them.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[The six continual streams]{\textbf{The six continual streams.} Train/test:
+  documents of the underlying datasets. AA: average accuracy; full-label F1: on the
+  unmasked test set (Section~\ref{sec:m-formulation}).}
+  \label{tab:streams}
+  \resizebox{\textwidth}{!}{\input{generated/paper/tab_bench}}
+\end{table}
+
+\subsection{Class-Incremental Streams}
+\label{sec:e-cil}
+
+\paragraph{CIL-CORD.} We take CORD as the running example of label growth. We do not change
+the receipts; we change which of their labels a session can see. The $30$ classes are
+divided into five groups of six, one per session (Table~\ref{tab:sessions}). The training
+set of session $t$ keeps every receipt that holds at least one entity of its group and
+applies Equation~\eqref{eq:mask}; every entity of another session is labelled ``O''. Hence,
+the head grows by twelve \gls{bio} tags per session, and the same receipt returns in several
+sessions under different label masks, as in the overlapped protocol of class-incremental
+segmentation~\citep{cermelli2020mib}. As a result, the same token receives contradicting
+labels over time: the total of a receipt is ``O'' in session~1 and
+\texttt{total.total\_price} in session~5, whereas the price of a menu item is
+\texttt{menu.price} in session~1 and ``O'' in session~5. The test split of a session is
+built in the same way from the test receipts. Joint training sees every receipt once with
+all of its labels.
+
+\paragraph{CIL-FUNSD and CIL-WildReceipt.} The two other class-incremental streams are
+built in the same way. In CIL-FUNSD, the headers and the questions arrive in the first
+session and the answers in the second one; the forms of the second session also contain
+questions, which are then labelled ``O''. It is a short stream on few documents with long
+pages. In CIL-WildReceipt, the $24$ classes arrive six per session over four sessions, in
+the order of the dataset. It tests whether the findings on CORD hold on a larger dataset
+with another schema.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Sessions of CIL-CORD and Mixed]{\textbf{Sessions.} Top: CIL-CORD (classes with
+  the prefix of their group). Bottom: Mixed. Pool: training documents that contain one of
+  the session's entities; schema: the annotation scheme that the supervision rule of SBR
+  reads (Section~\ref{sec:m-sbr}).}
+  \label{tab:sessions}
+  \small
+  \begin{tabularx}{\textwidth}{@{}cLlr@{}}
+    \toprule
+    \multicolumn{4}{@{}l}{\emph{CIL-CORD} (30 classes, 61 tags)} \\
+    Session & Classes & & Pool \\
+    \midrule
+    1 & menu: cnt, discountprice, itemsubtotal, nm, num, price & & 800 \\
+    2 & menu: unitprice, vatyn, sub.cnt, sub.nm, sub.price, sub.unitprice & & 382 \\
+    3 & sub\_total: discount\_price, etc, othersvc\_price, service\_price, subtotal\_price, tax\_price & & 549 \\
+    4 & total: cashprice, changeprice, creditcardprice, emoneyprice, menuqty\_cnt, menutype\_cnt & & 723 \\
+    5 & total.total\_etc, total.total\_price, void\_menu.nm, void\_menu.price, sub.nm, sub.cnt & & 780 \\
+    \midrule
+    \multicolumn{4}{@{}l}{\emph{Mixed} (12 classes, 25 tags)} \\
+    Session & Dataset: tags introduced & Schema & Pool \\
+    \midrule
+    1 & FUNSD: header, question & FUNSD & 149 \\
+    2 & FUNSD: answer & FUNSD & 147--148 \\
+    3 & SROIE: company, date, address, total & SROIE & 625--626 \\
+    4 & CORD (super-classes): menu, sub\_total & CORD & 799--800 \\
+    5 & CORD (super-classes): total, void\_menu, sub & CORD & 797--798 \\
+    6 & FUNSD: none (all FUNSD labels) & FUNSD & 149 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Domain-Incremental Streams}
+\label{sec:e-dil}
+
+\paragraph{DIL.} For the domain-incremental streams, every dataset is mapped to one schema
+of four classes: header, key, value and other (Table~\ref{tab:dil-map}). For instance, a
+question of a FUNSD form becomes a key and its answer a value. Every session is annotated
+with all four classes, so Equation~\eqref{eq:mask} masks nothing and the head never grows.
+The model learns FUNSD forms, then SROIE receipts, then CORD receipts. It is noted that the
+mapping is a choice: SROIE has no keys of its own, so its company field is treated as a
+key, and CORD contributes no key at all; hence, the schema is dominated by values. Since
+every method is trained and scored under the same mapping, this does not favour any of
+them.
+
+\paragraph{DIL-XFUND.} The second domain-incremental stream changes the language and keeps
+everything else fixed. The XFUND forms are mapped to the same schema as FUNSD and presented
+in German, Spanish, French, Italian and Chinese in turn. Thus, the stream goes through four
+languages in Latin script and ends on a change of script.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[The unified schema of the domain-incremental streams]{\textbf{The unified
+  schema} of the domain-incremental streams: how the classes of each dataset are mapped.}
+  \label{tab:dil-map}
+  \begin{tabularx}{\textwidth}{@{}lL@{}}
+    \toprule
+    Dataset & Class of the dataset $\rightarrow$ class of the unified schema \\
+    \midrule
+    FUNSD, XFUND & header $\rightarrow$ header; question $\rightarrow$ key; answer $\rightarrow$ value \\
+    SROIE & company $\rightarrow$ key; address, date, total $\rightarrow$ value \\
+    CORD & menu, sub\_total, total $\rightarrow$ value; void\_menu, sub $\rightarrow$ other \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Mixed Stream}
+\label{sec:e-mixed}
+
+The Mixed stream has six sessions over three datasets and their annotation schemas
+(Table~\ref{tab:sessions}, bottom): FUNSD in two sessions, SROIE in one, CORD with its
+super-classes in two, and FUNSD again with all of its labels and no new class. Hence, a
+session boundary brings new classes within a dataset, a new dataset with a new schema, or a
+return to an old dataset. This stream tests the two causes together: the classes grow, as
+in the class-incremental streams, and the documents change, as in the domain-incremental
+ones. The last session measures whether the model can return to a dataset that it has not
+seen for three sessions.
+
+% =============================================================================
 \section{Model and Training Protocol}
-\label{sec:c5-s3}
-% SOURCE: paper Sec. 6.1, App. A protocol
-\todo{to be written}
+\label{sec:e-protocol}
 
+\paragraph{Model architecture.} Our main encoder is
+LayoutLMv3-base~\citep{huang2022layoutlmv3}, which reads the \gls{ocr} words, their boxes
+and the page image. We use page images at $224\times224$ and at most $512$ text tokens.
+Every model has one linear head on the token features. When the head grows, the rows of the
+old tags are kept and the rows of the new tags are initialised at random. To examine
+whether the findings depend on the encoder, we also use LiLT~\citep{wang2022lilt} and
+BROS~\citep{hong2022bros}, which read text and layout, and BERT~\citep{devlin2019bert},
+which reads text only.
+
+\paragraph{References.} We report two references. \emph{Naive fine-tuning} trains on the
+sessions in turn with no continual-learning mechanism; it shows what is lost when nothing
+is done. \emph{Joint training} trains once on all documents with all of their labels; it is
+the upper-bound baseline that a continual learner aims at.
+
+\paragraph{Memory.} A memory is filled at the end of each session with documents of that
+session, drawn at random, together with the masked labels they had. CoLaR and CoLaR-SBR
+keep $50$ documents per session as rank-$128$ factors of their layer-$4$ activations, and
+$10$ per session on CIL-FUNSD, which has only $149$ training forms. SBR-Recall keeps no
+document. The replay baselines keep raw documents. On CIL-CORD and CIL-FUNSD they receive
+the same number of documents as our memory, i.e., $\nErCilBuf$ and $20$ in total; on the
+other streams they keep $200$ to $250$ raw documents. Our memory replays four stored documents with each batch, and the replay baselines
+replay eight raw documents, the default of their implementation.
+
+\paragraph{Training protocol.} We trained our models mainly on 6 NVIDIA RTX 4070 Ti GPUs
+using the AdamW optimizer with a learning rate of $5\times10^{-5}$, a weight decay of
+$0.01$ and gradient clipping at $1.0$, in full precision with a batch size of $2$. Every
+session is trained for at most $10$ epochs with early stopping: $10\%$ of the training set
+of the session is held out, the model is scored on it after every epoch with the same
+session restriction as at test time, and training stops when the F1 has not improved by
+$0.1$ points for two epochs. The weights of the best epoch are then restored. Hence, the
+test split never selects a model. Joint training follows the same rule with at most $100$
+epochs, and with a patience of ten epochs on CIL-CORD and CIL-FUNSD, since with a patience
+of two epochs it can stop before it has started to learn.
+
+\paragraph{Hyperparameter tuning.} Tuning on the evaluated stream overstates continual
+learning methods~\citep{cha2025hyperparameters}. Hence, we tune as little as possible. The
+settings of the memory (layer, rank and number of documents) were chosen on the
+domain-incremental stream and then kept for all streams. The threshold of SBR was not
+tuned (Section~\ref{sec:m-sbr}). The only setting that we chose on a class-incremental
+stream is the rank of the updates of SBR-Recall. The baselines use the default
+hyperparameters of their methods. The impact of each setting of our method is studied in
+Section~\ref{sec:c6-s5}.
+
+% =============================================================================
 \section{Baselines}
-\label{sec:c5-s4}
-% SOURCE: paper App. C baseline card
-\todo{to be written}
+\label{sec:e-baselines}
 
+We benchmark against eight continual learning methods from five families.
+
+\begin{itemize}
+  \item \textbf{ER}~\citep{rolnick2019er}: This baseline keeps raw documents of the past
+        sessions and trains on them together with the current batch. It is the basic
+        starting point for replay.
+  \item \textbf{DER++}~\citep{buzzega2020der}: This baseline also keeps the logits of the
+        stored documents and adds a distillation term on them to replay.
+  \item \textbf{LwF}~\citep{li2017lwf}: This baseline keeps no document. It distils the
+        outputs of the previous model on the current documents.
+  \item \textbf{CODA-Prompt}~\citep{smith2023coda}: This baseline freezes the encoder and
+        learns a pool of prompts that are combined by attention.
+  \item \textbf{CL-LoRA}~\citep{he2025cllora}: This baseline freezes the encoder and learns
+        low-rank adapters with distillation from the previous model.
+  \item \textbf{CPFD}~\citep{zhang2023cpfd}: This baseline is designed for continual named
+        entity recognition. It distils the attention features of the previous model and
+        uses its predictions as pseudo-labels for the background tokens.
+  \item \textbf{IS3}~\citep{qiu2024is3}: This baseline is also designed for continual named
+        entity recognition. It distils the previous model with a debiased loss and keeps
+        class prototypes.
+  \item \textbf{LCA}~\citep{lca2026}: This baseline trains one model per session, merges
+        them, and realigns the head with features sampled from class Gaussians.
+\end{itemize}
+
+\noindent The first three are the classical families of replay and regularisation; the
+next two adapt a frozen pre-trained encoder; CPFD and IS3 address the shift of the
+background label, which makes them the closest prior work to our problem; and LCA
+represents model merging.
+
+\paragraph{Re-implementations.} All baselines are our re-implementations on the one
+growing token head that every row of our tables uses, and all of them keep the shared
+softmax. Table~\ref{tab:baselines} lists what each re-implementation changes against the
+published method and what it keeps across the sessions. It is noted that the published
+numbers of these methods are on other benchmarks and other heads; hence, our numbers for
+them are not comparable with the published ones.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[The baselines]{\textbf{The baselines}: family, what our re-implementation
+  changes against the published method, and what it keeps across the sessions (memory on
+  CIL-CORD).}
+  \label{tab:baselines}
+  \resizebox{\textwidth}{!}{\input{generated/paper/supp_baselines_short}}
+\end{table}
+
+\paragraph{Choice of the baselines.} We fixed the set of baselines after a first comparison
+on CIL-CORD, Mixed and DIL. EWC~\citep{kirkpatrick2017ewc}, L2P~\citep{wang2022l2p} and
+DualPrompt~\citep{wang2022dualprompt} did not learn the last sessions of CIL-CORD in any
+run; hence, we dropped them. EWC is still used in
+the analysis of drift on the four encoders (Section~\ref{sec:c6-s1}), where the label space
+is fixed.
+
+% =============================================================================
 \section{Evaluation and Statistics}
-\label{sec:c5-s5}
-% SOURCE: AA, full-label F1, AF; three runs; paired tests and bootstrap (E6)
-\todo{to be written}
+\label{sec:e-eval}
 
+\paragraph{Metrics.} We use the metrics of Section~\ref{sec:m-formulation}. On the three
+class-incremental streams, we report the full-label F1 of the final model as the headline
+number, together with \gls{aa} and \gls{af} from the session-restricted retention matrix.
+On the two domain-incremental streams and on Mixed, there is no single unmasked test set
+over all sessions; hence, we report \gls{aa} and \gls{af}.
+
+\paragraph{Repeated runs.} Every configuration is run three times with different random
+seeds, which change the initialisation of the head, the order of the training documents and
+the documents that are stored. Every cell of our tables is the mean and the standard
+deviation over these three runs. Where a result comes from a single run, the table or the
+text says so.
+
+\paragraph{Comparing two methods.} With three runs, a significance test has little power.
+Hence, we support a comparison in two other ways. First, for the main comparisons we also
+report the smallest difference between the two methods over the runs; a claim such as ``at
+least'' always refers to every run. Second, for the final models we compute a paired
+bootstrap over the test documents: the documents are resampled with replacement, the same
+resample is scored for both models, and we report the $95\%$ interval of the difference. It
+is noted that this interval describes the uncertainty from the test documents for two given
+models and not the variation between training runs; the two views are complementary.
+
+\paragraph{A single source of numbers.} No result number in this thesis is typed by hand.
+Every table, and every number quoted in the text, is produced by a script that reads the
+result files of the runs (Section~\ref{sec:c4-s3}); the same files produce the tables of the
+accompanying paper.
+
+% =============================================================================
 \section{Summary}
-\label{sec:c5-s6}
-% SOURCE: 
-\todo{to be written}
+\label{sec:e-summary}
 
+We evaluate on six streams over five public datasets: three class-incremental streams,
+where the background label changes its meaning; two domain-incremental streams, where only
+drift is present; and one Mixed stream with both. All methods share one encoder, one
+growing head and one training protocol, in which the test set never selects a model. Our
+method is compared against eight baselines from five families and against naive
+fine-tuning and joint training, with three runs per configuration.
