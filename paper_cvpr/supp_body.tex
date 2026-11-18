@@ -245,7 +245,7 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 \begin{table}[t]
 \centering\small
 \setlength{\tabcolsep}{5pt}
-\caption{\textbf{Session order} on CIL-CORD (full-label F1; mean $\pm$ s.d.\ of three runs; single values: one run).}
+\caption{\textbf{Session order} on CIL-CORD (full-label F1; mean $\pm$ s.d.\ of three runs; values separated by a slash: the runs of a cell with fewer than three).}
 \label{tab:order}
 \input{supp_order}
 \end{table}
@@ -266,7 +266,7 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 \input{supp_patience}
 \end{table}
 
-\runin{Session order.} \Cref{tab:order} reports CIL-CORD with its five sessions reversed and shuffled. The gap between the shared softmax and the per-session readout does not depend on the order: over the three runs of each order, CoLaR-SBR stays at or above $\nOrderSbrRunMin$ full-label F1, whereas CoLaR stays at or below $\nOrderColarRunMax$. SBR-Recall also holds under both orders (one run each).
+\runin{Session order.} \Cref{tab:order} reports CIL-CORD with its five sessions reversed and shuffled. The gap between the shared softmax and the per-session readout does not depend on the order: over the three runs of each order, CoLaR-SBR stays at or above $\nOrderSbrRunMin$ full-label F1, whereas CoLaR stays at or below $\nOrderColarRunMax$. SBR-Recall holds under the shuffled order. Under the reversed order, its runs end at \nOrderRevRecallRuns: in the last one, the first session is not learned before early stopping ends it, and with the encoder frozen afterwards, no later session is learned either.
 
 \runin{A second backbone.} To examine whether the result depends on LayoutLMv3, we repeat the main rows of the hypothesis table on CIL-CORD with BROS, which has no image input (\cref{tab:bros}; \nBrosRecipe, since BROS needs more memory per document). The picture is the same: with the same memory, the shared softmax stays at $\vBrosColarFull$ full-label F1, whereas CoLaR-SBR reaches $\vBrosSbrFull$. Besides, the two rows in between show the same order as on LayoutLMv3: the ground-truth stored labels help but are unstable, and a constant background logit is below the learned one.
 

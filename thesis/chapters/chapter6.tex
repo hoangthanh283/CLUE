@@ -173,7 +173,8 @@ memory removes the drift; neither replaces the other (Section~\ref{sec:c6-s4}).
 the three hypotheses and shows, for the final model, where the entities of the old sessions
 end. Under CoLaR-SBR, the owning block claims $\mSbrOwnerMin$ to $\mSbrOwnerMax\%$ of the
 old entity tokens, and most of the remaining errors ($\mSbrSameMin$ to $\mSbrSameMax\%$ of
-the wrong tokens) give the token another tag of its own session. Therefore, the blocks
+the wrong tokens) give the token another tag of its own session
+(Section~\ref{sec:c6-s9} gives the full breakdown). Therefore, the blocks
 rarely confuse the sessions; what is left is the usual confusion between the classes of
 one session. With a shared softmax and a memory, the newest session is suppressed, whereas
 naive fine-tuning learns it and keeps nothing older (Figure~\ref{fig:findings}c).
@@ -414,25 +415,284 @@ this setting either, and we keep four replayed documents.
   \input{generated/paper/tab_analysis}
 \end{table}
 
+% =============================================================================
 \section{Robustness}
 \label{sec:c6-s6}
-% SOURCE: session order, BROS + E2 encoders, patience
-\todo{to be written}
+% E2 (CoLaR and CoLaR-SBR on LiLT and BERT) extends the paragraph on the second encoder.
 
+The results so far use one session order, one encoder and one early-stopping rule. In this
+section, we examine whether the gap between the shared softmax and the per-session readout
+depends on any of them, and how much of it can be due to the choice of the test documents.
+
+\paragraph{Session order.} Table~\ref{tab:order} reports CIL-CORD with its five sessions
+reversed and shuffled. The gap between the shared softmax and the per-session readout does
+not depend on the order: over the three runs of each order, CoLaR-SBR stays at or above
+$\nOrderSbrRunMin$ full-label F1, whereas CoLaR stays at or below $\nOrderColarRunMax$.
+SBR-Recall holds under the shuffled order, where every run reaches at least
+$\nOrderShufRecallRunMin$. Under the reversed order, however, its runs end at
+\nOrderRevRecallRuns. In the last of them, the first session is not learned: its
+validation F1 is still zero when early stopping ends the session, which is the slow start
+that we also observed for joint training with a patience of two epochs
+(Section~\ref{sec:e-protocol}). None of the later sessions is learned in this run either.
+This is consistent with the design of SBR-Recall: the encoder is frozen after the first
+session; hence, every later update is trained on top of the first session, and a first
+session that fails cannot be repaired afterwards. In our runs, CoLaR-SBR, which keeps
+training the upper layers in every session, did not show such a failure under any order.
+Thus, the memory-free variant depends on its first session more than CoLaR-SBR does.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Session order on CIL-CORD]{\textbf{Session order} on CIL-CORD (full-label F1;
+  mean $\pm$ s.d.; values separated by a slash: the runs of a cell with fewer than three
+  runs).}
+  \label{tab:order}
+  \input{generated/paper/supp_order}
+\end{table}
+
+\paragraph{A second encoder.} To examine whether the result depends on LayoutLMv3, we
+repeat the main rows of the hypothesis table on CIL-CORD with BROS, which has no image
+input (Table~\ref{tab:bros}; \nBrosRecipe, since BROS needs more memory per document). The
+picture is the same: with the same memory, the shared softmax stays at $\vBrosColarFull$
+full-label F1, whereas CoLaR-SBR reaches $\vBrosSbrFull$, a gain of at least
+\nBrosSbrMinusColarFullMin{} points in every run. Besides, the two rows in between show the
+same order as on LayoutLMv3: the ground-truth stored labels help but are unstable
+($\vBrosOracleFull$), and a constant background logit is below the learned one
+($\vBrosConstOFull$). Hence, the background conflict and its repair are not specific to one
+encoder or to the image input.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[A second encoder: BROS on CIL-CORD]{\textbf{A second encoder}: BROS on CIL-CORD
+  (mean $\pm$ s.d.). $^{r}$Uses the ground-truth labels of the stored documents.}
+  \label{tab:bros}
+  \input{generated/paper/supp_bros}
+\end{table}
+
+\paragraph{Patience of the baselines.} One may ask whether the weak baselines only stop
+too early. To examine this, we repeat CODA-Prompt, CPFD, IS3 and LCA on CIL-FUNSD with a
+patience of ten epochs instead of two (Table~\ref{tab:patience}). More patience does not
+close the gap: every one of them stays far below CoLaR-SBR, and LCA even falls. Hence, the
+ranking of Section~\ref{sec:c6-s3} is not an effect of the early-stopping rule.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Patience of the baselines on CIL-FUNSD]{\textbf{Patience of the baselines} on
+  CIL-FUNSD (AA; mean $\pm$ s.d.; ``--'': not run).}
+  \label{tab:patience}
+  \input{generated/paper/supp_patience}
+\end{table}
+
+\input{generated/paper/supp_document_bootstrap}
+Hence, the choice of the test documents cannot explain the gap either.
+
+% =============================================================================
 \section{Memory and Computational Cost}
 \label{sec:c6-s7}
-% SOURCE: paper App. B memory analysis; E6 cost table
-\todo{to be written}
+
+In this section, we compare what the methods keep across the sessions and what they cost
+to train and to apply. The sizes follow the accounting of Section~\ref{sec:m-accounting},
+and all values are on CIL-CORD.
+
+\paragraph{What each method stores.} Table~\ref{tab:memcmp} compares what each method
+keeps across the sessions. ER and DER++ keep $\nErCilBuf$ raw documents ($\nMemErMB$\,MB),
+which expose pixels and token ids. The distillation methods keep a copy of the previous
+model ($\nMemModelMB$\,MB), and LCA keeps one encoder per session ($\nMemLcaMB$\,MB in
+all). In contrast, CoLaR-SBR keeps $250$ documents in $\nMemColarMB$\,MB,
+$\nMemLatentOverColar\times$ less than the activations it compresses, with no pixels or
+token ids. It is noted that we make no privacy claim, since activations can still leak
+content. SBR-Recall stores no document at all: its four updates take $\nMemRecallMB$\,MB at
+two bytes per parameter, and $\nMemRecallFpMB$\,MB in the precision in which we trained
+them. Among the methods of Table~\ref{tab:memcmp}, only those with our readout come close
+to joint training.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[What each method keeps across the sessions]{\textbf{Memory comparison} on
+  CIL-CORD: what each method keeps across the sessions, its size and its accuracy
+  ($1$\,MB $=10^{6}$ bytes). $^{k}$Size computed from tensor shapes or parameter counts; the
+  other sizes were recorded by the runs. $^{l}$Not counted in the size. A delta is the
+  low-rank update of one session. The 8-bit row is the
+  same ER memory counted with 8-bit pixels, an encoding that we did not run.}
+  \label{tab:memcmp}
+  \resizebox{\textwidth}{!}{\input{generated/paper/tab_memcmp}}
+\end{table}
+
+\paragraph{Size and fidelity.} Figure~\ref{fig:memory} plots the full-label F1 against the
+stored size, and Table~\ref{tab:memory} shows how one stored unit of each form is counted.
+The size does not separate the methods, whereas the readout does. Every memory that we ran
+with our readout (the rank-$128$ latent, raw documents or the updates) ends within
+$\nSbrGapFullMax$ full-label F1 points of joint training in every run, whereas the same
+latent memory under a shared softmax stays at $\vColarFull$. Regarding the size, CoLaR at
+rank $128$ is $\nMemRawOverColar\times$ smaller than raw documents as our code holds them,
+but $\nMemColarOverRawEight\times$ larger than raw documents with 8-bit pixels
+($\nMemErEightMB$\,MB). A lower rank would shrink it further; however, the accuracy falls
+with it (Section~\ref{sec:c6-s5}). Hence, the benefit of the latent memory is not its size:
+it is a whole-document memory without pixels or token ids, and it is cheaper to train on,
+as shown next.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=0.62\textwidth]{paper/memory.pdf}
+  \caption[Accuracy against stored bytes]{\textbf{Accuracy against stored bytes} on
+  CIL-CORD (dots: runs, bar: their mean; dashed black: joint training). Filled: the size
+  that the run held; hollow: the size computed for an encoding that we did not run. The
+  dashed blue line joins CoLaR-SBR at ranks $32$, $64$ and $128$.}
+  \label{fig:memory}
+\end{figure}
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Memory accounting on CIL-CORD]{\textbf{Memory accounting} on CIL-CORD ($250$
+  stored documents, or the four per-session updates of SBR-Recall, listed as deltas).
+  Computed: the size of an encoding that we did not
+  run. Trainable: parameters trained at once after the first session, in millions.}
+  \label{tab:memory}
+  \resizebox{\textwidth}{!}{\input{generated/paper/supp_memory}}
+\end{table}
+
+\paragraph{Training cost.} Table~\ref{tab:cost} reports the cost of training. After the
+first session, CoLaR-SBR trains $\nCostTrainSbr$ million parameters, i.e.,
+$\nMemTrainSbrPct\%$ of the network, since the stored documents enter above the frozen
+layers; a method that replays raw documents trains all $\nCostTrainEr$ million. SBR-Recall
+trains $\nCostTrainRecall$ million parameters at a time ($\nMemTrainRecallPct\%$). The peak
+GPU memory of our two variants is at the level of naive fine-tuning ($\nCostPeakSbr$
+against $\nCostPeakNaive$\,MB), which hints that the peak is set by the first session,
+where the whole network is trained. In contrast, the replay of raw documents raises it to $\nCostPeakEr$\,MB
+for ER and $\nCostPeakDerPp$\,MB for DER++. Regarding the time, a run of CoLaR-SBR over the
+five sessions takes $\nCostHoursSbr$ hours, against $\nCostHoursNaive$ for naive
+fine-tuning, $\nCostHoursEr$ for ER and $\nCostHoursErSbr$ for our readout on raw
+documents. It is noted that the cards were shared by several runs and that early stopping
+decides the number of epochs; hence, the training time is indicative only.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Compute cost on CIL-CORD]{\textbf{Compute cost} on CIL-CORD. Trainable:
+  parameters trained at once after the first session, in millions. Peak GPU: over the
+  whole run. Training: wall-clock time of one run over the five sessions (mean of three
+  runs; indicative, since the cards were shared). Passes: forward passes per test
+  document.}
+  \label{tab:cost}
+  \input{generated/paper/supp_cost}
+\end{table}
+
+\paragraph{Inference cost.} CoLaR-SBR needs one forward pass per document, as every
+baseline does; its blocks add only one vector and one bias per session to the head. In
+contrast, SBR-Recall reads each block under its own state and needs one pass per session,
+i.e., $\nCostRecallPasses$ passes on CIL-CORD. Since the lower layers are shared by all
+states, an implementation that caches them repeats only the upper layers, which costs about
+$\nCostRecallPassEq$ passes (Section~\ref{sec:m-accounting}). Hence, SBR-Recall trades the
+stored documents for inference time.
+
+\paragraph{Choice between the two variants.} The cost of SBR-Recall grows with the number
+of sessions and not with their documents; thus, it is cheaper to store only when the
+documents of a session take more than its update. Besides, the updates do not replace the
+memory when the schema or the domain changes (Section~\ref{sec:c6-s3}), and they depend on
+the first session (Section~\ref{sec:c6-s6}). Therefore, we suggest CoLaR-SBR as the default,
+and SBR-Recall when the classes grow within one schema and no document may be kept.
 
 \section{Beyond Documents: Image Classification}
 \label{sec:c6-s8}
 % SOURCE: paper App. F; E4
 \todo{to be written}
 
+% =============================================================================
 \section{Qualitative and Error Analysis}
 \label{sec:c6-s9}
-% SOURCE: receipt figure, per-class results, where the owner block errs
-\todo{to be written}
+
+The metrics above summarise a model in one number. In this section, we look at what the
+final models of CIL-CORD predict: first on one receipt, then per class, and finally per
+token of the old sessions.
+
+\paragraph{A test receipt.} Figure~\ref{fig:qualitative} shows one test receipt after the
+last session. We did not pick it by hand: it is the test receipt whose accuracy on the
+entity words is closest to the average of the test set for both models, which is
+$\qualColarAcc\%$ for CoLaR with a shared softmax and $\qualSbrAcc\%$ for CoLaR-SBR. With
+a shared softmax, CoLaR tags only $\qualColarOk$ of the $\qualEnt$ entity words correctly,
+namely the cash and the change amounts; every other entity word (the items, the subtotal,
+the tax and the total) is predicted as background. In contrast, CoLaR-SBR tags
+$\qualSbrOk$ of them correctly. Hence, under a shared softmax the entities are not
+confused with each other; they are lost to the label ``O''.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{paper/qualitative.pdf}
+  \caption[A test receipt after the last session]{\textbf{A test receipt of CIL-CORD after
+  the last session} (one run per method). With a shared softmax, CoLaR tags $\qualColarOk$
+  of the $\qualEnt$ entity words correctly and predicts the others as background;
+  CoLaR-SBR tags $\qualSbrOk$.}
+  \label{fig:qualitative}
+\end{figure}
+
+\paragraph{Per-class results.} Figure~\ref{fig:perclass} shows the full-label F1 of each
+class for one run per method. Of the $\pcPresent$ classes that occur in the test set, joint
+training finds $\pcFoundJoint$ (F1 above $0$), CoLaR-SBR $\pcFoundSbr$, CoLaR
+$\pcFoundColar$ and naive fine-tuning $\pcFoundNaive$; $\pcBothMissed$ of the classes that
+CoLaR-SBR misses are missed by joint training too, i.e., they are hard on their own and
+not forgotten. With CoLaR and a shared softmax, the classes of session~5 are almost never
+found, which is the suppression of the newest session, and the classes of session~1, which
+hold $\mSessOneShare\%$ of the $\mTestSpans$ test entities, are found only in part, while
+several classes of sessions~2 and~3 are kept. This agrees with the receipt of
+Figure~\ref{fig:qualitative}.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{paper/perclass.pdf}
+  \caption[Per-class full-label F1 on CIL-CORD]{\textbf{Per-class full-label F1} on
+  CIL-CORD (final model, unmasked test set; one run per method, with its full-label F1 in
+  the legend). Classes are grouped by the session that introduces them; grey: the class
+  does not occur in the test set.}
+  \label{fig:perclass}
+\end{figure}
+
+\paragraph{Where the entities of the old sessions go.} Table~\ref{tab:mech} follows the
+entities of sessions~1 to~4 in the final model. For every model, it gives the recall and
+the precision of their spans. Under a shared softmax, it gives the share of the missed
+spans that are predicted entirely as ``O''. Under the blocked readout, it gives the share
+of the old entity tokens that their own block claims (\emph{owner}), where the wrong ones
+go (to the background, to another tag of their session, or to a class of another session)
+and the share of the other tokens that an old block claims (\emph{false}).
+
+Under a shared softmax, naive fine-tuning keeps no old entity, and the memory recovers
+$\mColarRMin$ to $\mColarRMax\%$ of them. What both miss goes to the background:
+$\mNaiveIndMin$ to $\mNaiveIndMax\%$ of the missed spans of naive fine-tuning and
+$\mColarIndMin$ to $\mColarIndMax\%$ of those of CoLaR are predicted entirely as ``O''.
+This is what the conflict predicts, since the background label is the target that the
+later documents give to these tokens.
+
+Under the blocked readout, the picture differs. Without the memory, the owning block claims
+only $\mNoBankOwnerMin$ to $\mNoBankOwnerMax\%$ of the old entity tokens, no wrong token
+goes to the background, and $\mNoBankOtherMin$ to $\mNoBankOtherMax\%$ of them receive a
+class of another session; hence, the blocks are confused with each other, which is
+consistent with drift and not with the conflict. With the memory (CoLaR-SBR), the owning
+block claims $\mSbrOwnerMin$ to $\mSbrOwnerMax\%$ of the old entity tokens. Of the wrong
+ones, $\mSbrSameMin$ to $\mSbrSameMax\%$ receive another tag of their own session, which
+includes a swap between the B and I tags of one class, $\mSbrOtherMin$ to
+$\mSbrOtherMax\%$ a class of another session and only $\mSbrToOMin$ to $\mSbrToOMax\%$ the
+background. Besides, an old block claims at most $\mSbrFalseMax\%$ of the tokens that are
+not its entities. SBR-Recall behaves alike, with $\mRecallOwnerMin$ to $\mRecallOwnerMax\%$
+of the tokens claimed by their own block.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Where the entities of the old sessions go]{\textbf{Where the entities of the
+  old sessions go} (CIL-CORD, final model, sessions~1 to~4; range over the runs, in
+  percent). Relab.$^{r}$: older stored documents relabelled with the ground-truth labels;
+  No mem.: blocked readout without a memory. R, P: recall and precision of the old spans
+  (P is an upper bound under the shared softmax). O$^{i}$: share of the missed spans that
+  are predicted entirely as ``O''. Owner: share of the old entity tokens claimed by their
+  own block; $\to$O, $\to$same, $\to$other: where the wrong tokens go; false: share of the
+  other tokens that an old block claims.}
+  \label{tab:mech}
+  \small\input{generated/paper/tab_mech}
+\end{table}
+
+\paragraph{Outcome.} The three views agree. With a shared softmax, the entities of the
+sessions that are not being trained end as background, on the receipt, per class and per
+token. With the per-session readout and the memory, the sessions are rarely confused, and
+most of the remaining errors are confusions between the tags of one session. What
+CoLaR-SBR still loses to joint training is a part of the retention of the early sessions
+(Section~\ref{sec:r-h3}), which the per-session updates of SBR-Recall remove on this
+stream.
 
 \section{Discussion}
 \label{sec:c6-s10}
