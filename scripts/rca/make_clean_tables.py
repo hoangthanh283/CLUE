@@ -2663,6 +2663,12 @@ def write_robust():
               f"{cell(pre + '_colar_sbr', 'full_label_f1', '')} & "
               f"{cell(pre + '_colar_sbr_recall_r64', 'full_label_f1', '')} \\\\\n")  # fmt: skip
     (OUT / "supp_order.tex").write_text(t + "\\bottomrule\n\\end{tabular}\n")
+    sbr = [v for o in ("o2", "o3") for v in load(CLEAN, f"cil_cord_{o}_colar_sbr", "full_label_f1", "")]
+    col = [v for o in ("o2", "o3") for v in load(CLEAN, f"cil_cord_{o}_colar", "full_label_f1")]
+    assert len(sbr) == len(col) == 6, (len(sbr), len(col))  # three runs per order
+    (OUT / "robust_vals.tex").write_text(
+        HDR + f"\\newcommand{{\\nOrderSbrRunMin}}{{{math.floor(min(sbr) * 10) / 10:.1f}}}\n"
+        f"\\newcommand{{\\nOrderColarRunMax}}{{{math.ceil(max(col) * 10) / 10:.1f}}}\n")  # fmt: skip
     t = HDR + "\\begin{tabular}{@{}lcc@{}}\n\\toprule\n"
     t += "Method & Patience 2 & Patience 10 \\\\\n\\midrule\n"
     for lab, k in (("CODA-Prompt", "coda_prompt"), ("CPFD", "cpfd"), ("IS3", "is3"), ("LCA", "lca")):

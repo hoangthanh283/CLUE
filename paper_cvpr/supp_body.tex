@@ -6,6 +6,7 @@
 \input{analysis_vals}
 \input{qual_vals}
 \input{dil_check_vals}
+\input{robust_vals}
 
 \noindent This appendix is organised as follows. \Cref{app:setup} details the six streams, the two metrics and the training protocol. \Cref{app:method} gives the details of CoLaR, SBR and SBR-Recall, together with the memory analysis and further ablations. \Cref{app:baselines} describes our re-implementations of the baselines. \Cref{app:results} provides extended results for the hypotheses of \bodyref{sec:investigation}{the main paper} and for CIL-FUNSD, the memory-size study with three runs per size and a qualitative example. \Cref{app:drift} shows the drift on four encoders, and \cref{app:image} examines our memory on image classification.
 
@@ -244,7 +245,7 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 \begin{table}[t]
 \centering\small
 \setlength{\tabcolsep}{5pt}
-\caption{\textbf{Session order} on CIL-CORD (full-label F1; mean $\pm$ s.d.\ of three runs, single values: one run).}
+\caption{\textbf{Session order} on CIL-CORD (full-label F1; mean $\pm$ s.d.\ of three runs; single values: one run).}
 \label{tab:order}
 \input{supp_order}
 \end{table}
@@ -265,7 +266,7 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 \input{supp_patience}
 \end{table}
 
-\runin{Session order.} \Cref{tab:order} reports CIL-CORD with its five sessions reversed and shuffled. The gap between the shared softmax and the per-session readout does not depend on the order: CoLaR-SBR reaches $\nOrderRevSbr$ and $\nOrderShufSbr$ full-label F1, against $\nOrderRevColar$ and $\nOrderShufColar$ for CoLaR. SBR-Recall also holds under both orders.
+\runin{Session order.} \Cref{tab:order} reports CIL-CORD with its five sessions reversed and shuffled. The gap between the shared softmax and the per-session readout does not depend on the order: over the three runs of each order, CoLaR-SBR stays at or above $\nOrderSbrRunMin$ full-label F1, whereas CoLaR stays at or below $\nOrderColarRunMax$. SBR-Recall also holds under both orders (one run each).
 
 \runin{A second backbone.} To examine whether the result depends on LayoutLMv3, we repeat the main rows of the hypothesis table on CIL-CORD with BROS, which has no image input (\cref{tab:bros}; \nBrosRecipe, since BROS needs more memory per document). The picture is the same: with the same memory, the shared softmax stays at $\vBrosColarFull$ full-label F1, whereas CoLaR-SBR reaches $\vBrosSbrFull$. Besides, the two rows in between show the same order as on LayoutLMv3: the ground-truth stored labels help but are unstable, and a constant background logit is below the learned one.
 
