@@ -7,7 +7,7 @@
 \input{qual_vals}
 \input{dil_check_vals}
 
-\noindent This appendix is organised as follows. \Cref{app:setup} details the six streams, the two metrics and the training protocol. \Cref{app:method} gives the details of CoLaR, SBR and SBR-Recall, together with the memory analysis and further ablations. \Cref{app:baselines} describes our re-implementations of the baselines. \Cref{app:results} provides extended results for the hypotheses of \bodyref{sec:investigation}{the main paper} and for CIL-FUNSD. \Cref{app:drift} shows the drift on four encoders, and \cref{app:image} examines our memory on image classification.
+\noindent This appendix is organised as follows. \Cref{app:setup} details the six streams, the two metrics and the training protocol. \Cref{app:method} gives the details of CoLaR, SBR and SBR-Recall, together with the memory analysis and further ablations. \Cref{app:baselines} describes our re-implementations of the baselines. \Cref{app:results} provides extended results for the hypotheses of \bodyref{sec:investigation}{the main paper} and for CIL-FUNSD, the memory-size study with three runs per size and a qualitative example. \Cref{app:drift} shows the drift on four encoders, and \cref{app:image} examines our memory on image classification.
 
 %% ============================================================================ A
 \section{Setup and protocol}
@@ -57,7 +57,7 @@ S. & Dataset: tags introduced & Schema & Pool \\
 
 \runin{Agreement of the two metrics.} The two metrics rank the methods in the same way. In every run, the methods without a memory (naive fine-tuning and the blocked readout alone) are below CoLaR, CoLaR is below the memory relabelled at the boundaries, and the top group consists of CoLaR-SBR, SBR-Recall, the memory relabelled before each session and joint training. The MiB-style loss and ICE-O lie between CoLaR and the top group under both metrics; only the MiB-style loss and the memory relabelled at the boundaries swap places. For CoLaR-SBR, SBR-Recall and joint training, the two metrics differ by at most $\nAgreeHighMax$ points. For weak models AA is more lenient, by $\nAgreeLowMin$ to $\nAgreeLowMax$ points without a memory and by $\nAgreeColarMin$ to $\nAgreeColarMax$ points for CoLaR.
 
-\runin{Protocol.} We train every session in full precision with a batch size of $2$ and gradient checkpointing, using AdamW (learning rate $5{\times}10^{-5}$, weight decay $0.01$, gradient clipping at $1.0$) for at most $10$ epochs ($100$ for joint training). Early stopping uses $10\%$ of the training pool of the session, held out and scored with the same session restriction, with a patience of $2$ epochs ($10$ for joint training on CIL-CORD and CIL-FUNSD) and a minimum improvement of $0.1$ F1 points; the weights of the best epoch are restored. Hence, the test split never selects a model. Two tables of this appendix are marked $\dagger$: their runs follow an earlier protocol, which stopped early on the test split, used a different epoch cap per method and partly ran in mixed precision. No table of the main paper contains such a run. We used rented NVIDIA RTX 4070 Ti GPUs.
+\runin{Protocol.} We train every session in full precision with a batch size of $2$ and gradient checkpointing, using AdamW (learning rate $5{\times}10^{-5}$, weight decay $0.01$, gradient clipping at $1.0$) for at most $10$ epochs ($100$ for joint training). Early stopping uses $10\%$ of the training pool of the session, held out and scored with the same session restriction, with a patience of $2$ epochs ($10$ for joint training on CIL-CORD and CIL-FUNSD) and a minimum improvement of $0.1$ F1 points; the weights of the best epoch are restored. Hence, the test split never selects a model. One table of this appendix (\cref{tab:dil}) is marked $\dagger$: its runs follow an earlier protocol, which stopped early on the test split, used a different epoch cap per method and partly ran in mixed precision. No table of the main paper contains such a run. We used rented NVIDIA RTX 4070 Ti GPUs.
 
 %% ============================================================================ B
 \section{Method details}
@@ -225,7 +225,7 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 \resizebox{\linewidth}{!}{\input{supp_ablation_ext}}
 \end{table}
 
-\runin{Design choices of SBR-Recall.} \Cref{tab:ablext} gathers two design choices of SBR-Recall, and \cref{fig:ablation} shows every run of the component study. \emph{Capacity of the deltas.} A delta of rank $8$ on the query, key and value layers learns its weakest session only to the value in the column min $R[j,j]$, and adding the memory does not change this. In contrast, at rank $64$ with the attention output and the feed-forward layers, every session is learned. Hence, the capacity of the delta was the limit, and we use rank $64$; this is the one setting that we chose on CIL-CORD. \emph{Across schemas.} Without a memory on Mixed, an old block is trained towards its background on every token of the documents of another schema, and nothing trains it towards its own tags; hence, it stops claiming its entities and does not recover when its dataset returns: both minima of this row in \cref{tab:ablext} are zero. Since the encoder is frozen, this is an effect of the readout and not of drift. In contrast, with the $50$-document memory, SBR-Recall reaches $\nRecallMixMem$ AA against $\nRecallMixNoMem$ without it. Thus, the deltas do not replace the memory across schemas.
+\runin{Design choices of SBR-Recall.} \Cref{tab:ablext} gathers two design choices of SBR-Recall, and \cref{fig:ablation} shows every run of the component study. \emph{Capacity of the deltas.} A delta of rank $8$ on the query, key and value layers learns its weakest session only to the value in the column min $R[j,j]$, and adding the memory does not repair it. In contrast, at rank $64$ with the attention output and the feed-forward layers, every session is learned. Hence, the capacity of the delta was the limit, and we use rank $64$; this is the one setting that we chose on CIL-CORD. \emph{Across schemas.} Without a memory on Mixed, an old block is trained towards its background on every token of the documents of another schema, and nothing trains it towards its own tags; hence, it stops claiming its entities and does not recover when its dataset returns: both minima of this row in \cref{tab:ablext} are zero. Since the encoder is frozen, this is an effect of the readout and not of drift. In contrast, with the $50$-document memory, SBR-Recall reaches $\nRecallMixMem$ AA against $\nRecallMixNoMem$ without it. Thus, the deltas do not replace the memory across schemas.
 
 \runin{Qualitative example.} \Cref{fig:qualitative} shows one test receipt after the last session. We did not pick it by hand: it is the test receipt whose accuracy on the entity words is closest to the average of the test set for both models, which is $\qualColarAcc\%$ for CoLaR with a shared softmax and $\qualSbrAcc\%$ for CoLaR-SBR. With a shared softmax, only the cash and the change amounts are tagged; every other entity word (the items, the subtotal, the tax and the total) is predicted as background, i.e., the entities are not confused with each other but lost to the label ``O''. In contrast, CoLaR-SBR tags all but one of the entity words correctly, which agrees with the per-class results in \cref{fig:perclass}.
 
@@ -253,9 +253,16 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.8\textwidth]{figures/qualitative.pdf}
+\begin{minipage}[t]{0.62\textwidth}\centering
+\includegraphics[width=\linewidth]{figures/qualitative.pdf}
 \caption{\textbf{A test receipt of CIL-CORD after the last session} (one run per method). With a shared softmax, CoLaR tags $\qualColarOk$ of the $\qualEnt$ entity words correctly and predicts the others as background; CoLaR-SBR tags $\qualSbrOk$.}
 \label{fig:qualitative}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.34\textwidth}\centering
+\includegraphics[width=\linewidth]{figures/backbone_cka_gradient.pdf}
+\caption{\textbf{Drift by depth}: linear CKA between the checkpoints before and after the second task (FUNSD$\rightarrow$CORD, each dataset with its own labels) under naive fine-tuning on four encoders ($1.0$: no drift; mean of three runs).}
+\label{fig:cka}
+\end{minipage}
 \end{figure*}
 
 \section{Drift evidence}
@@ -269,10 +276,6 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 \resizebox{\linewidth}{!}{\input{tab_dil_grid}}
 \end{table}
 
-\begin{figure}[t]\centering
-\includegraphics[width=0.9\linewidth]{figures/backbone_cka_gradient.pdf}
-\caption{\textbf{Drift by depth}: linear CKA between the checkpoints before and after the second task (FUNSD$\rightarrow$CORD, each dataset with its own labels) under naive fine-tuning on four encoders ($1.0$: no drift; mean of three runs).}
-\label{fig:cka}\end{figure}
 
 \runin{Where the drift sits.} Under naive fine-tuning on a fixed label space, every encoder forgets its earlier domains (\cref{tab:dil}). On the stream FUNSD, CORD and SROIE, where each dataset keeps its own labels, the drift of the representation grows with depth on all four encoders: it is smallest at the embeddings and largest at the last layer and the head (\cref{fig:cka}). That forgetting concentrates in the layers close to the output is known for image classifiers~\citep{ramasesh2021anatomy}; here we observe it for three multimodal document encoders and a text-only one.
 

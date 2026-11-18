@@ -555,7 +555,7 @@ def fig_forgetting() -> dict:
     axes[0].set_ylabel("F1", labelpad=1)
     axes[1].legend(loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False, fontsize=6.5,
                    handlelength=1.6, labelspacing=0.25, borderaxespad=0.2)  # fmt: skip
-    fig.subplots_adjust(left=0.06, right=0.78, top=0.9, bottom=0.2, wspace=0.06)
+    fig.subplots_adjust(left=0.06, right=0.74, top=0.9, bottom=0.2, wspace=0.06)
     save(fig, "forgetting.pdf")
     return out
 
