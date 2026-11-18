@@ -21,7 +21,7 @@ our method. The protocol is described in Section~\ref{sec:e-protocol}.
     \midrule
     \multicolumn{2}{@{}l}{\emph{Shared}} \\
     Main encoder & LayoutLMv3-base ($12$ layers, width $768$) \\
-    Optimizer & AdamW, learning rate $5\times10^{-5}$, weight decay $0.01$ \\
+    Optimiser & AdamW, learning rate $5\times10^{-5}$, weight decay $0.01$ \\
     Gradient clipping & norm $1.0$ \\
     Batch size & $2$ documents, gradient checkpointing \\
     Precision & full precision \\
@@ -51,7 +51,7 @@ our method. The protocol is described in Section~\ref{sec:e-protocol}.
 Table~\ref{tab:baselinecard-full} gives the full card of the eight baselines: what our
 re-implementation keeps from the published method, what it changes, and what it keeps
 across the sessions. Table~\ref{tab:baseline-hp} lists their hyper-parameters as recorded
-by the runs; they are the defaults of each method. LCA keeps its published optimizer
+by the runs; they are the defaults of each method. LCA keeps its published optimiser
 instead of AdamW, i.e., SGD with momentum.
 
 \begin{landscape}

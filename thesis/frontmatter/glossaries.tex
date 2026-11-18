@@ -8,59 +8,20 @@
 \newacronym{aa}{AA}{Average Accuracy}
 \newacronym{af}{AF}{Average Forgetting}
 \newacronym{bio}{BIO}{Begin--Inside--Outside tagging scheme}
-\newacronym{bwt}{BWT}{Backward Transfer}
 \newacronym{cil}{CIL}{Class-Incremental Learning}
 \newacronym{cka}{CKA}{Centered Kernel Alignment}
-\newacronym{cl}{CL}{Continual Learning}
-\newacronym{cf}{CF}{Catastrophic Forgetting}
-\newacronym{der}{DER}{Dark Experience Replay}
 \newacronym{dil}{DIL}{Domain-Incremental Learning}
 \newacronym{er}{ER}{Experience Replay}
 \newacronym{ewc}{EWC}{Elastic Weight Consolidation}
-\newacronym{fwt}{FWT}{Forward Transfer}
-\newacronym{ie}{IE}{Information Extraction}
 \newacronym{kie}{KIE}{Key-Information Extraction}
-\newacronym{lora}{LoRA}{Low-Rank Adaptation}
 \newacronym{lwf}{LwF}{Learning without Forgetting}
-\newacronym{l2p}{L2P}{Learning to Prompt}
-\newacronym{mllm}{MLLM}{Multimodal Large Language Model}
 \newacronym{ner}{NER}{Named-Entity Recognition}
 \newacronym{ocr}{OCR}{Optical Character Recognition}
-\newacronym{ptm}{PTM}{Pre-Trained Model}
-\newacronym{re}{RE}{Relation Extraction}
-\newacronym{til}{TIL}{Task-Incremental Learning}
-\newacronym{vrdu}{VRDU}{Visually-Rich Document Understanding}
 % == IE / task acronyms ==
-\newacronym{ee}{EE}{Event Extraction}
-\newacronym{cner}{CNER}{Continual Named-Entity Recognition}
-\newacronym{cre}{CRE}{Continual Relation Extraction}
-\newacronym{kgc}{KGC}{Knowledge-Graph Completion}
-\newacronym{kbqa}{KBQA}{Knowledge-Based Question Answering}
-\newacronym{vqa}{VQA}{Visual Question Answering}
-\newacronym{oie}{OIE}{Open Information Extraction}
 % == CL methods / mechanisms ==
-\newacronym{gem}{GEM}{Gradient Episodic Memory}
-\newacronym{agem}{A-GEM}{Averaged Gradient Episodic Memory}
-\newacronym{icarl}{iCaRL}{incremental Classifier and Representation Learning}
-\newacronym{si}{SI}{Synaptic Intelligence}
-\newacronym{mas}{MAS}{Memory-Aware Synapses}
-\newacronym{gpm}{GPM}{Gradient Projection Memory}
-\newacronym{ogd}{OGD}{Orthogonal Gradient Descent}
-\newacronym{olora}{O-LoRA}{Orthogonal Low-Rank Adaptation}
-\newacronym{kd}{KD}{Knowledge Distillation}
-\newacronym{moe}{MoE}{Mixture of Experts}
-\newacronym{peft}{PEFT}{Parameter-Efficient Fine-Tuning}
 % == pre-training objectives / analysis tools ==
-\newacronym{mlm}{MLM}{Masked Language Modelling}
-\newacronym{mim}{MIM}{Masked Image Modelling}
-\newacronym{wpa}{WPA}{Word--Patch Alignment}
 \newacronym{svd}{SVD}{Singular Value Decomposition}
-\newacronym{fim}{FIM}{Fisher Information Matrix}
 % == architectures / misc ==
-\newacronym{bert}{BERT}{Bidirectional Encoder Representations from Transformers}
-\newacronym{vit}{ViT}{Vision Transformer}
-\newacronym{pii}{PII}{Personally Identifiable Information}
-\newacronym{gdpr}{GDPR}{General Data Protection Regulation}
 
 % =====================================================================
 %  Notation glossary (printed as "List of Notations" by main.tex).
@@ -69,101 +30,82 @@
 \newglossary[nlg]{notation}{not}{ntn}{Notation}
 
 \newglossaryentry{not:doc}{
-  name={\ensuremath{D=(W,B,I)}},
-  description={a document: OCR token sequence $W$, bounding boxes $B$, and page image $I$},
+  name={\ensuremath{x=(w_{1:L},b_{1:L},I)}},
+  description={a document: its OCR tokens, their bounding boxes and the page image},
   type=notation, sort=01}
 
-\newglossaryentry{not:N}{
-  name={\ensuremath{N}},
-  description={number of tokens in a document},
+\newglossaryentry{not:T}{
+  name={\ensuremath{T,\ t}},
+  description={number of sessions; index of the current session},
   type=notation, sort=02}
 
-\newglossaryentry{not:T}{
-  name={\ensuremath{T}},
-  description={number of tasks in the continual sequence},
+\newglossaryentry{not:task}{
+  name={\ensuremath{\mathcal{D}_t,\ \mathcal{T}_t}},
+  description={training set and tag set of session $t$},
   type=notation, sort=03}
 
-\newglossaryentry{not:task}{
-  name={\ensuremath{\mathcal{T}_t}},
-  description={the $t$-th task (data and, in CIL, its label space)},
+\newglossaryentry{not:feat}{
+  name={\ensuremath{h(x),\ z(x)}},
+  description={feature and tag logits of a token $x$},
   type=notation, sort=04}
 
 \newglossaryentry{not:theta}{
   name={\ensuremath{\theta,\ \theta^{(t)}}},
-  description={encoder parameters; parameters after training task $t$},
+  description={model parameters; parameters after training session $t$},
   type=notation, sort=05}
-
-\newglossaryentry{not:Y}{
-  name={\ensuremath{Y}},
-  description={sequence of BIO labels $(y_1,\dots,y_N)$},
-  type=notation, sort=06}
-
-\newglossaryentry{not:labelset}{
-  name={\ensuremath{\mathcal{L}_{\text{task}}}},
-  description={dataset-specific BIO tag set},
-  type=notation, sort=07}
 
 \newglossaryentry{not:R}{
   name={\ensuremath{R[i,j]}},
-  description={accuracy matrix: entity-F1 on task $j$ after training task $i$},
-  type=notation, sort=08}
+  description={F1 on the test split of session $j$ after training session $i$},
+  type=notation, sort=06}
 
 \newglossaryentry{not:cka}{
   name={\ensuremath{\mathrm{CKA}(X,Y)}},
-  description={linear Centered Kernel Alignment between activation matrices},
-  type=notation, sort=09}
+  description={linear centred kernel alignment between two activation matrices},
+  type=notation, sort=07}
 
 \newglossaryentry{not:fisher}{
-  name={\ensuremath{F_g}},
-  description={empirical Fisher information of parameter group $g$},
+  name={\ensuremath{F_g,\ D_g}},
+  description={Fisher importance and Fisher-weighted displacement of parameter group $g$},
+  type=notation, sort=08}
+
+\newglossaryentry{not:k}{
+  name={\ensuremath{k,\ r}},
+  description={layer where the memory is injected; rank of its compression},
+  type=notation, sort=09}
+
+\newglossaryentry{not:H}{
+  name={\ensuremath{H_j}},
+  description={layer-$k$ activations of the stored document $j$},
   type=notation, sort=10}
 
-\newglossaryentry{not:phi}{
-  name={\ensuremath{\phi(\text{boxes})}},
-  description={layout signature: $4\times4$ grid histogram of box centres (16-dim)},
+\newglossaryentry{not:d}{
+  name={\ensuremath{d,\ L}},
+  description={width of the encoder; number of positions of a document},
   type=notation, sort=11}
 
-\newglossaryentry{not:lambda}{
-  name={\ensuremath{\lambda}},
-  description={regularisation strength (the global scale on a Fisher penalty, e.g.\ EWC or the depth-targeting probe)},
+\newglossaryentry{not:b}{
+  name={\ensuremath{b,\ \mathcal{T}_b}},
+  description={a readout block and the tags it holds},
   type=notation, sort=12}
 
-\newglossaryentry{not:M}{
-  name={\ensuremath{M}},
-  description={replay memory buffer of stored past exemplars (size $|M|$)},
+\newglossaryentry{not:o}{
+  name={\ensuremath{o_b(x),\ p_b(\cdot\mid x)}},
+  description={background logit and distribution of block $b$},
   type=notation, sort=13}
 
-\newglossaryentry{not:P}{
-  name={\ensuremath{P}},
-  description={parameter budget (bound on $\lVert\Delta\theta\rVert$)},
+\newglossaryentry{not:m}{
+  name={\ensuremath{m_{sb}}},
+  description={whether a document of session $s$ supervises block $b$},
   type=notation, sort=14}
 
-\newglossaryentry{not:d}{
-  name={\ensuremath{d}},
-  description={encoder hidden dimension ($768$ for the base model)},
+\newglossaryentry{not:e}{
+  name={\ensuremath{e_b(x)}},
+  description={claim of block $b$ on a token},
   type=notation, sort=15}
 
-\newglossaryentry{not:L}{
-  name={\ensuremath{L}},
-  description={number of transformer layers ($12$ for the base model)},
+\newglossaryentry{not:delta}{
+  name={\ensuremath{\theta_0,\ \Delta_b}},
+  description={frozen encoder state and the low-rank update of block $b$},
   type=notation, sort=16}
 
-\newglossaryentry{not:r}{
-  name={\ensuremath{r}},
-  description={LoRA rank (low-rank adapter dimension)},
-  type=notation, sort=17}
-
-\newglossaryentry{not:q}{
-  name={\ensuremath{q(x)}},
-  description={layout-aware prompt query for input $x$},
-  type=notation, sort=18}
-
-\newglossaryentry{not:hcls}{
-  name={\ensuremath{h_{\mathrm{CLS}}}},
-  description={the \textsc{cls}-token embedding},
-  type=notation, sort=19}
-
-\newglossaryentry{not:Wlayout}{
-  name={\ensuremath{W_{\text{layout}}}},
-  description={trainable projection of the layout signature $\phi(\text{boxes})$},
-  type=notation, sort=20}

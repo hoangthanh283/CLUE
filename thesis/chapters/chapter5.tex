@@ -203,7 +203,7 @@ other streams they keep $200$ to $250$ raw documents. Our memory replays four st
 replay eight raw documents, the default of their implementation.
 
 \paragraph{Training protocol.} We trained our models mainly on 6 NVIDIA RTX 4070 Ti GPUs
-using the AdamW optimizer with a learning rate of $5\times10^{-5}$, a weight decay of
+using the AdamW optimiser with a learning rate of $5\times10^{-5}$, a weight decay of
 $0.01$ and gradient clipping at $1.0$, in full precision with a batch size of $2$. Every
 session is trained for at most $10$ epochs with early stopping: $10\%$ of the training set
 of the session is held out, the model is scored on it after every epoch with the same

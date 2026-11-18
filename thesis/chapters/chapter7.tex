@@ -14,7 +14,7 @@ We answer the four research questions of Section~\ref{sec:c1-s3} as follows.
 the drift of the representation: under naive fine-tuning, the features of all four
 encoders change, more so with depth, and the head that was fitted on the old features is
 displaced the most. Replay removes this cause on a fixed label space, whereas
-regularization does not. The second is the conflict on the background label: when the
+regularisation does not. The second is the conflict on the background label: when the
 label set grows, the stored documents and the current documents each label the entities
 of the other sessions as background, and a shared softmax counts every such label against
 the class that it hides. A memory does not remove this cause: on CIL-CORD, the memory

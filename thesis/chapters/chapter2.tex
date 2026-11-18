@@ -4,7 +4,7 @@
 \label{ch:background}
 
 This chapter gives the background of the thesis and reviews the related studies. In the
-following, we first summarize document understanding and \gls{kie}
+following, we first summarise document understanding and \gls{kie}
 (Section~\ref{sec:c2-s1}) and the basics of continual learning (Section~\ref{sec:c2-s2}).
 Then, we review the four lines of work that our study builds on: the shift of the background
 label (Section~\ref{sec:c2-s3}), separated readouts and session identification
@@ -99,10 +99,10 @@ together; their formal definition for \gls{kie} is given in
 Section~\ref{sec:m-formulation}.
 
 \paragraph{Method families.} Recent studies on catastrophic forgetting mainly consist of
-regularization, replay, optimization-based methods, parameter isolation and methods built
-on pre-trained models~\citep{wang2024survey}. Table~\ref{tab:cl-families} summarizes them.
+regularisation, replay, optimisation-based methods, parameter isolation and methods built
+on pre-trained models~\citep{wang2024survey}. Table~\ref{tab:cl-families} summarises them.
 
-\emph{Regularization} methods penalise the change of what the old sessions need. For
+\emph{Regularisation} methods penalise the change of what the old sessions need. For
 instance, \gls{ewc}~\citep{kirkpatrick2017ewc} adds to the loss of the new session a
 quadratic penalty that is weighted by the Fisher information of the old ones,
 \begin{equation}
@@ -113,7 +113,7 @@ quadratic penalty that is weighted by the Fisher information of the old ones,
 where $\theta^{\ast}$ are the weights after the previous session and $F_i$ is the diagonal
 of the Fisher information. SI~\citep{zenke2017si} and MAS~\citep{aljundi2018mas} estimate
 the importance of a weight in other ways. As another example, \gls{lwf}~\citep{li2017lwf}
-regularizes the outputs instead of the weights: the model before the session serves as a
+regularises the outputs instead of the weights: the model before the session serves as a
 teacher, and the new model is distilled towards its predictions on the new data. These
 methods store no sample, but they can only slow the change of the model down.
 
@@ -126,7 +126,7 @@ A-GEM~\citep{chaudhry2019agem} use the memory as a constraint on the gradient. I
 comparison of class-incremental methods, the best ones keep
 exemplars~\citep{masana2022class}.
 
-\emph{Optimization-based} methods restrict the direction of the update. For instance,
+\emph{Optimisation-based} methods restrict the direction of the update. For instance,
 OGD~\citep{farajtabar2020ogd} projects the gradient to be orthogonal to the gradients of
 the old sessions, and GPM~\citep{saha2021gpm} projects it out of the subspace that the old
 inputs span. \emph{Parameter-isolation} methods give every session its own parameters:
@@ -147,11 +147,11 @@ Section~\ref{sec:c2-s6}.
     \toprule
     Family & Examples & Kept across sessions & Limit for continual \gls{kie} \\
     \midrule
-    Regularization & \gls{ewc}, SI, MAS, \gls{lwf} & importance weights or the previous
+    Regularisation & \gls{ewc}, SI, MAS, \gls{lwf} & importance weights or the previous
       model & slows drift down, does not remove it \\
     Replay & \gls{er}, DER++, iCaRL, GEM & raw samples (and logits) & the stored labels
       become stale when the label set grows \\
-    Optimization & OGD, GPM & gradient or input subspaces & subspaces fill up over the
+    Optimisation & OGD, GPM & gradient or input subspaces & subspaces fill up over the
       sessions \\
     Parameter isolation & PNN, PackNet, DEN & parameters per session & needs the session
       identity at test time \\
@@ -214,7 +214,7 @@ pooled features with confidence-based pseudo-labels for the old entities, and
 IS3~\citep{qiu2024is3} combines distillation with a debiased loss against the bias towards
 the new classes. SpanKL~\citep{zhang2023spankl} avoids the token-level conflict by
 classifying spans with one binary decision per class. Outside continual learning, the same
-idea as in MiB appears for corpora with different tag sets: the likelihood is marginalized
+idea as in MiB appears for corpora with different tag sets: the likelihood is marginalised
 over the tags that a corpus does not
 annotate~\citep{greenberg2018marginal,beryozkin2019tagset}.
 

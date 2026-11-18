@@ -10,15 +10,14 @@
 \authorclass{}                       % TODO: class/cohort
 \duration{2026}         % TODO: project duration
 
-\statement{This thesis investigates where catastrophic forgetting occurs within a
-tri-modal document encoder (LayoutLMv3) under continual key-information
-extraction, and proposes a mechanism-targeted continual-learning method derived
-from that diagnosis. The objectives are: (i) to build a per-component forgetting
-diagnostic using representational drift (CKA) and per-group Fisher information;
-(ii) to characterise which components forget most across continual scenarios; and
-(iii) to design and evaluate a remedy that concentrates its mechanism on the
-dominant-forgetting component, benchmarked against ten baselines on the FCS-CL
-benchmark (FUNSD/CORD/SROIE).}
+\statement{This thesis investigates why key-information extraction models forget
+when documents and labels arrive in sequence, and proposes a continual-learning method
+derived from that analysis. The objectives are: (i) to build an analysis protocol that
+measures the drift of the representation inside the encoder (CKA and Fisher information)
+and tests hypotheses on the conflict caused by the background label; (ii) to design a
+method that addresses each cause, with a compressed latent memory and a session-blocked
+readout; and (iii) to evaluate it against eight continual-learning baselines on six
+streams over five public document datasets (FUNSD, CORD, SROIE, WildReceipt and XFUND).}
 
 \declaration{I declare that this thesis and the work presented in it are my own. I
 confirm that where I have consulted or quoted the published work of others, it is

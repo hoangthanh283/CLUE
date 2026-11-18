@@ -5,7 +5,7 @@
 
 This chapter describes how the methods of Chapter~\ref{ch:methodology} are implemented and
 how the numbers of Chapter~\ref{ch:results} are produced. In the following, we first
-summarize the software stack (Section~\ref{sec:c4-s1}) and the architecture of the system
+summarise the software stack (Section~\ref{sec:c4-s1}) and the architecture of the system
 (Section~\ref{sec:c4-s2}). Then, we detail the path from a training run to a number in
 this thesis (Section~\ref{sec:c4-s3}) and what is needed to reproduce the results
 (Section~\ref{sec:c4-s4}).
@@ -33,7 +33,7 @@ scorer.
     Component & Library & Role \\
     \midrule
     Models & PyTorch ($\geq 2.2$), Transformers $4.48$ & encoders, pre-trained weights,
-      tokenizers \\
+      tokenisers \\
     Low-rank updates & PEFT $0.13$ & adapters of the LoRA baselines; the per-session
       updates of SBR-Recall are our own modules \\
     Configuration & Hydra $1.3$ & one configuration group each for the stream, the method,
@@ -81,7 +81,7 @@ labels. In the class-incremental streams, a remapper translates the tags of a da
 the positions of the growing head and masks the tags outside the session to ``O'', as in
 Equation~\eqref{eq:mask}. It is noted that joint training must use the pool with all
 labels: concatenating the masked copies of the sessions would show the same document with
-contradicting labels. Every dataset is tokenized for the encoder of the run, and the page
+contradicting labels. Every dataset is tokenised for the encoder of the run, and the page
 images are decoded only when a batch needs them.
 
 \paragraph{Encoders.} Every encoder is wrapped in a class with one interface: grow the
@@ -93,7 +93,7 @@ class without it.
 
 \paragraph{Methods.} Every method implements the same four steps of
 Algorithm~\ref{alg:cl-loop}. The base class provides what all methods share, i.e., the
-optimizer, gradient clipping, early stopping with the restoration of the best epoch and
+optimiser, gradient clipping, early stopping with the restoration of the best epoch and
 optional mixed precision. Hence, a baseline and our method differ only in what they add
 to the loss and what they keep across the sessions. The eight baselines are
 re-implemented on this interface (Section~\ref{sec:e-baselines}).
@@ -153,7 +153,7 @@ disagree, and a repeated run changes all of them at once.
 \label{sec:c4-s4}
 
 \paragraph{Randomness and configuration.} Every cell is run with three fixed random seeds,
-which control the initialization of the head, the order of the documents and the choice of
+which control the initialisation of the head, the order of the documents and the choice of
 the held-out documents. The configuration files of the streams, the methods and the
 recipes are never edited once a run has used them; a new setting is a new file or an
 override that the run record stores. The name of a run encodes its stream, method, setting
