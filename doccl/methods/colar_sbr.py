@@ -138,6 +138,13 @@ class CoLaRSBR(CoLaR):
         # (ICE-O's constant Other) instead of learning it; supervision, memory and routing are
         # unchanged. The sbr_o heads are still created (state_dict shape) but never used.
         self.const_o = bool(config.get("sbr_const_o", False))
+        # AGENT IMPL (2026-11-18): sbr_exclusive_sessions gives every session its own schema, so
+        # a sample of session s trains every other block towards its background ("neg" mode).
+        # For streams whose sessions are mutually exclusive (image classification: an image has
+        # one label, so it is a true negative for every other block). Without it such a stream
+        # never shows a block a negative and its background logit stays untrained. Off by
+        # default -> every document run is unchanged.
+        self.exclusive_sessions = bool(config.get("sbr_exclusive_sessions", False))
         self.blocks: list[torch.Tensor] = []
         self.block_domains: list[str] = []
         self.sessions: list[tuple[set[int], str]] = []  # (annotated head ids, schema domain)
@@ -165,7 +172,7 @@ class CoLaRSBR(CoLaR):
         self._hook_classifier()
         l2i = self.model.label_to_id
         idx = [l2i[lb] for lb in task.label_set if lb in l2i and lb != "O"]
-        domain = task_domain(task)
+        domain = f"session{len(self.sessions)}" if self.exclusive_sessions else task_domain(task)
         covered = set().union(*[set(b.tolist()) for b in self.blocks]) if self.blocks else set()
         new = [i for i in idx if i not in covered]
         if new:  # a session that only re-annotates known tags (DIL, a revisit) adds no block
@@ -254,7 +261,9 @@ class CoLaRSBR(CoLaR):
         if self._dump is not None:
             e, tags = block_scores(bls, self.blocks)
             mask = batch["labels"] != -100
-            self._dump["e"].append(e[mask].half().cpu())
+            # fp32 for image streams: claims saturate near 1 and fp16 ties change the argmax
+            img = getattr(self.model, "task_type", "token") == "image"
+            self._dump["e"].append((e[mask].float() if img else e[mask].half()).cpu())
             self._dump["tag"].append(tags[mask].short().cpu())
             self._dump["gold"].append(batch["labels"][mask].short().cpu())
         return aggregate_blocks(

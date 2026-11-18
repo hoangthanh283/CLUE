@@ -79,3 +79,13 @@ def test_offline_calibration_default_rule_matches_aggregate_blocks():
         d = {"e": e.reshape(-1, 2), "tag": tags.reshape(-1, 2), "allowed": allowed, "n_head": 6}
         d["allowed"] = sorted(allowed) if allowed is not None else None
         assert torch.equal(cal.predict(d, np.zeros(2), 0.5), ref.reshape(-1))
+
+
+def test_supervision_plan_exclusive_sessions_train_every_other_block_as_background():
+    # sbr_exclusive_sessions: one schema per session -> a sample is a negative for every other block
+    blocks, doms = [{1, 2}, {3, 4}, {5, 6}], ["session0", "session1", "session2"]
+    assert supervision_plan({3, 4}, "session1", blocks, doms) == [
+        (0, "neg"),
+        (1, "full"),
+        (2, "neg"),
+    ]
