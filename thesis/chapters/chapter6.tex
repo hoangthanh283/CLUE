@@ -821,10 +821,12 @@ more than SLCA and RanPAC, and it remains $\imgJointMinusSbrXCifar$ and
 $\imgJointMinusSbrXImnr$ points below joint training.
 
 \paragraph{Which part matters.} Table~\ref{tab:image-ablation} adds the three parts one at
-a time. With the encoder trained at the full rate, the negatives lower the accuracy below
-the unchanged method, and the refit recovers little: the blocks of the newest sessions
-then claim the images of the old ones. In contrast, with the slow encoder the same two
-parts give the gain. Moreover, Figure~\ref{fig:image-readout} shows where the gain comes
+a time. Neither of the first and the last part helps alone. With the encoder trained at the
+full rate, the negatives lower the accuracy below the unchanged method, since the blocks of
+the newest sessions then claim the images of the old ones. With the slow encoder but
+without the negatives, the late sessions are hardly read on ImageNet-R, and the accuracy
+falls far below the unchanged method. In contrast, the two together give most of the gain.
+The refit adds little: nothing on CIFAR-100 and about one point on ImageNet-R. Moreover, Figure~\ref{fig:image-readout} shows where the gain comes
 from. The accuracy when the session is given rises to $\iaSbrXCifarClas$ and
 $\iaSbrXImnrClas$, i.e., the loss inside the sessions falls from $\iaSbrCifarDriftLoss$ to
 $\iaSbrXCifarDriftLoss$ points on CIFAR-100 and from $\iaSbrImnrDriftLoss$ to
