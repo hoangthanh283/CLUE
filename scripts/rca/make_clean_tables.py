@@ -179,7 +179,9 @@ D = {  # DIL (scoring unaffected by the restriction; legacy = fp32 grid, test-sp
     "joint": src("dil_joint", ("results", "dil_joint", "")),
     "er": src("dil_er", ("results", "dil_er", "")),
     "slot": src(None, (GATE, "dil_colar_sbr_slot")),
-    "recall": src("dil_colar_sbr_recall_r64"),  # no memory; a fixed label space has one block (2026-11-17)
+    "recall": src(
+        "dil_colar_sbr_recall_r64"
+    ),  # no memory; a fixed label space has one block (2026-11-17)
 }
 BASE = [  # (label, rescore/grid method key, drop exact-zero collapses)
     ("LwF", "lwf", True),
@@ -440,9 +442,16 @@ REPAIR_ROWS = (  # (label, run key per stream): the label-side repairs under one
 )
 REPAIR_STREAMS = (  # (header, scenario, {key: (name, suffix)} overrides)
     ("CIL-CORD", "cil_cord", {"joint": ("joint_p10", "*")}),
-    ("CIL-FUNSD", "cil_funsd", {"joint": ("joint_p10", "*"), "colar": ("colar", "_k4_d10_r128"),
-                                "colar_r_oracle_pre": ("colar_r_oracle_pre", "_k4_d10_r128"),
-                                "colar_sbr": ("colar_sbr_d10", "*")}),
+    (
+        "CIL-FUNSD",
+        "cil_funsd",
+        {
+            "joint": ("joint_p10", "*"),
+            "colar": ("colar", "_k4_d10_r128"),
+            "colar_r_oracle_pre": ("colar_r_oracle_pre", "_k4_d10_r128"),
+            "colar_sbr": ("colar_sbr_d10", "*"),
+        },
+    ),
     ("CIL-WildReceipt", "cil_wildreceipt", {}),
 )
 
@@ -450,14 +459,22 @@ REPAIR_STREAMS = (  # (header, scenario, {key: (name, suffix)} overrides)
 def write_repairs():
     """tab_repairs.tex: full-label F1 of each repair on the three class-incremental streams.
     A cell needs all three clean seeds; otherwise it prints "--"."""
-    t = HDR + "\\begin{tabular}{lccc}\n\\toprule\nRepair & " + " & ".join(h for h, _, _ in REPAIR_STREAMS)
+    t = (
+        HDR
+        + "\\begin{tabular}{lccc}\n\\toprule\nRepair & "
+        + " & ".join(h for h, _, _ in REPAIR_STREAMS)
+    )
     t += " \\\\\n\\midrule\n"
     for label, key in REPAIR_ROWS:
         cells = []
         for _, sc, over in REPAIR_STREAMS:
             name, sfx = over.get(key, (key, "*"))
             vs = load(CLEAN, f"{sc}_{name}", "full_label_f1", sfx)
-            cells.append(f"${np.mean(vs):.1f}{{\\pm}}{np.std(vs, ddof=1):.1f}$" if len(vs) == len(SEEDS) else "--")
+            cells.append(
+                f"${np.mean(vs):.1f}{{\\pm}}{np.std(vs, ddof=1):.1f}$"
+                if len(vs) == len(SEEDS)
+                else "--"
+            )
         if key == "joint":
             t += "\\midrule\n"
         t += f"{label} & " + " & ".join(cells) + " \\\\\n"
@@ -490,12 +507,16 @@ def write_analysis():
             f1, aa = load(CLEAN, name, "full_label_f1", "*"), load(CLEAN, name, "AA", "*")
             if f1:
                 shown = f"\\textbf{{{val}}}" if val == default else f"{val}"
-                rows.append(f" & {shown} & {fmt(f1, True, show_n=True)} & {fmt(aa, True, show_n=True)} \\\\\n")
+                rows.append(
+                    f" & {shown} & {fmt(f1, True, show_n=True)} & {fmt(aa, True, show_n=True)} \\\\\n"
+                )
                 means.append(float(np.mean(f1)))
         if len(rows) > 1:
             t += "\\midrule\n" + label + rows[0] + "".join(rows[1:])
-            v += (f"\\newcommand{{\\nAna{key}Lo}}{{{min(means):.1f}}}"
-                  f"\\newcommand{{\\nAna{key}Hi}}{{{max(means):.1f}}}\n")
+            v += (
+                f"\\newcommand{{\\nAna{key}Lo}}{{{min(means):.1f}}}"
+                f"\\newcommand{{\\nAna{key}Hi}}{{{max(means):.1f}}}\n"
+            )
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "tab_analysis.tex").write_text(t)
     (OUT / "analysis_vals.tex").write_text(v)
@@ -517,6 +538,7 @@ def write_components():
     """tab_components.tex: the component ablation as one table with check marks (rows I to V add
     the memory, the blocked readout and the learned background; VI and VII replace the memory),
     and components_vals.tex: the mean gains the text quotes. A cell needs three clean seeds."""
+
     def cell(name, key):
         d = load_seeds(CLEAN, name, key)
         return [d[x] for x in SEEDS] if len(d) == len(SEEDS) else []
@@ -525,8 +547,10 @@ def write_components():
         return f"${np.mean(vs):.1f}{{\\pm}}{np.std(vs, ddof=1):.1f}$" if vs else "--"
 
     mark = {"": "--", "ck": "\\checkmark"}
-    t = HDR + ("\\begin{tabular}{@{}lccc ccc@{}}\n\\toprule\nIndex & Memory & Blocked readout & "
-               "Learned bg. & F1$\\uparrow$ & AA$\\uparrow$ & AF$\\downarrow$ \\\\\n\\midrule\n")
+    t = HDR + (
+        "\\begin{tabular}{@{}lccc ccc@{}}\n\\toprule\nIndex & Memory & Blocked readout & "
+        "Learned bg. & F1$\\uparrow$ & AA$\\uparrow$ & AF$\\downarrow$ \\\\\n\\midrule\n"
+    )
     f1 = {}
     for idx, mem, ro, bg, name in COMPONENT_ROWS:
         f, aa, af = cell(name, "full_label_f1"), cell(name, "AA"), cell(name, "AF")
@@ -540,23 +564,34 @@ def write_components():
         t += (f"{idx} & {mark.get(mem, mem)} & {mark[ro]} & {mark[bg]} & {fs} & {aas} & "
               f"{_af(af)} \\\\\n")  # fmt: skip
     j = cell("cil_cord_joint_p10", "full_label_f1")
-    t += (f"\\midrule\n\\multicolumn{{4}}{{@{{}}l}}{{Joint training (reference)}} & {ms(j)} & "
-          f"{ms(cell('cil_cord_joint_p10', 'AA'))} & -- \\\\\n\\bottomrule\n\\end{{tabular}}\n")
+    t += (
+        f"\\midrule\n\\multicolumn{{4}}{{@{{}}l}}{{Joint training (reference)}} & {ms(j)} & "
+        f"{ms(cell('cil_cord_joint_p10', 'AA'))} & -- \\\\\n\\bottomrule\n\\end{{tabular}}\n"
+    )
     (OUT / "tab_components.tex").write_text(t)
     ladder = (OUT / "tab_ladder.tex").read_text()
     for idx in ("I", "II", "III", "IV", "V"):  # the same runs are rows of the hypothesis table
         name = next(r[4] for r in COMPONENT_ROWS if r[0] == idx)
-        assert ms(cell(name, "full_label_f1")) in ladder, f"components row {idx} differs from tab_ladder"
+        assert (
+            ms(cell(name, "full_label_f1")) in ladder
+        ), f"components row {idx} differs from tab_ladder"
     g = {"AblMemGain": f1["II"] - f1["I"], "AblReadAlone": f1["III"] - f1["I"],
          "AblReadoutGain": f1["IV"] - f1["II"], "AblBgGain": f1["V"] - f1["IV"],
          "AblFullGain": f1["V"] - f1["I"]}  # fmt: skip
-    v = HDR + "".join(f"\\newcommand{{\\n{k}}}{{{x:+.1f}}}\n"
-                      for k, x in g.items())
+    v = HDR + "".join(f"\\newcommand{{\\n{k}}}{{{x:+.1f}}}\n" for k, x in g.items())
     (OUT / "components_vals.tex").write_text(v)
 
 
-BUDGET_WORDS = {5: "Five", 10: "Ten", 20: "Twenty", 30: "Thirty", 40: "Forty", 50: "Fifty",
-                100: "Hundred", 200: "TwoHundred"}
+BUDGET_WORDS = {
+    5: "Five",
+    10: "Ten",
+    20: "Twenty",
+    30: "Thirty",
+    40: "Forty",
+    50: "Fifty",
+    100: "Hundred",
+    200: "TwoHundred",
+}
 
 
 def write_budget_vals():
@@ -566,7 +601,9 @@ def write_budget_vals():
     t = HDR
     for key, base in (("Sbr", "cil_cord_colar_sbr"), ("Colar", "cil_cord_colar")):
         for n, word in BUDGET_WORDS.items():
-            v = list(load_seeds(CLEAN, base if n == 50 else f"{base}_d{n}", "full_label_f1").values())
+            v = list(
+                load_seeds(CLEAN, base if n == 50 else f"{base}_d{n}", "full_label_f1").values()
+            )
             if not v:
                 continue
             t += f"\\newcommand{{\\nBud{key}{word}}}{{{np.mean(v):.1f}}}\n"
@@ -721,19 +758,25 @@ def write_supp_vals():
         vs = list(sl.values())
         t += m("vSlicedBothFull", f"{np.mean(vs):.1f}{{\\pm}}{np.std(vs, ddof=1):.1f}")
         t += m("nSlicedBothBelowSbrMin", down1(min(sb_full[s] - sl[s] for s in SEEDS)))
-    cu = load_seeds(CLEAN, "cil_cord_colar_cur_sliced", "full_label_f1")  # current loss sliced only (ER-ACE-style)
+    cu = load_seeds(
+        CLEAN, "cil_cord_colar_cur_sliced", "full_label_f1"
+    )  # current loss sliced only (ER-ACE-style)
     if len(cu) == len(SEEDS) and len(sl) == len(SEEDS) and len(sb_full) == len(SEEDS):
         vs = list(cu.values())
         t += m("vSlicedCurFull", f"{np.mean(vs):.1f}{{\\pm}}{np.std(vs, ddof=1):.1f}")
         t += m("nSlicedAnyBelowSbrMin", down1(min(sb_full[s] - max(sl[s], cu[s]) for s in SEEDS)))
     # Class order (2026-11-17): CIL-CORD with the sessions reversed (cil_cord_o2), seed 42, full-label F1.
-    o2 = {k: load_seeds(CLEAN, f"cil_cord_o2_{n}", "full_label_f1").get(42)
-          for k, n in (("Colar", "colar"), ("Sbr", "colar_sbr"), ("Recall", "colar_sbr_recall_r64"))}
+    o2 = {
+        k: load_seeds(CLEAN, f"cil_cord_o2_{n}", "full_label_f1").get(42)
+        for k, n in (("Colar", "colar"), ("Sbr", "colar_sbr"), ("Recall", "colar_sbr_recall_r64"))
+    }
     if all(v is not None for v in o2.values()):
         for k, v in o2.items():
             t += m(f"nOrderRev{k}", f"{v:.1f}")
-    o3 = {k: load_seeds(CLEAN, f"cil_cord_o3_{n}", "full_label_f1").get(42)
-          for k, n in (("Colar", "colar"), ("Sbr", "colar_sbr"), ("Recall", "colar_sbr_recall_r64"))}
+    o3 = {
+        k: load_seeds(CLEAN, f"cil_cord_o3_{n}", "full_label_f1").get(42)
+        for k, n in (("Colar", "colar"), ("Sbr", "colar_sbr"), ("Recall", "colar_sbr_recall_r64"))
+    }
     if all(v is not None for v in o3.values()):  # sessions shuffled (cil_cord_o3), seed 42
         for k, v in o3.items():
             t += m(f"nOrderShuf{k}", f"{v:.1f}")
@@ -1389,7 +1432,9 @@ def gap_macros() -> str:
     for nm, srcs in (("nRecallMixNoMem", MIX_RECALL_NOMEM), ("nRecallMixMem", MIX_RECALL_MEM),
                      ("nSbrFrozen", (GATE, "cil_cord_colar_sbr_frozen", "*"))):  # fmt: skip
         sd = load_seeds(*srcs[:2], suffix=srcs[2])
-        x = sum(sd.values()) / len(sd) if len(sd) >= 3 else sd.get(42)  # mean of three seeds, else seed 42
+        x = (
+            sum(sd.values()) / len(sd) if len(sd) >= 3 else sd.get(42)
+        )  # mean of three seeds, else seed 42
         v[nm] = f"{x:.1f}" if x is not None else "--"
     er, co = pick(C["er"])[0], pick(C["colar"])[0]
     if er and co and max(er) >= min(co):
@@ -1795,7 +1840,9 @@ def write_baseline_card_short() -> None:
         if "buffer_size" in hp:
             mem = f"{hp['buffer_size']} {mem}"
         dz = dzs.get(key, False)
-        assert {seeds(cil, dz), seeds(mixs, dz), seeds(dils)} == {"3"}, label  # every cell: three clean runs
+        assert {seeds(cil, dz), seeds(mixs, dz), seeds(dils)} == {
+            "3"
+        }, label  # every cell: three clean runs
         t += f"{label} & {fam} & {changes} & {mem} \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_baselines_short.tex").write_text(t)
@@ -2539,8 +2586,10 @@ def write_funsd_baselines() -> str:
     v = {"nFunsdSbrMinusBestBaseMin": down1(min(gaps)) if gaps else "--",
          "nFunsdBaseAllBelowSbr": "true" if gaps and min(gaps) > 0 else "false"}  # fmt: skip
     for key, nm in (("AA", ""), ("full_label_f1", "Full")):
-        out += macro("FunsdRecall" + nm,
-                     list(load_seeds(CLEAN, "cil_funsd_colar_sbr_recall_r64", key, "").values()))
+        out += macro(
+            "FunsdRecall" + nm,
+            list(load_seeds(CLEAN, "cil_funsd_colar_sbr_recall_r64", key, "").values()),
+        )
     return out + "".join(f"\\newcommand{{\\{k}}}{{{x}}}\n" for k, x in v.items())
 
 
@@ -2659,23 +2708,89 @@ def write_robust():
     cell = lambda name, key, sfx="*": fmt(load(CLEAN, name, key, sfx), True)  # noqa: E731
     t = HDR + "\\begin{tabular}{@{}lccc@{}}\n\\toprule\n"
     t += "Session order & CoLaR & CoLaR-SBR & SBR-Recall \\\\\n\\midrule\n"
-    for lab, pre in (("Original", "cil_cord"), ("Reversed", "cil_cord_o2"), ("Shuffled", "cil_cord_o3")):
+    for lab, pre in (
+        ("Original", "cil_cord"),
+        ("Reversed", "cil_cord_o2"),
+        ("Shuffled", "cil_cord_o3"),
+    ):
         t += (f"{lab} & {cell(pre + '_colar', 'full_label_f1')} & "
               f"{cell(pre + '_colar_sbr', 'full_label_f1', '')} & "
               f"{cell(pre + '_colar_sbr_recall_r64', 'full_label_f1', '')} \\\\\n")  # fmt: skip
     (OUT / "supp_order.tex").write_text(t + "\\bottomrule\n\\end{tabular}\n")
-    sbr = [v for o in ("o2", "o3") for v in load(CLEAN, f"cil_cord_{o}_colar_sbr", "full_label_f1", "")]
+    sbr = [
+        v for o in ("o2", "o3") for v in load(CLEAN, f"cil_cord_{o}_colar_sbr", "full_label_f1", "")
+    ]
     col = [v for o in ("o2", "o3") for v in load(CLEAN, f"cil_cord_{o}_colar", "full_label_f1")]
     assert len(sbr) == len(col) == 6, (len(sbr), len(col))  # three runs per order
+    # SBR-Recall per order, run by run (a run can fail at its first session, so no mean in the text)
+    rec = {o: sorted(load(CLEAN, f"cil_cord_{o}_colar_sbr_recall_r64", "full_label_f1", ""),
+                     reverse=True) for o in ("o2", "o3")}  # fmt: skip
+    runs = lambda vs: ", ".join(f"{x:.1f}" for x in vs[:-1]) + f" and {vs[-1]:.1f}"  # noqa: E731
     (OUT / "robust_vals.tex").write_text(
         HDR + f"\\newcommand{{\\nOrderSbrRunMin}}{{{math.floor(min(sbr) * 10) / 10:.1f}}}\n"
-        f"\\newcommand{{\\nOrderColarRunMax}}{{{math.ceil(max(col) * 10) / 10:.1f}}}\n")  # fmt: skip
+        f"\\newcommand{{\\nOrderColarRunMax}}{{{math.ceil(max(col) * 10) / 10:.1f}}}\n"
+        f"\\newcommand{{\\nOrderRevRecallRuns}}{{{runs(rec['o2'])}}}\n"
+        f"\\newcommand{{\\nOrderRevRecallN}}{{{len(rec['o2'])}}}\n"
+        f"\\newcommand{{\\nOrderShufRecallN}}{{{len(rec['o3'])}}}\n"
+        f"\\newcommand{{\\nOrderShufRecallRunMin}}{{{math.floor(min(rec['o3']) * 10) / 10:.1f}}}\n")  # fmt: skip
     t = HDR + "\\begin{tabular}{@{}lcc@{}}\n\\toprule\n"
     t += "Method & Patience 2 & Patience 10 \\\\\n\\midrule\n"
-    for lab, k in (("CODA-Prompt", "coda_prompt"), ("CPFD", "cpfd"), ("IS3", "is3"), ("LCA", "lca")):
+    for lab, k in (
+        ("CODA-Prompt", "coda_prompt"),
+        ("CPFD", "cpfd"),
+        ("IS3", "is3"),
+        ("LCA", "lca"),
+    ):
         t += f"{lab} & {cell('cil_funsd_' + k, 'AA', '')} & {cell('cil_funsd_' + k + '_p10', 'AA', '')} \\\\\n"
     t += f"\\midrule\nCoLaR-SBR & {cell('cil_funsd_colar_sbr_d10', 'AA', '')} & -- \\\\\n"
     (OUT / "supp_patience.tex").write_text(t + "\\bottomrule\n\\end{tabular}\n")
+
+
+COST_ROWS = (  # (label, clean CIL-CORD run family, suffix); a rule before each new group
+    ("Naive fine-tuning", "cil_cord_naive", "*"), ("Joint training", "cil_cord_joint_p10", "*"),
+    None,
+    ("ER", "cil_cord_er250", "*"), ("DER++", "cil_cord_der_pp", "*"), ("LwF", "cil_cord_lwf", "*"),
+    ("CODA-Prompt", "cil_cord_coda_prompt", "*"), ("CL-LoRA", "cil_cord_cl_lora", "*"),
+    ("CPFD", "cil_cord_cpfd", "*"), ("IS3", "cil_cord_is3", "*"), ("LCA", "cil_cord_lca", "*"),
+    None,
+    ("CoLaR, shared softmax", "cil_cord_colar", "*"), ("SBR on raw documents", ER_SBR_NAME, ""),
+    ("CoLaR-SBR", SBR_NAME, "*"), ("SBR-Recall", RECALL_NAME, "*"),
+)  # fmt: skip
+
+
+def write_cost() -> None:
+    """supp_cost.tex + cost_vals.tex (thesis only): compute cost on CIL-CORD from metrics.json.
+    Trainable parameters and peak GPU memory: max over the runs; hours: mean training-loop
+    wall-clock (cards were shared, so indicative). Passes: forward passes per test document;
+    SBR-Recall reads each block under its own state (one pass per session)."""
+    t = HDR + "\\begin{tabular}{@{}lcccc@{}}\n\\toprule\n"
+    t += "Method & Trainable (M) & Peak GPU (MB) & Training (h) & Passes \\\\\n\\midrule\n"
+    v = {}
+    for row in COST_ROWS:
+        if row is None:
+            t += "\\midrule\n"
+            continue
+        lab, name, sfx = row
+        ms = _metas(name, sfx)
+        assert len(ms) == len(SEEDS), (name, len(ms))
+        tr = max(m["trainable_params"] for m in ms.values()) / 1e6
+        pk = max(m["peak_gpu_mem_mb"] for m in ms.values())
+        h = float(np.mean([m["total_wall_time_s"] for m in ms.values()])) / 3600
+        passes = 1
+        if name == RECALL_NAME:
+            m = next(iter(ms.values()))
+            passes, k = int(m["num_tasks"]), int(m["method_hparams"]["split_layer_k"])
+            v["nCostRecallPasses"] = str(passes)
+            v["nCostRecallPassEq"] = f"{1 + (passes - 1) * (LV3_LAYERS - k) / LV3_LAYERS:.1f}"
+        key = {"cil_cord_naive": "Naive", "cil_cord_er250": "Er", "cil_cord_der_pp": "DerPp",
+               ER_SBR_NAME: "ErSbr", SBR_NAME: "Sbr", RECALL_NAME: "Recall",
+               "cil_cord_colar": "Colar"}.get(name)  # fmt: skip
+        if key:
+            v[f"nCostHours{key}"], v[f"nCostTrain{key}"] = f"{h:.1f}", f"{tr:.1f}"
+            v[f"nCostPeak{key}"] = f"{pk:.0f}"
+        t += f"{lab} & {tr:.1f} & {pk:.0f} & {h:.1f} & {passes} \\\\\n"
+    (OUT / "supp_cost.tex").write_text(t + "\\bottomrule\n\\end{tabular}\n")
+    (OUT / "cost_vals.tex").write_text(HDR + _defs(v))
 
 
 def rank_seed_macros() -> str:
@@ -2745,6 +2860,7 @@ def main():
     write_components()
     write_budget_vals()
     write_budget_table()
+    write_cost()
     write_beyond()
 
     # ---- tab_2x2.tex
