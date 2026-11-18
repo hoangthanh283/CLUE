@@ -164,6 +164,11 @@ class CoLaRSBR(CoLaR):
         # alignment plays in SLCA, here on stored samples). 0 = off -> prior runs unchanged.
         self.refit_steps = int(config.get("sbr_refit_steps", 0))
         self.refit_lr = float(config.get("sbr_refit_lr", 1e-3))
+        # AGENT IMPL (2026-11-18): slow encoder. The encoder trains at lr * sbr_trunk_lr_scale
+        # and the readout (head + background logits) at sbr_head_lr (default: lr), to limit the
+        # drift inside old sessions. Scale 1.0 and no head lr -> the default optimizer.
+        self.trunk_lr_scale = float(config.get("sbr_trunk_lr_scale", 1.0))
+        self.head_lr = config.get("sbr_head_lr", None)
         self.blocks: list[torch.Tensor] = []
         self.block_domains: list[str] = []
         self.sessions: list[tuple[set[int], str]] = []  # (annotated head ids, schema domain)
@@ -216,6 +221,23 @@ class CoLaRSBR(CoLaR):
         super()._capture_task(train_loader)
         for d in self.store[n_before:]:
             d["session"] = torch.tensor(self._cur_session)
+
+    def _make_optimizer(self) -> torch.optim.Optimizer:
+        if self.trunk_lr_scale == 1.0 and self.head_lr is None:
+            return super()._make_optimizer()
+        lr = self.config.get("lr", 5e-5)
+        named = [(n, p) for n, p in self.model.named_parameters() if p.requires_grad]
+        is_readout = lambda n: "classifier" in n or "sbr_o" in n  # noqa: E731
+        return torch.optim.AdamW(
+            [
+                {"params": [p for n, p in named if is_readout(n)], "lr": float(self.head_lr or lr)},
+                {
+                    "params": [p for n, p in named if not is_readout(n)],
+                    "lr": lr * self.trunk_lr_scale,
+                },
+            ],
+            weight_decay=self.config.get("weight_decay", 0.01),
+        )
 
     def _after_task_impl(self, task: TaskInfo, train_loader: DataLoader) -> None:
         super()._after_task_impl(task, train_loader)
