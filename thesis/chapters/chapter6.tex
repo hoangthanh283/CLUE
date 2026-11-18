@@ -707,7 +707,6 @@ and SBR-Recall when the classes grow within one schema and no document may be ke
 
 \section{Beyond Documents: Image Classification}
 \label{sec:c6-s8}
-% E4: further image runs (balanced session choice, SBR-Recall on ViT) extend the last paragraphs.
 
 To examine whether the two components of our method transfer beyond documents, we run them
 on class-incremental image classification. An image has one label and no background class,
@@ -730,8 +729,8 @@ numbers are not comparable with the published ones.
 \begin{table}[!htbp]
   \centering
   \caption[Image class-incremental learning with ViT-B/16]{\textbf{Image class-incremental
-  learning} with ViT-B/16 (AA, mean $\pm$ s.d.). Bold: best of each column, joint training
-  aside; underlined: our best when a baseline is best.}
+  learning} with ViT-B/16 (mean $\pm$ s.d.\ of three runs; AF: mean). Bold: best of each
+  column, joint training aside; underlined: our best when a baseline is best.}
   \label{tab:image}
   \input{generated/paper/tab_image_core}
 \end{table}
@@ -746,13 +745,13 @@ images, ER falls to $\imgErTwoHCifar$ and $\imgErTwoHImnr$. The rank-$128$ compr
 changes \gls{aa} by at most $\imgColarBankGapMax$ points. Hence, the compressed latent
 memory transfers to images as a replacement for raw replay.
 
-\paragraph{Results of the readout.} On ImageNet-R, CoLaR-SBR reaches $\imgSbrImnr$ \gls{aa},
+\paragraph{Results of the unchanged readout.} On ImageNet-R, CoLaR-SBR reaches $\imgSbrImnr$ \gls{aa},
 which is \imgSbrMinusColarImnrMin{} to \imgSbrMinusColarImnrMax{} points above CoLaR with a
 shared softmax, and above RanPAC, ER and the latent memory, while SLCA remains higher. On
 CIFAR-100 it reaches $\imgSbrCifar$, within \imgSbrMinusColarCifarMin{} to
 \imgSbrMinusColarCifarMax{} points of CoLaR. This hints that separating the sessions in
-the readout can help beyond the background label. However, our method stays below SLCA on
-both datasets and below joint training ($\imgJointCifar$ and $\imgJointImnr$).
+the readout can help beyond the background label. However, run unchanged, our method stays
+below SLCA on both datasets and below joint training ($\imgJointCifar$ and $\imgJointImnr$).
 
 \paragraph{Where the readout loses.} To understand the remaining gap, we split the error
 of CoLaR-SBR into two parts (Figure~\ref{fig:image-readout}). For every test image, we ask
@@ -772,9 +771,9 @@ remaining error comes from assigning an image to the wrong session.
   \centering
   \includegraphics[width=\textwidth]{paper/image_readout.pdf}
   \caption[Where the per-session readout loses on images]{\textbf{Where the per-session
-  readout loses on images} (CoLaR-SBR, final model, per session). Dotted: the session
-  trained alone. Blue: accuracy when the session is given. Black: measured accuracy. The
-  gap between blue and black is what the choice of the session costs.}
+  readout loses on images} (final model, per session, mean of three runs). Dotted: the
+  session trained alone. Dashed: accuracy when the session is given. Solid: measured
+  accuracy. The gap between dashed and solid is what the choice of the session costs.}
   \label{fig:image-readout}
 \end{figure}
 
@@ -784,18 +783,63 @@ entities, and, across schemas, the tokens of other documents. On images, every t
 image is a positive for the block of its session, and under the supervision rule of
 Table~\ref{tab:supervision} it says nothing about the other blocks. Hence, a block never
 sees an input for which its answer should be the background, and its claim is not
-calibrated against the claims of the other blocks. As a first attempt, we treat every
-image as a negative for the blocks of all other sessions, with a weight of $0.1$ on these
-terms. In one run on CIFAR-100, this reaches $\iaNegCifar$ \gls{aa} against
-$\iaNegRefCifar$ for the unchanged readout in the matching run, i.e., it does not help.
-This can be due to the imbalance of the terms: with ten sessions, every image is a
-negative for nine blocks and a positive for one.
+calibrated against the claims of the other blocks. Hence, the two causes of
+Section~\ref{sec:c6-s2} appear again on images: a part of the error is drift inside the old
+sessions, and the larger part comes from the readout.
+
+\paragraph{Session-exclusive training.} Motivated by this, we adapt the training of
+CoLaR-SBR to streams whose sessions are mutually exclusive, in three parts. First, since an
+image belongs to exactly one session, it is a true negative for every other block; hence,
+we train every other block towards its background on it, with a weight of $0.1$ on these
+terms. This is the all-background mode of Table~\ref{tab:supervision}, applied between
+sessions. Then, after each session, we retrain only the head and the background logits for
+$200$ steps on the memory, where every session is drawn equally often, so that no block is
+favoured by the session that was just trained. Finally, we train the encoder with a
+learning rate one hundred times smaller than that of the readout ($5\times10^{-6}$ against
+$5\times10^{-4}$), which limits the drift inside the old sessions. At inference, the block
+with the largest claim always answers, since an image cannot be background. The memory is
+unchanged.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[Ablation of session-exclusive training on images]{\textbf{Ablation of
+  session-exclusive training} (one run per row, the same run for every row; first row:
+  CoLaR-SBR unchanged).}
+  \label{tab:image-ablation}
+  \input{generated/paper/tab_image_ablation}
+\end{table}
+
+\paragraph{Results of session-exclusive training.} As shown in Table~\ref{tab:image},
+session-exclusive training improves CoLaR-SBR in every run, by \imgSbrXMinusSbrCifarMin{} to
+\imgSbrXMinusSbrCifarMax{} \gls{aa} points on CIFAR-100 and by \imgSbrXMinusSbrImnrMin{} to
+\imgSbrXMinusSbrImnrMax{} points on ImageNet-R. On ImageNet-R it reaches $\imgSbrXImnr$
+\gls{aa}, the best result of the table apart from joint training (SLCA: $\imgSlcaImnr$). On
+CIFAR-100 it reaches $\imgSbrXCifar$, above RanPAC and $\imgSlcaMinusSbrXCifar$ points below
+SLCA. It also forgets less than the unchanged CoLaR-SBR (AF of $\imgSbrXAfCifar$ and
+$\imgSbrXAfImnr$ against $\imgSbrAfCifar$ and $\imgSbrAfImnr$). However, it still forgets
+more than SLCA and RanPAC, and it remains $\imgJointMinusSbrXCifar$ and
+$\imgJointMinusSbrXImnr$ points below joint training.
+
+\paragraph{Which part matters.} Table~\ref{tab:image-ablation} adds the three parts one at
+a time. With the encoder trained at the full rate, the negatives lower the accuracy below
+the unchanged method, and the refit recovers little: the blocks of the newest sessions
+then claim the images of the old ones. In contrast, with the slow encoder the same two
+parts give the gain. Moreover, Figure~\ref{fig:image-readout} shows where the gain comes
+from. The accuracy when the session is given rises to $\iaSbrXCifarClas$ and
+$\iaSbrXImnrClas$, i.e., the loss inside the sessions falls from $\iaSbrCifarDriftLoss$ to
+$\iaSbrXCifarDriftLoss$ points on CIFAR-100 and from $\iaSbrImnrDriftLoss$ to
+$\iaSbrXImnrDriftLoss$ on ImageNet-R. The loss to the choice of the session falls on
+CIFAR-100 (from $\iaSbrCifarIdentLoss$ to $\iaSbrXCifarIdentLoss$) but not on ImageNet-R
+($\iaSbrImnrIdentLoss$ and $\iaSbrXImnrIdentLoss$). Hence, the scheme mainly removes the
+drift, and the choice of the session remains the larger loss.
 
 \paragraph{Outcome.} The compressed latent memory transfers to images, and the per-session
-readout brings a gain on ImageNet-R without any change. However, the choice of the session,
-which the background label trains on documents, has no training signal on images and
-becomes the main source of error. We make no state-of-the-art claim for images; a
-calibrated choice of the session is left for future work (Chapter~\ref{ch:conclusion}).
+readout brings a gain on ImageNet-R without any change. With a training that matches the
+stream, our method is competitive with the strongest baselines under the same recipe and
+is the best on ImageNet-R. However, the choice of the session, which the background label
+trains on documents, remains the main source of error on images. We make no claim against
+the published numbers of the baselines; a calibrated choice of the session is left for
+future work (Chapter~\ref{ch:conclusion}).
 
 % =============================================================================
 \section{Qualitative and Error Analysis}
