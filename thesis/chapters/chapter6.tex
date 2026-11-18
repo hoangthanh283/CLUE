@@ -824,9 +824,11 @@ $\imgJointMinusSbrXImnr$ points below joint training.
 a time. Neither of the first and the last part helps alone. With the encoder trained at the
 full rate, the negatives lower the accuracy below the unchanged method, since the blocks of
 the newest sessions then claim the images of the old ones. With the slow encoder but
-without the negatives, the late sessions are hardly read on ImageNet-R, and the accuracy
-falls far below the unchanged method. In contrast, the two together give most of the gain.
-The refit adds little: nothing on CIFAR-100 and about one point on ImageNet-R. Moreover, Figure~\ref{fig:image-readout} shows where the gain comes
+without the negatives, the late sessions are hardly read, and the accuracy falls far
+below the unchanged method on both datasets. In contrast, the two together give most of the gain.
+The refit adds little: nothing on CIFAR-100, and on ImageNet-R three runs without it reach
+$\imgNoRefitImnr\pm\imgNoRefitSdImnr$ against $\imgSbrXImnr\pm\imgSbrXSdImnr$ with it, a difference
+within the spread of the runs. Moreover, Figure~\ref{fig:image-readout} shows where the gain comes
 from. The accuracy when the session is given rises to $\iaSbrXCifarClas$ and
 $\iaSbrXImnrClas$, i.e., the loss inside the sessions falls from $\iaSbrCifarDriftLoss$ to
 $\iaSbrXCifarDriftLoss$ points on CIFAR-100 and from $\iaSbrImnrDriftLoss$ to

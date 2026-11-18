@@ -238,13 +238,22 @@ def write_vals() -> None:
         t += f"\\newcommand{{\\imgSbrXMinusSbr{ds}Max}}{{{max(dd):+.1f}}}\n"
         t += f"\\newcommand{{\\imgSbrXMinusSlca{ds}}}{{{mean(sc, 'SbrX') - mean(sc, 'Slca'):+.1f}}}\n"
         t += f"\\newcommand{{\\imgJointMinusSbrX{ds}}}{{{mean(sc, 'Joint') - mean(sc, 'SbrX'):.1f}}}\n"
-        t += f"\\newcommand{{\\imgSlcaMinusSbrX{ds}}}{{{mean(sc, 'Slca') - mean(sc, 'SbrX'):.1f}}}\n"
+        t += (
+            f"\\newcommand{{\\imgSlcaMinusSbrX{ds}}}{{{mean(sc, 'Slca') - mean(sc, 'SbrX'):.1f}}}\n"
+        )
         for k, tm in (("SbrX", SBRX), ("Sbr", VAL_RUNS["Sbr"]), ("Slca", VAL_RUNS["Slca"])):
             af = seeds_of(tm, sc, "AF")
             if len(af) == len(SEEDS):
                 t += f"\\newcommand{{\\img{k}Af{ds}}}{{{st.mean(af.values()):.1f}}}\n"
         if not all(v[sc]["SbrX"][s] > v[sc]["Ranpac"][s] for s in SEEDS):
             _warn(f"the session-exclusive scheme is not above RanPAC on every run of {sc}")
+    # the scheme without its refit (negatives + slow encoder), where all three runs exist
+    for sc, ds in DS.items():
+        nr = seeds_of("{sc}_colar_sbrx500r128_nw010_sl_seed{sd}_vit", sc)
+        if len(nr) == len(SEEDS) and len(v[sc]["SbrX"]) == len(SEEDS):
+            t += f"\\newcommand{{\\imgNoRefit{ds}}}{{{st.mean(nr.values()):.1f}}}\n"
+            t += f"\\newcommand{{\\imgNoRefitSd{ds}}}{{{st.stdev(nr.values()):.1f}}}\n"
+            t += f"\\newcommand{{\\imgSbrXSd{ds}}}{{{st.stdev(v[sc]['SbrX'].values()):.1f}}}\n"
     if not all(v[sc]["Slca"][s] > v[sc]["Sbr"][s] for sc in SCEN for s in SEEDS):
         _warn("SLCA is not above CoLaR-SBR on every seed")
     if not all(r["Sbr"][s] > max(r["Ranpac"][s], r["ErTwoK"][s], r["Bank"][s]) for s in SEEDS):
