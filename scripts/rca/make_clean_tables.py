@@ -577,19 +577,20 @@ def write_budget_vals():
 
 
 def write_budget_table():
-    """supp_budget.tex: the memory-size study with every run (mean +- s.d. per size)."""
-    t = HDR + "\\begin{tabular}{@{}rccc@{}}\n\\toprule\n"
-    t += " & \\multicolumn{2}{c}{CoLaR-SBR} & CoLaR, shared softmax \\\\\n"
-    t += "\\cmidrule(lr){2-3}\\cmidrule(l){4-4}\n"
-    t += "Documents per session & Full-label F1 & AA & Full-label F1 \\\\\n\\midrule\n"
-    for n in BUDGET_WORDS:
-        name = lambda base: base if n == 50 else f"{base}_d{n}"  # noqa: E731
-        f1 = list(load_seeds(CLEAN, name("cil_cord_colar_sbr"), "full_label_f1").values())
-        aa = list(load_seeds(CLEAN, name("cil_cord_colar_sbr")).values())
-        sh = list(load_seeds(CLEAN, name("cil_cord_colar"), "full_label_f1").values())
-        assert len(f1) == len(aa) == 3 and len(sh) in (0, 3), (n, len(f1), len(aa), len(sh))
-        lab = f"\\textbf{{{n}}}" if n == 50 else str(n)
-        t += f"{lab} & {fmt(f1, True)} & {fmt(aa, True)} & {fmt(sh, True)} \\\\\n"
+    """supp_budget.tex: the memory-size study with every run (mean +- s.d. per size); the shared
+    softmax was run from the default size upwards, so it has its own block (no empty cell)."""
+    t = HDR + "\\begin{tabular}{@{}lrcc@{}}\n\\toprule\n"
+    t += "Readout & Documents per session & Full-label F1 & AA \\\\\n\\midrule\n"
+    for label, base, sizes in (("Per-session (CoLaR-SBR)", "cil_cord_colar_sbr", tuple(BUDGET_WORDS)),
+                               ("Shared softmax (CoLaR)", "cil_cord_colar", (50, 100, 200))):  # fmt: skip
+        for i, n in enumerate(sizes):
+            name = base if n == 50 else f"{base}_d{n}"
+            f1 = load(CLEAN, name, "full_label_f1", "" if "sbr" in base else "*")
+            aa = load(CLEAN, name, "AA", "" if "sbr" in base else "*")
+            assert len(f1) == len(aa) == 3, (name, len(f1), len(aa))
+            lab = f"\\textbf{{{n}}}" if n == 50 else str(n)
+            t += f"{label if i == 0 else ''} & {lab} & {fmt(f1, True)} & {fmt(aa, True)} \\\\\n"
+        t += "\\midrule\n" if "sbr" in base else ""
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_budget.tex").write_text(t)
 
