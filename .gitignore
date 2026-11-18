@@ -103,3 +103,18 @@ PLAN.md
 .github/workflows/
 .qwen/
 .serena/
+
+# Local notes, runbooks and stray files — local only, never commit
+/skills-lock.json
+/tmp
+/review-cvpr.md
+/claude
+/ROADMAP.md
+/RUNBOOK.md
+/STATE.md
+/STATE_ARCHIVE.md
+/A6000_RUNBOOK.md
+/AGENTS.md
+/BUGFIX_REPORT.md
+/EXPLORE.md
+/README.md
