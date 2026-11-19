@@ -645,11 +645,16 @@ def dump_pred(d: dict) -> list[int]:
     return blocked_pred(d["e"], d["tag"], d["threshold"])[0].tolist()
 
 
+PC_SEED = 42  # the run the per-class figure shows (the only seed every method has a dump of)
+
+
 def fig_perclass() -> dict:
-    """Per-class full-label F1 of the seed-42 prediction-dump re-runs that exist (one run each)."""
+    """Per-class full-label F1 of the seed-42 prediction-dump re-runs that exist (one run each).
+    Dumps of other seeds are further runs: they add only ``runs`` ({seed: per-class F1}), which
+    feeds the per-run ranges of write_perclass_vals, never the figure."""
     res = json.loads(MECH_JSON.read_text())
     order = [c for sess in res["session_types"] for c in sess]
-    found = {}
+    found, runs = {}, {}
     for f in sorted(glob(f"{CLEAN}/cil_cord_*dump*/full_label_dump.pt")):
         meta = json.loads((Path(f).parent / "metrics.json").read_text())
         key = MECH_KEY.get(meta["method"], meta["method"].removesuffix("_dump"))
@@ -662,9 +667,15 @@ def fig_perclass() -> dict:
             seq[doc][1].append(i2l[g])
         preds, golds = [v[0] for v in seq.values()], [v[1] for v in seq.values()]
         rep = classification_report(golds, preds, output_dict=True, zero_division=0)
-        found[key] = {"seed": meta["seed"], "micro": 100 * f1_score(golds, preds),
-                      "dump_f1": d["full_label_f1"],
-                      "f1": [100 * rep[c]["f1-score"] if c in rep else np.nan for c in order]}  # fmt: skip
+        f1 = [100 * rep[c]["f1-score"] if c in rep else np.nan for c in order]
+        assert abs(100 * f1_score(golds, preds) - d["full_label_f1"]) < 1e-6, f
+        runs.setdefault(key, {})[meta["seed"]] = f1
+        if meta["seed"] == PC_SEED:
+            found[key] = {"seed": meta["seed"], "micro": 100 * f1_score(golds, preds),
+                          "dump_f1": d["full_label_f1"], "f1": f1}  # fmt: skip
+    for k, v in found.items():
+        v["runs"] = runs[k]
+        v["last"] = len(res["session_types"][-1])  # number of classes of the last session
     fig, ax = plt.subplots(figsize=(WIDE, 2.25))
     x = np.arange(len(order))
     w = 0.8 / max(len(found), 1)
@@ -832,6 +843,19 @@ def write_perclass_vals(perclass: dict) -> None:
         a, b = np.array(perclass["sbr"]["f1"]), np.array(perclass["joint"]["f1"])
         both = str(int(((a == 0) & (b == 0)).sum()))
     t += f"\\newcommand{{\\pcBothMissed}}{{{both}}}\n"
+    # every run with a dump (the figure's run and the further runs): range of the classes found
+    for k, nm in PC_NAME.items():
+        if k not in perclass:
+            continue
+        per_run = [np.array(f) for f in perclass[k]["runs"].values()]
+        n = [int((f[~np.isnan(f)] > 0).sum()) for f in per_run]
+        t += f"\\newcommand{{\\pcRuns{nm}}}{{{len(n)}}}\n"
+        t += f"\\newcommand{{\\pcFound{nm}Min}}{{{min(n)}}}\n"
+        t += f"\\newcommand{{\\pcFound{nm}Max}}{{{max(n)}}}\n"
+    if "colar" in perclass:  # best F1 of a class of the last session under CoLaR, over the runs
+        last = perclass["colar"]["last"]
+        worst = max(np.nanmax(np.array(f)[-last:]) for f in perclass["colar"]["runs"].values())
+        t += f"\\newcommand{{\\pcColarLastMax}}{{{np.ceil(worst * 10) / 10:.1f}}}\n"
     (OUT / "supp_perclass_vals.tex").write_text(t)
     print("wrote", OUT / "supp_perclass_vals.tex")
 
