@@ -3,15 +3,17 @@
 \toprule
 Method & Full-label F1 & AA & $R[2,1]$ \\
 \midrule
+\multicolumn{4}{@{}l}{\emph{Rows of the hypothesis table}} \\
 Naive fine-tuning & $50.8{\pm}0.2$ & $43.9{\pm}0.5$ & 0.0--0.0 \\
 CoLaR, shared softmax & $52.2{\pm}0.6$ & $45.0{\pm}0.2$ & 0.0--1.0 \\
 CoLaR, true labels before each session$^{r}$ & $52.2{\pm}0.2$ & $44.5{\pm}0.2$ & 0.0--0.0 \\
-CoLaR-SBR & $\underline{87.2{\pm}0.6}$ & $\underline{87.4{\pm}0.6}$ & 85.0--86.6 \\
+\rowcolor{black!7} CoLaR-SBR & $\underline{87.2{\pm}0.6}$ & $\underline{87.4{\pm}0.6}$ & 85.0--86.6 \\
 CoLaR-SBR, constant background logit & $87.2{\pm}0.3$ & $\mathbf{87.7{\pm}0.3}$ & 85.5--86.0 \\
 Joint training (reference) & $87.5{\pm}0.8$ & $87.9{\pm}0.7$ & -- \\
 \midrule
-true labels before each session, 50 forms$^{r}$ & $54.8{\pm}6.4$ & $49.8{\pm}10.1$ & 0.0--34.6 \\
-CoLaR + MiB-style unbiased CE & $\mathbf{87.3{\pm}0.4}$ & $\mathbf{87.7{\pm}0.0}$ & 84.0--87.7 \\
+\multicolumn{4}{@{}l}{\emph{Further controls}} \\
+CoLaR, true labels before each session, 50 forms$^{r}$ & $54.8{\pm}6.4$ & $49.8{\pm}10.1$ & 0.0--34.6 \\
+CoLaR, MiB-style loss & $\mathbf{87.3{\pm}0.4}$ & $\mathbf{87.7{\pm}0.0}$ & 84.0--87.7 \\
 CoLaR, replay and current losses sliced & $83.7{\pm}3.0$ & $84.4{\pm}2.8$ & 74.9--83.8 \\
 SBR, no memory & $77.6{\pm}3.8$ & $79.7{\pm}3.4$ & 65.0--75.2 \\
 CoLaR, current loss sliced & $78.0{\pm}6.1$ & $79.1{\pm}5.5$ & 56.3--79.7 \\

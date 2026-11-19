@@ -317,7 +317,16 @@ def fig_findings_c() -> dict:
 
 
 # ---------------------------------------------------------------- appendix
-HEAT_KEYS = ("naive", "er", "colar", "oracle", "nobank", "sbr", "recall", "joint")  # 2 x 4, no empty slot
+HEAT_KEYS = (
+    "naive",
+    "er",
+    "colar",
+    "oracle",
+    "nobank",
+    "sbr",
+    "recall",
+    "joint",
+)  # 2 x 4, no empty slot
 
 
 def fig_heatmaps() -> dict:
@@ -379,13 +388,26 @@ def fig_repairs() -> dict:
             vs = cells[head, k]
             x = i + (j - (len(keys) - 1) / 2) * w
             if len(vs) == len(SEEDS):
-                ax.bar(x, np.mean(list(vs.values())), w * 0.92, color=REPAIR_COLOR[k],
-                       label=REPAIR_LABEL[k] if i == 0 else None, linewidth=0)
+                ax.bar(
+                    x,
+                    np.mean(list(vs.values())),
+                    w * 0.92,
+                    color=REPAIR_COLOR[k],
+                    label=REPAIR_LABEL[k] if i == 0 else None,
+                    linewidth=0,
+                )
             ax.scatter([x] * len(vs), list(vs.values()), s=3, color="black", zorder=3, linewidths=0)
         jv = cells[head, "joint"]
         if len(jv) == len(SEEDS):
-            ax.hlines(np.mean(list(jv.values())), i - 0.42, i + 0.42, colors="black",
-                      linestyles="dashed", linewidth=0.7, label="joint training" if i == 0 else None)
+            ax.hlines(
+                np.mean(list(jv.values())),
+                i - 0.42,
+                i + 0.42,
+                colors="black",
+                linestyles="dashed",
+                linewidth=0.7,
+                label="joint training" if i == 0 else None,
+            )
     ax.set_xticks(range(len(REPAIR_STREAMS)), [h for h, _s, _o in REPAIR_STREAMS])
     ax.set_ylabel("full-label F1")
     ax.set_ylim(0, 100)
@@ -393,10 +415,20 @@ def fig_repairs() -> dict:
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     hs, ls = ax.get_legend_handles_labels()  # bars in bar order, the joint line last
-    order = [i for i, lab in enumerate(ls) if lab != "joint training"] + [ls.index("joint training")]
-    ax.legend([hs[i] for i in order], [ls[i] for i in order], loc="upper center",
-              bbox_to_anchor=(0.46, 1.42), ncol=2, frameon=False,
-              handlelength=1.2, columnspacing=1.0, handletextpad=0.4)
+    order = [i for i, lab in enumerate(ls) if lab != "joint training"] + [
+        ls.index("joint training")
+    ]
+    ax.legend(
+        [hs[i] for i in order],
+        [ls[i] for i in order],
+        loc="upper center",
+        bbox_to_anchor=(0.46, 1.42),
+        ncol=2,
+        frameon=False,
+        handlelength=1.2,
+        columnspacing=1.0,
+        handletextpad=0.4,
+    )
     fig.subplots_adjust(left=0.13, right=0.995, top=0.72, bottom=0.11)
     save(fig, "repairs.pdf")
     return cells
@@ -426,13 +458,24 @@ def fig_budget() -> dict:
         for n in ns:
             v = list(pts[key, n].values())
             ax.scatter([xs.index(n)] * len(v), v, s=5, color=STYLE[key][1], zorder=3, linewidths=0)
-        ax.plot([xs.index(n) for n in ns],
-                [np.mean(list(pts[key, n].values())) for n in ns],  # mean of the runs, as in the text
-                color=STYLE[key][1], linewidth=1.0, marker="o", markersize=2.5, label=label)
+        ax.plot(
+            [xs.index(n) for n in ns],
+            [np.mean(list(pts[key, n].values())) for n in ns],  # mean of the runs, as in the text
+            color=STYLE[key][1],
+            linewidth=1.0,
+            marker="o",
+            markersize=2.5,
+            label=label,
+        )
     joint = load_seeds(CLEAN, "cil_cord_joint_p10", "full_label_f1")
     if joint:
-        ax.axhline(np.mean(list(joint.values())), color="black", linestyle="dashed",
-                   linewidth=0.7, label="joint training")
+        ax.axhline(
+            np.mean(list(joint.values())),
+            color="black",
+            linestyle="dashed",
+            linewidth=0.7,
+            label="joint training",
+        )
     ax.set_xticks(range(len(xs)), [str(n) for n in xs])
     ax.set_xlabel("stored documents per session (not to scale)")
     ax.set_ylabel("full-label F1")
@@ -758,9 +801,14 @@ def selfcheck(cells, cols, pts, means, dots, traj, counts, spans, perclass) -> N
         assert not any("dump" in s[1] for s in _sources(k)), k
     CHECKS.append("dump re-runs: absent from every table-backed figure")
     by_run = {(r["method"], r["seed"]): r["aa_vs_full"] for r in res["runs"].values()}
-    meth = {"naive": "naive", "nobank": "colar_sbr_noreplay", "colar": "colar",
-            "oracle": "colar_r_oracle", "sbr": "colar_sbr", "recall": "colar_sbr_recall_r64",
-            }  # fmt: skip  (joint: the figure reads the patience-10 runs, the analysis file the patience-2 ones)
+    meth = {
+        "naive": "naive",
+        "nobank": "colar_sbr_noreplay",
+        "colar": "colar",
+        "oracle": "colar_r_oracle",
+        "sbr": "colar_sbr",
+        "recall": "colar_sbr_recall_r64",
+    }  # fmt: skip  (joint: the figure reads the patience-10 runs, the analysis file the patience-2 ones)
     n_c = 0
     for k, (by_seed, _) in pts.items():  # F2(c) = aa_vs_full of the mechanism analysis
         for s, (x, y) in by_seed.items():
@@ -814,7 +862,9 @@ def selfcheck(cells, cols, pts, means, dots, traj, counts, spans, perclass) -> N
         assert abs(v["micro"] - v["dump_f1"]) < 1e-6, k
         # P17: each dump re-run reproduces the full-label F1 of its clean run of the same seed
         src_clean = [x for x in _sources(k) if x[0] == CLEAN][0]
-        if k == "joint":  # the dump re-run is of the patience-2 joint run (the tables read patience 10)
+        if (
+            k == "joint"
+        ):  # the dump re-run is of the patience-2 joint run (the tables read patience 10)
             src_clean = (CLEAN, "cil_cord_joint", "*")
         ref = load_seeds(*src_clean[:2], key="full_label_f1", suffix=src_clean[2])
         assert abs(ref[v["seed"]] - v["dump_f1"]) < 1e-6, (k, ref, v["dump_f1"])
@@ -1126,8 +1176,10 @@ def fig_image_budget() -> dict:
 
 def _tab_cell(fname: str, label_start: str, col: int) -> str:
     """The mean printed in column ``col`` (0-based, after the label) of a generated image table."""
-    line = next(x for x in (OUT / fname).read_text().splitlines() if x.startswith(label_start))
-    return re.match(r"\s*(?:\\(?:textbf|underline)\{)?([0-9.]+)", line.split("&")[1 + col]).group(1)
+    lines = [x.replace("\\rowcolor{black!7} ", "") for x in (OUT / fname).read_text().splitlines()]
+    line = next(x for x in lines if x.startswith(label_start))
+    cell = line.split("&")[1 + col]  # "$\\mathbf{80.0{\\pm}0.7}$" or "80.0\\;{...}"
+    return re.search(r"([0-9]+\.[0-9]+)", cell).group(1)
 
 
 def selfcheck_p18(abl, img_aa, img_traj, img_budget) -> None:
@@ -1143,14 +1195,15 @@ def selfcheck_p18(abl, img_aa, img_traj, img_budget) -> None:
     core = {"Naive": "Naive &", "Lwf": "LwF &", "ErTwoK": "ER (2", "DerTwoK": "DER++ (2",
             "Coda": "CODA-Prompt &", "Cllora": "CL-LoRA", "Slca": "SLCA (2023)",
             "Ranpac": "RanPAC", "Lca": "LCA", "Bank": "Latent memory",
-            "Colar": "CoLaR $r", "Joint": "Joint training"}  # fmt: skip
+            "Colar": "CoLaR (ours)", "Joint": "Joint training"}  # fmt: skip
     supp = {"ErTwoH": "ER (200", "DerTwoH": "DER++ (200"}
     n = 0
     for (k, sc), d in {**img_aa, **img_budget}.items():
         ci = [s for s, _ in IMG_DS].index(sc)
         if k in core:
             assert (
-                _tab_cell("tab_image_core.tex", core[k], ci) == f"{np.mean(list(d.values())):.1f}"
+                _tab_cell("tab_image_core.tex", core[k], 2 * ci)  # AA and AF per dataset
+                == f"{np.mean(list(d.values())):.1f}"
             ), k
         else:
             assert (
@@ -1173,7 +1226,10 @@ def main() -> None:
     fig_budget()
     for (head, key), vs in rep.items():  # the figure plots the cells of tab_repairs.tex
         if len(vs) == len(SEEDS):
-            assert f"{np.mean(list(vs.values())):.1f}" in (OUT / "tab_repairs.tex").read_text(), (head, key)
+            assert f"{np.mean(list(vs.values())):.1f}" in (OUT / "tab_repairs.tex").read_text(), (
+                head,
+                key,
+            )
     means = fig_heatmaps()
     dots = fig_perseed()
     traj = fig_trajectory()

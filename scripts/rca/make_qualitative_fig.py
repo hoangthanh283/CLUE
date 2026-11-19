@@ -61,7 +61,9 @@ def pick(doc, gold, preds, n_words) -> int:
         e = m & ent
         if e.sum() < MIN_ENTITY_WORDS:
             continue
-        dist = sum(abs(float((p[e] == gold[e]).mean()) - a) for p, a in zip(preds, avg, strict=True))
+        dist = sum(
+            abs(float((p[e] == gold[e]).mean()) - a) for p, a in zip(preds, avg, strict=True)
+        )
         if best is None or dist < best:
             best, best_d = dist, int(d)
     assert best_d is not None, "no receipt satisfies the size constraints"
@@ -113,14 +115,14 @@ def main() -> None:
                                    ec="none"))  # fmt: skip
             ax.add_patch(Rectangle((bx0, by0), bx1 - bx0, by1 - by0, fill=False, ec=col, lw=0.9))
         counts[tag] = (int(ok), int(ok + wrong), int(fp))
-        ax.set_title(f"({tag}) {label}: {ok} of {ok + wrong} entity words correct", fontsize=7.5,
+        ax.set_title(f"({tag}) {label}: {ok} of {ok + wrong} correct", fontsize=9,
                      pad=3)  # fmt: skip
     keys = [(RIGHT, "entity word, correct tag"), (WRONG, "entity word, wrong tag")]
     if any(c[2] for c in counts.values()):  # only when a panel shows such a word
         keys.append((FALSE_POS, "background word tagged as an entity"))
     fig.legend(
         [Patch(fc=c, alpha=0.5) for c, _ in keys], [t for _, t in keys],
-        loc="lower center", ncol=3, frameon=False, fontsize=7, handlelength=1.2, columnspacing=1.2,
+        loc="lower center", ncol=3, frameon=False, fontsize=9, handlelength=1.2, columnspacing=1.2,
     )  # fmt: skip
     fig.subplots_adjust(left=0.01, right=0.99, top=0.95, bottom=0.07, wspace=0.03)
     fig.savefig(OUT / "figures" / "qualitative.pdf", dpi=220)

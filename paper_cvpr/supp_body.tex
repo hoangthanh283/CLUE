@@ -6,10 +6,11 @@
 \input{analysis_vals}
 \input{qual_vals}
 \input{dil_check_vals}
+\input{encoders_vals}
 \input{robust_vals}
 \input{image_analysis_vals}
 
-\noindent This appendix is organised as follows. \Cref{app:setup} details the six streams, the two metrics and the training protocol. \Cref{app:method} gives the details of CoLaR, SBR and SBR-Recall, together with the memory analysis and further ablations. \Cref{app:baselines} describes our re-implementations of the baselines. \Cref{app:results} provides extended results for the hypotheses of \bodyref{sec:investigation}{the main paper} and for CIL-FUNSD, the memory-size study with three runs per size and a qualitative example. \Cref{app:drift} shows the drift on four encoders, and \cref{app:image} examines our memory and readout on image classification.
+\noindent This appendix is organised as follows. \Cref{app:setup} details the six streams, the two metrics and the training protocol. \Cref{app:method} gives the details of CoLaR, SBR and SBR-Recall (\cref{app:components}), the memory analysis (\cref{app:memsec}) and the model analysis (\cref{app:modelsec}). \Cref{app:baselines} describes our re-implementations of the baselines. \Cref{app:results} provides extended results: the three hypotheses of \bodyref{sec:investigation}{the main paper} (\cref{app:hyp}), other streams, session orders and encoders (\cref{app:robust}), further ablations (\cref{app:moreabl}) and a qualitative example (\cref{app:qual}). \Cref{app:drift} shows the drift on four encoders, and \cref{app:image} examines our memory and readout on image classification.
 
 %% ============================================================================ A
 \section{Setup and protocol}
@@ -63,7 +64,10 @@ S. & Dataset: tags introduced & Schema & Pool \\
 
 %% ============================================================================ B
 \section{Method details}
-\label{app:method}
+\label{app:method}\label{app:memory}\label{app:analysis}
+
+\subsection{CoLaR, SBR and SBR-Recall}
+\label{app:components}
 
 \runin{CoLaR.} First, after the first session, we freeze the embeddings and layers $1..k$; hence, a stored activation is always produced by the same layers and stays valid. Then, at the end of each session, we keep the layer-$k$ output of $50$ training documents as the fp16 factors $U_r\Sigma_r$ and $V_r^{\top}$ of its truncated SVD, together with the boxes, attention mask, labels and session of the document. No pixels and no token ids are kept. Finally, at every training step, we rebuild four stored documents and inject them at layer $k{+}1$ (their boxes and mask drive the layout biases and the attention mask), and add their cross-entropy with weight $1$. Regarding the size, a document takes $2r(709{+}768)$ bytes of factors plus $24{,}576$ bytes of boxes, mask and labels (and one byte for the session under SBR). For the $250$ documents of CIL-CORD this gives $\nAblSbrMB$\,MB ($1$\,MB $=10^6$ bytes; \cref{tab:memcmp}). At rank $64$ or $32$ a document would take $\nMemColarSixtyFourKB$ or $\nMemColarThirtyTwoKB$\,KB, i.e., $\nMemColarSixtyFourMB$ or $\nMemColarThirtyTwoMB$\,MB in all.
 
@@ -76,7 +80,14 @@ b^\star=\arg\max_b e_b.
 \label{eq:infer}
 \end{equation}
 
-\runin{SBR-Recall.} Every linear layer named query, key, value or dense (the attention output and both feed-forward layers) in layers $k{+}1..12$ carries one low-rank pair per session, with rank $64$, $\alpha{=}128$, $A$ initialised as Kaiming-uniform and $B{=}0$; hence, a new delta starts as the identity. The first session trains the base. After that, the encoder is frozen and only the head, the background weights and the current delta are trained. The loss groups the blocks of a document by the delta each block is read under and runs one forward pass per delta, so that every term is computed under the encoder state of its own block. Inference does the same, i.e., five passes on CIL-CORD (a cached implementation repeats only the $12-k$ upper layers, about $3.7$ layer-equivalents of one pass). Regarding the size, a rank-$64$ delta over the eight layers above $k{=}4$ has $8\times[3\cdot64\cdot1536+64\cdot1536+2\cdot64\cdot(768{+}3072)]=7{,}077{,}888$ parameters. The four deltas of CIL-CORD take $\nAblRecallMB$\,MB at two bytes per parameter ($\nMemRecallSessMB$\,MB per session), and $\nMemRecallFpMB$\,MB in fp32, the precision in which we trained and evaluated them. Without a memory on one schema, the loss of a later session contains only its own block. Hence, the delta and the background weights of an old block receive no gradient, and only the weight decay of AdamW (under $1\%$ over a run) and the claims of new blocks can change its predictions. In our runs, no session falls more than $\nRecallMaxLoss$ points below its diagonal at any later boundary.
+\runin{SBR-Recall.} Every linear layer named query, key, value or dense (the attention output and both feed-forward layers) in layers $k{+}1..12$ carries one low-rank pair per session, with rank $64$, $\alpha{=}128$, $A$ initialised as Kaiming-uniform and $B{=}0$; hence, a new delta starts as the identity. The first session trains the base. After that, the encoder is frozen and only the head, the background weights and the current delta are trained. The loss groups the blocks of a document by the delta each block is read under and runs one forward pass per delta, so that every term is computed under the encoder state of its own block. Inference does the same, i.e., five passes on CIL-CORD (a cached implementation repeats only the $12-k$ upper layers, about $3.7$ layer-equivalents of one pass).
+
+\runin{Size of the deltas.} A rank-$64$ delta over the eight layers above $k{=}4$ has $8\times[3\cdot64\cdot1536+64\cdot1536+2\cdot64\cdot(768{+}3072)]=7{,}077{,}888$ parameters. The four deltas of CIL-CORD take $\nAblRecallMB$\,MB at two bytes per parameter ($\nMemRecallSessMB$\,MB per session), and $\nMemRecallFpMB$\,MB in fp32, the precision in which we trained and evaluated them.
+
+\runin{Old sessions under SBR-Recall.} Without a memory on one schema, the loss of a later session contains only its own block. Hence, the delta and the background weights of an old block receive no gradient, and only the weight decay of AdamW (under $1\%$ over a run) and the claims of new blocks can change its predictions. In our runs, no session falls more than $\nRecallMaxLoss$ points below its diagonal at any later boundary.
+
+\subsection{Memory accounting and analysis}
+\label{app:memsec}
 
 \begin{table*}[t]
 \centering\scriptsize
@@ -97,7 +108,7 @@ b^\star=\arg\max_b e_b.
 \input{tab_memcmp}
 \end{table*}
 
-\runin{Memory analysis: what each method stores.}\label{app:memory} \Cref{tab:memcmp} compares what each method keeps across the sessions of CIL-CORD. ER and DER++ keep $\nErCilBuf$ raw documents ($\nMemErMB$\,MB), which expose pixels and token ids. The distillation methods keep a copy of the previous model ($\nMemModelMB$\,MB), and LCA keeps one backbone per session ($\nMemLcaMB$\,MB in all). In contrast, CoLaR-SBR keeps $250$ documents in $\nMemColarMB$\,MB, $\nMemLatentOverColar\times$ less than the activations it compresses, with no pixels or token ids. It is noted that we make no privacy claim, since activations can still leak content. SBR-Recall stores no document at all: its four deltas take $\nMemRecallMB$\,MB. Among the methods of \cref{tab:memcmp}, only those with our readout come close to joint training.
+\runin{What each method stores.} \Cref{tab:memcmp} compares what each method keeps across the sessions of CIL-CORD. ER and DER++ keep $\nErCilBuf$ raw documents ($\nMemErMB$\,MB), which expose pixels and token ids. The distillation methods keep a copy of the previous model ($\nMemModelMB$\,MB), and LCA keeps one backbone per session ($\nMemLcaMB$\,MB in all). In contrast, CoLaR-SBR keeps $250$ documents in $\nMemColarMB$\,MB, $\nMemLatentOverColar\times$ less than the activations it compresses, with no pixels or token ids. It is noted that we make no privacy claim, since activations can still leak content. SBR-Recall stores no document at all: its four deltas take $\nMemRecallMB$\,MB. Among the methods of \cref{tab:memcmp}, only those with our readout come close to joint training.
 
 \begin{figure}[t]
 \centering
@@ -105,9 +116,12 @@ b^\star=\arg\max_b e_b.
 \caption{\textbf{Accuracy against stored bytes} on CIL-CORD (dots: runs, bar: their mean; dashed black: joint training). Filled: the size that the run held; hollow: the size computed for an encoding that we did not run (8-bit pixels for raw documents, two bytes per parameter for the deltas). The dashed blue line joins CoLaR-SBR at ranks $32$, $64$ and $128$.}
 \label{fig:memory}
 \end{figure}
-\runin{Memory analysis: size, fidelity and cost.} \Cref{fig:memory} plots full-label F1 against the stored size. The size does not separate the methods, whereas the readout does. Every memory that we ran with our readout (the rank-$128$ latent, raw documents or the deltas) ends within $\nSbrGapFullMax$ full-label F1 points of joint training in every run, whereas the same latent memory under a shared softmax stays at $\vColarFull$. Regarding the size, CoLaR at rank $128$ is $\nMemRawOverColar\times$ smaller than raw documents as our code holds them, but $\nMemColarOverRawEight\times$ larger than raw documents with 8-bit pixels ($\nMemErEightMB$\,MB). Hence, the benefit of the latent memory is not its size: it is a whole-document memory without pixels or token ids, and it trains only $\nMemTrainSbrPct\%$ of the parameters that our raw replay trains, with full-label F1 within $\nErSbrAbsFullMax$ points of raw replay (\bodyref{sec:ablations}{the ablation study}). Lastly, the cost of SBR-Recall grows with the number of sessions and not with their documents; thus, it is cheaper only when the documents of a session take more than its delta.
+\runin{Size, fidelity and cost.} \Cref{fig:memory} plots full-label F1 against the stored size. The size does not separate the methods, whereas the readout does. Every memory that we ran with our readout (the rank-$128$ latent, raw documents or the deltas) ends within $\nSbrGapFullMax$ full-label F1 points of joint training in every run, whereas the same latent memory under a shared softmax stays at $\vColarFull$. Regarding the size, CoLaR at rank $128$ is $\nMemRawOverColar\times$ smaller than raw documents as our code holds them, but $\nMemColarOverRawEight\times$ larger than raw documents with 8-bit pixels ($\nMemErEightMB$\,MB). Hence, the benefit of the latent memory is not its size: it is a whole-document memory without pixels or token ids, and it trains only $\nMemTrainSbrPct\%$ of the parameters that our raw replay trains, with full-label F1 within $\nErSbrAbsFullMax$ points of raw replay (\bodyref{sec:ablations}{the ablation study}). Lastly, the cost of SBR-Recall grows with the number of sessions and not with their documents; thus, it is cheaper only when the documents of a session take more than its delta.
 
-\runin{Model analysis: the settings of CoLaR-SBR.}\label{app:analysis} In this section, we study the impact of each setting of CoLaR-SBR. We change one setting at a time around the default, i.e., rank $128$, injection at layer $4$ and four replayed documents per batch, and report the results on CIL-CORD in \cref{tab:analysis}. The impact of the number of stored documents is studied in \bodyref{sec:ablations}{the ablation study of the main paper}, and \cref{tab:budget} reports it with three runs per size.
+\subsection{Model analysis}
+\label{app:modelsec}
+
+\noindent In this section, we study the impact of each setting of CoLaR-SBR. We change one setting at a time around the default, i.e., rank $128$, injection at layer $4$ and four replayed documents per batch, and report the results on CIL-CORD in \cref{tab:analysis}. The impact of the number of stored documents is studied in \bodyref{sec:ablations}{the ablation study of the main paper}, and \cref{tab:budget} reports it with three runs per size.
 
 \begin{table}[h]
 \centering\small
@@ -144,6 +158,9 @@ b^\star=\arg\max_b e_b.
 \section{Extended results and ablations}
 \label{app:results}
 
+\subsection{The three hypotheses}
+\label{app:hyp}
+
 \begin{figure*}[t]\centering
 \includegraphics[width=0.86\linewidth]{figures/heatmaps.pdf}
 \caption{\textbf{Retention matrices} (CIL-CORD, LayoutLMv3, session-restricted F1, mean over three runs). Row $i$: after training session $i$; column $j$: session $j$. Joint training is one pooled run, so only its final row exists.}
@@ -158,7 +175,9 @@ b^\star=\arg\max_b e_b.
 
 \runin{Details for H1.} With the CoLaR memory and a shared softmax, the model keeps $\mColarRMin$ to $\mColarRMax\%$ of the spans of the old sessions, where naive fine-tuning keeps none, at a precision on old spans of at least $\mColarOldPLb\%$ (a lower bound; \cref{app:setup}).
 
-\runin{Details for H2.} \emph{Stored side.} Relabelling the older stored documents at each boundary lifts AA from $\nColarSeed$ to $\nOracle$, which is \nOracleShare\% of the gap to joint training in AA ($\nJointSeed$). However, it cannot help the session being trained: sessions~3 to~5 are learned only to $\nOracleLateMin$ to $\nOracleLateMax$ F1 on their own diagonal, sessions~3 and~4 rise to $\nOracleNextMin$ to $\nOracleNextMax$ one session later, and the last session ends at \nOracleLast. Relabelled before each session instead, the memory reaches $\vOraclePre$ AA. \emph{Current side.} The MiB-style loss reaches $\vMib$ AA, \nMibShare\% of the gap to joint training. It learns every session to at least $\nMibDiagMin$ F1; however, the first session ends at no more than $\nMibFirstMax$ F1 in any run. Slicing the softmax of the replay loss reaches $\vSliced$ AA and $\vSlicedFull$ full-label F1, i.e., \nSlicedShare\% of the gap in AA, and stays at least $\nSlicedPreGapMin$ points below the memory relabelled before each session under either metric. It is noted that this variant trains unstably: within a session, its validation F1 can collapse after its peak, and the later sessions are barely learned in two of the three runs. Since AA weights the sessions equally, its AA lies above its full-label F1; hence, the main paper quotes its full-label F1.
+\runin{Details for H2: the stored side.} Relabelling the older stored documents at each boundary lifts AA from $\nColarSeed$ to $\nOracle$, which is \nOracleShare\% of the gap to joint training in AA ($\nJointSeed$). However, it cannot help the session being trained: sessions~3 to~5 are learned only to $\nOracleLateMin$ to $\nOracleLateMax$ F1 on their own diagonal, sessions~3 and~4 rise to $\nOracleNextMin$ to $\nOracleNextMax$ one session later, and the last session ends at \nOracleLast. Relabelled before each session instead, the memory reaches $\vOraclePre$ AA.
+
+\runin{Details for H2: the current side.} The MiB-style loss reaches $\vMib$ AA, \nMibShare\% of the gap to joint training. It learns every session to at least $\nMibDiagMin$ F1; however, the first session ends at no more than $\nMibFirstMax$ F1 in any run. Slicing the softmax of the replay loss reaches $\vSliced$ AA and $\vSlicedFull$ full-label F1, i.e., \nSlicedShare\% of the gap in AA, and stays at least $\nSlicedPreGapMin$ points below the memory relabelled before each session under either metric. It is noted that this variant trains unstably: within a session, its validation F1 can collapse after its peak, and the later sessions are barely learned in two of the three runs. Since AA weights the sessions equally, its AA lies above its full-label F1; hence, the main paper quotes its full-label F1.
 
 \runin{Details for H3.} CoLaR-SBR reaches $\vSbr$ AA. Its owning block claims $\mSbrOwnerMin$ to $\mSbrOwnerMax\%$ of the old entity tokens, and most of the remaining errors ($\mSbrSameMin$ to $\mSbrSameMax\%$ of the wrong tokens) give the token another tag of its own session (\cref{fig:findings}b). Without the memory, the same readout scores $\vNoBank$ AA: no old entity token is predicted as ``O'', $\mNoBankOtherMin$ to $\mNoBankOtherMax\%$ of the wrong ones receive a class of another session, and each old block claims $\mNoBankFalseMin$ to $\mNoBankFalseMax\%$ of the tokens of its own test split that are not its entities, against $\mSbrFalseMin$ to $\mSbrFalseMax\%$ with the memory. This is consistent with an encoder that has drifted under a readout that no longer fits it. Lastly, under SBR-Recall the owning block claims $\mRecallOwnerMin$ to $\mRecallOwnerMax\%$ of the old entity tokens.
 
@@ -206,32 +225,73 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 
 \runin{The three repairs.} \Cref{tab:repairs} gives the values behind the repairs figure of the main paper, and \cref{tab:scope} lists how each repair treats a stored background label. As the results demonstrate, the ground-truth stored labels and the MiB-style loss each succeed on one stream, whereas the per-session readout closes most of the gap on all three streams.
 
-\runin{Forgetting curves.} \Cref{fig:forgetting} shows the F1 over the sessions seen so far and the F1 of session~1 after each session of CIL-CORD. CoLaR-SBR and SBR-Recall stay close to joint training after every session, whereas the methods with a shared softmax lose session~1 step by step.
-
-\input{supp_document_bootstrap}
-
 \runin{Slicing the softmax.} The replay-side slice keeps, for a stored document, all classes that were known when it was stored. The current-side slice removes the logits of the old classes only for the tokens labelled ``O''; the tokens with an entity label still use the full softmax. Combining both slices is a partial-label control inspired by SS-IL and ER-ACE, and not a full reproduction of them. The results on CIL-FUNSD are in \cref{tab:funsd}, and the combined slice on CIL-CORD is reported in the main paper.
 
-\runin{CIL-FUNSD.} On CIL-FUNSD (\cref{tab:funsd}), the question, answer and header types of FUNSD arrive in two sessions, and the forms of session~2 also contain questions, which are labelled ``O''. Joint training uses a patience of ten epochs on this stream and on CIL-CORD, since with a patience of two one of its runs stopped at its first epoch. As shown in \cref{tab:funsd}, CoLaR-SBR is level with joint training, whereas the memory relabelled with the ground-truth labels stays at the level of the shared softmax, even with fifty stored forms. In contrast, slicing both losses closes most of the gap on this stream, and slicing only the current loss closes a part of it.
+\runin{Forgetting curves.} \Cref{fig:forgetting} shows the F1 over the sessions seen so far and the F1 of session~1 after each session of CIL-CORD. CoLaR-SBR and SBR-Recall stay close to joint training after every session, whereas the methods with a shared softmax lose session~1 step by step.
 
 \runin{Per-class results.} \Cref{fig:perclass} shows the full-label F1 of each class of CIL-CORD for one run per method. Of the $\pcPresent$ classes that occur in the test set, joint training finds $\pcFoundJoint$ (F1 above $0$), CoLaR-SBR $\pcFoundSbr$, CoLaR $\pcFoundColar$ and naive fine-tuning $\pcFoundNaive$; $\pcBothMissed$ of the classes that CoLaR-SBR misses are missed by joint training too. With CoLaR and a shared softmax, the classes of session~5 are almost never found, i.e., the newest session is suppressed, and the classes of session~1, which hold most test entities, are found only in part, while several classes of sessions~2 and~3 are kept.
+
+\input{supp_document_bootstrap}
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{figures/ablation.pdf}
 \caption{\textbf{The component study with every run} (CIL-CORD; bar: mean of three runs, dots: the runs; full-label F1 dark, AA light). The values are in \bodyref{tab:ladder}{the hypothesis table} and \bodyref{tab:components}{the ablation table of the main paper}.}
 \label{fig:ablation}\end{figure}
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.5\textwidth]{figures/findings_a.pdf}\hfill
+\includegraphics[width=0.25\textwidth]{figures/findings_b.pdf}\hfill
+\includegraphics[width=0.25\textwidth]{figures/findings_c.pdf}\\
+\makebox[0.5\textwidth]{\small(a)}\hfill\makebox[0.25\textwidth]{\small(b)}\hfill\makebox[0.25\textwidth]{\small(c)}\\[1pt]
+\includegraphics{figures/findings_b_key.pdf}
+\caption{\textbf{The findings in one figure} (CIL-CORD, LayoutLMv3). (a) The series of hypotheses (\bodyref{tab:ladder}{the hypothesis table of the main paper}): full-label F1 (dark) and AA (light); bar: mean of three runs, dots: runs; lines: joint and naive full-label F1. (b) Where the final model puts the entities of old sessions (sessions 1 to 4); a shared softmax records only span recall. (c) Newest-session F1 against mean old-session F1, one marker per run: with a shared softmax and a memory the newest session is suppressed, whereas naive fine-tuning learns it and keeps nothing older.}
+\label{fig:findings}
+\end{figure*}
+
+\subsection{Other streams, session orders and encoders}
+\label{app:robust}
+
+\runin{CIL-FUNSD.} On CIL-FUNSD (\cref{tab:funsd}), the question, answer and header types of FUNSD arrive in two sessions, and the forms of session~2 also contain questions, which are labelled ``O''. Joint training uses a patience of ten epochs on this stream and on CIL-CORD, since with a patience of two one of its runs stopped at its first epoch. As shown in \cref{tab:funsd}, CoLaR-SBR is level with joint training, whereas the memory relabelled with the ground-truth labels stays at the level of the shared softmax, even with fifty stored forms. In contrast, slicing both losses closes most of the gap on this stream, and slicing only the current loss closes a part of it.
+
 \begin{table}[t]
 \centering\small
-\setlength{\tabcolsep}{3pt}
-\caption{\textbf{Design choices of SBR-Recall} (AA, mean $\pm$ s.d.\ of three runs): the capacity of the deltas on CIL-CORD and the memory across schemas on Mixed. Min $R[j,j]$: the lowest F1 of a session right after it is learned; min $R[T,j]$: the lowest final F1 of a session, both over all runs.}
-\label{tab:ablext}
-\resizebox{\linewidth}{!}{\input{supp_ablation_ext}}
+\setlength{\tabcolsep}{5pt}
+\caption{\textbf{Session order} on CIL-CORD (full-label F1; mean $\pm$ s.d.\ of three runs). $^{f}$The three runs: one of them fails in its first session.}
+\label{tab:order}
+\input{supp_order}
 \end{table}
 
-\runin{Design choices of SBR-Recall.} \Cref{tab:ablext} gathers two design choices of SBR-Recall, and \cref{fig:ablation} shows every run of the component study. \emph{Capacity of the deltas.} A delta of rank $8$ on the query, key and value layers learns its weakest session only to the value in the column min $R[j,j]$, and adding the memory does not repair it. In contrast, at rank $64$ with the attention output and the feed-forward layers, every session is learned. Hence, the capacity of the delta was the limit, and we use rank $64$; this is the one setting that we chose on CIL-CORD. \emph{Across schemas.} Without a memory on Mixed, an old block is trained towards its background on every token of the documents of another schema, and nothing trains it towards its own tags; hence, it stops claiming its entities and does not recover when its dataset returns: both minima of this row in \cref{tab:ablext} are zero. Since the encoder is frozen, this is an effect of the readout and not of drift. In contrast, with the $50$-document memory, SBR-Recall reaches $\nRecallMixMem$ AA against $\nRecallMixNoMem$ without it. Thus, the deltas do not replace the memory across schemas.
+\runin{Session order.} \Cref{tab:order} reports CIL-CORD with its five sessions reversed and shuffled. The gap between the shared softmax and the per-session readout does not depend on the order: over the three runs of each order, CoLaR-SBR stays at or above $\nOrderSbrRunMin$ full-label F1, whereas CoLaR stays at or below $\nOrderColarRunMax$. SBR-Recall holds under the shuffled order. Under the reversed order, its runs end at \nOrderRevRecallRuns: in the last one, the first session is not learned before early stopping ends it, and with the encoder frozen afterwards, no later session is learned either.
 
-\runin{Qualitative example.} \Cref{fig:qualitative} shows one test receipt after the last session. We did not pick it by hand: it is the test receipt whose accuracy on the entity words is closest to the average of the test set for both models, which is $\qualColarAcc\%$ for CoLaR with a shared softmax and $\qualSbrAcc\%$ for CoLaR-SBR. With a shared softmax, only the cash and the change amounts are tagged; every other entity word (the items, the subtotal, the tax and the total) is predicted as background, i.e., the entities are not confused with each other but lost to the label ``O''. In contrast, CoLaR-SBR tags all but one of the entity words correctly, which agrees with the per-class results in \cref{fig:perclass}.
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{Four encoders} on CIL-CORD (full-label F1, mean $\pm$ s.d.\ of three runs). Smallest gain: CoLaR-SBR minus CoLaR in the least favourable run.}
+\label{tab:encoders}
+\resizebox{\linewidth}{!}{\input{supp_encoders}}
+\end{table}
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\caption{\textbf{BROS} on CIL-CORD: the rows of the hypothesis table (mean $\pm$ s.d.\ of three runs). $^{r}$Uses the ground-truth labels.}
+\label{tab:bros}
+\resizebox{\linewidth}{!}{\input{supp_bros}}
+\end{table}
+
+\runin{Other encoders.} To examine whether the result depends on LayoutLMv3, we repeat CoLaR and CoLaR-SBR on CIL-CORD with three other encoders: LiLT and BROS, which have no image input, and the text-only BERT (\cref{tab:encoders}). BROS is trained with a batch size of one, since it needs more memory per document, and LiLT also stores its layout stream, hence its larger memory. The picture is the same on every encoder: with the same memory, the shared softmax stays at or below $\nEncColarFullMax$ full-label F1 on average, whereas CoLaR-SBR reaches at least $\nEncSbrFullMin$, and its smallest gain over the runs is \nEncGainFullMin{} points. Hence, the conflict and its repair do not depend on the image input or on the layout stream. On BROS, we also repeat the two rows in between of the hypothesis table (\cref{tab:bros}), and they show the same order as on LayoutLMv3: the ground-truth stored labels help but are unstable, and a constant background logit is below the learned one. Lastly, more patience for the weak baselines does not change the comparison either (\cref{tab:patience}, discussed in \cref{app:baselines}).
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\caption{\textbf{Patience of the baselines} on CIL-FUNSD (AA; mean $\pm$ s.d.\ of three runs; ``--'': not run).}
+\label{tab:patience}
+\input{supp_patience}
+\end{table}
+
+\subsection{Further ablations}
+\label{app:moreabl}
 
 \begin{table}[t]
 \centering\small
@@ -245,60 +305,36 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 
 \begin{table}[t]
 \centering\small
-\setlength{\tabcolsep}{5pt}
-\caption{\textbf{Session order} on CIL-CORD (full-label F1; mean $\pm$ s.d.\ of three runs).}
-\label{tab:order}
-\input{supp_order}
+\setlength{\tabcolsep}{3pt}
+\caption{\textbf{Design choices of SBR-Recall} (AA, mean $\pm$ s.d.\ of three runs): the capacity of the deltas on CIL-CORD and the memory across schemas on Mixed. Min $R[j,j]$: the lowest F1 of a session right after it is learned; min $R[T,j]$: the lowest final F1 of a session, both over all runs.}
+\label{tab:ablext}
+\resizebox{\linewidth}{!}{\input{supp_ablation_ext}}
 \end{table}
 
-\begin{table}[t]
-\centering\small
-\setlength{\tabcolsep}{5pt}
-\caption{\textbf{A second backbone}: BROS on CIL-CORD (mean $\pm$ s.d.\ of three runs). $^{r}$Uses the ground-truth labels.}
-\label{tab:bros}
-\resizebox{\linewidth}{!}{\input{supp_bros}}
-\end{table}
+\runin{Design choices of SBR-Recall.} \Cref{tab:ablext} gathers two design choices of SBR-Recall, and \cref{fig:ablation} shows every run of the component study. \emph{Capacity of the deltas.} A delta of rank $8$ on the query, key and value layers learns its weakest session only to the value in the column min $R[j,j]$, and adding the memory does not repair it. In contrast, at rank $64$ with the attention output and the feed-forward layers, every session is learned. Hence, the capacity of the delta was the limit, and we use rank $64$; this is the one setting that we chose on CIL-CORD. \emph{Across schemas.} Without a memory on Mixed, an old block is trained towards its background on every token of the documents of another schema, and nothing trains it towards its own tags; hence, it stops claiming its entities and does not recover when its dataset returns: both minima of this row in \cref{tab:ablext} are zero. Since the encoder is frozen, this is an effect of the readout and not of drift. In contrast, with the $50$-document memory, SBR-Recall reaches $\nRecallMixMem$ AA against $\nRecallMixNoMem$ without it. Thus, the deltas do not replace the memory across schemas.
 
-\begin{table}[t]
-\centering\small
-\setlength{\tabcolsep}{5pt}
-\caption{\textbf{Patience of the baselines} on CIL-FUNSD (AA; mean $\pm$ s.d.\ of three runs; ``--'': not run).}
-\label{tab:patience}
-\input{supp_patience}
-\end{table}
+\subsection{Qualitative example}
+\label{app:qual}
 
-\runin{Session order.} \Cref{tab:order} reports CIL-CORD with its five sessions reversed and shuffled. The gap between the shared softmax and the per-session readout does not depend on the order: over the three runs of each order, CoLaR-SBR stays at or above $\nOrderSbrRunMin$ full-label F1, whereas CoLaR stays at or below $\nOrderColarRunMax$. SBR-Recall holds under the shuffled order. Under the reversed order, its runs end at \nOrderRevRecallRuns: in the last one, the first session is not learned before early stopping ends it, and with the encoder frozen afterwards, no later session is learned either.
-
-\runin{A second backbone.} To examine whether the result depends on LayoutLMv3, we repeat the main rows of the hypothesis table on CIL-CORD with BROS, which has no image input (\cref{tab:bros}; \nBrosRecipe, since BROS needs more memory per document). The picture is the same: with the same memory, the shared softmax stays at $\vBrosColarFull$ full-label F1, whereas CoLaR-SBR reaches $\vBrosSbrFull$. Besides, the two rows in between show the same order as on LayoutLMv3: the ground-truth stored labels help but are unstable, and a constant background logit is below the learned one.
-
-%% ============================================================================ E
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.5\textwidth]{figures/findings_a.pdf}\hfill
-\includegraphics[width=0.25\textwidth]{figures/findings_b.pdf}\hfill
-\includegraphics[width=0.25\textwidth]{figures/findings_c.pdf}\\
-\makebox[0.5\textwidth]{\small(a)}\hfill\makebox[0.25\textwidth]{\small(b)}\hfill\makebox[0.25\textwidth]{\small(c)}\\[1pt]
-\includegraphics{figures/findings_b_key.pdf}
-\caption{\textbf{The findings in one figure} (CIL-CORD, LayoutLMv3). (a) The series of hypotheses (\bodyref{tab:ladder}{the hypothesis table of the main paper}): full-label F1 (dark) and AA (light); bar: mean of three runs, dots: runs; lines: joint and naive full-label F1. (b) Where the final model puts the entities of old sessions (sessions 1 to 4); a shared softmax records only span recall. (c) Newest-session F1 against mean old-session F1, one marker per run: with a shared softmax and a memory the newest session is suppressed, whereas naive fine-tuning learns it and keeps nothing older.}
-\label{fig:findings}
-\end{figure*}
+\runin{Qualitative example.} \Cref{fig:qualitative} shows one test receipt after the last session. We did not pick it by hand: it is the test receipt whose accuracy on the entity words is closest to the average of the test set for both models, which is $\qualColarAcc\%$ for CoLaR with a shared softmax and $\qualSbrAcc\%$ for CoLaR-SBR. With a shared softmax, only the cash and the change amounts are tagged; every other entity word (the items, the subtotal, the tax and the total) is predicted as background, i.e., the entities are not confused with each other but lost to the label ``O''. In contrast, CoLaR-SBR tags all but one of the entity words correctly, which agrees with the per-class results in \cref{fig:perclass}.
 
 \begin{figure*}[t]
 \centering
-\begin{minipage}[t]{0.62\textwidth}\centering
-\includegraphics[width=\linewidth]{figures/qualitative.pdf}
+\includegraphics[width=0.78\textwidth]{figures/qualitative.pdf}
 \caption{\textbf{A test receipt of CIL-CORD after the last session} (one run per method). With a shared softmax, CoLaR tags $\qualColarOk$ of the $\qualEnt$ entity words correctly and predicts the others as background; CoLaR-SBR tags $\qualSbrOk$.}
 \label{fig:qualitative}
-\end{minipage}\hfill
-\begin{minipage}[t]{0.34\textwidth}\centering
-\includegraphics[width=\linewidth]{figures/backbone_cka_gradient.pdf}
-\caption{\textbf{Drift by depth}: linear CKA between the checkpoints before and after the second task (FUNSD$\rightarrow$CORD, each dataset with its own labels) under naive fine-tuning on four encoders ($1.0$: no drift; mean of three runs).}
-\label{fig:cka}
-\end{minipage}
 \end{figure*}
 
+%% ============================================================================ E
 \section{Drift evidence}
 \label{app:drift}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.9\linewidth]{figures/backbone_cka_gradient.pdf}
+\caption{\textbf{Drift by depth}: linear CKA between the checkpoints before and after the second task (FUNSD$\rightarrow$CORD, each dataset with its own labels) under naive fine-tuning on four encoders ($1.0$: no drift; mean of three runs).}
+\label{fig:cka}
+\end{figure}
 
 \begin{table}[t]
 \centering\scriptsize
@@ -308,7 +344,6 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 \resizebox{\linewidth}{!}{\input{tab_dil_grid}}
 \end{table}
 
-
 \runin{Where the drift sits.} Under naive fine-tuning on a fixed label space, every encoder forgets its earlier domains (\cref{tab:dil}). On the stream FUNSD, CORD and SROIE, where each dataset keeps its own labels, the drift of the representation grows with depth on all four encoders: it is smallest at the embeddings and largest at the last layer and the head (\cref{fig:cka}). That forgetting concentrates in the layers close to the output is known for image classifiers~\citep{ramasesh2021anatomy}; here we observe it for three multimodal document encoders and a text-only one.
 
 \runin{Replay against regularisation.} On every encoder of \cref{tab:dil}, replay (ER, DER++) comes close to joint training, whereas EWC and LwF stay near naive fine-tuning. This is the reason why we take replay as the starting point in the main paper. The cells of \cref{tab:dil} were run under an earlier protocol. We repeated $\nDilCheckCells$ of the cells of LiLT, BROS and BERT with one run under the protocol of the main paper, and each differs from its cell by at most $\nDilCheckMaxDiff$ AA points; LwF on LiLT, which is missing in the table, reaches $\nDilLwfLilt$ AA. On images, the readout can also be repaired from class statistics (\cref{app:image}); on token-labelled documents, only replaying old documents repaired it in our experiments.
@@ -316,6 +351,9 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 %% ============================================================================ F
 \section{Image classification}
 \label{app:image}
+
+\subsection{Setup and the unchanged method}
+\label{app:imgsetup}
 
 \begin{table}[t]
 \centering\small
@@ -327,7 +365,9 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 
 \runin{Setup.} To examine whether the latent memory and the per-session readout transfer beyond documents, we run them on CIFAR-100 and ImageNet-R in ten sessions (with the class order of SLCA and RanPAC), using a ViT-B/16 pre-trained on ImageNet-21k and a linear head on the CLS token. We train with AdamW at $5{\times}10^{-5}$ (SLCA and LCA: SGD at $0.01$), a batch size of $16$ and at most $100$ epochs (SLCA: $20$) with early stopping, in full precision (mixed precision for the latent memory, CoLaR and CoLaR-SBR). ER and DER++ keep $2{,}000$ raw images and SLCA keeps class Gaussians, whereas the latent memory, CoLaR and CoLaR-SBR keep $500$ images per session as layer-$4$ activations (rank $128$ for CoLaR and CoLaR-SBR). SLCA~\citep{zhang2023slca} and RanPAC~\citep{mcdonnell2023ranpac} take the place of CPFD and IS3, which are designed for documents. Since our recipe differs from theirs, our numbers are not comparable with the published ones.
 
-\runin{The unchanged method.} As shown in \cref{tab:image}, the latent memory is competitive with raw replay: on CIFAR-100 the latent memory and CoLaR are above ER and DER++, and on ImageNet-R they are within $\imgBankErGapImnr$ and $\imgColarErGapImnr$ points of ER. It is noted that they store no pixel but more items ($\imgBankMB$ and $\imgColarMB$\,MB against $\imgErTwoKMB$\,MB for $2{,}000$ raw images); with $200$ raw images, ER falls to $\imgErTwoHCifar$ and $\imgErTwoHImnr$. The rank-$128$ compression changes AA by at most $\imgColarBankGapMax$ points. An image has one label and no background class, and the label of a stored image never becomes stale; hence, the conflict of \bodyref{sec:investigation}{the main paper} does not arise. Nevertheless, CoLaR-SBR run unchanged, with one block per session, reaches $\imgSbrImnr$ on ImageNet-R, which is \imgSbrMinusColarImnrMin{} to \imgSbrMinusColarImnrMax{} points above CoLaR, and $\imgSbrCifar$ on CIFAR-100, within \imgSbrMinusColarCifarMin{} to \imgSbrMinusColarCifarMax{} points of CoLaR. However, it stays below SLCA on both datasets.
+\runin{The memory.} As shown in \cref{tab:image}, the latent memory is competitive with raw replay: on CIFAR-100 the latent memory and CoLaR are above ER and DER++, and on ImageNet-R they are within $\imgBankErGapImnr$ and $\imgColarErGapImnr$ points of ER. It is noted that they store no pixel but more items ($\imgBankMB$ and $\imgColarMB$\,MB against $\imgErTwoKMB$\,MB for $2{,}000$ raw images); with $200$ raw images, ER falls to $\imgErTwoHCifar$ and $\imgErTwoHImnr$. The rank-$128$ compression changes AA by at most $\imgColarBankGapMax$ points.
+
+\runin{The unchanged readout.} An image has one label and no background class, and the label of a stored image never becomes stale; hence, the conflict of \bodyref{sec:investigation}{the main paper} does not arise. Nevertheless, CoLaR-SBR run unchanged, with one block per session, reaches $\imgSbrImnr$ on ImageNet-R, which is \imgSbrMinusColarImnrMin{} to \imgSbrMinusColarImnrMax{} points above CoLaR, and $\imgSbrCifar$ on CIFAR-100, within \imgSbrMinusColarCifarMin{} to \imgSbrMinusColarCifarMax{} points of CoLaR. However, it stays below SLCA on both datasets.
 
 \runin{Where the readout loses.} To understand this gap, we split the error of CoLaR-SBR into two parts (\cref{fig:imagereadout}). For every test image, we ask whether the block of its own session ranks the right class first, i.e., what the readout would answer if the session were given. On CIFAR-100, this accuracy is $\iaSbrCifarClas$, only $\iaSbrCifarDriftLoss$ points below the sessions trained alone ($\iaCifarAlone$), whereas $\iaSbrCifarIdentLoss$ points are lost to the choice of the session. On ImageNet-R, it is $\iaSbrImnrClas$ against $\iaImnrAlone$, and $\iaSbrImnrIdentLoss$ points are lost to the choice of the session. Hence, the two causes of the main paper appear again: a part of the error is drift inside the old sessions, and the larger part comes from the readout, which assigns an image to the wrong session. On documents, the tokens that are not entities train every block to say when a token is not its own. In contrast, on images every training image is a positive for its block, so the background logit of a block is never trained.
 
@@ -338,16 +378,22 @@ Per-session readout (SBR) & background within its own session & $\vSbrFull$ \\
 \label{fig:imagereadout}
 \end{figure}
 
+\subsection{Session-exclusive training}
+\label{app:imgx}
+
 \runin{Session-exclusive training.} Motivated by this, we adapt the training of CoLaR-SBR to streams whose sessions are mutually exclusive, in three parts. First, since an image belongs to exactly one session, it is a true negative for every other block; hence, we train every other block towards its background on it (with weight $0.1$), which is the all-background mode of \cref{app:method}. Then, after each session, we retrain only the head and the background logits for $200$ steps on the memory, where every session is drawn equally often, so that no block is favoured by the session that was just trained. Finally, we train the encoder with a learning rate one hundred times smaller than that of the readout ($5{\times}10^{-6}$ against $5{\times}10^{-4}$), which limits the drift inside the old sessions. At inference, the block with the largest claim always answers, since an image cannot be background. The memory is unchanged.
+
+\runin{Results.} As shown in \cref{tab:image}, session-exclusive training improves CoLaR-SBR in every run, by \imgSbrXMinusSbrCifarMin{} to \imgSbrXMinusSbrCifarMax{} AA points on CIFAR-100 and by \imgSbrXMinusSbrImnrMin{} to \imgSbrXMinusSbrImnrMax{} points on ImageNet-R. On ImageNet-R it reaches $\imgSbrXImnr$ AA, the best result of the table apart from joint training (SLCA: $\imgSlcaImnr$). On CIFAR-100 it reaches $\imgSbrXCifar$, above RanPAC and $\imgSlcaMinusSbrXCifar$ points below SLCA. It also forgets less than CoLaR-SBR (AF of $\imgSbrXAfCifar$ and $\imgSbrXAfImnr$ against $\imgSbrAfCifar$ and $\imgSbrAfImnr$). However, it still forgets more than SLCA and RanPAC, and it remains $\imgJointMinusSbrXCifar$ and $\imgJointMinusSbrXImnr$ points below joint training. Thus, with a training that matches the stream, our method is competitive with the strongest baselines under the same recipe; we make no claim against their published numbers.
+
+\subsection{Ablation and analysis}
+\label{app:imgabl}
 
 \begin{table}[t]
 \centering\small
 \setlength{\tabcolsep}{4pt}
-\caption{\textbf{Ablation of session-exclusive training} (one run per row, the same run for every row; first row: CoLaR-SBR unchanged).}
+\caption{\textbf{Ablation of session-exclusive training} (one run per row, the same run for every row; row~I: CoLaR-SBR unchanged). $^{u}$Not reported: the late sessions are not learned, so there is nothing to forget.}
 \label{tab:imageabl}
 \resizebox{\linewidth}{!}{\input{tab_image_ablation}}
 \end{table}
-
-\runin{Results.} As shown in \cref{tab:image}, session-exclusive training improves CoLaR-SBR in every run, by \imgSbrXMinusSbrCifarMin{} to \imgSbrXMinusSbrCifarMax{} AA points on CIFAR-100 and by \imgSbrXMinusSbrImnrMin{} to \imgSbrXMinusSbrImnrMax{} points on ImageNet-R. On ImageNet-R it reaches $\imgSbrXImnr$ AA, the best result of the table apart from joint training (SLCA: $\imgSlcaImnr$). On CIFAR-100 it reaches $\imgSbrXCifar$, above RanPAC and $\imgSlcaMinusSbrXCifar$ points below SLCA. It also forgets less than CoLaR-SBR (AF of $\imgSbrXAfCifar$ and $\imgSbrXAfImnr$ against $\imgSbrAfCifar$ and $\imgSbrAfImnr$). However, it still forgets more than SLCA and RanPAC, and it remains $\imgJointMinusSbrXCifar$ and $\imgJointMinusSbrXImnr$ points below joint training. Thus, with a training that matches the stream, our method is competitive with the strongest baselines under the same recipe; we make no claim against their published numbers.
 
 \runin{Which part matters.} \Cref{tab:imageabl} adds the three parts one at a time. Neither of the first and the last part helps alone. With the encoder trained at the full rate, the negatives lower the accuracy below the unchanged method, since the blocks of the newest sessions then claim the images of the old ones. With the slow encoder but without the negatives, the late sessions are hardly read, and the accuracy falls far below the unchanged method on both datasets. In contrast, the two together give most of the gain. The refit adds little: nothing on CIFAR-100, and on ImageNet-R three runs without it reach $\imgNoRefitImnr{\pm}\imgNoRefitSdImnr$ against $\imgSbrXImnr{\pm}\imgSbrXSdImnr$ with it, a difference within the spread of the runs. Moreover, \cref{fig:imagereadout} shows where the gain comes from. The accuracy when the session is given rises to $\iaSbrXCifarClas$ and $\iaSbrXImnrClas$, i.e., the loss inside the sessions falls from $\iaSbrCifarDriftLoss$ to $\iaSbrXCifarDriftLoss$ points on CIFAR-100 and from $\iaSbrImnrDriftLoss$ to $\iaSbrXImnrDriftLoss$ on ImageNet-R. The loss to the choice of the session falls on CIFAR-100 (from $\iaSbrCifarIdentLoss$ to $\iaSbrXCifarIdentLoss$) but not on ImageNet-R ($\iaSbrImnrIdentLoss$ and $\iaSbrXImnrIdentLoss$). Hence, the scheme mainly removes the drift, and the choice of the session remains the larger loss; a better calibrated choice is left for future work.
