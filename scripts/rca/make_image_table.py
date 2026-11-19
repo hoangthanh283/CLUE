@@ -312,13 +312,21 @@ def write_ablation() -> None:
         cells = []
         for sc in SCEN:
             for key in ("AA", "AF"):
-                x = metric(f"{sc}_{stem}_seed42_vit", key)
+                # every run the row has: mean +- s.d. with three runs, the value with one
+                vs = [
+                    x for sd in SEEDS if (x := metric(f"{sc}_{stem}_seed{sd}_vit", key)) is not None
+                ]
                 # slow encoder without negatives: the late sessions are never learned, so AF
                 # (what was learned and then lost) says nothing there; printed as -- with a mark
                 if key == "AF" and (n, r, sl) == (0, 0, 1):
                     cells.append("--$^{u}$")
+                elif not vs:
+                    cells.append("\\emph{pending}")
+                elif len(vs) == len(SEEDS) and key == "AA":
+                    cells.append(f"${st.mean(vs):.1f}{{\\pm}}{st.stdev(vs):.1f}$")
                 else:
-                    cells.append("\\emph{pending}" if x is None else f"${x:.1f}$")
+                    assert len(vs) in (1, len(SEEDS)), (stem, sc, len(vs))  # no half-filled row
+                    cells.append(f"${st.mean(vs):.1f}$")
         shade = "\\rowcolor{black!7} " if (n, r, sl) == (1, 1, 1) else ""  # the full scheme
         idx = ("I", "II", "III", "IV", "V", "VI")[i]
         t += f"{shade}{idx} & {ck(n)} & {ck(r)} & {ck(sl)} & " + " & ".join(cells) + " \\\\\n"

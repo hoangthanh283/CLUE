@@ -825,8 +825,9 @@ unchanged.
 \begin{table}[!htbp]
   \centering
   \caption[Ablation of session-exclusive training on images]{\textbf{Ablation of
-  session-exclusive training} (one run per row, the same run for every row; first row:
-  CoLaR-SBR unchanged).}
+  session-exclusive training} (mean $\pm$ s.d.\ of three runs; rows~II and~III: one run;
+  row~I: CoLaR-SBR unchanged). $^{u}$Not reported: the late sessions are not learned, so
+  there is nothing to forget.}
   \label{tab:image-ablation}
   \input{generated/paper/tab_image_ablation}
 \end{table}
@@ -848,8 +849,9 @@ full rate, the negatives lower the accuracy below the unchanged method, since th
 the newest sessions then claim the images of the old ones. With the slow encoder but
 without the negatives, the late sessions are hardly read, and the accuracy falls far
 below the unchanged method on both datasets. In contrast, the two together give most of the gain.
-The refit adds little: nothing on CIFAR-100, and on ImageNet-R three runs without it reach
-$\imgNoRefitImnr\pm\imgNoRefitSdImnr$ against $\imgSbrXImnr\pm\imgSbrXSdImnr$ with it, a difference
+The refit adds little: without it, the scheme reaches $\imgNoRefitCifar\pm\imgNoRefitSdCifar$ on
+CIFAR-100 and $\imgNoRefitImnr\pm\imgNoRefitSdImnr$ on ImageNet-R, against
+$\imgSbrXCifar\pm\imgSbrXSdCifar$ and $\imgSbrXImnr\pm\imgSbrXSdImnr$ with it, i.e., differences
 within the spread of the runs. Moreover, Figure~\ref{fig:image-readout} shows where the gain comes
 from. The accuracy when the session is given rises to $\iaSbrXCifarClas$ and
 $\iaSbrXImnrClas$, i.e., the loss inside the sessions falls from $\iaSbrCifarDriftLoss$ to
