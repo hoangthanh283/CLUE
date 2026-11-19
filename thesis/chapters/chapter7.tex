@@ -41,7 +41,7 @@ joint training.
 
 \paragraph{RQ4: How far does the result hold?} The gap between the shared softmax and the
 per-session readout holds on three class-incremental streams, under three session orders
-and on a second encoder, and it is not explained by the patience of the baselines or by
+and on four encoders, one of which reads text only, and it is not explained by the patience of the baselines or by
 the choice of the test documents. On the Mixed stream, CoLaR-SBR is on par with joint
 training. The result has limits as well: on the domain-incremental streams the readout
 brings nothing, as expected, SBR-Recall needs the memory when the schema changes and
@@ -81,7 +81,7 @@ under the reversed session order, the first session was not learned, and no late
 recovered. A longer patience for the first session, or a first session trained with
 several restarts, may remove this failure.
 
-\paragraph{Encoders and tasks.} Most results are on LayoutLMv3, with one stream on BROS.
+\paragraph{Encoders and tasks.} Most results are on LayoutLMv3; LiLT, BROS and BERT are examined on one stream only.
 We study \gls{kie} as token labelling only; generative document models and multimodal
 language models, which produce the fields as text, have no background label in this form,
 and whether a related conflict exists for them is unknown.

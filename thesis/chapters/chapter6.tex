@@ -534,7 +534,6 @@ this setting either, and we keep four replayed documents.
 % =============================================================================
 \section{Robustness}
 \label{sec:c6-s6}
-% E2 (CoLaR and CoLaR-SBR on LiLT and BERT) extends the paragraph on the second encoder.
 
 The results so far use one session order, one encoder and one early-stopping rule. In this
 section, we examine whether the gap between the shared softmax and the per-session readout
@@ -564,21 +563,44 @@ Thus, the memory-free variant depends on its first session more than CoLaR-SBR d
   \input{generated/paper/supp_order}
 \end{table}
 
-\paragraph{A second encoder.} To examine whether the result depends on LayoutLMv3, we
-repeat the main rows of the hypothesis table on CIL-CORD with BROS, which has no image
-input (Table~\ref{tab:bros}; \nBrosRecipe, since BROS needs more memory per document). The
-picture is the same: with the same memory, the shared softmax stays at $\vBrosColarFull$
-full-label F1, whereas CoLaR-SBR reaches $\vBrosSbrFull$, a gain of at least
-\nBrosSbrMinusColarFullMin{} points in every run. Besides, the two rows in between show the
-same order as on LayoutLMv3: the ground-truth stored labels help but are unstable
-($\vBrosOracleFull$), and a constant background logit is below the learned one
-($\vBrosConstOFull$). Hence, the background conflict and its repair are not specific to one
-encoder or to the image input.
+\paragraph{Other encoders.} To examine whether the result depends on LayoutLMv3, we repeat
+CoLaR and CoLaR-SBR on CIL-CORD with three further encoders: LiLT and BROS, which read text
+and layout, and BERT, which reads text only (Table~\ref{tab:encoders}). The settings are
+those of LayoutLMv3, with two exceptions. First, BROS runs with \nBrosRecipe, since it needs
+more memory per document. Second, LiLT keeps a layout stream next to its text stream, and
+the two exchange their attention scores in every layer. Hence, for LiLT the memory stores
+the layout activations of layer~$k$ as well, in half precision and without compression;
+otherwise, the layout stream of a replayed document would be recomputed without its text
+and would no longer match the stored activations. This brings the memory of LiLT to
+$\nEncLiltMemMB$\,MB, against $\nEncLmvMemMB$\,MB for LayoutLMv3.
+
+The picture is the same on every encoder. With the same memory, the shared softmax stays at
+or below $\nEncColarFullMax$ full-label F1 on average, whereas CoLaR-SBR reaches at least
+$\nEncSbrFullMin$, and the gain is at least $\nEncGainFullMin$ points in every run of every
+encoder. It is noted that the result holds for BERT, which sees neither the layout nor the
+page image. This is what the conflict predicts, since it comes from the labels of the
+sessions and not from a modality of the input.
 
 \begin{table}[!htbp]
   \centering
-  \caption[A second encoder: BROS on CIL-CORD]{\textbf{A second encoder}: BROS on CIL-CORD
-  (mean $\pm$ s.d.). $^{r}$Uses the ground-truth labels of the stored documents.}
+  \caption[Other encoders on CIL-CORD]{\textbf{Other encoders} on CIL-CORD: CoLaR with a
+  shared softmax against CoLaR-SBR (full-label F1; mean $\pm$ s.d.). Batch: batch size of
+  the runs. Memory: size of the memory of CoLaR-SBR. Smallest gain: the smallest gain of
+  CoLaR-SBR over CoLaR among the paired runs.}
+  \label{tab:encoders}
+  \small\input{generated/paper/supp_encoders}
+\end{table}
+
+On BROS, we also repeat the two rows in between of the hypothesis table
+(Table~\ref{tab:bros}). They show the same order as on LayoutLMv3: the ground-truth stored
+labels help but are unstable ($\vBrosOracleFull$), and a constant background logit is below
+the learned one ($\vBrosConstOFull$). Hence, the background conflict and its repair are not
+specific to one encoder, to the layout or to the image input.
+
+\begin{table}[!htbp]
+  \centering
+  \caption[The hypothesis rows on BROS]{\textbf{The hypothesis rows on BROS} (CIL-CORD;
+  mean $\pm$ s.d.). $^{r}$Uses the ground-truth labels of the stored documents.}
   \label{tab:bros}
   \input{generated/paper/supp_bros}
 \end{table}
@@ -1016,7 +1038,7 @@ capacity of the per-session updates of SBR-Recall was chosen on CIL-CORD. Second
 too few for a significance test; hence, we rely on the per-run rule and on the bootstrap
 over the test documents (Section~\ref{sec:e-eval}), and the per-class figure and the qualitative
 example show one run per method. Third, the main encoder is LayoutLMv3; the conflict and its repair are
-confirmed on BROS for one stream only. Fourth, the comparison of the method families on
+confirmed on LiLT, BROS and BERT for one stream only. Fourth, the comparison of the method families on
 four encoders (Table~\ref{tab:dil}) follows an earlier protocol, which we checked on a
 part of its cells. Lastly, the streams are built from public datasets and hold at most a
 handful of sessions; longer streams may behave differently.

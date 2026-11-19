@@ -102,7 +102,8 @@ re-implemented on this interface (Section~\ref{sec:e-baselines}).
 runs the frozen lower layers on the documents selected at the end of a session, computes
 the truncated \gls{svd} of the layer-$k$ activations of each document and stores the two
 factors in half precision with the boxes, the mask, the labels and the session of the
-document. At training time, it rebuilds the activations of a stored document and feeds
+document. For LiLT, it also stores the activations of the layout stream at layer $k$
+(Section~\ref{sec:c6-s6}). At training time, it rebuilds the activations of a stored document and feeds
 them into layer $k{+}1$. The readout module holds one background vector and bias per
 block, builds the supervision plan of a batch from the session of each document
 (Table~\ref{tab:supervision}) and applies the inference rule of

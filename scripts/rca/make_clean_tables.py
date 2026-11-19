@@ -347,6 +347,10 @@ def write_perseed():
     (OUT / "supp_perseed.tex").write_text(t)
 
 
+# alias suffix of a run on another encoder -> what its row label adds
+AGREE_ENC = {"_bros_b1": " (BROS)", "_lilt": " (LiLT)", "_bert": " (BERT)"}
+
+
 def write_agree():
     """Session-restricted AA next to full-label F1 for every clean CIL-CORD run that records both
     (any backbone: the row label names a non-LayoutLMv3 one). Runs of other scenarios (e.g.
@@ -363,8 +367,9 @@ def write_agree():
     t = HDR + "\\begin{tabular}{llcccc}\n\\toprule\n"
     t += "Scenario & Method & Seed & AA & Full-label F1 & Difference \\\\\n\\midrule\n"
     for sc, me, sd, aa, fl in rows:
-        base, bros = me.removesuffix("_bros_b1"), me.endswith("_bros_b1")  # BROS batch-1 runs
-        lab = ROW_LABEL.get(base.replace("colar_sbr", "sbr"), base) + (" (BROS)" if bros else "")
+        enc = next((e for e in AGREE_ENC if me.endswith(e)), "")  # runs on another encoder
+        base = me.removesuffix(enc)
+        lab = ROW_LABEL.get(base.replace("colar_sbr", "sbr"), base) + AGREE_ENC.get(enc, "")
         lab = lab.replace("_", "\\_")
         t += f"{sc.replace('_', '-').upper()} & {lab} & {sd} & {aa:.1f} & {fl:.1f} & ${fl - aa:+.1f}$ \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
@@ -2709,12 +2714,13 @@ ENC_RUNS = (("Lmv", "LayoutLMv3", "cil_cord_colar", "cil_cord_colar_sbr"),
 
 
 def write_encoders() -> None:
-    """supp_encoders.tex (full-label F1 of CoLaR and CoLaR-SBR per encoder, with the batch size the
-    runs recorded and the smallest per-run gain) + encoders_vals.tex: \\vEnc<E>{Colar,Sbr}Full,
-    \\nEnc<E>GainFullMin, \\nEncGainFullMin (over the complete encoders), \\nEncDone."""
-    v, out, gains = {}, "", []
-    t = HDR + "\\begin{tabular}{@{}lcccc@{}}\n\\toprule\n"
-    t += "Encoder & Batch & CoLaR, shared softmax & CoLaR-SBR & Smallest gain \\\\\n\\midrule\n"
+    """supp_encoders.tex (full-label F1 of CoLaR and CoLaR-SBR per encoder, with the batch size and
+    the memory size the runs recorded and the smallest per-run gain) + encoders_vals.tex:
+    \\vEnc<E>{Colar,Sbr}Full, \\nEnc<E>GainFullMin, \\nEnc<E>MemMB, and over the complete encoders \\nEncGainFullMin,
+    \\nEncColarFullMax, \\nEncSbrFullMin, \\nEncDone."""
+    v, out, gains, means_c, means_s = {}, "", [], [], []
+    t = HDR + "\\begin{tabular}{@{}lccccc@{}}\n\\toprule\n"
+    t += "Encoder & Batch & Memory (MB) & CoLaR, shared softmax & CoLaR-SBR & Smallest gain \\\\\n\\midrule\n"
     for stem, label, colar, sbr in ENC_RUNS:
         c, s = (load_seeds(CLEAN, r, "full_label_f1") for r in (colar, sbr))
         ok = len(c) == len(s) == len(SEEDS)
@@ -2723,10 +2729,15 @@ def write_encoders() -> None:
         gain = min(s[k] - c[k] for k in SEEDS) if ok else None
         v[f"nEnc{stem}GainFullMin"] = _signed(gain, True) if ok else "--"
         gains += [gain] if ok else []
+        means_c += [np.mean(list(c.values()))] if ok else []
+        means_s += [np.mean(list(s.values()))] if ok else []
         bs = {json.loads(f.read_text())["training_hparams"]["batch_size"]
               for r in (colar, sbr) for sd in SEEDS if (f := _run_file(CLEAN, r, sd, "*", "metrics.json"))}  # fmt: skip
         if len(bs) > 1:
             _warn(f"{label}: CoLaR and CoLaR-SBR runs disagree on the batch size: {bs}")
+        # the memory of CoLaR-SBR (it adds one session id per document to the CoLaR memory)
+        mem = set(load_seeds(CLEAN, sbr, "replay_memory_bytes").values())
+        v[f"nEnc{stem}MemMB"] = f"{max(mem) / 1e6:.1f}" if mem else "--"
         cells = (
             [
                 fmt(list(c.values()), True),
@@ -2736,10 +2747,14 @@ def write_encoders() -> None:
             if ok
             else [_pending(c), _pending(s), "--"]
         )
-        t += f"{label} & {min(bs) if bs else '--'} & " + " & ".join(cells) + " \\\\\n"
+        t += f"{label} & {min(bs) if bs else '--'} & {v[f'nEnc{stem}MemMB']} & "
+        t += " & ".join(cells) + " \\\\\n"
     t += "\\bottomrule\n\\end{tabular}\n"
     (OUT / "supp_encoders.tex").write_text(t)
     v["nEncGainFullMin"] = _signed(min(gains), True) if gains else "--"
+    # over the complete encoders: the best CoLaR mean and the worst CoLaR-SBR mean
+    v["nEncColarFullMax"] = f"{max(means_c):.1f}" if gains else "--"
+    v["nEncSbrFullMin"] = f"{min(means_s):.1f}" if gains else "--"
     v["nEncDone"] = str(len(gains))
     (OUT / "encoders_vals.tex").write_text(HDR + out + _defs(v))
     print(f"encoders: {len(gains)}/{len(ENC_RUNS)} complete")
