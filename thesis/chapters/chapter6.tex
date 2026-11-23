@@ -751,10 +751,12 @@ numbers are not comparable with the published ones.
 \begin{table}[!htbp]
   \centering
   \caption[Image class-incremental learning with ViT-B/16]{\textbf{Image class-incremental
-  learning} with ViT-B/16 (mean $\pm$ s.d.\ of three runs; AF: mean). Bold: best of each
-  column, joint training aside; underlined: our best when a baseline is best.}
+  learning} with ViT-B/16 (mean $\pm$ s.d.\ of three runs; AF: mean). Kept across
+  sessions: what a method stores (MB $=10^6$ bytes; ER: computed from its buffer, ours:
+  recorded by the runs). Bold: best of each column, joint training aside; underlined: our
+  best when a baseline is best.}
   \label{tab:image}
-  \input{generated/paper/tab_image_core}
+  \resizebox{\textwidth}{!}{\input{generated/paper/tab_image_core}}
 \end{table}
 
 \paragraph{Results of the memory.} As shown in Table~\ref{tab:image}, SLCA leads on both
@@ -770,8 +772,8 @@ memory transfers to images as a replacement for raw replay.
 \paragraph{Results of the unchanged readout.} On ImageNet-R, CoLaR-SBR reaches $\imgSbrImnr$ \gls{aa},
 which is \imgSbrMinusColarImnrMin{} to \imgSbrMinusColarImnrMax{} points above CoLaR with a
 shared softmax, and above RanPAC, ER and the latent memory, while SLCA remains higher. On
-CIFAR-100 it reaches $\imgSbrCifar$, within \imgSbrMinusColarCifarMin{} to
-\imgSbrMinusColarCifarMax{} points of CoLaR. This hints that separating the sessions in
+CIFAR-100 it reaches $\imgSbrCifar$, \imgSbrMinusColarCifarMin{} to
+\imgSbrMinusColarCifarMax{} points against CoLaR. This hints that separating the sessions in
 the readout can help beyond the background label. However, run unchanged, our method stays
 below SLCA on both datasets and below joint training ($\imgJointCifar$ and $\imgJointImnr$).
 
@@ -818,9 +820,14 @@ sessions. Then, after each session, we retrain only the head and the background 
 $200$ steps on the memory, where every session is drawn equally often, so that no block is
 favoured by the session that was just trained. Finally, we train the encoder with a
 learning rate one hundred times smaller than that of the readout ($5\times10^{-6}$ against
-$5\times10^{-4}$), which limits the drift inside the old sessions. At inference, the block
-with the largest claim always answers, since an image cannot be background. The memory is
-unchanged.
+$5\times10^{-4}$, where the unchanged method uses $5\times10^{-5}$ for both), which limits
+the drift inside the old sessions; we call this part \emph{two-rate training}, since it
+lowers the rate of the encoder and raises that of the readout at once. At inference, the
+block with the largest claim always answers, since an image cannot be background. The
+memory is unchanged. It is noted that, unlike on the document streams, these settings were
+selected on test data: we chose the weight $0.1$ from $\{0.05, 0.1, 0.2\}$, the $200$ refit
+steps and the two learning rates on the first run of each dataset, scored on its test
+split, and the two other runs were trained afterwards with these values.
 
 \begin{table}[!htbp]
   \centering
@@ -836,7 +843,8 @@ unchanged.
 session-exclusive training improves CoLaR-SBR in every run, by \imgSbrXMinusSbrCifarMin{} to
 \imgSbrXMinusSbrCifarMax{} \gls{aa} points on CIFAR-100 and by \imgSbrXMinusSbrImnrMin{} to
 \imgSbrXMinusSbrImnrMax{} points on ImageNet-R. On ImageNet-R it reaches $\imgSbrXImnr$
-\gls{aa}, the best result of the table apart from joint training (SLCA: $\imgSlcaImnr$). On
+\gls{aa}, above SLCA ($\imgSlcaImnr$) in each of the three runs, by
+$\imgSbrXMinusSlcaImnrRunMin$ to $\imgSbrXMinusSlcaImnrRunMax$ points with the same seed. On
 CIFAR-100 it reaches $\imgSbrXCifar$, above RanPAC and $\imgSlcaMinusSbrXCifar$ points below
 SLCA. It also forgets less than the unchanged CoLaR-SBR (AF of $\imgSbrXAfCifar$ and
 $\imgSbrXAfImnr$ against $\imgSbrAfCifar$ and $\imgSbrAfImnr$). However, it still forgets
@@ -846,7 +854,7 @@ $\imgJointMinusSbrXImnr$ points below joint training.
 \paragraph{Which part matters.} Table~\ref{tab:image-ablation} adds the three parts one at
 a time. Neither of the first and the last part helps alone. With the encoder trained at the
 full rate, the negatives lower the accuracy below the unchanged method, since the blocks of
-the newest sessions then claim the images of the old ones. With the slow encoder but
+the newest sessions then claim the images of the old ones. With the two rates but
 without the negatives, the late sessions are hardly read, and the accuracy falls far
 below the unchanged method on both datasets. In contrast, the two together give most of the gain.
 The refit adds little: without it, the scheme reaches $\imgNoRefitCifar\pm\imgNoRefitSdCifar$ on

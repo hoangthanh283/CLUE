@@ -162,7 +162,9 @@ and seed, so that a table cell can be traced back to its runs.
 
 \paragraph{Protocol.} All methods share the recipe of Section~\ref{sec:e-protocol}. In
 particular, early stopping uses documents that are held out from the training set of the
-session; the test split never selects a model or a hyper-parameter.
+session; the test split never selects a model or a hyper-parameter. The one exception is
+the image study, whose settings were selected on test data, as Section~\ref{sec:c6-s8}
+states.
 
 \paragraph{Compute.} A run of five sessions takes a few hours on one consumer GPU
 (Table~\ref{tab:cost}). With a batch size of two and gradient checkpointing, the peak

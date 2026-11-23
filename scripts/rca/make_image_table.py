@@ -255,6 +255,11 @@ def write_vals() -> None:
         t += f"\\newcommand{{\\imgSbrXMinusSbr{ds}Min}}{{{min(dd):+.1f}}}\n"
         t += f"\\newcommand{{\\imgSbrXMinusSbr{ds}Max}}{{{max(dd):+.1f}}}\n"
         t += f"\\newcommand{{\\imgSbrXMinusSlca{ds}}}{{{mean(sc, 'SbrX') - mean(sc, 'Slca'):+.1f}}}\n"
+        ds_ = [v[sc]["SbrX"][s] - v[sc]["Slca"][s] for s in SEEDS]  # run-matched, same seed
+        t += f"\\newcommand{{\\imgSbrXMinusSlca{ds}RunMin}}{{{min(ds_):.1f}}}\n"
+        t += f"\\newcommand{{\\imgSbrXMinusSlca{ds}RunMax}}{{{max(ds_):.1f}}}\n"
+        if ds == "Imnr" and min(ds_) <= 0:
+            _warn("the session-exclusive scheme is not above SLCA on every ImageNet-R run")
         t += f"\\newcommand{{\\imgJointMinusSbrX{ds}}}{{{mean(sc, 'Joint') - mean(sc, 'SbrX'):.1f}}}\n"
         t += (
             f"\\newcommand{{\\imgSlcaMinusSbrX{ds}}}{{{mean(sc, 'Slca') - mean(sc, 'SbrX'):.1f}}}\n"
