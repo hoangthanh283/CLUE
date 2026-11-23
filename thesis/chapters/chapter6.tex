@@ -753,8 +753,10 @@ numbers are not comparable with the published ones.
   \caption[Image class-incremental learning with ViT-B/16]{\textbf{Image class-incremental
   learning} with ViT-B/16 (mean $\pm$ s.d.\ of three runs; AF: mean). Kept across
   sessions: what a method stores (MB $=10^6$ bytes; ER: computed from its buffer, ours:
-  recorded by the runs). Bold: best of each column, joint training aside; underlined: our
-  best when a baseline is best.}
+  recorded by the runs). $^{p}$Collapses under our shared recipe (AdamW at
+  $5\times10^{-5}$, early stopping), far below its published results; we did not tune it,
+  so the row is not representative of the method. Bold: best of each column, joint training
+  aside; underlined: our best when a baseline is best.}
   \label{tab:image}
   \resizebox{\textwidth}{!}{\input{generated/paper/tab_image_core}}
 \end{table}
@@ -807,9 +809,11 @@ entities, and, across schemas, the tokens of other documents. On images, every t
 image is a positive for the block of its session, and under the supervision rule of
 Table~\ref{tab:supervision} it says nothing about the other blocks. Hence, a block never
 sees an input for which its answer should be the background, and its claim is not
-calibrated against the claims of the other blocks. Hence, the two causes of
-Section~\ref{sec:c6-s2} appear again on images: a part of the error is drift inside the old
-sessions, and the larger part comes from the readout.
+calibrated against the claims of the other blocks. Hence, the error again splits into two
+parts: a part is drift inside the old sessions, and the larger part comes from the readout,
+which assigns an image to the wrong session. It is noted that this readout error differs
+from the stale background label of Section~\ref{sec:c6-s2}, since an image has no
+background class.
 
 \paragraph{Session-exclusive training.} Motivated by this, we adapt the training of
 CoLaR-SBR to streams whose sessions are mutually exclusive, in three parts. First, since an
@@ -843,8 +847,10 @@ split, and the two other runs were trained afterwards with these values.
 session-exclusive training improves CoLaR-SBR in every run, by \imgSbrXMinusSbrCifarMin{} to
 \imgSbrXMinusSbrCifarMax{} \gls{aa} points on CIFAR-100 and by \imgSbrXMinusSbrImnrMin{} to
 \imgSbrXMinusSbrImnrMax{} points on ImageNet-R. On ImageNet-R it reaches $\imgSbrXImnr$
-\gls{aa}, above SLCA ($\imgSlcaImnr$) in each of the three runs, by
-$\imgSbrXMinusSlcaImnrRunMin$ to $\imgSbrXMinusSlcaImnrRunMax$ points with the same seed. On
+\gls{aa} and is comparable to SLCA ($\imgSlcaImnr$): it is above SLCA in each of the three
+runs, by $\imgSbrXMinusSlcaImnrRunMin$ to $\imgSbrXMinusSlcaImnrRunMax$ points with the same
+seed; however, its settings were selected on test data, and it keeps a larger memory
+(Table~\ref{tab:image}). On
 CIFAR-100 it reaches $\imgSbrXCifar$, above RanPAC and $\imgSlcaMinusSbrXCifar$ points below
 SLCA. It also forgets less than the unchanged CoLaR-SBR (AF of $\imgSbrXAfCifar$ and
 $\imgSbrXAfImnr$ against $\imgSbrAfCifar$ and $\imgSbrAfImnr$). However, it still forgets
