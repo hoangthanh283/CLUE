@@ -111,10 +111,10 @@ with another schema.
     Session & Classes & & Pool \\
     \midrule
     1 & menu: cnt, discountprice, itemsubtotal, nm, num, price & & 800 \\
-    2 & menu: unitprice, vatyn, sub.cnt, sub.nm, sub.price, sub.unitprice & & 382 \\
+    2 & menu: unitprice, vatyn; menu.sub: cnt, nm, price, unitprice & & 382 \\
     3 & sub\_total: discount\_price, etc, othersvc\_price, service\_price, subtotal\_price, tax\_price & & 549 \\
     4 & total: cashprice, changeprice, creditcardprice, emoneyprice, menuqty\_cnt, menutype\_cnt & & 723 \\
-    5 & total.total\_etc, total.total\_price, void\_menu.nm, void\_menu.price, sub.nm, sub.cnt & & 780 \\
+    5 & total: total\_etc, total\_price; void\_menu: nm, price; sub: nm, cnt & & 780 \\
     \midrule
     \multicolumn{4}{@{}l}{\emph{Mixed} (12 classes, 25 tags)} \\
     Session & Dataset: tags introduced & Schema & Pool \\
