@@ -60,6 +60,8 @@ STORED = {
     "CoLaR-SBR, session-exclusive training (ours)": "5{,}000 latents, 1{,}235 MB",
     "Joint training (reference)": "all data",
 }
+# rows that collapse under our full-fine-tuning recipe (footnote p in the Tab. 17 caption)
+COLLAPSED = {"CODA-Prompt", "CL-LoRA (2025)"}
 # Ridge-readout probe on the adapted latent-bank trunk (Pass 2b, seed 42): rp_full from probes.json.
 PROBE = {
     "cil_cifar100": "cil_cifar100_rcaBank_seed42_vit",
@@ -397,7 +399,8 @@ def main() -> None:
             lines.append("\\midrule")
         prev = group
         shade = "\\rowcolor{black!7} " if group == "ours" else ""  # ours, as in the main table
-        lines.append(f"{shade}{label} & {STORED[label]} & " + " & ".join(cells) + " \\\\")
+        mark = "$^{p}$" if label in COLLAPSED else ""  # see the caption of Tab. 17
+        lines.append(f"{shade}{label}{mark} & {STORED[label]} & " + " & ".join(cells) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}", ""]
     OUT.write_text("\n".join(lines))
     print(OUT.read_text())
