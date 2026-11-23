@@ -872,7 +872,8 @@ drift, and the choice of the session remains the larger loss.
 \paragraph{Outcome.} The compressed latent memory transfers to images, and the per-session
 readout brings a gain on ImageNet-R without any change. With a training that matches the
 stream, our method is competitive with the strongest baselines under the same recipe and
-is the best on ImageNet-R. However, the choice of the session, which the background label
+is above SLCA on ImageNet-R in every run, with settings that were selected on test data.
+However, the choice of the session, which the background label
 trains on documents, remains the main source of error on images. We make no claim against
 the published numbers of the baselines; a calibrated choice of the session is left for
 future work (Chapter~\ref{ch:conclusion}).
@@ -1044,7 +1045,9 @@ first session (Sections~\ref{sec:c6-s6} and~\ref{sec:c6-s7}).
 baseline is our re-implementation on one growing token head; the published numbers of
 these methods are on other benchmarks, and we did not verify our re-implementations
 against them. All baselines use the default hyper-parameters of their method, and the
-capacity of the per-session updates of SBR-Recall was chosen on CIL-CORD. Second, every cell has three runs, which is
+capacity of the per-session updates of SBR-Recall was chosen on CIL-CORD. Moreover, the
+settings of session-exclusive training on images were selected on test data
+(Section~\ref{sec:c6-s8}). Second, every cell has three runs, which is
 too few for a significance test; hence, we rely on the per-run rule and on the bootstrap
 over the test documents (Section~\ref{sec:e-eval}), and the per-class figure and the qualitative
 example show one run per method. Third, the main encoder is LayoutLMv3; the conflict and its repair are
