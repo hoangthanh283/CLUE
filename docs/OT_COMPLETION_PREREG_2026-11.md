@@ -174,3 +174,50 @@ informative.
 Bars: kill if full-label F1 < 88 on CIL-CORD (from the plan). On CIL-FUNSD, kill if < 84.3,
 the Gate 1b pass bar there (within 3 of the MiB-style loss, 87.3): an upper bound below the
 bar that the method must reach closes the dataset.
+
+## Gate R: transport readout (written 2026-11-26 21:55, before any result)
+
+Author's direction after Gate 0: find the place for OT in this problem. Candidate: the
+**readout**. A shared softmax trained under the background conflict is miscalibrated between
+sessions, and no label-based calibration is available because every stored label set is
+incomplete. Matching the predicted class marginal to the class-frequency table needs no label:
+the column potentials of the transport plan are a per-class logit correction, and the decoded
+label is argmax(log p + g). Same operation as Gate 0's current side, moved to test time.
+Signal that motivated it (exploratory, token-level split of the Gate 0 dumps): potentials
+fitted on half the tokens decode the other half at 91.8 to 94.0, argmax 81.1, top-k
+thresholds 90.7 to 91.1, one-step prior adjustment 88.7 to 89.9.
+
+Data: the saved test-set outputs of finished runs (`full_label_dump.pt`, three runs each), no
+training. Script `scripts/rca/ot_readout.py`. Metric: full-label F1 (seqeval), per document
+sequence; the argmax row must reproduce the stored `full_label_f1`.
+
+Primary models (CIL-CORD, shared softmax, CoLaR k4 d50 r128): plain CoLaR (`colar_dump`),
+double-sliced (`colar_r_sliced2`), MiB-style loss (`colar_mib`).
+
+Rules:
+1. argmax (as stored);
+2. transport readout, lam 1 (plain marginal matching, no sharpness to tune), over all test
+   tokens; sensitivity lam 10 and relaxed columns 0.5;
+3. the same with potentials fitted on one half of the test documents and applied to the other
+   half (two folds), to separate the correction from transduction;
+4. same-prior controls without a coupling: per-class top-k; one-step prior adjustment
+   (log prior minus log mean predicted probability);
+5. control without a prior, tuned on the truth (favours the control): one scalar shift of the
+   background logit.
+
+Prior: estimated = the class-frequency table of the Gate 0 run (share of valid tokens of class
+c in the session that annotated c; one table, used for the three runs); background share =
+max(1 − sum, smallest class share), then normalised. Oracle = test counts (upper bound, also
+reported on CIL-FUNSD and CIL-WildReceipt, whose estimated tables need a dataset build).
+
+Bars:
+- **PLACE**: rule 2 with the estimated prior raises mean full-label F1 by ≥ 10 over argmax on
+  at least two of the three models, same sign in all three runs, and rule 3 keeps at least
+  half of that gain.
+- **OT against its control**: rule 2 exceeds the best rule-4 control by ≥ 3 points in the mean
+  with the same sign in all three runs, on at least two of the three models. Otherwise the
+  simpler rule is reported as equivalent, as at Gate 0.
+- **KILL**: gain over argmax below 3 on all three models.
+
+Known limits: 100 test receipts; rule 2 is transductive; a readout cannot restore a class the
+features no longer separate.
