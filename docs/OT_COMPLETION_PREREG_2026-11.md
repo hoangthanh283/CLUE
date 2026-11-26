@@ -262,3 +262,28 @@ Open before any claim: literature on prior matching at test time in class-increm
 learning and label-shift correction (Sinkhorn / iterative proportional fitting, bias
 correction layers, logit adjustment); estimated tables for the other two datasets; a stream
 whose test prior differs from the training prior.
+
+## Gate L2: literature for the readout (read 2026-11-26)
+
+| Paper | What it does | Overlap |
+|---|---|---|
+| OTTER (Shin, Zhao, Cromp, Vishwakarma, Sala; arXiv 2404.08461) | Exact transport (linear program) between a batch of zero-shot predictions (cost −log p) and a given label distribution; label = argmax of the plan row. R-OTTER learns a per-class reweighting from the OTTER labels for online use. Theorem: Bayes-optimal under label shift when the given distribution is the true one. Beats Prior Matching on 17 of 21 datasets. | **The mechanism.** Not continual, no background class, no sequence labelling; the label distribution is given (true, or estimated from 10 labels per class). |
+| Prior Matching (the baseline of OTTER) | Per-class weights on the probabilities so that the mean prediction equals the prior | **Equal to our primary setting**: the entropic plan at lam 1 is this matrix scaling, solved by Sinkhorn iterations. |
+| ARC (Chen, Goldblum, Wu, Jiang; arXiv 2405.14318) | Test-time correction of the recency bias in class-incremental image classification with a task-wise softmax score and pseudo-label updates | Same goal, no prior, no transport, images only. |
+| AdaPrior (CVPR 2026), Prior2Posterior | Post-hoc prior correction for long-tailed (continual) classification, prior estimated from the model | Not read in full. Same family of corrections. |
+| BiC, WA, IL2M | Bias correction layers or statistics for old against new classes | Need a labelled validation set or per-class statistics from labelled data. |
+| MProto, CPFD, PLOP, BACS, "Mitigating Background Shift" (ECCV 2024) | Training-time handling of the background (pseudo-labels, distillation) | None corrects the readout with a class prior. |
+
+Four searches and two papers read (both pages truncated at about half; the rest from a model
+summary). No paper found that matches a predicted class marginal to class frequencies in
+continual sequence labelling or under background shift.
+
+Consequences:
+1. The readout is **OTTER / Prior Matching applied to a continual stream**; the mechanism is
+   not new and both must be named and compared. An exact-plan row (as OTTER) is added to
+   `ot_readout.py` after this reading.
+2. What the stream adds: the label distribution needs no labelled calibration set, it
+   accumulates as a frequency table while sessions arrive; and the finding that most of the
+   background-conflict loss of a shared softmax on CIL-CORD is recoverable by that table alone.
+3. A paper needs more than the readout: the correction inside training (next gate), and a
+   case where the table is misspecified.
