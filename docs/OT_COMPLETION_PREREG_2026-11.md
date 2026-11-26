@@ -308,3 +308,37 @@ OT against its control: `transport` exceeds the better of `quota` and `threshold
 CIL-CORD; seed 42 alone is exploratory, a claim needs the three runs. References: double-sliced
 CoLaR 46.7 (83.7 with the readout), MiB-style 60.0 / 87.3, CoLaR-SBR 89.1 / 87.2, two-sided
 true-label bound from Gate 1a.
+
+## Gate 1a verdict (2026-11-26, seed 42)
+
+Two-sided true-label bound under one shared softmax: **CIL-CORD 94.9, CIL-FUNSD 88.6**
+full-label F1 (`results/gates/ot_gate1a`). Both above their kill bars (88 and 84.3). For
+scale: joint 93.1 and 84.3 (three-run means), stored-side oracle alone 92.1 and 52.2,
+CoLaR-SBR 89.1 and 87.2. A shared softmax is sufficient when both sides are labelled; on
+CIL-FUNSD the room above the methods of the paper is about one point.
+
+## Gate R, estimated tables on the other two datasets (2026-11-26)
+
+Tables from `scripts/rca/class_freq_table.py` (training sets only). Mean of three runs,
+argmax -> transport readout with the estimated table [best same-prior control]:
+
+| Model | CIL-FUNSD | CIL-WildReceipt |
+|---|---|---|
+| plain CoLaR | 52.2 -> 71.0 [56.7] | 32.5 -> 42.7 [38.4], runs 36.5 / 56.1 / 35.5 |
+| ER | 51.4 -> 69.7 [62.7] | 30.8 -> 44.5 [38.6] |
+| current-sliced CoLaR | 78.0 -> 85.6 [84.9] | not run |
+| double-sliced CoLaR | 83.8 -> 85.2 [84.6] | not run |
+| MiB-style loss | 87.3 -> 85.3 [87.3] | 66.5 -> 69.9 [69.3] |
+| joint | 84.3 -> 82.9 [84.3] | 83.7 -> 83.5 [83.8] |
+
+Reading: the readout repairs models that the background conflict left badly miscalibrated
+(+10 to +19 on plain CoLaR and ER on every dataset, held-out potentials within 1.1), and it
+is neutral to slightly harmful (−2.0 at worst) on models that are already calibrated. It beats
+its controls by 3 or more only on the badly miscalibrated models. On CIL-WildReceipt it
+recovers a small part of the gap (CoLaR-SBR 79.5). On CIL-FUNSD the estimated table does
+better than the test counts on plain CoLaR (71.0 against 64.4), which the method does not
+explain; noted, not interpreted.
+
+Exact plan (the OTTER rule), first timing: one linear program takes 213 s on CIL-CORD beside
+a training job, and gives 75.2 on the double-sliced run of seed 42 where the entropic plan at
+lam 1 gives 83.1. The three primary models are being run; rows will be added to the report.

@@ -11,6 +11,7 @@ Each <run_prefix> is matched as <results_root>/<run_prefix>_seed* (three runs).
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import sys
 
@@ -22,7 +23,7 @@ from seqeval.metrics import f1_score
 
 from doccl.methods.colar_otc import quota_assign
 
-EXACT_MAX_CELLS = 600_000  # tokens x classes the linear program is run for
+EXACT_MAX_CELLS = int(os.environ.get("OT_EXACT_MAX_CELLS", 600_000))  # tokens x classes for the LP
 O_SHIFTS = torch.linspace(-12, 4, 33).tolist()  # rule 5, tuned on the truth
 
 
