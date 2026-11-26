@@ -342,3 +342,19 @@ explain; noted, not interpreted.
 Exact plan (the OTTER rule), first timing: one linear program takes 213 s on CIL-CORD beside
 a training job, and gives 75.2 on the double-sliced run of seed 42 where the entropic plan at
 lam 1 gives 83.1. The three primary models are being run; rows will be added to the report.
+
+## Gate R, exact plan (the OTTER rule) on the three primary models (2026-11-26)
+
+CIL-CORD, mean of three runs, added after the literature check (exploratory):
+
+| Model | argmax | entropic lam 1, est. / oracle prior | exact plan, est. / oracle prior |
+|---|---|---|---|
+| plain CoLaR | 29.6 | 74.6 / 74.1 | 68.5 / 75.0 |
+| double-sliced CoLaR | 46.7 | 83.7 / 85.0 | 75.5 / 83.3 |
+| MiB-style loss | 60.0 | 82.2 / 82.4 | 74.7 / 81.8 |
+
+With the true class counts the two plans agree within 1.7. With the estimated table the exact
+plan loses 6.1 to 8.2 points in every run and the entropic plan loses at most 1.3. The exact
+plan enforces the table as hard quotas; the scaling at lam 1 only moves one bias per class.
+This matches the lam 10 row of the verdict above (sharper plan, worse with the estimated
+table) and is the one place where our setting differs in outcome from the published one.
