@@ -35,6 +35,7 @@ from doccl.methods.colar_cb import CoLaRCB
 from doccl.methods.colar_knn import CoLaRKNN
 from doccl.methods.colar_meta import CoLaRMeta
 from doccl.methods.colar_mib import CoLaRMiB
+from doccl.methods.colar_otc import CoLaROTC
 from doccl.methods.colar_pp import CoLaRPP
 from doccl.methods.colar_r import CoLaRRefresh
 from doccl.methods.colar_sbr import CoLaRSBR
@@ -265,6 +266,7 @@ METHOD_REGISTRY = {
     # (whole-doc binding preserved; per-doc matrices ARE low-rank though the pooled space isn't).
     "colar": CoLaR,
     "colar_r": CoLaRRefresh,
+    "colar_otc": CoLaROTC,
     "colar_sbr": CoLaRSBR,
     "colar_sbr_recall": CoLaRSBRRecall,
     "colar_sbr_slot": CoLaRSBRSlot,

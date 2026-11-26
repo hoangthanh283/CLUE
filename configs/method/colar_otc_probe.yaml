@@ -1,0 +1,16 @@
+name: colar_otc
+run_alias: colar_otc_probe
+# Gate 0 of docs/OT_COMPLETION_PREREG_2026-11.md: double-sliced CoLaR (no label repair, no
+# true label in any loss) with the mass probe on. Dumps mass_probe_{cur,mem}_t*.pt per session
+# boundary for scripts/rca/ot_gate0_mass.py.
+refresh: sliced
+current_sliced: true
+mass_probe: true
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 4
+docs_per_task: 50
+replay_batch_size: 4
+rank_r: 128
