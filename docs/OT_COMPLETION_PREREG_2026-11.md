@@ -102,3 +102,75 @@ not depend on the training regime; label F1 is not downstream F1.
 - Gate 2: 5, 10 and 0 stored documents; pass at ≥ +10 over CoLaR-SBR at 10 documents (68.1),
   with the gain surviving on a disjoint stream.
 - Claims need three runs with sign agreement; seed-42 gates are exploratory.
+
+## Gate 0 verdict (2026-11-26, seed 42, exploratory)
+
+Run `results/gates/ot_gate0/cil_cord_colar_otc_probe_seed42` (the probe run itself, double-
+sliced CoLaR with no repair: full-label F1 54.4; last row of the session matrix 28.7 / 63.3 /
+73.5 / 77.1 / 91.1). Table:
+`ot_gate0_report.json` in the run directory. Completed-label F1, pooled over four boundaries:
+
+| Rule | Current side | Stored side |
+|---|---|---|
+| threshold, best tau (0.5) | 81.4 (P 97.8, R 69.7) | 90.9 |
+| quota, estimated / oracle marginals | 90.9 / 91.6 | 90.5 / 91.9 |
+| Sinkhorn lam 10, estimated / oracle | 91.8 / 94.1 | 92.4 / 93.2 |
+| Sinkhorn, relaxed columns 0.9 / 0.5 (est.) | 91.2 / 90.8 | 91.9 / 90.8 |
+| *post hoc*: one scalar background shift, tuned on the truth | 90.2 (t 0.001) | 90.9 (t 0.3) |
+| *post hoc*: total budget only, estimated / oracle | 89.4 / 91.6 | 83.0 / 91.9 |
+
+Hidden entities: 38,431 of 46,369 O-labelled current tokens; 1,492 of 8,278 stored ones.
+Macro AP per boundary: current 93.2 / 77.4 / 73.8 / 74.4; stored 98.5 / 96.6 / 89.1 / 59.8.
+
+Against the bars:
+- **KILL-rank: not triggered, with one cell below the bar.** The bar did not say whether it
+  applies per boundary or per side (my omission). Per side (mean) it holds: 79.7 and 86.0. The
+  one cell below 0.70 (stored, boundary 4) comes from two classes with 3 and 5 hidden tokens
+  (AP 2.8 and 44.7); the two classes with 193 and 227 tokens have AP 96. With classes of at
+  least 10 hidden tokens every boundary is at 79.9 or above.
+- **KILL-mass: not triggered.** Current side +10.4 over the best threshold; stored side +1.5
+  (the bar needed both sides within 3).
+- **PASS: met on the letter, by 0.4 points.** Sinkhorn with estimated marginals: 91.8 and 92.4
+  (both ≥ 85), +10.4 on the current side. The quota rule is at +9.5 and misses the +10 bar by
+  0.5. One run; a margin of this size is not evidence that the two rules differ.
+- **OT verdict: the coupling is not needed.** Sinkhorn minus quota at equal marginals: +0.9 and
+  +1.9 (estimated), +2.5 and +1.3 (oracle). Ahead in all four cells, inside the 3-point bar in
+  all four. By the agreed rule the direction continues as prior-constrained completion with
+  the quota rule.
+
+What the run says about H:
+1. Mass is wrong on the **current side, and in the direction opposite to the one H assumed**.
+   83% of the O-labelled current tokens are hidden old entities, and the threshold rule misses
+   30% of them at 98% precision. The "27k tokens per epoch" of E2 was therefore not a flood: it
+   is below the number of hidden entities. The failure of E2 (44.1) has another cause, which
+   Gate 1a isolates.
+2. Mass is **not** the problem on the stored side once replay is sliced: the plain threshold
+   reaches 90.9. The near-empty refreshes of F10c belong to a teacher trained on unsliced
+   replay, not to the assignment rule.
+3. Post hoc controls (added after the first reading, so exploratory): a single scalar shift of
+   the background score, tuned on the truth, recovers 90.2 on the current side, and a total
+   budget with oracle count ties the per-class quota (91.6). What remains for the prior is that
+   it sets the operating point without labels: the best scalar differs by a factor of 300
+   between the two sides, and the total budget with an estimated count falls to 83.0 on the
+   stored side where the per-class quota holds 90.5.
+4. The estimated marginals overshoot (current side +9% to +21%, stored side up to 2.7×; a
+   session's training set is selected on its own classes). The cost is 0.7 to 2.3 points.
+5. Ranking on the current side falls from 93.2 at boundary 1 to about 74 afterwards, and the
+   teacher of boundary 1 is the only one that does not depend on the training regime.
+
+Limits unchanged: one seed, overlapped protocol, label F1 is not downstream F1.
+
+## Gate 1a design (written 2026-11-26, before the run)
+
+`method=colar_otc_oracle_both`: stored documents carry the true label of every class in the
+head before each session (`refresh: oracle`, `refresh_before_task: true`), and the current-side
+loss reads the same for the session's pages (`current_oracle: true`). No slicing. Seed 42,
+clean-protocol flags, output `results/gates/ot_gate1a`.
+
+Amendment to the plan: CIL-FUNSD is added to this gate. The stored-side oracle alone already
+reaches 92.1 on CIL-CORD and 52.2 on CIL-FUNSD, so CIL-FUNSD is where a two-sided bound is
+informative.
+
+Bars: kill if full-label F1 < 88 on CIL-CORD (from the plan). On CIL-FUNSD, kill if < 84.3,
+the Gate 1b pass bar there (within 3 of the MiB-style loss, 87.3): an upper bound below the
+bar that the method must reach closes the dataset.

@@ -1,0 +1,17 @@
+name: colar_otc
+run_alias: colar_otc_oracle_both
+# Gate 1a of docs/OT_COMPLETION_PREREG_2026-11.md: two-sided true-label upper bound under one
+# shared softmax (not deployable). Stored side: true labels of every class in the head, applied
+# before each session (as colar_r_oracle_pre). Current side: the same for the session's pages
+# (current_oracle). No slicing: no token carries a stale label for a class in the head.
+refresh: oracle
+refresh_before_task: true
+current_oracle: true
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 4
+docs_per_task: 50
+replay_batch_size: 4
+rank_r: 128

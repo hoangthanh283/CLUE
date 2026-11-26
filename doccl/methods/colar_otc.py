@@ -17,6 +17,11 @@ opt-in probe that dumps what they need. No rule changes training yet.
 ``mass_probe: true`` (Gate 0 only): keeps ``labels_full`` beside the stored documents and
 writes, per session boundary, the teacher scores of every O-labelled token with its true
 label. The true labels are read by the dump alone, never by a loss.
+
+``current_oracle: true`` (Gate 1a only, not deployable): the current-side loss reads the true
+label of every class already in the head. With ``refresh: oracle`` and
+``refresh_before_task: true`` on the stored side this is the two-sided upper bound of any
+completion rule under one shared softmax.
 """
 
 from __future__ import annotations
@@ -25,9 +30,10 @@ import logging
 import pathlib
 
 import torch
+import torch.nn.functional as F  # noqa: N812
 from torch.utils.data import DataLoader
 
-from doccl.methods.colar_r import CoLaRRefresh
+from doccl.methods.colar_r import CoLaRRefresh, oracle_refresh
 from doccl.types import TaskInfo
 
 log = logging.getLogger(__name__)
@@ -176,6 +182,15 @@ class CoLaROTC(CoLaRRefresh):
                 "probs": torch.cat(probs),  # (N_O, n_cur) current-model scores
                 "labels_full": torch.cat(truth),
             },
+        )
+
+    def _current_ce(self, cur_out, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        if not self.config.get("current_oracle", False):
+            return super()._current_ce(cur_out, batch)
+        logits = cur_out.logits.float()
+        labels = oracle_refresh(batch["labels"], batch["labels_full"].long(), logits.shape[-1])
+        return F.cross_entropy(
+            logits.reshape(-1, logits.shape[-1]), labels.reshape(-1), ignore_index=-100
         )
 
     def before_task(self, task: TaskInfo, train_loader: DataLoader) -> None:

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-import torch
+from types import SimpleNamespace
 
-from doccl.methods.colar_otc import quota_assign, sinkhorn_assign, threshold_assign
+import torch
+import torch.nn.functional as F  # noqa: N812
+
+from doccl.methods.colar_otc import CoLaROTC, quota_assign, sinkhorn_assign, threshold_assign
 
 
 def _scores(n: int = 400, k: int = 4, seed: int = 0) -> torch.Tensor:
@@ -67,3 +70,15 @@ def test_quota_assign_takes_top_k_per_class_and_resolves_conflicts_by_score():
 def test_threshold_assign_keeps_background_and_low_confidence_tokens():
     probs = torch.tensor([[0.05, 0.95], [0.4, 0.6], [0.8, 0.2]])
     assert threshold_assign(probs, 0.9).tolist() == [1, 0, 0]
+
+
+def test_current_oracle_reads_true_labels_of_head_classes_only():
+    logits = torch.randn(1, 4, 3)  # head: O, class 1, class 2; class 3 is a later session
+    labels = torch.tensor([[0, 2, 0, -100]])  # CIL-masked: the class-1 token reads O
+    labels_full = torch.tensor([[1, 2, 3, 1]])
+    m = SimpleNamespace(config={"current_oracle": True})
+    loss = CoLaROTC._current_ce(
+        m, SimpleNamespace(logits=logits), {"labels": labels, "labels_full": labels_full}
+    )
+    want = F.cross_entropy(logits[0], torch.tensor([1, 2, 0, -100]), ignore_index=-100)
+    assert torch.allclose(loss, want)
