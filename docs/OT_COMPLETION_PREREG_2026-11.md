@@ -221,3 +221,44 @@ Bars:
 
 Known limits: 100 test receipts; rule 2 is transductive; a readout cannot restore a class the
 features no longer separate.
+
+## Gate R verdict (2026-11-26, three runs per model, saved outputs)
+
+Report: `results/gates/ot_gate0/cil_cord_colar_otc_probe_seed42/ot_readout_report.json`. The
+argmax row reproduces the stored full-label F1 of every run. CIL-CORD, estimated prior, mean
+of three runs (per run in the report):
+
+| Model (shared softmax) | argmax | transport readout | held-out potentials | top-k | one-step | background shift tuned on truth |
+|---|---|---|---|---|---|---|
+| plain CoLaR | 29.6 | 74.6 | 72.8 | 52.5 | 52.4 | 62.7 |
+| double-sliced CoLaR | 46.7 | 83.7 | 83.3 | 69.8 | 77.6 | 72.9 |
+| MiB-style loss | 60.0 | 82.2 | 81.4 | 71.4 | 76.5 | 79.5 |
+| current-sliced CoLaR (secondary) | 30.6 | 72.9 | 72.7 | 53.3 | 57.1 | 62.9 |
+| ER, 250 pages (secondary) | 21.3 | 79.2 | 78.5 | 64.9 | 66.2 | 73.6 |
+
+- **PLACE: met on the three primary models.** Gains +45.0, +37.0, +22.2, positive in every
+  run; held-out potentials keep 43.2, 36.6, 21.4.
+- **OT against its control: met on the three primary models.** Over the best same-prior
+  control: +22.1, +6.1, +5.7, positive in every run (on the MiB-style model two of the three
+  runs are within 2.5 points).
+- **KILL: not triggered.**
+
+What limits the result (all from the same report):
+1. It does not reach the blocked readout: CoLaR-SBR is at 89.1 on CIL-CORD.
+2. Sensitivities are not flat: lam 10 costs 4 to 6 points with the estimated prior, relaxed
+   columns (0.5) cost 7 to 17. The balanced plan at lam 1 is the only setting that passes.
+3. On models that are already calibrated the estimated prior costs: joint 91.7 to 90.9, true
+   stored labels 92.1 to 89.8 (with the oracle prior: 92.8 and 92.5).
+4. Where the features are gone the readout does nothing: naive 13.2 to 20.5, LwF 13.0 to 30.6
+   with one run unchanged.
+5. Other datasets, oracle prior only (upper bound of the readout; estimated tables pending):
+   CIL-FUNSD plain CoLaR 52.2 to 64.4, double-sliced 83.8 to 86.3 (top-k 86.2), MiB-style 87.3
+   to 85.1 (worse), joint 84.3 to 83.1 (worse); CIL-WildReceipt plain CoLaR 32.5 to 42.6
+   (runs 36 / 57 / 35), MiB-style 66.5 to 70.1 (top-k 69.7), ER 30.8 to 44.5, joint 83.7 to
+   84.0. CoLaR-SBR there: 87.2 and 79.5. The large effect is specific to CIL-CORD so far.
+6. 100 test receipts; the prior comes from the same distribution as the test set.
+
+Open before any claim: literature on prior matching at test time in class-incremental
+learning and label-shift correction (Sinkhorn / iterative proportional fitting, bias
+correction layers, logit adjustment); estimated tables for the other two datasets; a stream
+whose test prior differs from the training prior.
