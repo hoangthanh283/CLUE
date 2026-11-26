@@ -1,0 +1,15 @@
+name: colar_otc
+run_alias: colar_otc_quota
+# Gate 1b of docs/OT_COMPLETION_PREREG_2026-11.md: two-sided label completion under one shared
+# softmax, rule = quota. Stored documents stay sliced until they are completed
+# (refresh: sliced_pseudo); the current side trains with plain CE on the completed labels.
+refresh: sliced_pseudo
+completion: quota
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 4
+docs_per_task: 50
+replay_batch_size: 4
+rank_r: 128

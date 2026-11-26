@@ -14,11 +14,15 @@ import json
 import pathlib
 import sys
 
+import numpy as np
+import scipy.sparse as sp
 import torch
+from scipy.optimize import linprog
 from seqeval.metrics import f1_score
 
 from doccl.methods.colar_otc import quota_assign
 
+EXACT_MAX_CELLS = 600_000  # tokens x classes the linear program is run for
 O_SHIFTS = torch.linspace(-12, 4, 33).tolist()  # rule 5, tuned on the truth
 
 
@@ -36,10 +40,32 @@ def potentials(
     return g
 
 
-def estimated_prior(gate0_run: pathlib.Path, n_cls: int) -> torch.Tensor:
-    freq = torch.load(sorted(gate0_run.glob("mass_probe_cur_t*.pt"))[-1], weights_only=False)[
-        "class_freq"
-    ]
+def exact_labels(logp: torch.Tensor, prior: torch.Tensor) -> torch.Tensor:
+    """Unregularised plan by linear programming with cost -log p, label = argmax of the row:
+    the OTTER rule (Shin et al., arXiv 2404.08461). Added after the literature check."""
+    n, k = logp.shape
+    cost = (-logp.double().clamp_min(-30.0)).numpy().ravel()
+    rows = sp.kron(sp.eye(n), np.ones((1, k)), format="csr")
+    cols = sp.kron(np.ones((1, n)), sp.eye(k), format="csr")
+    mass = np.r_[np.ones(n), prior.double().numpy() * n]
+    res = linprog(cost, A_eq=sp.vstack([rows, cols]), b_eq=mass, bounds=(0, None), method="highs")
+    if res.x is None:
+        return logp.argmax(-1)
+    return torch.from_numpy(res.x.reshape(n, k)).argmax(-1)
+
+
+def estimated_prior(gate0_run: pathlib.Path, scenario: str, n_cls: int) -> torch.Tensor | None:
+    """Table written by class_freq_table.py beside the Gate 0 run; for CIL-CORD the table the
+    Gate 0 probe measured (as preregistered)."""
+    table = gate0_run.parent / f"class_freq_{scenario}.json"
+    if scenario == "cil_cord":
+        freq = torch.load(sorted(gate0_run.glob("mass_probe_cur_t*.pt"))[-1], weights_only=False)[
+            "class_freq"
+        ]
+    elif table.exists():
+        freq = {int(k): v for k, v in json.loads(table.read_text()).items()}
+    else:
+        return None
     prior = torch.tensor([0.0] + [freq.get(c, 0.0) for c in range(1, n_cls)], dtype=torch.float64)
     prior[0] = max(1.0 - prior.sum().item(), prior[1:][prior[1:] > 0].min().item())
     return prior / prior.sum()
@@ -73,6 +99,8 @@ def decode_all(d: dict, est: torch.Tensor | None) -> dict[str, float]:
         for fit, apply in (folds, folds[::-1]):
             held[apply] = (logp[apply].double() + potentials(logp[fit], prior)).argmax(-1)
         out[f"transport[{tag}] held-out potentials"] = f1(held)
+        if logp.numel() <= EXACT_MAX_CELLS:
+            out[f"exact plan, as OTTER[{tag}]"] = f1(exact_labels(logp, prior))
         out[f"top-k[{tag}]"] = f1(quota_assign(p, prior.float() * len(gold)))
         adj = prior.clamp_min(1e-12).log() - p.double().mean(0).clamp_min(1e-12).log()
         out[f"one-step[{tag}]"] = f1((logp.double() + adj).argmax(-1))
@@ -93,11 +121,11 @@ def main(gate0_run: str, root: str, prefixes: list[str]) -> None:
             d = torch.load(f, weights_only=False)
             if "logits" not in d:
                 continue
-            est = (
-                estimated_prior(pathlib.Path(gate0_run), d["logits"].shape[1])
-                if prefix.startswith("cil_cord")
-                else None
+            scenario = next(
+                (x for x in ("cil_cord", "cil_funsd", "cil_wildreceipt") if prefix.startswith(x)),
+                "",
             )
+            est = estimated_prior(pathlib.Path(gate0_run), scenario, d["logits"].shape[1])
             rows.append(decode_all(d, est))
         if not rows:
             print(f"\n{prefix}: no shared-softmax dump")

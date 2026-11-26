@@ -287,3 +287,24 @@ Consequences:
    background-conflict loss of a shared softmax on CIL-CORD is recoverable by that table alone.
 3. A paper needs more than the readout: the correction inside training (next gate), and a
    case where the table is misspecified.
+
+## Gate 1b design (written 2026-11-26 22:15, before any run)
+
+`method=colar_otc_{transport,quota,threshold}`: two-sided completion under one shared softmax
+(`doccl/methods/colar_otc.py`, `completion`). Current side: the model before the session scores
+the session's O-labelled tokens over {O} ∪ old classes, the rule assigns them once for the whole
+training set, plain CE on the completed labels. Stored side: after the session the trained
+model scores the O-labelled tokens of the banked documents over {O} ∪ the session's classes
+(background = everything else), the rule writes the labels; until then the document is sliced.
+Masses from the frequency table; `transport` = entropic plan at lam 1 (the Gate R setting),
+`quota` = per-class top-k with the same masses, `threshold` = argmax with tau 0.5.
+
+Runs: seed 42 first, CIL-FUNSD and CIL-CORD, clean-protocol flags plus the test-output dump,
+output `results/gates/ot_gate1b`. Each run is scored twice: argmax, and the transport readout
+with the same table (Gate R rule 2).
+
+Bars (unchanged from above): pass at ≥ 70 on CIL-CORD and ≥ 84.3 on CIL-FUNSD (argmax).
+OT against its control: `transport` exceeds the better of `quota` and `threshold` by ≥ 3 on
+CIL-CORD; seed 42 alone is exploratory, a claim needs the three runs. References: double-sliced
+CoLaR 46.7 (83.7 with the readout), MiB-style 60.0 / 87.3, CoLaR-SBR 89.1 / 87.2, two-sided
+true-label bound from Gate 1a.

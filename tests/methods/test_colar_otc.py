@@ -82,3 +82,53 @@ def test_current_oracle_reads_true_labels_of_head_classes_only():
     )
     want = F.cross_entropy(logits[0], torch.tensor([1, 2, 0, -100]), ignore_index=-100)
     assert torch.allclose(loss, want)
+
+
+def _bare(rule: str) -> CoLaROTC:
+    m = CoLaROTC.__new__(CoLaROTC)
+    m.completion, m.config = rule, {}
+    m._completed, m._completion_miss = {}, 0
+    return m
+
+
+def test_current_completion_writes_old_classes_and_the_loss_reads_them():
+    m = _bare("transport")
+    m._class_freq = {1: 0.25, 2: 0.25}  # two old classes, a quarter of the tokens each
+    ids = torch.arange(8).view(2, 4)
+    rows = [torch.tensor([0, 3, 0, -100]), torch.tensor([0, 0, 3, -100])]  # class 3 = new
+    probs = [  # O-labelled tokens only, columns O / class 1 / class 2; O dominant everywhere
+        torch.tensor([[0.6, 0.39, 0.01], [0.6, 0.01, 0.39]]),
+        torch.tensor([[0.98, 0.01, 0.01], [0.98, 0.01, 0.01]]),
+    ]
+    keys = [ids[0].numpy().tobytes(), ids[1].numpy().tobytes()]
+    m._complete_current(keys, [r.clone() for r in rows], probs, [], n_valid=4)
+    assert m._completed[keys[0]].tolist() == [1, 3, 2, -100]  # argmax would have kept O
+    assert m._completed[keys[1]].tolist() == [0, 0, 3, -100]
+
+    logits = torch.randn(2, 4, 4)
+    loss = m._current_ce(
+        SimpleNamespace(logits=logits), {"labels": torch.stack(rows), "input_ids": ids}
+    )
+    want = F.cross_entropy(
+        logits.reshape(-1, 4), torch.tensor([1, 3, 2, -100, 0, 0, 3, -100]), ignore_index=-100
+    )
+    assert torch.allclose(loss, want) and m._completion_miss == 0
+
+
+def test_stored_completion_assigns_only_the_sessions_classes_to_o_tokens():
+    m = _bare("quota")
+    m._class_freq = {3: 0.25}  # head: O, 1, 2 at capture; class 3 arrives now
+    doc = {"labels": torch.tensor([0, 1, 0, 0, -100]), "n_labels": torch.tensor(3)}
+    scores = torch.tensor(  # full softmax of the trained model, (seq, 4)
+        [
+            [0.5, 0.0, 0.0, 0.5],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.9, 0.0, 0.0, 0.1],
+            [0.1, 0.0, 0.8, 0.1],  # an older class the page hides: not this pass's business
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+    m._memory_probs = lambda docs: [scores]
+    changed, considered = m._pseudo_pass([doc], n_cur=4)
+    assert doc["labels"].tolist() == [3, 1, 0, 0, -100]
+    assert (changed, considered) == (1, 3)
