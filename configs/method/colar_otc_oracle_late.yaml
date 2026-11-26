@@ -1,0 +1,18 @@
+name: colar_otc
+run_alias: colar_otc_oracle_late
+# Diagnostic after Gate 1b (docs/OT_COMPLETION_PREREG_2026-11.md): true labels on both sides
+# as in colar_otc_oracle_both, but with the TIMING of the completion runs: a stored document
+# receives the labels of a session's classes only after that session, and is sliced until then.
+# Separates "the completed labels contain errors" from "the stored side is completed too late".
+refresh: oracle
+replay_sliced: true
+current_oracle: true
+bank_completed: true
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 4
+docs_per_task: 50
+replay_batch_size: 4
+rank_r: 128

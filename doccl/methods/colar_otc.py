@@ -95,8 +95,10 @@ def quota_assign(probs: torch.Tensor, col_mass: torch.Tensor) -> torch.Tensor:
     return torch.where(best >= 0, cls, torch.zeros_like(cls))
 
 
-def _doc_key(input_ids: torch.Tensor) -> bytes:
-    return input_ids.cpu().numpy().tobytes()
+def _doc_key(batch: dict[str, torch.Tensor], i: int) -> bytes:
+    """Identity of a document inside one session. The bank keeps bbox and not input_ids, so
+    bbox is the key whenever the backbone has it."""
+    return batch["bbox" if "bbox" in batch else "input_ids"][i].cpu().numpy().tobytes()
 
 
 def threshold_assign(probs: torch.Tensor, tau: float) -> torch.Tensor:
@@ -156,7 +158,7 @@ class CoLaROTC(CoLaRRefresh):
             p = self.model(**feed).logits[..., :n_old].float().softmax(-1).cpu()
             for i in range(labels.shape[0]):
                 o_tok = labels[i] == 0
-                keys.append(_doc_key(batch["input_ids"][i]))
+                keys.append(_doc_key(batch, i))
                 rows.append(labels[i].clone())
                 probs.append(p[i][o_tok])
                 if "labels_full" in batch:
@@ -277,14 +279,52 @@ class CoLaROTC(CoLaRRefresh):
             },
         )
 
+    def _capture_task(self, train_loader: DataLoader) -> None:
+        """A page enters the bank with the labels its session trained on: the completed ones
+        (or the true ones under ``current_oracle``). The loader's own labels hide every older
+        class under O, and nothing later would repair those (found after Gate 1b, v1)."""
+        n_before = len(self.store)
+        super()._capture_task(train_loader)
+        if not self.config.get("bank_completed", False):
+            return
+        n_done = 0
+        for d in self.store[n_before:]:
+            if self.config.get("current_oracle", False) and "labels_full" in d:
+                d["labels"] = oracle_refresh(
+                    d["labels"], d["labels_full"].long(), self._head_size()
+                )
+                n_done += 1
+            elif self._completed and "bbox" in d:
+                row = self._completed.get(_doc_key(d, slice(None)))
+                if row is not None and row.shape == d["labels"].shape:
+                    d["labels"] = row.clone()
+                    n_done += 1
+        log.info(
+            "colar_otc: %d of %d new pages banked with completed labels",
+            n_done,
+            len(self.store) - n_before,
+        )
+
+    def _stack_replay(self, docs: list[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
+        """``mask_stale_o: true``: while a stored document has not been completed for the
+        classes of the running session, its O labels are ambiguous (background or one of those
+        classes) and are left out of the replay loss instead of being replayed as O."""
+        replay = super()._stack_replay(docs)
+        if self.config.get("mask_stale_o", False):
+            stale = (replay["n_labels"] < self._head_size())[:, None] & (replay["labels"] == 0)
+            labels = replay["labels"].masked_fill(stale, -100)
+            if (labels != -100).any():  # never hand the loss a batch with no label
+                replay["labels"] = labels
+        return replay
+
     def _current_ce(self, cur_out, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         logits = cur_out.logits.float()
         if self.config.get("current_oracle", False):
             labels = oracle_refresh(batch["labels"], batch["labels_full"].long(), logits.shape[-1])
         elif getattr(self, "_completed", None):
             labels = batch["labels"].clone()
-            for i, ids in enumerate(batch["input_ids"]):
-                row = self._completed.get(_doc_key(ids))
+            for i in range(labels.shape[0]):
+                row = self._completed.get(_doc_key(batch, i))
                 if row is None or row.shape != labels[i].shape:
                     self._completion_miss += 1
                 else:

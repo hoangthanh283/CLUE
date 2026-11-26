@@ -358,3 +358,51 @@ plan loses 6.1 to 8.2 points in every run and the entropic plan loses at most 1.
 plan enforces the table as hard quotas; the scaling at lam 1 only moves one bias per class.
 This matches the lam 10 row of the verdict above (sharper plan, worse with the estimated
 table) and is the one place where our setting differs in outcome from the published one.
+
+## Gate 1b verdict, v1 (2026-11-27, seed 42, exploratory)
+
+Full-label F1, `results/gates/ot_gate1b`; second number = with the transport readout
+(estimated table) on the saved test outputs:
+
+| Completion rule | CIL-FUNSD | CIL-CORD |
+|---|---|---|
+| transport | 88.5 (86.3) | 72.8 (84.1) |
+| per-class top-k | 82.8 (84.8) | 62.4 (84.6) |
+| threshold 0.5 | 88.3 (86.4) | 57.1 (86.5) |
+
+References: two-sided true labels 88.6 / 94.9; CoLaR-SBR 87.2 / 89.1; MiB-style 87.3 / 60.0;
+double-sliced CoLaR with the readout 85.2 / 83.7.
+
+- **Pass bars: met by the transport rule** (72.8 ≥ 70 on CIL-CORD, 88.5 ≥ 84.3 on CIL-FUNSD).
+- **OT against its control (argmax): met on CIL-CORD**, +10.4 over top-k and +15.7 over the
+  threshold. On CIL-FUNSD transport and threshold tie (88.5, 88.3).
+- **With the readout on top the three rules are within 2.4 points on CIL-CORD and the order
+  reverses** (threshold 86.5). The gain of the transport rule is a calibration gain that the
+  readout also delivers. On CIL-FUNSD the readout costs about 2 points on these models.
+- No run reaches CoLaR-SBR on CIL-CORD. On CIL-FUNSD transport and threshold are at the
+  true-label bound and 1.3 above CoLaR-SBR, one run against a three-run mean.
+
+What is wrong with the v1 models (test outputs): every error is a class predicted as O. The
+final models predict O on 714 / 978 / 1123 of 2,356 test tokens; 4 are O. Under the transport
+rule the last session is not learned (its own F1 15.3; 82% of its tokens predicted O), under
+the threshold rule it is (91.0) while session 1 is lost (36.1).
+
+Flaw found in the implementation, not in a rule: a page enters the bank with the labels of
+the loader, which hide every OLDER class under O, and the stored-side pass only writes NEWER
+classes. From session 2 on, each bank therefore replays old entities as O for the rest of the
+stream. The design text above did not say which labels are banked; this was an omission.
+
+## Gate 1b v2 and timing diagnostic (written 2026-11-27 04:40, before the runs)
+
+`bank_completed: true`: a page is banked with the labels its session trained on (completed,
+or true under `current_oracle`). Configs `colar_otc_{transport,quota,threshold}_bank`. CIL-CORD
+only (on CIL-FUNSD the first bank hides no older class, so v2 equals v1 there). Same bars as
+Gate 1b; exploratory, seed 42.
+
+`colar_otc_oracle_late`: true labels on both sides with the timing of the completion runs (a
+stored page receives a session's classes only after that session; sliced until then). Reading
+fixed now: within 3 points of the 94.9 of Gate 1a means the timing is harmless and the
+remaining gap of v2 is label error; a larger drop means the stored side must be completed
+during the session, not after it.
+
+Order: transport, threshold, oracle_late, top-k. Output `results/gates/ot_gate1b_v2`.

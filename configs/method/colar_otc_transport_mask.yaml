@@ -1,0 +1,15 @@
+name: colar_otc
+run_alias: colar_otc_transport_mask
+# colar_otc_transport plus mask_stale_o: stored O labels are left out of the replay loss until
+# the document has been completed for the running session's classes (exploratory, after Gate 1b).
+refresh: sliced_pseudo
+completion: transport
+mask_stale_o: true
+lr: 5.0e-5
+weight_decay: 0.01
+epochs: 10
+max_grad_norm: 1.0
+split_layer_k: 4
+docs_per_task: 50
+replay_batch_size: 4
+rank_r: 128

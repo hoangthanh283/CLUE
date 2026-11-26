@@ -100,7 +100,7 @@ def test_current_completion_writes_old_classes_and_the_loss_reads_them():
         torch.tensor([[0.6, 0.39, 0.01], [0.6, 0.01, 0.39]]),
         torch.tensor([[0.98, 0.01, 0.01], [0.98, 0.01, 0.01]]),
     ]
-    keys = [ids[0].numpy().tobytes(), ids[1].numpy().tobytes()]
+    keys = [ids[0].numpy().tobytes(), ids[1].numpy().tobytes()]  # no bbox: keyed on input_ids
     m._complete_current(keys, [r.clone() for r in rows], probs, [], n_valid=4)
     assert m._completed[keys[0]].tolist() == [1, 3, 2, -100]  # argmax would have kept O
     assert m._completed[keys[1]].tolist() == [0, 0, 3, -100]
@@ -132,3 +132,37 @@ def test_stored_completion_assigns_only_the_sessions_classes_to_o_tokens():
     changed, considered = m._pseudo_pass([doc], n_cur=4)
     assert doc["labels"].tolist() == [3, 1, 0, 0, -100]
     assert (changed, considered) == (1, 3)
+
+
+def test_mask_stale_o_hides_background_of_uncompleted_documents_only():
+    from unittest.mock import patch
+
+    from doccl.methods.colar_r import CoLaRRefresh
+
+    m = _bare("transport")
+    m.config = {"mask_stale_o": True}
+    m.model = SimpleNamespace(label_to_id=dict.fromkeys(range(4)))  # head size 4
+    stacked = {
+        "labels": torch.tensor([[0, 1, -100], [0, 3, -100]]),
+        "n_labels": torch.tensor([3, 4]),  # first document predates the running session
+    }
+    with patch.object(CoLaRRefresh, "_stack_replay", lambda self, docs: dict(stacked)):
+        out = m._stack_replay([])
+    assert out["labels"].tolist() == [[-100, 1, -100], [0, 3, -100]]
+
+
+def test_capture_banks_the_completed_labels_when_asked():
+    from unittest.mock import patch
+
+    from doccl.methods.colar_r import CoLaRRefresh
+
+    m = _bare("transport")
+    m.config = {"bank_completed": True}
+    m.model = SimpleNamespace(label_to_id=dict.fromkeys(range(4)))
+    bbox = torch.arange(12).view(3, 4)
+    page = {"labels": torch.tensor([0, 3, -100]), "bbox": bbox}
+    m.store = []
+    m._completed = {bbox.numpy().tobytes(): torch.tensor([2, 3, -100])}
+    with patch.object(CoLaRRefresh, "_capture_task", lambda self, loader: self.store.append(page)):
+        m._capture_task(None)
+    assert m.store[0]["labels"].tolist() == [2, 3, -100]
