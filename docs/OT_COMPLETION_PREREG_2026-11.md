@@ -406,3 +406,47 @@ remaining gap of v2 is label error; a larger drop means the stored side must be 
 during the session, not after it.
 
 Order: transport, threshold, oracle_late, top-k. Output `results/gates/ot_gate1b_v2`.
+
+## Gate 1b v2 verdict (2026-11-27, CIL-CORD, seed 42, exploratory)
+
+`results/gates/ot_gate1b_v2`. The machine went down at about 10:18 during the fourth run
+(top-k, session 1); cause not established; that run is not repeated here.
+
+| Run | argmax | + transport readout (est. table) | + one-step adjustment |
+|---|---|---|---|
+| transport completion, banked | 83.2 | 85.5 | 84.5 |
+| threshold completion, banked | 83.2 | **90.0** | 91.2 |
+| true labels, completion timing (`oracle_late`) | 93.6 | 92.6 | 94.4 |
+
+- Banking the completed labels is worth +10.4 (transport) and +26.1 (threshold) over v1.
+- Timing diagnostic: 93.6 against 94.9 with labels before the session, inside the 3 points
+  fixed above. The late stored side is harmless; what remains is label error.
+- **The transport rule no longer beats the threshold inside training** (83.2 both), and after
+  the readout it is 4.5 below. At boundaries 3 and 4 the table overshoots the number of O
+  tokens, the balanced plan assigns every O token to an old class (11,939 of 11,939 with
+  10,493 hidden), and the session's own classes are learned badly (own F1 9.1 at session 4).
+- **Best single-softmax pipeline so far: threshold completion + banked labels + transport
+  readout = 90.0** (held-out potentials 90.0), against CoLaR-SBR 89.1 (three-run mean). One run.
+- On these better-calibrated models the one-step adjustment matches or beats the transport
+  readout (91.2 against 90.0). The readout's advantage over its controls holds on the badly
+  miscalibrated models of Gate R, not here.
+
+## Feasibility batch (written 2026-11-27 15:00, before the runs)
+
+Question: does "one shared softmax + label completion + class-prior readout" hold beyond one
+run and beyond a 50-page memory? Configs `colar_otc_{threshold,transport}_bank`, clean-protocol
+flags, test outputs saved; every run scored by argmax, transport readout and one-step
+adjustment with the estimated table.
+
+1. CIL-FUNSD, seeds 42 / 7 / 123, both rules (`results/gates/ot_feas`).
+2. CIL-CORD, 10 stored pages per session (`method.docs_per_task=10`), seed 42, both rules
+   (`results/gates/ot_feas_d10`). Reference CoLaR-SBR at 10 pages: 68.1.
+3. CIL-CORD, 50 pages, seeds 7 and 123, threshold rule then transport rule.
+
+Bars, on completion + transport readout:
+- FEASIBLE at 50 pages: three-run mean on CIL-CORD ≥ 88.1 (within 1 of CoLaR-SBR) and on
+  CIL-FUNSD ≥ 84.2 (within 3 of CoLaR-SBR).
+- FEASIBLE at 10 pages: ≥ 78.1 (CoLaR-SBR + 10), seed 42.
+- OT component inside training: transport rule ≥ threshold rule + 3 in the three-run mean,
+  else the threshold rule is kept. OT component at readout: transport readout ≥ one-step + 3
+  in the three-run mean, else the simpler adjustment is reported as equivalent.
