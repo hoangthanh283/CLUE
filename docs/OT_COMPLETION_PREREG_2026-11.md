@@ -431,7 +431,7 @@ Order: transport, threshold, oracle_late, top-k. Output `results/gates/ot_gate1b
   readout (91.2 against 90.0). The readout's advantage over its controls holds on the badly
   miscalibrated models of Gate R, not here.
 
-## Feasibility batch (written 2026-11-27 15:00, before the runs)
+## Feasibility batch (written 2026-11-27 14:49, before the runs)
 
 Question: does "one shared softmax + label completion + class-prior readout" hold beyond one
 run and beyond a 50-page memory? Configs `colar_otc_{threshold,transport}_bank`, clean-protocol
